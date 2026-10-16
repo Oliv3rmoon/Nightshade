@@ -124,7 +124,7 @@ uint32_t ReadLanguages(const FileSys::VirtualDir& romfs) {
 }
 
 // The game's language flags: a packed update's when it has them (a game can gain languages in an
-// update, as Breath of the Wild gained Chinese), else the game's own.
+// update), else the game's own.
 uint32_t ReadLanguages(const FileSys::VirtualDir& game, const FileSys::VirtualDir& packed_update) {
     if (packed_update)
         if (const uint32_t languages = ReadLanguages(packed_update)) return languages;
