@@ -1490,6 +1490,7 @@ for old, new in shader_costs:
 # every pipeline was compiled again at the next start (#170). It is now written beside the old
 # file and renamed over it once whole, and leaving a game rewrites it only when pipelines were
 # added since it was last written.
+# The anchors include the timer the cost patches above add to the function.
 pipeline_cache_writes = [
     ('PipelineCache::~PipelineCache() {\n'
      '    if (use_vulkan_pipeline_cache && !vulkan_pipeline_cache_filename.empty()) {\n'
@@ -1513,6 +1514,7 @@ pipeline_cache_writes = [
     ('''void PipelineCache::SerializeVulkanPipelineCache(const std::filesystem::path& filename,
                                                  const vk::PipelineCache& pipeline_cache,
                                                  u32 cache_version) try {
+    auto timer = Eden::Performance::VulkanTimer(18);
     std::ofstream file(filename, std::ios::binary);
     file.exceptions(std::ifstream::failbit);
     if (!file.is_open()) {
@@ -1546,6 +1548,7 @@ pipeline_cache_writes = [
 '''void PipelineCache::SerializeVulkanPipelineCache(const std::filesystem::path& filename,
                                                  const vk::PipelineCache& pipeline_cache,
                                                  u32 cache_version) {
+    auto timer = Eden::Performance::VulkanTimer(18);  // as the port times the write it replaces
     // Written whole beside the cache, then renamed over it: until the rename the previous cache
     // stays as it was, and a write that fails or is cut short leaves it alone.
     auto partial = filename;
