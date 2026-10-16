@@ -393,6 +393,11 @@ int main(int argc, char** argv) {
                     Eden::Report("cache", "The driver's shader cache could not move to the data folder; it starts empty");
                 (void)mkdir(cache.c_str(), 0777);
                 setenv("MESA_SHADER_CACHE_DIR", cache.c_str(), 1);
+                // Mesa caps its cache at 1 GiB, shared by every game, and past that each new entry
+                // drops an older one: with a large game (13,000 pipelines) among them, every start
+                // could drop part of what it compiled the time before (#170). An environment that
+                // sets a size keeps it.
+                setenv("MESA_SHADER_CACHE_MAX_SIZE", "4G", 0);
             }
         }
         // Whether Eden's large tables can be sparse on this console (src/memory_pages.cpp),
