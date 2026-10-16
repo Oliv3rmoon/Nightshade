@@ -51,6 +51,26 @@ if(texture_util_derived STREQUAL texture_util_header OR NOT texture_util_header 
 endif()
 write_derived("${PORT_BUILD_DIR}/small-vector/video_core/texture_cache/util.h" "${texture_util_derived}")
 target_include_directories(video_core BEFORE PRIVATE "${PORT_BUILD_DIR}/small-vector")
+# Each Vulkan pipeline locks its own std::mutex and signals its own std::condition_variable once,
+# when its build ends, and keeps both while it is cached. On the PS5 those are thread library
+# objects, of which a process has only so many: a game with thousands of pipelines used them up
+# and the next lock failed with "mutex lock failed: Cannot allocate memory" (#204). The pipelines
+# share a fixed set of them instead (headless/striped_wait.h).
+foreach(pipeline_header IN ITEMS vk_graphics_pipeline.h vk_compute_pipeline.h)
+    file(READ "${PROJECT_SOURCE_DIR}/src/video_core/renderer_vulkan/${pipeline_header}" pipeline_source)
+    set(pipeline_wait_old "    std::condition_variable build_condvar;\n    std::mutex build_mutex;\n")
+    string(FIND "${pipeline_source}" "${pipeline_wait_old}" pipeline_wait_at)
+    if(pipeline_wait_at LESS 0)
+        message(FATAL_ERROR "Pinned ${pipeline_header} build wait changed")
+    endif()
+    string(REPLACE "${pipeline_wait_old}"
+        "    ::Eden::StripedCondition build_condvar;\n    ::Eden::StripedMutex build_mutex;\n"
+        pipeline_source "${pipeline_source}")
+    string(PREPEND pipeline_source "#include \"${EDEN_PORT_DIR}/striped_wait.h\"\n")
+    write_derived("${PORT_BUILD_DIR}/pipeline-wait/video_core/renderer_vulkan/${pipeline_header}"
+        "${pipeline_source}")
+endforeach()
+target_include_directories(video_core BEFORE PRIVATE "${PORT_BUILD_DIR}/pipeline-wait")
 set(MULTIPLAYER_SOURCE "${PROJECT_SOURCE_DIR}")
 set(MULTIPLAYER_OUTPUT "${PORT_BUILD_DIR}/multiplayer")
 include("${EDEN_PORT_DIR}/multiplayer_packets.cmake")
@@ -962,6 +982,22 @@ string(REPLACE "${spin_old}" "void KSpinLock::Lock() {\n    ::Eden::Performance:
 write_derived("${PORT_BUILD_DIR}/k_spin_lock.cpp" "#include \"${EDEN_PORT_DIR}/performance.h\"\n${spin_source}")
 list(REMOVE_ITEM core_sources "hle/kernel/k_spin_lock.cpp")
 list(APPEND core_sources "${PORT_BUILD_DIR}/k_spin_lock.cpp")
+# Eden keeps up to 8,192 host files open and closes the least recently used one only past that.
+# Each open file is a stdio FILE, and on the PS5 (as on FreeBSD) a FILE has its own thread library
+# lock, made at its first read and kept until it is closed. Every NSP and XCI in the updates folder
+# is opened when a game starts (ExternalContentProvider) and stays open for the session, so a full
+# folder held hundreds of them on top of the game's own (#169). A file closed here is opened again
+# when it is next read.
+file(READ "${PROJECT_SOURCE_DIR}/src/core/file_sys/vfs/vfs_real.cpp" vfs_real_source)
+set(open_files_old "constexpr size_t MaxOpenFiles = 8192;")
+string(FIND "${vfs_real_source}" "${open_files_old}" open_files_at)
+if(open_files_at LESS 0)
+    message(FATAL_ERROR "Pinned vfs_real.cpp MaxOpenFiles changed")
+endif()
+string(REPLACE "${open_files_old}" "constexpr size_t MaxOpenFiles = 512;" vfs_real_source "${vfs_real_source}")
+write_derived("${PORT_BUILD_DIR}/vfs_real.cpp" "${vfs_real_source}")
+list(REMOVE_ITEM core_sources "file_sys/vfs/vfs_real.cpp")
+list(APPEND core_sources "${PORT_BUILD_DIR}/vfs_real.cpp")
 if(EDEN_DEV_PROFILE)
     # Guest-visible waits: syncpoint event registration to signal (GPU-pipeline latency
     # the game waits on) and buffer-queue dequeue waits (presentation back-pressure).
