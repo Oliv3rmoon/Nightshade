@@ -236,6 +236,21 @@ list(REMOVE_ITEM common_sources multi_level_page_table.cpp)
 list(APPEND common_sources "${PORT_BUILD_DIR}/multi_level_page_table.cpp")
 set_property(TARGET common PROPERTY SOURCES "${common_sources}")
 
+# The last service calls (headless/ipc_ring.h): after Eden writes a reply into the calling
+# thread's local storage, the reply is read back from there and recorded with its service and
+# command, in every build; a game that breaks (svcBreak) prints them. Applied to service.cpp by
+# the development build's own patch of it too.
+function(eden_ipc_ring_service var)
+    set(source "${${var}}")
+    set(site "    if (system.IsPoweredOn()) {\n        ctx.WriteToOutgoingCommandBuffer();\n")
+    string(FIND "${source}" "${site}" at)
+    if(at LESS 0)
+        message(FATAL_ERROR "Pinned service reply write changed; review the service call record.")
+    endif()
+    string(REPLACE "${site}" "${site}        {\n            std::array<u32, 64> eden_reply{};\n            auto& eden_thread = ctx.GetThread();\n            eden_thread.GetOwnerProcess()->GetMemory().ReadBlock(eden_thread.GetTlsAddress(), eden_reply.data(),\n                                                                 sizeof(eden_reply));\n            ::Eden::IpcRing::Record(service_name, eden_thread.GetThreadId(), ctx.GetCommand(),\n                                    static_cast<u32>(ctx.GetCommandType()), eden_reply.data(), eden_reply.size());\n        }\n" source "${source}")
+    set(${var} "#include <array>\n#include \"${EDEN_PORT_DIR}/ipc_ring.h\"\n#include \"core/hle/kernel/k_process.h\"\n#include \"core/memory.h\"\n${source}" PARENT_SCOPE)
+endfunction()
+
 # An abandoned fiber stack is not unwound. Empty the by-value weak reference
 # before switching; jump_fcontext returns the live destination supplied by the
 # resumer, under that fiber's guard, just as the initial entry trampoline does.
@@ -1149,6 +1164,7 @@ if(EDEN_DEV_PROFILE)
     # HLE service requests: handling time per service command, and the guest's
     # svcSendSyncRequest latency (queueing behind other requests included).
     file(READ "${PROJECT_SOURCE_DIR}/src/core/hle/service/service.cpp" hle_source)
+    eden_ipc_ring_service(hle_source)
     foreach(hle_call "        InvokeRequest(ctx);" "            InvokeRequestTipc(ctx);")
         string(FIND "${hle_source}" "${hle_call}" hle_at)
         if(hle_at LESS 0)
@@ -1192,6 +1208,24 @@ if(EDEN_DEV_PROFILE)
     list(REMOVE_ITEM core_sources "hle/kernel/svc/svc_ipc.cpp")
     list(APPEND core_sources "${PORT_BUILD_DIR}/svc_ipc.cpp")
 endif()
+if(NOT EDEN_DEV_PROFILE)
+    file(READ "${PROJECT_SOURCE_DIR}/src/core/hle/service/service.cpp" hle_source)
+    eden_ipc_ring_service(hle_source)
+    write_derived("${PORT_BUILD_DIR}/hle_service.cpp" "${hle_source}")
+    list(REMOVE_ITEM core_sources "hle/service/service.cpp")
+    list(APPEND core_sources "${PORT_BUILD_DIR}/hle_service.cpp")
+endif()
+# A game that stops itself prints the last service calls first (headless/ipc_ring.h).
+file(READ "${PROJECT_SOURCE_DIR}/src/core/hle/kernel/svc/svc_exception.cpp" break_source)
+set(break_site "    bool notification_only = True(reason & BreakReason::NotificationOnlyFlag);\n")
+string(FIND "${break_source}" "${break_site}" break_at)
+if(break_at LESS 0)
+    message(FATAL_ERROR "Pinned svcBreak changed; review where the last service calls are printed.")
+endif()
+string(REPLACE "${break_site}" "${break_site}    if (!notification_only) {\n        ::Eden::IpcRing::Dump(GetCurrentThread(system.Kernel()).GetThreadId(),\n                              [](const char* line) { LOG_CRITICAL(Debug_Emulated, \"{}\", line); });\n    }\n" break_source "${break_source}")
+write_derived("${PORT_BUILD_DIR}/svc_exception.cpp" "#include \"${EDEN_PORT_DIR}/ipc_ring.h\"\n${break_source}")
+list(REMOVE_ITEM core_sources "hle/kernel/svc/svc_exception.cpp")
+list(APPEND core_sources "${PORT_BUILD_DIR}/svc_exception.cpp")
 file(READ "${PROJECT_SOURCE_DIR}/src/core/memory.cpp" arena_source)
 # An unmap zeroes the entries directly: zero the JIT's direct values first (jit-page-table.cmake).
 set(unmap_old "            page_table.entries.ZeroRegion(base, end);\n")
