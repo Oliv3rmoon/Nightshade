@@ -85,7 +85,8 @@ replacing the same `ui_chara_db.prc` need an author's supported merged setup.
   executable-memory hooks cannot recompile stale instructions.
 - Request the timing thread's stop before waking it, preventing a lost-wake
   deadlock during shutdown.
-- Build shader catalog keys lexically, avoiding PS5's denied canonicalization.
+- Keep shader discovery working when PS5 denies canonicalization, using lexical
+  names as a fallback.
 
 `tools/check-guest-hooks.py` exercises four guest cores and writable/executable
 aliases. `tools/check-timing-stop.py` forces the original lost-wake schedule and
