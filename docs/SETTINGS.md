@@ -34,9 +34,13 @@ Resolution, the upscaling filter, the renderer and the refresh rate, which chang
 
 ### Idle emulated cores
 
-An emulated CPU core with no runnable guest thread sleeps until an interrupt wakes it. It no
-longer spins before sleeping by default, reducing CPU work spent waiting. Sleeping can add
-wake-up latency compared with spinning, which can affect frame pacing.
+An emulated CPU core with no runnable guest thread waits for an interrupt to wake it. Waking a
+sleeping core takes the console's scheduler some time, so a core first watches for the interrupt
+for a short while (up to 0.5 ms) before it sleeps. Each core sets how long from its own recent
+waits. A core that is handed work within that time keeps watching and wakes at once, as before.
+A core whose waits keep running past it (a few dozen in a row, about a frame or two) stops
+watching and sleeps at once, leaving that CPU time to the rest of the console. The first short
+wait after that sleeps; the core then watches again as long as before.
 
 With **CPU by core** off, the CPU overlay shows the busiest emulated core, rather than total PS5
 CPU usage. A core executing guest or emulator work can still reach 100%.

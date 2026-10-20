@@ -910,8 +910,9 @@ int main(int argc, char** argv) {
                     // Guest vsync signalled first, composition N us later (VI conductor; 0 = upstream).
                     Eden::Performance::compose_delay_us = std::stoi(entry.substr(17));
                 } else if (entry.starts_with("idle_spin_us=")) {
-                    // Guest cores spin this long on their interrupt flag before sleeping (W1).
-                    Eden::Performance::idle_spin_iterations = static_cast<unsigned>(std::stoul(entry.substr(13)) * 50);
+                    // Guest cores poll their interrupt flag this long before sleeping, fixed (W1).
+                    Eden::Performance::idle_poll_most_ns = static_cast<long long>(std::stoul(entry.substr(13))) * 1000;
+                    Eden::Performance::idle_poll_adaptive = false;
                 } else if (entry.starts_with("kspin=")) {
                     // PAUSE iterations a guest kernel spin lock retries before blocking (performance.h).
                     Eden::Performance::kernel_spin_iterations = static_cast<unsigned>(std::stoul(entry.substr(6)));
