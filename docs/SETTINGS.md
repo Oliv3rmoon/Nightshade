@@ -32,6 +32,15 @@ The accuracy switches help only where a game is held back by what they relax. In
 
 Resolution, the upscaling filter, the renderer and the refresh rate, which change speed too, are in **Settings > Video** and in a game's own settings.
 
+### Idle emulated cores
+
+An emulated CPU core with no runnable guest thread sleeps until an interrupt wakes it. It no
+longer spins before sleeping by default, reducing CPU work spent waiting. Sleeping can add
+wake-up latency compared with spinning, which can affect frame pacing.
+
+With **CPU by core** off, the CPU overlay shows the busiest emulated core, rather than total PS5
+CPU usage. A core executing guest or emulator work can still reach 100%.
+
 ### Speed limit
 
 **Settings > Performance > Speed limit** is how fast a game may run, as a percentage of the console it was made for (Eden's *Limit Speed Percentage*). Left and right move over **100%** (the default, and what every earlier version did), **150%**, **200%**, **300%** and **Unlimited**. A game can have its own in **Library > Game settings > Performance**, which follows Settings until you choose one; it applies when a game starts.

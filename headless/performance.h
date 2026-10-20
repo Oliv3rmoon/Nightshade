@@ -531,13 +531,13 @@ struct IdleCounters {
     std::atomic<unsigned long long> calls{0}, nanoseconds{0}, sleeps{0};
 };
 inline std::array<IdleCounters, 4> guest_idle{};
-// PAUSE iterations a guest core spins on its interrupt flag before sleeping (~20 ns each on the
-// console). Guest job systems hand work between cores thousands of times a second; sleeping on a
-// handoff puts the host's thread wake-up latency on the critical path. 100 us took a racing game's
-// heavy phase from ~55 to ~59.6 FPS; 500 us (the default) cut a tested game's requests for
+// Optional PAUSE iterations on the interrupt flag before sleeping (~20 ns each on the console).
+// The default is zero: a core with no runnable guest thread blocks immediately instead of
+// spending CPU time spinning. Spinning can reduce host wake-up latency for frequent handoffs:
+// 100 us took a racing game's heavy phase from ~55 to ~59.6 FPS; 500 us cut a tested game's requests for
 // 30 FPS from 23% to 15% of frames (sleeps per core 800 -> 330 a second). 2 ms cut them to 12% but
 // made some effects flicker. dev-settings idle_spin_us=N overrides it (0 sleeps at once).
-inline std::atomic<unsigned> idle_spin_iterations{25000};
+inline std::atomic<unsigned> idle_spin_iterations{0};
 // Draws between the Vulkan rasterizer's hand-offs to its worker, minus one (a power of two minus
 // one; tools/prepare-vulkan-port.py). Upstream hands off every 8 draws; dev-settings
 // dispatch_draws=N (8 to 512) overrides the 64 used here.
