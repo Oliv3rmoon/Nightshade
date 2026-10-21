@@ -78,6 +78,7 @@ python3 -B "$root/headless/check_audio_shutdown.py" "$scratch/native-local/headl
 python3 -B "$root/tools/check-load-failure.py"
 python3 -B "$root/tools/check-recent-games.py"
 python3 -B "$root/tools/check-update-versions.py" "$scratch/native-local/headless/ncz-registered_cache.cpp"
+python3 -B "$root/tools/check-game-folder-mods.py"
 python3 -B "$root/tools/check-nso-memory.py"
 python3 -B "$root/tools/check-performance.py"
 python3 -B "$root/tools/check-performance-settings.py"
