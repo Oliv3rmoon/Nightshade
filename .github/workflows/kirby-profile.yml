@@ -29,7 +29,8 @@ name: Kirby profiling build
 # A development build (make dev) of the dev/all-fixes fixes for profiling Kirby and the Forgotten
 # Land's busy emulated core 0 on a tester's console (Swordpdf/ProsperoEden#275): the PC sampler
 # is on (pc-sample.txt) at ~500 Hz (dev-settings pc_fast=on), and the launcher opens first so the
-# game is started from the Library wherever it is. Not a release.
+# game is started from the Library wherever it is. replay=off: the controller plays it, not the
+# development build's timed input replay for its own title. Not a release.
 on:
   push:
     branches: ['dev/kirby-profile']
@@ -169,7 +170,7 @@ jobs:
           make dev DEV_TITLE=01004D300C5AE000
           app=build/dev/PPSA99008
           : > "$app/pc-sample.txt"
-          printf 'pc_core=0\npc_fast=on\nlauncher=first\n' > "$app/dev-settings.txt"
+          printf 'pc_core=0\npc_fast=on\nlauncher=first\nreplay=off\n' > "$app/dev-settings.txt"
           python3 tools/ci/make-dist.py "$app"
 
       - name: Report disk, ccache and the linker
