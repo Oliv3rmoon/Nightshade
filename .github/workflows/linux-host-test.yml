@@ -1,0 +1,87 @@
+{
+ "name": "Dev build Linux host tests",
+ "on": {
+  "push": {
+   "branches": [
+    "test/dev-all-fixes-linux-host"
+   ]
+  },
+  "workflow_dispatch": {}
+ },
+ "permissions": {
+  "contents": "read"
+ },
+ "jobs": {
+  "host-tests": {
+   "runs-on": "ubuntu-24.04",
+   "timeout-minutes": 150,
+   "defaults": {
+    "run": {
+     "shell": "bash"
+    }
+   },
+   "env": {
+    "XDG_CACHE_HOME": "/tmp/prosperoeden-dev-host-cache",
+    "PROSPEROEDEN_DEPS_CACHE": "/tmp/prosperoeden-dev-downloads",
+    "DEV_HEAD": "e4f4c25957a43fd39a91f9ae235fe5a827298414"
+   },
+   "steps": [
+    {
+     "name": "Check out the dev branch",
+     "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+     "with": {
+      "ref": "e4f4c25957a43fd39a91f9ae235fe5a827298414",
+      "persist-credentials": false
+     }
+    },
+    {
+     "name": "Record revision",
+     "run": "test \"$(git rev-parse HEAD)\" = \"$DEV_HEAD\"\ngit log -1 --format=fuller\nnproc; free -h; df -h ."
+    },
+    {
+     "name": "Install Linux host tools",
+     "run": "sudo apt-get update\nsudo apt-get install --yes --no-install-recommends build-essential ca-certificates git curl wget unzip zip xz-utils file pkgconf patch bsdextrautils ninja-build ccache nasm rsync bison flex glslang-tools spirv-tools python3 python3-venv python3-pip python3-yaml clang-18 lld-18 llvm-18 libclang-rt-18-dev libexpat1-dev zlib1g-dev libssl-dev libvulkan-dev libudev-dev libasound2-dev libcurl4-openssl-dev nlohmann-json3-dev\ncmake --version\nclang++-18 --version"
+    },
+    {
+     "name": "Run the full Linux host make test suite",
+     "run": "set -o pipefail\nmake test 2>&1 | tee \"$RUNNER_TEMP/dev-make-test.log\""
+    },
+    {
+     "name": "Run download and save-sync checks against local mock servers",
+     "if": "always()",
+     "run": "set -o pipefail\npython3 -B tools/check-remote.py 2>&1 | tee \"$RUNNER_TEMP/dev-remote-check.log\"\nif grep -q \"check-remote: SKIPPED\" \"$RUNNER_TEMP/dev-remote-check.log\"; then exit 1; fi"
+    },
+    {
+     "name": "Run Smash staging tests",
+     "if": "always()",
+     "run": "set -o pipefail\npython3 -B tools/test-stage-smash-mods.py 2>&1 | tee \"$RUNNER_TEMP/dev-staging-tests.log\""
+    },
+    {
+     "name": "Draw the launcher's screens",
+     "if": "always()",
+     "run": "set -o pipefail\nsudo apt-get install --yes --no-install-recommends libegl-dev libgl-dev libegl-mesa0 libgl1-mesa-dri libcurl4-openssl-dev ffmpeg\nmkdir -p \"$RUNNER_TEMP/preview\"\nbash tools/launcher/preview.sh \"$RUNNER_TEMP/preview\" 2>&1 | tail -20\nls \"$RUNNER_TEMP/preview\" | head -50"
+    },
+    {
+     "name": "Keep the screens",
+     "if": "always()",
+     "uses": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+     "with": {
+      "name": "launcher-screens",
+      "retention-days": 7,
+      "path": "${{ runner.temp }}/preview"
+     }
+    },
+    {
+     "name": "Preserve logs",
+     "if": "always()",
+     "uses": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+     "with": {
+      "name": "dev-linux-host-logs",
+      "retention-days": 7,
+      "path": "${{ runner.temp }}/*.log"
+     }
+    }
+   ]
+  }
+ }
+}
