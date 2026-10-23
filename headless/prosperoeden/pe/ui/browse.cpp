@@ -527,6 +527,8 @@ void Launcher::draw_about(Canvas &c)
                748.0f, 2, kShrink);
     text_shrink(c, tr("Menu sound effects made with ElevenLabs."), 144.0f,
                 baseline(788.0f, 30.0f, th().size_small), th().size_small, th().meta, 748.0f);
+    text_shrink(c, kBuildCredit, 144.0f, baseline(826.0f, 28.0f, th().size_small), th().size_small,
+                th().accent_pale, 748.0f);
     text(c, version_, 892.0f, baseline(866.0f, 28.0f, th().size_small), th().size_small,
          th().accent_pale, Align::right);
     // A newer release the check found (with Update notices off, the one place that says so).

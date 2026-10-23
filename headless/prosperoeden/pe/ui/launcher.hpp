@@ -17,6 +17,14 @@
 namespace pe::ui
 {
 
+// This build is not an official release: it adds fixes that are still open as pull requests on
+// Swordpdf/ProsperoEden. The home screen names it beside the version, the About screen says who
+// made it and where to reach them. Plain text (not tr()): a name and two addresses, the same in
+// every language.
+inline constexpr const char* kBuildLabel = "Oliv3rmoon build 2";
+inline constexpr const char* kBuildCredit =
+    "Oliv3rmoon build 2  /  discord.gg/pSqgRU3YP9  /  buymeacoffee.com/oliv3rmoon";
+
 // Every screen of the launcher as one state machine. The frontend feeds it
 // pressed buttons and frame time, draws its list and plays its cues; it ends
 // when a game is chosen (and the closing animation has run).

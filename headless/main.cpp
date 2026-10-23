@@ -367,7 +367,9 @@ int main(int argc, char** argv) {
         // unless Settings > Diagnostics asks for every line at once (to find a crash).
         static Eden::LogFlusher log_flusher;
         if (!log_flusher.Start(Eden::LoadPreferences().immediate_logs)) return 2;
-        Eden::Crash::Install(Eden::LogsDir(), Eden::kAppVersion, last_crash.restarted);
+        // A crash report says which build it came from: this one is not an official release.
+        static const std::string crash_version = std::string{Eden::kAppVersion} + " (Oliv3rmoon build 2)";
+        Eden::Crash::Install(Eden::LogsDir(), crash_version.c_str(), last_crash.restarted);
         Eden::BootTrace::Ready(Eden::LogsDir(), Eden::FilesystemAccess());
         Eden::BootTrace::Line("logs and crash handler ready (%s)", Eden::LogsDir().c_str());
         for (const char* folder : {"/app0", Eden::kMountedAppDir, Eden::kInstallDir, "/mnt/sandbox/PPSA99008_000/app0"})
