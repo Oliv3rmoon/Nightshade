@@ -528,9 +528,12 @@ inline std::atomic<bool> trace_fs_callers{false};
 // compare, [17]/[18] hcr=cpu constant predicate draw/skip, [19] hcr=exact pending-query fallback.
 inline std::array<std::atomic<unsigned long long>, 20> render_conditions{};
 // Guest core idle waits (PhysicalCore::Idle): calls, nanoseconds until the
-// interrupt, and calls that went to sleep because nothing arrived while spinning.
+// interrupt, calls that went to sleep because nothing arrived while spinning, and the
+// nanoseconds spent polling the interrupt flag. Polling is CPU time the core spends waiting:
+// the overlay's per-core load leaves it out (GuestCoreLoads), so a core that polls through
+// a game's short waits does not read as busy.
 struct IdleCounters {
-    std::atomic<unsigned long long> calls{0}, nanoseconds{0}, sleeps{0};
+    std::atomic<unsigned long long> calls{0}, nanoseconds{0}, sleeps{0}, spin_ns{0};
 };
 inline std::array<IdleCounters, 4> guest_idle{};
 // The longest a guest core polls its interrupt flag before sleeping. Guest job systems hand work
@@ -605,11 +608,16 @@ inline void AdaptIdlePoll(std::size_t core, long long wanted_ns, bool slept) {
 // one; tools/prepare-vulkan-port.py). Upstream hands off every 8 draws; dev-settings
 // dispatch_draws=N (8 to 512) overrides the 64 used here.
 inline std::atomic<unsigned> dispatch_mask{63};
-inline void CountIdle(std::size_t core, long long nanoseconds, bool slept) {
+inline void CountIdle(std::size_t core, long long nanoseconds, bool slept, long long spun = 0) {
     if (core >= guest_idle.size()) return;
     guest_idle[core].calls.fetch_add(1, std::memory_order_relaxed);
     guest_idle[core].nanoseconds.fetch_add(static_cast<unsigned long long>(nanoseconds), std::memory_order_relaxed);
     if (slept) guest_idle[core].sleeps.fetch_add(1, std::memory_order_relaxed);
+    if (spun > 0) guest_idle[core].spin_ns.fetch_add(static_cast<unsigned long long>(spun), std::memory_order_relaxed);
+}
+// The nanoseconds a guest core has spent polling while idle, for its load (GuestCoreLoads).
+inline unsigned long long IdleSpinNs(std::size_t core) {
+    return core < guest_idle.size() ? guest_idle[core].spin_ns.load(std::memory_order_relaxed) : 0;
 }
 // Development: reads 32-bit guest words for code dumps (installed by the frontend per session).
 inline bool (*guest_read32)(unsigned long long address, unsigned& value) = nullptr;
