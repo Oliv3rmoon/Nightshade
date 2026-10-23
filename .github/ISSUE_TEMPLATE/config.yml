@@ -1,1 +1,8 @@
 blank_issues_enabled: false
+contact_links:
+  - name: "The Commons on Discord"
+    url: "https://discord.gg/pSqgRU3YP9"
+    about: "Questions, test builds and quick help for the Oliv3rmoon builds"
+  - name: "Official ProsperoEden"
+    url: "https://github.com/Swordpdf/ProsperoEden/issues"
+    about: "Problems with the official release"

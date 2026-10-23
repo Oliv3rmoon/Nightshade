@@ -1,0 +1,54 @@
+name: "Request a fix (Oliv3rmoon builds)"
+description: "Ask for a game fix or a feature in the Oliv3rmoon builds"
+title: "[Request] "
+labels: ["request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Requests for the **Oliv3rmoon builds** of ProsperoEden: a game that doesn't work, a crash, a feature you'd like. Fixes made here are also sent to the official ProsperoEden as pull requests.
+
+        **Before you post**
+
+        - Naming a game is fine; it's how a fix is found.
+        - Do not post or ask for links to games, keys, firmware or shader caches. Your own save data, attached so the problem can be reached, is welcome; do not ask others for theirs.
+        - Do not post Sony SDK files, firmware, decrypted system files, keys or links to them.
+        - Requests that break these rules are closed without a reply.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: "What is it?"
+      options:
+        - "A game doesn't start, crashes or runs badly"
+        - "Something in ProsperoEden doesn't work"
+        - "A feature or improvement"
+    validations:
+      required: true
+  - type: input
+    id: build
+    attributes:
+      label: "Build"
+      description: "The build you use: \"Oliv3rmoon build 2\", a dev build's date, or the official version (for example 01.005.000)"
+    validations:
+      required: true
+  - type: input
+    id: game
+    attributes:
+      label: "Game and its version"
+      description: "If it's about a game: its name, its version, and any update, DLC or mods"
+  - type: textarea
+    id: what
+    attributes:
+      label: "What happens, and what you'd like instead"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: "Logs"
+      description: "For a crash or a game problem: attach /data/prosperoeden/logs/stderr.log and /data/prosperoeden/user/log/eden_log.txt from right after it happened"
+  - type: input
+    id: system
+    attributes:
+      label: "PS5 system software version"
+      placeholder: "12.70"
