@@ -5,7 +5,8 @@ spin lock (headless/kernel_spin_lock.h).
 
 Usage: check-guest-idle.py PINNED_PHYSICAL_CORE_CPP
 
-It checks the polling rule, that no wake-up is lost, that a core which waits long stops polling
+It checks the polling rule, that no wake-up is lost, that the time counted as polling is what
+the core spent polling (the overlay leaves it out of the core's load), that a core which waits long stops polling
 and one that is handed work often keeps polling, and the lock under ThreadSanitizer. It does not
 measure a game's frame rate on the console.
 """
@@ -77,7 +78,7 @@ static void Reset() {
     for (auto& poll : P::idle_poll_ns) poll = 0;
     for (auto& kept : P::idle_poll_kept_ns) kept = 0;
     for (auto& run : P::idle_long_run) run = 0;
-    for (auto& core : P::guest_idle) core.calls = core.nanoseconds = core.sleeps = 0;
+    for (auto& core : P::guest_idle) core.calls = core.nanoseconds = core.sleeps = core.spin_ns = 0;
     P::idle_poll_most_ns = 500'000;
     P::idle_poll_adaptive = true;
 }
@@ -241,12 +242,37 @@ static void Cost() {
     (void)Waiting({50us}, 400, slept);
     std::printf("50 us handoffs without polling: %u of 400 waits slept\n", Count(slept));
     assert(Count(slept) > 200);
+    assert(P::IdleSpinNs(2) == 0);                    // Nothing polled, nothing counted.
+}
+
+// The overlay leaves a core's polling out of its load (GuestCoreLoads): the time Idle counts as
+// polled must be the CPU time it spent waiting, and only that.
+static void Spin() {
+    std::vector<bool> slept;
+    // Work handed over every 50 us, caught while polling: nearly all of the waiting thread's CPU
+    // time is polling, so leaving it out leaves little.
+    Reset();
+    const long long handoffs = Waiting({50us}, 400, slept);
+    const long long polled = static_cast<long long>(P::IdleSpinNs(2));
+    std::printf("50 us handoffs: %.2f ms CPU, %.2f ms of it polling\n", handoffs / 1e6, polled / 1e6);
+    assert(polled > 0 && handoffs - polled < handoffs / 2);
+    // 4 ms waits with a fixed 500 us poll: only the poll counts, not the sleep after it.
+    Reset();
+    P::idle_poll_adaptive = false;
+    const long long waits = Waiting({4ms}, 60, slept);
+    const long long poll_only = static_cast<long long>(P::IdleSpinNs(2));
+    std::printf("4 ms waits, 500 us poll: %.2f ms CPU, %.2f ms polling\n", waits / 1e6, poll_only / 1e6);
+    assert(poll_only >= 60 * 450'000LL && poll_only <= 60 * 1'500'000LL);
+    assert(poll_only <= waits + 10'000'000);
 }
 
 int main(int argc, char**) {
     Policy();
     Wakeups();
-    if (argc == 1) Cost();                            // Timing: not under ThreadSanitizer.
+    if (argc == 1) {                                  // Timing: not under ThreadSanitizer.
+        Cost();
+        Spin();
+    }
     std::puts("idle: PASS");
 }
 '''

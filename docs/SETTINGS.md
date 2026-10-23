@@ -42,8 +42,12 @@ A core whose waits keep running past it (a few dozen in a row, about a frame or 
 watching and sleeps at once, leaving that CPU time to the rest of the console. The first short
 wait after that sleeps; the core then watches again as long as before.
 
-With **CPU by core** off, the CPU overlay shows the busiest emulated core, rather than total PS5
-CPU usage. A core executing guest or emulator work can still reach 100%.
+The CPU overlay's numbers are the emulated cores' work: the time a core spends watching for an
+interrupt while it waits (above) is waiting, and is not counted. A game that waits very often for
+very short times keeps its core watching nearly all the time; Kirby and the Forgotten Land's main
+core read 95-97% that way while it did about 60% work. With **CPU by core** off, the CPU overlay
+shows the busiest emulated core, rather than total PS5 CPU usage. A core executing guest or
+emulator work can still reach 100%.
 
 ### Speed limit
 

@@ -994,6 +994,7 @@ string(REPLACE "${idle_old}" [=[void PhysicalCore::Idle() {
             ::Eden::CpuRelax();
             if ((i & 63) == 0 && ::Eden::Performance::NowNs() - start >= poll) break;
         }
+    const long long spun = poll > 0 ? ::Eden::Performance::NowNs() - start : 0;
     bool slept;
     long long raised;
     {
@@ -1003,7 +1004,7 @@ string(REPLACE "${idle_old}" [=[void PhysicalCore::Idle() {
         raised = ::Eden::Performance::RaisedNs(m_core_index);
     }
     const long long waited = ::Eden::Performance::NowNs() - start;
-    ::Eden::Performance::CountIdle(m_core_index, waited, slept);
+    ::Eden::Performance::CountIdle(m_core_index, waited, slept, spun);
     ::Eden::Performance::AdaptIdlePoll(m_core_index, raised > start ? raised - start : 0, slept);
 }]=] physical_core_source "${physical_core_source}")
 # The time an interrupt raises a core's flag, for the core's idle poll (performance.h AdaptIdlePoll).
