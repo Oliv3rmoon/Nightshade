@@ -1799,7 +1799,12 @@ set_property(TARGET core PROPERTY SOURCES "${core_sources}")
 # (Swordpdf/ProsperoEden#248). The file is the same encrypted .bfttf the console's archive holds.
 file(READ "${PROJECT_SOURCE_DIR}/src/core/hle/service/ns/platform_service_manager.cpp" font_source)
 eden_patch(font_source "        const auto font_fp = extracted_romfs->GetFile(font.second);\n"
-    "        auto font_fp = extracted_romfs->GetFile(font.second);\n        if (auto mod_font = ::Eden::SystemFontMod::Read(\n                Common::FS::GetEdenPath(Common::FS::EdenPath::LoadDir), static_cast<u64>(font.first), font.second);\n            !mod_font.empty()) {\n            LOG_INFO(Service_NS, \"{:016X}: {} from mods ({} bytes)\", font.first, font.second, mod_font.size());\n            font_fp = std::make_shared<FileSys::VectorVfsFile>(std::move(mod_font), font.second);\n        }\n")
+    "        auto font_fp = extracted_romfs->GetFile(font.second);\n        std::string mod_rejected;\n        if (auto mod_font = ::Eden::SystemFontMod::Read(\n                Common::FS::GetEdenPath(Common::FS::EdenPath::LoadDir), static_cast<u64>(font.first), font.second,\n                &mod_rejected);\n            !mod_font.empty()) {\n            LOG_INFO(Service_NS, \"{:016X}: {} from mods ({} bytes)\", font.first, font.second, mod_font.size());\n            font_fp = std::make_shared<FileSys::VectorVfsFile>(std::move(mod_font), font.second);\n        } else if (!mod_rejected.empty()) {\n            LOG_WARNING(Service_NS, \"{:016X}: the console's {} kept, the mod's left out: {}\", font.first, font.second, mod_rejected);\n        }\n")
+# Every font, the console's or a mod's, must fit the shared fonts' memory: Eden's own checks only
+# log, and the copy would then write past it. One that does not fit is left out, and its place in
+# the list stays (empty), so the fonts after it keep theirs.
+eden_patch(font_source "        // Font offset and size do not account for the header\n"
+    "        if (offset + font_data_u32.size() * sizeof(u32) >= SHARED_FONT_MEM_SIZE) {\n            LOG_ERROR(Service_NS, \"{:016X}: {} does not fit the shared fonts' memory; left out\", font.first, font.second);\n            impl->shared_font_regions.push_back(EMPTY_REGION);\n            continue;\n        }\n        // Font offset and size do not account for the header\n")
 string(PREPEND font_source "#include \"${EDEN_PORT_DIR}/system_font_mod.h\"\n#include \"common/fs/path_util.h\"\n#include \"core/file_sys/vfs/vfs_vector.h\"\n")
 write_derived("${PORT_BUILD_DIR}/platform_service_manager.cpp" "${font_source}")
 get_target_property(core_sources core SOURCES)
