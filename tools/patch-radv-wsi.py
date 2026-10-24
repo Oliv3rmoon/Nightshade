@@ -42,17 +42,18 @@ text = (text[:body_start] + '   const char *const asked = getenv("EDEN_VIDEOOUT_
 # On a display with a variable refresh rate that is wrong: before the first frame is shown it
 # idles at the bottom of its range (a vblank every 20.87 ms, 48 Hz, in two reports), the output
 # went back to 59.94 Hz, and a game could not have 120 Hz at all. Only a display that stayed at
-# 59.94 Hz (a vblank about every 16.7 ms) gives the mode back.
-replace('         if (period > VIDEOOUT_HIGH_REFRESH_LIMIT_NS) {',
-        '         if (period > UINT64_C(15000000) && period < UINT64_C(18500000)) {')
+# 59.94 Hz (a vblank about every 16.7 ms) gives the mode back, and, as the pinned source has it,
+# a failed vblank wait (a period of 0).
+replace('         if (period == 0 || period > VIDEOOUT_HIGH_REFRESH_LIMIT_NS) {',
+        '         if (period == 0 || (period > UINT64_C(15000000) && period < UINT64_C(18500000))) {')
 # Say so when the display follows, as the pinned source does when it does not.
-replace('''                    (double)period / 1e6);
+replace('''                       (double)period / 1e6);
          }
-      } else {''', '''                    (double)period / 1e6);
+      } else if (supported > 0) {''', '''                       (double)period / 1e6);
          } else {
             fprintf(stderr, "wsi/videoout: 119.88 Hz output, a vblank every %.3f ms\\n", (double)period / 1e6);
          }
-      } else {''')
+      } else if (supported > 0) {''')
 replace('   wsi->base.get_support =', '   videoout_ref();\n\n   wsi->base.get_support =')
 replace('   if (wsi)\n      vk_free(alloc, wsi);',
         '   if (wsi) {\n      videoout_unref();\n      vk_free(alloc, wsi);\n      wsi_device->wsi[VK_ICD_WSI_PLATFORM_DISPLAY] = NULL;\n   }')
