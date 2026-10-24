@@ -104,6 +104,8 @@ if [[ "$graphics" == ON ]]; then
     if [[ ${EDEN_PS5_VULKAN:-OFF} == ON ]]; then
         python3 -B "$root/tools/check-staging-buffers.py" "$scratch/source/src" \
             "$scratch/native-local/headless/vulkan_staging_buffer_pool.cpp"
+        python3 -B "$root/tools/check-texture-evictions.py" "$scratch/source/src" \
+            "$scratch/native-local/headless/vulkan-cache/video_core/texture_cache/texture_cache.h"
     fi
 fi
 

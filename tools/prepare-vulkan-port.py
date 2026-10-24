@@ -1165,6 +1165,13 @@ for old, new in [
     # Configure(true) pair above, whose first line this matches.
     ('        Configure(true);',
      '        Configure(true);\n        num_scanned = 0;'),
+    # What it frees because memory is short, for a line in the log (headless/texture_evictions.h).
+    ('        UnregisterImage(image_id);\n        DeleteImage(image_id, image.scale_tick > frame_tick + 5);',
+     '        if constexpr (std::is_same_v<Runtime, Vulkan::TextureCacheRuntime>) {\n'
+     '            ::Eden::TextureEvictions::Freed(aggressive_mode, True(image.flags & ImageFlagBits::Converted),\n'
+     '                                            must_download);\n'
+     '        }\n'
+     '        UnregisterImage(image_id);\n        DeleteImage(image_id, image.scale_tick > frame_tick + 5);'),
 ]:
     if gc.count(old) != 1:
         raise RuntimeError(f'Pinned GC anchor changed: {old}')
@@ -1253,13 +1260,21 @@ texture_partial = [
 ]
 adapt('src/video_core/texture_cache/texture_cache.h',
       'vulkan-cache/video_core/texture_cache/texture_cache.h', [
-    ('namespace VideoCommon {', '#include "performance.h"\n#include "texture_partial.h"\n#include "image_pages.h"\n#include "astc_policy.h"\n#include "common/scope_exit.h"\nnamespace Vulkan { class TextureCacheRuntime; }\n\nnamespace VideoCommon {'),
+    ('namespace VideoCommon {', '#include "performance.h"\n#include "texture_partial.h"\n#include "image_pages.h"\n#include "astc_policy.h"\n#include "texture_evictions.h"\n#include "common/scope_exit.h"\nnamespace Vulkan { class TextureCacheRuntime; }\n\nnamespace VideoCommon {'),
     # An ASTC texture kept as BC3 is converted in the background in a busy frame only, and in
     # place on a light screen (headless/astc_policy.h). The frame is counted where the texture
     # cache ends its own.
     ('    if (True(image.flags & ImageFlagBits::AsynchronousDecode)) {\n        QueueAsyncDecode(image, image_id);\n        return;\n    }',
      '    if (True(image.flags & ImageFlagBits::AsynchronousDecode) && ::Eden::AstcPolicy::InBackground()) {\n        QueueAsyncDecode(image, image_id);\n        return;\n    }'),
     ('    TickAsyncDecode();\n    TickAsyncUnswizzle();', '    ::Eden::AstcPolicy::Frame();\n    TickAsyncDecode();\n    TickAsyncUnswizzle();'),
+    # Every 10 s at most, what the collector freed because memory was short (texture_evictions.h).
+    ('    sentenced_images.Tick();\n',
+     '    ' + VULKAN_CACHE + '\n'
+     '        ::Eden::TextureEvictions::Frame(async_decodes.size(),\n'
+     '            ::Eden::Performance::graphics_memory_free.load(std::memory_order_relaxed),\n'
+     '            ::Eden::Performance::graphics_memory_held.load(std::memory_order_acquire));\n'
+     '    }\n'
+     '    sentenced_images.Tick();\n'),
     # Every place an image is registered at is marked before the texture cache can find the
     # image there (headless/image_pages.h): the two inserts below are the only ones.
     ('        auto map_id =\n            slot_map_views.insert(image.gpu_addr, image.cpu_addr, image.guest_size_bytes, image_id);',
