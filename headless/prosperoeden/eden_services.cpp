@@ -607,9 +607,16 @@ EdenServices::EdenServices(std::string launch_error, Eden::Multiplayer::RoomClie
     KeepSaveSyncFile(who.profiles);
     setup_ = eden_startup_error();
     Eden::Report("setup", setup_.empty() ? "Keys and firmware startup checks passed" : setup_.c_str());
+    // A games folder of its own that is not there (a USB drive not plugged in): the Library finds no
+    // games in it, and no download goes there, which would make its folders on the console's own
+    // storage instead.
+    const bool games_there = Eden::GamesDir() == Eden::AssetsDir() || Eden::DirectoryExists(Eden::GamesDir());
+    if (!games_there)
+        Eden::Report("games folder", ("Not found: " + Eden::GamesDir() + " (\"games_folder\"); no games are listed "
+                                      "from it and downloads wait until it is there").c_str());
     // The download sources' games and the download queue (remote/remote.h): only with filesystem access,
     // where the game files folder can be written.
-    if (Eden::FilesystemAccess())
+    if (Eden::FilesystemAccess() && games_there)
         Eden::Remote::Start({Eden::ConfigFile("remote"), Eden::CoversDir(), Eden::GamesPath("roms"),
                              Eden::GamesPath("updates"), Eden::GamesPath(".remote-downloads")},
                             WriteCover, ListFolder);
