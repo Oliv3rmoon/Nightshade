@@ -14,7 +14,7 @@ the reads instead of hanging them, and says so in its log; a file closed while a
 source that stalls ends that read at once, without counting as a failure.
 """
 from pathlib import Path
-import os, subprocess, sys, tempfile
+import os, platform, shutil, subprocess, sys, tempfile
 
 root = Path(__file__).resolve().parents[1]
 remote = root / 'headless/remote'
@@ -186,6 +186,18 @@ int main() {
 }
 '''
 
+
+def run(exe):
+    """Runs a check's program. Under a kernel that places memory more randomly than an older
+    ThreadSanitizer knows (Ubuntu 24.04's with GCC 13: "unexpected memory mapping"), the same
+    program without address randomization."""
+    result = subprocess.run([str(exe)], capture_output=True, text=True, timeout=600)
+    if result.returncode != 0 and 'unexpected memory mapping' in result.stderr and shutil.which('setarch'):
+        result = subprocess.run(['setarch', platform.machine(), '-R', str(exe)], capture_output=True, text=True,
+                                timeout=600)
+    return result
+
+
 with tempfile.TemporaryDirectory() as tmp:
     for flags, label in ((['-O1', '-g', '-fsanitize=address,undefined', '-fno-sanitize-recover=all'], 'checked'),
                          (['-O1', '-g', '-fsanitize=thread'], 'thread sanitizer')):
@@ -193,7 +205,7 @@ with tempfile.TemporaryDirectory() as tmp:
         subprocess.run([os.environ.get('CXX', 'c++'), '-std=c++20', '-pthread', '-Wall', '-Wextra', '-Werror', *flags,
                         '-I' + str(remote), '-x', 'c++', '-', str(remote / 'stream_file.cpp'), '-o', str(exe)],
                        input=code, text=True, check=True)
-        result = subprocess.run([str(exe)], capture_output=True, text=True, timeout=600)
+        result = run(exe)
         sys.stdout.write(f'[{label}] ' + result.stdout.splitlines()[0] + '\n' if result.stdout else '')
         if result.returncode != 0:
             sys.stderr.write(result.stderr[-3000:])

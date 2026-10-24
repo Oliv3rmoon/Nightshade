@@ -29,7 +29,7 @@ build's unpacked tree, else from .deps/eden-<commit>.tar.gz (checked against UPS
 Without any of them the check says so and is skipped.
 """
 from pathlib import Path
-import hashlib, json, os, re, subprocess, sys, tarfile, tempfile
+import hashlib, json, os, platform, re, shutil, subprocess, sys, tarfile, tempfile
 
 root = Path(__file__).resolve().parents[1]
 headless = root / 'headless'
@@ -71,6 +71,17 @@ def cmake_string(name):
     found = re.findall(r'set\(' + name + r' "((?:[^"\\]|\\.)*)"\)', text)
     assert len(found) == 1, f'headless/CMakeLists.txt sets {name} once'
     return re.sub(r'\\(.)', lambda m: {'n': '\n', 't': '\t'}.get(m.group(1), m.group(1)), found[0])
+
+
+def run(exe):
+    """Runs a check's program. Under a kernel that places memory more randomly than an older
+    ThreadSanitizer knows (Ubuntu 24.04's with GCC 13: "unexpected memory mapping"), the same
+    program without address randomization."""
+    result = subprocess.run([str(exe)], capture_output=True, text=True, timeout=600)
+    if result.returncode != 0 and 'unexpected memory mapping' in result.stderr and shutil.which('setarch'):
+        result = subprocess.run(['setarch', platform.machine(), '-R', str(exe)], capture_output=True, text=True,
+                                timeout=600)
+    return result
 
 
 launcher_code = r'''
@@ -349,7 +360,7 @@ with tempfile.TemporaryDirectory(prefix='streamed-game-') as tmp:
                         '-I' + str(headless / 'remote'), '-isystem', str(eden), '-x', 'c++', '-', '-x', 'none',
                         str(headless / 'remote/stream_file.cpp'), str(vfs), '-o', str(exe)],
                        input=source, text=True, check=True)
-        result = subprocess.run([str(exe)], capture_output=True, text=True, timeout=600)
+        result = run(exe)
         if result.returncode != 0 or result.stdout.strip() != 'ok':
             sys.stderr.write(result.stdout[-2000:] + result.stderr[-3000:])
             sys.exit(f'streamed game check failed ({label}): exit {result.returncode}')
