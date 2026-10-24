@@ -116,6 +116,11 @@ private:
         unsigned touch_width = 0; // no coordinates: retain the configured touchpad mapping
         bool touch_right = false; // latched when clicked, until the release pulse ends
         unsigned errors_in_a_row = 0; // reads that failed since the last one that worked
+        unsigned polls_to_reopen = 0; // failed polls left before the handle is opened again
+        unsigned reopens = 0;         // since the last read that worked
+        // Its handle was closed to be opened again and did not open yet: no handle, but the
+        // player keeps the slot (and its user) and the opening is tried again.
+        bool stale = false;
     };
     void Rescan();
     void OpenSlot(std::size_t player, int user);
