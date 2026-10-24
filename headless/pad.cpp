@@ -192,6 +192,23 @@ void Pad::OpenSlot(std::size_t player, int user) {
     connection_changes |= 1u << player;
     LOG_INFO(Input, "EDEN_PAD_OPEN player={} user={} handle={}", player + 1, user, handle);
 }
+// A controller whose reads keep failing gets its handle again, in place: the player stays
+// connected and keeps its slot, whether or not the new handle opens (it is tried again later).
+void Pad::ReopenSlot(std::size_t player) {
+    auto& slot = slots[player];
+    if (slot.haptics) slot.haptics->Stop();
+    const int closed = scePadClose(slot.handle);
+    int handle = scePadOpen(slot.user, ps5::pad::kPortTypeStandard, 0, nullptr);
+    if (handle < 0) handle = scePadGetHandle(slot.user, ps5::pad::kPortTypeStandard, 0);
+    LOG_INFO(Input, "EDEN_PAD_REOPEN player={} user={} old={} close={} new={:#x} errors={}", player + 1, slot.user,
+             slot.handle, closed, static_cast<unsigned>(handle), slot.errors_in_a_row);
+    if (handle < 0) return;
+    slot.handle = handle;
+    slot.haptics = std::make_unique<HapticStream>();
+    slot.haptics->Ensure(slot.user, handle);
+    slot.last_haptic_stats = slot.haptics->GetStats();
+    (void)scePadSetMotionSensorState(handle, true);
+}
 void Pad::CloseSlot(std::size_t player) {
     auto& slot = slots[player];
     if (slot.handle < 0) return;
@@ -269,6 +286,13 @@ bool Pad::Poll() {
         polls_since_scan = 0;
         Rescan();
     }
+    // Polls stop while the console sleeps (rest mode) and can while the home menu is shown: say how
+    // long, beside what the controller does afterwards (#97, #269).
+    const auto now = std::chrono::steady_clock::now();
+    if (last_poll != std::chrono::steady_clock::time_point{} && now - last_poll > std::chrono::seconds(1))
+        LOG_INFO(Input, "EDEN_PAD_PAUSE seconds={:.1f}",
+                 std::chrono::duration<double>(now - last_poll).count());
+    last_poll = now;
     ++polls;
     bool primary = false;
     std::array<ps5::pad::Data, ps5::pad::kMaxSamples> samples{};
@@ -291,9 +315,22 @@ bool Pad::Poll() {
         if (player == 0) last_result = count;
         if (count < 0 || count > static_cast<int>(samples.size())) {
             ++read_errors;
+            auto& slot = slots[player];
+            if (slot.errors_in_a_row++ == 0)
+                LOG_WARNING(Input, "EDEN_PAD_READ_ERROR player={} result={:#x}", player + 1,
+                            static_cast<unsigned>(count));
+            // After rest mode or a visit to the home menu a game's controller stayed dead
+            // (#97, #269): after about a second of failed reads, and each second after, its
+            // handle is opened again.
+            if (slot.errors_in_a_row % kPollsPerScan == 0) ReopenSlot(player);
             const auto neutral = ps5::pad::neutral_data();
             Consume(player, {&neutral, 1});
             continue;
+        }
+        if (slots[player].errors_in_a_row != 0) {
+            LOG_INFO(Input, "EDEN_PAD_READ_RECOVERED player={} after={} errors", player + 1,
+                     slots[player].errors_in_a_row);
+            slots[player].errors_in_a_row = 0;
         }
         for (int i = 0; i < count; ++i) {
             ++samples_read;
