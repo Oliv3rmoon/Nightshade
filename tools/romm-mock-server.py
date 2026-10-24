@@ -75,6 +75,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def log_message(self, *args):
         pass
 
+    def handle(self):
+        # A client that no longer needs the rest of a file (a game read where it lies, remote.h's
+        # OpenStream) closes its connection in the middle.
+        try:
+            super().handle()
+        except ConnectionResetError:
+            pass
+
     def send(self, status, body, kind="application/json", headers=()):
         self.send_response(status)
         self.send_header("Content-Type", kind)

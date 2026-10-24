@@ -199,8 +199,8 @@ def build(work):
         subprocess.run([c_compiler, "-std=c11", "-O1", "-w", "-c", str(MINIZ / f"{name}.c"), "-o", str(objects[-1])],
                        check=True)
     sources = ["romm_live_check.cpp", "remote/remote.cpp", "remote/backends.cpp", "remote/ftp.cpp",
-               "remote/stream_check.cpp", "remote/save_archive.cpp", "remote/save_sync.cpp", "remote/romm/romm_client.cpp",
-               "remote/romm/romm_source.cpp", "remote/romm/romm_saves.cpp"]
+               "remote/stream_check.cpp", "remote/stream_file.cpp", "remote/save_archive.cpp", "remote/save_sync.cpp",
+               "remote/romm/romm_client.cpp", "remote/romm/romm_source.cpp", "remote/romm/romm_saves.cpp"]
     binary = work / "romm_live_check"
     subprocess.run([compiler, "-std=c++20", *flags, "-fno-rtti", *includes, *[str(HEADLESS / s) for s in sources],
                     *map(str, objects), os.environ.get("CURL_LIBRARY", "-lcurl"), "-lcrypto", "-pthread", "-o", str(binary)],
