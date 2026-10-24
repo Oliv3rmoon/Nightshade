@@ -51,7 +51,8 @@ bool Open(const std::string& path, std::string* error) {
     streamed->cover = game.cover;
     streamed->file = readable;
     streamed->failed = [readable] { return readable->Failed(); };
-    streamed->stop = [file] { file->Close(); };
+    streamed->hold = [readable](std::function<void()> lost) { readable->Hold(std::move(lost)); };
+    streamed->stop = [readable] { readable->Stop(); };
     Set(std::move(streamed));
     return true;
 }

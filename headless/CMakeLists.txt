@@ -3078,6 +3078,13 @@ else()
     target_include_directories(eden-romfs-check PRIVATE "${PROJECT_SOURCE_DIR}/src")
     target_link_libraries(eden-romfs-check PRIVATE core)
     target_compile_options(eden-romfs-check PRIVATE -fno-rtti)
+    # A game played where it lies on its download source, shown to Eden's own loaders and to the
+    # patched GetGameFileFromPath (streamed_game.h); written with assert().
+    add_executable(eden-streamed-game-check "${EDEN_PORT_DIR}/streamed_game_check.cpp"
+        "${EDEN_PORT_DIR}/remote/stream_file.cpp")
+    target_include_directories(eden-streamed-game-check PRIVATE "${PROJECT_SOURCE_DIR}/src" "${EDEN_PORT_DIR}")
+    target_link_libraries(eden-streamed-game-check PRIVATE core)
+    target_compile_options(eden-streamed-game-check PRIVATE -fno-rtti -UNDEBUG)
     add_executable(eden-scalar-check "${EDEN_PORT_DIR}/scalar_check.cpp")
     target_include_directories(eden-scalar-check PRIVATE "${PROJECT_SOURCE_DIR}/src")
     target_link_libraries(eden-scalar-check PRIVATE dynarmic)

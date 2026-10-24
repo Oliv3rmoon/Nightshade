@@ -543,8 +543,10 @@ int main(int argc, char** argv) {
         Eden::Multiplayer::SetDetailedLogging(Eden::LoadPreferences().detailed_logging);
         Eden::Multiplayer::RoomClient rooms;
         for (;;) {
+        // The file of a game played before where it lies on its download source, while the stop
+        // limit still watches: letting it go waits for its transfer to end.
+        Eden::StreamedGame::Close();
         Eden::StopLimit::End();  // whatever game ran before is gone
-        Eden::StreamedGame::Close();  // and its file on its download source, when it was played so
 #ifdef EDEN_PS5_OPENGL
         std::error_code trim_error;
         const auto cache_entries = Eden::ReadNativeDirectory(native_shader_cache, trim_error);
@@ -1544,6 +1546,8 @@ int main(int argc, char** argv) {
                     std::string guest_fault;
                 };
                 auto completion = std::make_shared<Completion>();
+                // A game played where it lies (streamed_game.h); null for one on the console.
+                const auto streamed = Eden::StreamedGame::Find(guest);
                 system.RegisterExitCallback([completion] {
                     std::lock_guard lock(completion->mutex);
                     completion->exited = true;
@@ -1569,8 +1573,7 @@ int main(int argc, char** argv) {
                 game_contents.ClearAllEntries();
                 // (A game played where it lies is no file: its file is the one opened on its source.)
                 if (game && guest && !game_contents.AddEntriesFromContainer(
-                        Eden::StreamedGame::IsPath(guest) ? Eden::StreamedGame::File(guest) :
-                                                            system.GetFilesystem()->OpenFile(guest, FileSys::OpenMode::Read)))
+                        streamed ? streamed->file : system.GetFilesystem()->OpenFile(guest, FileSys::OpenMode::Read)))
                     Eden::Report("loader", "Game contents not registered; an update's data will not apply");
                 system.RegisterContentProvider(FileSys::ContentProviderUnionSlot::FrontendManual, &game_contents);
                 {
@@ -1793,6 +1796,15 @@ int main(int argc, char** argv) {
                 }
                 Eden::TakeGuestFault(); // Nothing from an earlier session belongs to this one.
                 Eden::Loading::Set(Eden::Loading::Step::starting);
+                // From here a read of a game played where it lies that its source can no longer
+                // answer waits for the stop below, instead of handing the game what did not come, and
+                // the session ends at once (streamed_game.h).
+                if (streamed)
+                    streamed->hold([completion] {
+                        std::lock_guard lock(completion->mutex);
+                        completion->stream_lost = true;
+                        completion->wake.notify_one();
+                    });
                 system.Run();
 #if defined(EDEN_DEV_PROFILE) && defined(PS5_NATIVE)
                 Eden::Stall::Trace("main running");
@@ -1809,8 +1821,6 @@ int main(int argc, char** argv) {
 #endif
                 const auto session_start = std::chrono::steady_clock::now();
                 [[maybe_unused]] double session_seconds = 0;  // guest-fault relaunch (PS5 only)
-                // A game played where it lies (streamed_game.h); null for one on the console.
-                const auto streamed = Eden::StreamedGame::Find(guest);
                 std::jthread input_worker;
                 if (pad) input_worker = std::jthread([&](std::stop_token stop) {
 #ifdef EDEN_DEV_PROFILE
@@ -2085,8 +2095,9 @@ int main(int argc, char** argv) {
                     for (;;) std::this_thread::sleep_for(std::chrono::seconds(1));
                 }
 #endif
-                // A read that waits for a stalled network must not hold the stop: the reads of a game
-                // played where it lies end now, with what is kept (streamed_game.h).
+                // A read that waits for a stalled network, or for this stop after its source failed,
+                // must not hold it: the reads of a game played where it lies end now, with what is kept
+                // (streamed_game.h).
                 if (streamed) streamed->stop();
                 system.ShutdownMainProcess();
                 Eden::Report("shutdown", "Game stopped; releasing renderer");

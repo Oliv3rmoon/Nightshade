@@ -21,6 +21,7 @@
 #include <mutex>
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include "core/file_sys/vfs/vfs_types.h"
 
@@ -41,8 +42,12 @@ struct Game {
     // Why the game's reads fail, once one did because the source failed for good (English);
     // empty while they work.
     std::function<std::string()> failed;
-    // Ends every read that waits for the source, at once, and the transfer: the game is being
-    // stopped, and a network that stalled must not hold it.
+    // The game runs (headless/main.cpp, as it starts it): from now on a read the source can no
+    // longer answer waits for stop instead of handing the game what did not come, and lost is told
+    // at once, from that read's thread (stream_vfs.h).
+    std::function<void(std::function<void()> lost)> hold;
+    // Ends every read, waiting or to come, at once with what is kept, and the transfer: the game is
+    // being stopped, and a network that stalled must not hold it.
     std::function<void()> stop;
 };
 
@@ -71,8 +76,12 @@ inline FileSys::VirtualFile File(std::string_view path) {
 }
 // The game played so from now on (one at a time); null: none.
 inline void Set(std::shared_ptr<const Game> game) {
-    const std::lock_guard lock(Detail::Lock());
-    Detail::Current() = std::move(game);
+    std::shared_ptr<const Game> before;
+    {
+        const std::lock_guard lock(Detail::Lock());
+        before = std::exchange(Detail::Current(), std::move(game));
+    }
+    // The one before is let go here, without the lock: its file waits for its transfer to end.
 }
 // The game ended: it is let go here, and its file once Eden let go of it too.
 inline void Close() { Set(nullptr); }

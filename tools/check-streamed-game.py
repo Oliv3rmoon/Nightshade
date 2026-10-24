@@ -7,10 +7,13 @@ Builds headless/stream_vfs.h, the file Eden reads such a game through, with
 headless/remote/stream_file.cpp, the pinned Eden's own file layer (src/core/file_sys/vfs/vfs.cpp)
 and a stand-in source, under ASan/UBSan and ThreadSanitizer, and checks what Eden gets: the
 file's name, size and extension, every byte through Read and through Eden's own ReadBytes,
-ReadByte and ReadAllBytes, nothing written; a source that fails for good makes the reads come
-short, says so once in the log and tells the session why, while a file closed for a game that
-stops does neither; a read that waits long for the source is said in the log; the session finds
-the game by its path and by no other.
+ReadByte and ReadAllBytes, nothing written; its folder, empty, which Eden's loaders look into
+without asking whether there is one (the unpacked-game loader's IdentifyType, checked to be so in
+the pinned Eden), also when its source failed; a source that fails for good makes the reads come
+short before the game runs, says so once in the log and tells the session why, and once the game
+runs (Hold) makes them wait, telling the session at once and once, until the game is stopped
+(Stop); a file stopped for a game that stops is no failure; a read that waits long for the source
+is said in the log; the session finds the game by its path and by no other.
 
 The patch of Eden's GetGameFileFromPath (headless/CMakeLists.txt): the text it is made at is
 still in the pinned Eden's src/core/core.cpp, once; patched as the build patches it, the
@@ -53,7 +56,7 @@ def eden_sources(work):
         return None
     if hashlib.sha256(archive.read_bytes()).hexdigest() != upstream['archives'][archive.name]:
         sys.exit(f'{archive} is not the pinned archive (UPSTREAM.json)')
-    wanted = ('src/common/', 'src/core/file_sys/', 'src/core/core.cpp')
+    wanted = ('src/common/', 'src/core/file_sys/', 'src/core/core.cpp', 'src/core/loader/')
     with tarfile.open(archive) as tar:
         members = []
         for member in tar.getmembers():
@@ -136,6 +139,8 @@ struct FakeSource final : Remote::Source {
     std::atomic<int> fail_next{0};             // fetches that bring nothing
     std::uint64_t stall_from = 0;              // the bytes from here on never come (0: they all do)
     std::chrono::milliseconds answer{0};       // how long each fetch takes to begin
+    bool from_start_only = false;              // it sends the file only from its start
+    std::uint64_t told_length = 0;             // the length it says follows (0: the right one)
     explicit FakeSource(std::uint64_t size_) : size(size_) {}
     std::string address() const override { return "fake"; }
     bool list(std::vector<Remote::SourceGame>*, std::string*, const Remote::Stopped&) override { return false; }
@@ -144,7 +149,8 @@ struct FakeSource final : Remote::Source {
                std::string* error) override {
         if (fail_next > 0) { --fail_next; *error = "connection reset"; return false; }
         std::this_thread::sleep_for(answer);
-        if (!receiver.begin(false, size - offset)) { *error = "stopped"; return false; }
+        if (from_start_only) offset = 0;
+        if (!receiver.begin(from_start_only, told_length != 0 ? told_length : size - offset)) { *error = "stopped"; return false; }
         std::uint8_t chunk[64 * 1024];
         for (std::uint64_t at = offset; at < size;) {
             if (receiver.stopped()) { *error = "stopped"; return false; }
@@ -205,8 +211,11 @@ int main() {
         std::shared_ptr<StreamFile> file = Open(std::make_unique<FakeSource>(kSize));
         FileSys::VirtualFile vfs = std::make_shared<StreamVfsFile>(file, said.log());
         assert(vfs->GetName() == kFile.name && vfs->GetExtension() == "nsp" && vfs->GetSize() == kSize);
-        assert(vfs->IsReadable() && !vfs->IsWritable() && vfs->GetContainingDirectory() == nullptr &&
-               vfs->GetFullPath() == "/" + kFile.name);
+        assert(vfs->IsReadable() && !vfs->IsWritable() && vfs->GetFullPath() == "/" + kFile.name);
+        // Its folder holds nothing: as IsDirectoryExeFS asks it, it is no unpacked game.
+        const FileSys::VirtualDir folder = vfs->GetContainingDirectory();
+        assert(folder != nullptr && folder->GetFile("main") == nullptr && folder->GetFile("main.npdm") == nullptr &&
+               folder->GetFiles().empty() && folder->GetSubdirectories().empty());
         const std::uint8_t byte = 1;
         assert(vfs->Write(&byte, 1, 0) == 0 && !vfs->WriteByte(1, 0) && !vfs->Resize(1) && !vfs->Rename("other.nsp"));
         std::vector<std::uint8_t> got(300000);
@@ -238,6 +247,37 @@ int main() {
         for (auto& reader : readers) reader.join();
         assert(vfs->Failed() == "connection reset");
         assert(said.count("The game's reads of what is not kept fail from now on: connection reset") == 1);
+        // What Eden's loaders ask of it then still holds (the unpacked-game loader asks its folder).
+        const FileSys::VirtualDir folder = vfs->GetContainingDirectory();
+        assert(folder != nullptr && folder->GetFile("main") == nullptr && folder->GetFile("main.npdm") == nullptr);
+    }
+    said.lines.clear();
+    {
+        // Once the game runs: a read its source can no longer answer waits until the game is
+        // stopped, the session told at once and once; before, it came back short. After the stop
+        // every read comes back with what is kept, and none waits.
+        auto source = std::make_unique<FakeSource>(kSize);
+        source->from_start_only = true; // fails for good at once at a read past the start
+        auto vfs = std::make_shared<StreamVfsFile>(Open(std::move(source)), said.log());
+        std::vector<std::uint8_t> got(1000);
+        assert(vfs->Read(got.data(), got.size(), 2 * StreamFile::kBlock) == 0 && !vfs->Failed().empty());
+        std::atomic<int> lost{0};
+        vfs->Hold([&] { ++lost; });
+        std::atomic<int> back{0};
+        std::vector<std::thread> readers;
+        for (unsigned t = 0; t < 2; ++t)
+            readers.emplace_back([&vfs, &back, t] {
+                std::vector<std::uint8_t> bytes(1000);
+                assert(vfs->Read(bytes.data(), bytes.size(), (3 + t) * StreamFile::kBlock) == 0);
+                ++back;
+            });
+        std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        assert(back == 0 && lost == 1);
+        vfs->Stop();
+        for (auto& reader : readers) reader.join();
+        assert(back == 2 && lost == 1);
+        assert(vfs->Read(got.data(), got.size(), 5 * StreamFile::kBlock) == 0 && lost == 1);
+        assert(said.count("fail from now on") == 1);
     }
     said.lines.clear();
     {
@@ -253,7 +293,7 @@ int main() {
             read = vfs->Read(got.data(), got.size(), 3 * StreamFile::kBlock);
         });
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        file->Close();
+        vfs->Stop();
         reader.join();
         assert(read == 0 && vfs->Failed().empty() && said.count("fail from now on") == 0);
     }
@@ -306,6 +346,13 @@ with tempfile.TemporaryDirectory(prefix='streamed-game-') as tmp:
         print('check-streamed-game: SKIPPED (no pinned Eden source: .deps/mirror-*, the build tree or '
               f'.deps/eden-{commit[:8]}.tar.gz)')
         sys.exit(0)
+    # Eden's loader of unpacked games asks the folder of any file it is shown, without looking
+    # whether there is one (why the streamed file has an empty folder of its own).
+    unpacked = (eden / 'core/loader/deconstructed_rom_directory.cpp').read_text()
+    exefs = (eden / 'core/file_sys/content_archive.h').read_text()
+    assert 'FileSys::IsDirectoryExeFS(dir_file->GetContainingDirectory())' in unpacked and \
+        'return pfs->GetFile("main") != nullptr && pfs->GetFile("main.npdm") != nullptr;' in exefs, \
+        "the pinned Eden's unpacked-game loader looks into a file's folder"
     # The build's patch of GetGameFileFromPath, at the text it is made at.
     core = (eden / 'core/core.cpp').read_text()
     old, new = cmake_string('game_file_old'), cmake_string('game_file_new')
@@ -352,13 +399,15 @@ with tempfile.TemporaryDirectory(prefix='streamed-game-') as tmp:
     for flags, label in ((['-O1', '-g', '-fsanitize=address,undefined', '-fno-sanitize-recover=all'], 'checked'),
                          (['-O1', '-g', '-fsanitize=thread'], 'thread sanitizer')):
         compiler = os.environ.get('CXX', 'c++')
-        vfs = work / f'vfs-{label.split()[0]}.o'
-        subprocess.run([compiler, '-std=c++20', '-w', *flags, '-I' + str(eden), '-c', str(eden / 'core/file_sys/vfs/vfs.cpp'),
-                        '-o', str(vfs)], check=True)
+        objects = []
+        for unit in ('vfs', 'vfs_vector'):
+            objects.append(work / f'{unit}-{label.split()[0]}.o')
+            subprocess.run([compiler, '-std=c++20', '-w', *flags, '-I' + str(eden), '-c',
+                            str(eden / f'core/file_sys/vfs/{unit}.cpp'), '-o', str(objects[-1])], check=True)
         exe = work / ('streamed-' + label.split()[0])
         subprocess.run([compiler, '-std=c++20', '-pthread', '-Wall', '-Wextra', '-Werror', *flags, '-I' + str(headless),
                         '-I' + str(headless / 'remote'), '-isystem', str(eden), '-x', 'c++', '-', '-x', 'none',
-                        str(headless / 'remote/stream_file.cpp'), str(vfs), '-o', str(exe)],
+                        str(headless / 'remote/stream_file.cpp'), *map(str, objects), '-o', str(exe)],
                        input=source, text=True, check=True)
         result = run(exe)
         if result.returncode != 0 or result.stdout.strip() != 'ok':
@@ -366,7 +415,9 @@ with tempfile.TemporaryDirectory(prefix='streamed-game-') as tmp:
             sys.exit(f'streamed game check failed ({label}): exit {result.returncode}')
         print(f'[{label}] ok')
 print('Streamed game: PASS Eden reads every byte of a game where it lies through its own file layer, nothing is '
-      'written, a failed source fails the reads and says why once, a stop is no failure, a slow read is said, the '
+      'written, its folder is empty (the unpacked-game loader looks into it), a failed source fails the reads and '
+      'says why once, once the game runs its reads wait for the stop instead and the session is told at once, a stop '
+      'is no failure, a slow read is said, the '
       "session finds the game by its path alone; GetGameFileFromPath's patch text is in the pinned Eden once and "
       'looks the path up first' + (f' (derived core.cpp of {", ".join(derived)} too)' if derived else '') +
       '; the launcher plays a game on sources only where it lies only when a source of it streams, else downloads it')
