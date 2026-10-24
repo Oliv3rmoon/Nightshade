@@ -38,6 +38,7 @@ bash tools/check-elevation-client.sh
 python3 -B tools/build-lapy-helper.py
 bash tools/build-headless-native.sh --graphics
 python3 -B tools/check-radv-native.py
+python3 -B tools/check-radv-submission-dump.py
 echo "== Package $EDEN_PACKAGE_DIR"
 rm -rf "$EDEN_PACKAGE_DIR"
 bash tools/package-headless-native.sh --integration
