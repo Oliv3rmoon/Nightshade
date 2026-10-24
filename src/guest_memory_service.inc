@@ -878,6 +878,8 @@ bool ServiceAvailable() noexcept {
 
 // The guest range starts being a service (when the platform passed the check).
 void ServiceStart(SparseRange& range) noexcept {
+    // A refusal belongs to the session it ended: a later crash must not report it again.
+    refused_address.store(0, std::memory_order_relaxed);
     if (!service_requested.load(std::memory_order_relaxed) || !ServiceAvailable() || !AddStates(range)) {
         char line[96];
         const int length = std::snprintf(line, sizeof(line), "EDEN_CRAM off: %s\n",
