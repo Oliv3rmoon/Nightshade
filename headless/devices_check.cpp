@@ -815,19 +815,20 @@ void CheckPad() {
         for (unsigned i = 1; i < 500; ++i) CHECK(!pad.Poll());
         CHECK(state.pad_closes == closes + 1);
         CHECK(!pad.Poll());
-        CHECK(state.pad_opens == opens + 1 && state.pad_closes == closes + 2);
+        // (The stand-in counts an attempt to open, refused or not.)
+        CHECK(state.pad_opens == opens + 2 && state.pad_closes == closes + 2);
         CHECK(pad.ConnectedPlayers() == 1u);
         state.pad_open_result = 7;   // tried again 4 s later, with nothing to close
         for (unsigned i = 1; i < 1000; ++i) CHECK(!pad.Poll());
-        CHECK(state.pad_opens == opens + 1);
+        CHECK(state.pad_opens == opens + 2);
         CHECK(!pad.Poll());
-        CHECK(state.pad_opens == opens + 2 && state.pad_closes == closes + 2);
+        CHECK(state.pad_opens == opens + 3 && state.pad_closes == closes + 2);
         state.read_result = 0;
         auto pressed = neutral_data(); pressed.connected = 1; pressed.buttons = kButtonCircle;
         state.pad_samples.push_back(pressed);
         CHECK(pad.Poll()); CHECK(pad.Engine().GetButton({}, 0));
         for (unsigned i = 0; i < 300; ++i) CHECK(pad.Poll());
-        CHECK(state.pad_opens == opens + 2);  // working reads open nothing
+        CHECK(state.pad_opens == opens + 3);  // working reads open nothing
     }
     std::puts("Pad mappings, a changed button mapping, calibration, motion, HD rumble over audio haptics with motor fallback, 64-sample edges, disconnect and ownership, a controller opened again after failed reads PASS");
 }
