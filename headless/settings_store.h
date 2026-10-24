@@ -633,6 +633,10 @@ struct GameSettings {
     std::array<int, kPerformanceSwitches> performance{-1, -1, -1, -1, -1, -1, -1, -1};  // kPerformanceKeys
     int64_t rng_seed = -1;      // 0 to 4294967295, or -1: no seed (load_address.h)
     int speed_limit = -1;       // index into kSpeedLimitKeys ("performance" / "speed_limit")
+    // VK_EXT_vertex_input_dynamic_state, on unless the game's entry has "vertex_input_dynamic":
+    // false. In the settings file only (docs/SETTINGS.md): Pokemon Legends: Z-A draws flashing
+    // colour after the train station with it on desktop RADV (Swordpdf/ProsperoEden#59, #112).
+    int vertex_input_dynamic = -1;
 };
 // The seed a typed text names: digits and nothing else, 0 to 4294967295. -1 for any other text.
 inline int64_t RngSeedFromText(std::string_view text) {
@@ -685,6 +689,7 @@ inline GameSettings LoadGameSettings(uint64_t title_id, const std::string& file 
     result.frame_gen = flag("/frame_gen");
     result.mute = flag("/mute");
     result.vibration = flag("/vibration");
+    result.vertex_input_dynamic = flag("/vertex_input_dynamic");
     for (int i = 0; i < kPerformanceSwitches; ++i)
         result.performance[i] = flag(std::string("/performance/") + kPerformanceKeys[i]);
     result.speed_limit = KeyIndex(key("performance/speed_limit"), kSpeedLimitKeys,
@@ -722,7 +727,7 @@ inline bool SaveGameSettings(uint64_t title_id, const GameSettings& value, const
         value.speed_limit >= int(std::size(kSpeedLimitKeys)) ||
         !flag_ok(value.hud) || !flag_ok(value.frame_gen) ||
         !flag_ok(value.mute) ||
-        !flag_ok(value.vibration) ||
+        !flag_ok(value.vibration) || !flag_ok(value.vertex_input_dynamic) ||
         !std::all_of(value.performance.begin(), value.performance.end(), flag_ok) ||
         (value.post_processing && !ValidPostProcessing(*value.post_processing)) ||
         (value.own_mapping && !ValidMapping(value.mapping))) return false;
@@ -756,6 +761,7 @@ inline bool SaveGameSettings(uint64_t title_id, const GameSettings& value, const
     flag(game, "frame_gen", value.frame_gen);
     flag(game, "mute", value.mute);
     flag(game, "vibration", value.vibration);
+    flag(game, "vertex_input_dynamic", value.vertex_input_dynamic);
     if (value.volume < 0) game.erase("volume");
     else game["volume"] = value.volume;
     if (value.rng_seed < 0) game.erase("rng_seed");
