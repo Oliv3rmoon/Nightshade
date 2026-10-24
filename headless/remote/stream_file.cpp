@@ -184,7 +184,9 @@ void StreamFile::Run() {
                 found = true;
                 break;
             }
-        for (std::uint64_t index = furthest_; !found && index < std::min<std::uint64_t>(furthest_ + kAhead / 2, Blocks());
+        // (Nothing is read ahead before the first read: furthest_ is 0 until then.)
+        for (std::uint64_t index = furthest_; !found && furthest_ > 0 &&
+                                              index < std::min<std::uint64_t>(furthest_ + kAhead / 2, Blocks());
              ++index)
             if (!blocks_.contains(index)) {
                 start = index;
