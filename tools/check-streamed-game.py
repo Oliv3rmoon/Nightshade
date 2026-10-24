@@ -13,7 +13,9 @@ the pinned Eden), also when its source failed; a source that fails for good make
 short before the game runs, says so once in the log and tells the session why, and once the game
 runs (Hold) makes them wait, telling the session at once and once, until the game is stopped
 (Stop); a file stopped for a game that stops is no failure; a read that waits long for the source
-is said in the log; the session finds the game by its path and by no other.
+is said in the log; the session finds the game by its path and by no other. What the session reads
+before the game loads (ReadBeforeLoad): a source that does not send the start in time, one that
+fails at once and one too slow for the rest each end it, every read stopped, within the limits.
 
 The patch of Eden's GetGameFileFromPath (headless/CMakeLists.txt): the text it is made at is
 still in the pinned Eden's src/core/core.cpp, once; patched as the build patches it, the
@@ -310,6 +312,42 @@ int main() {
         assert(said.count("A read of 1 KiB at 0 MiB waited 0.") == 1 && said.count("A read of") == 1);
     }
     {
+        // What the session reads before the game loads, within its limits: a source that does not
+        // send the start in time, one that fails at once, one too slow for the rest; every read is
+        // stopped and nothing is left waiting.
+        using std::chrono::milliseconds;
+        const auto timed = [](auto&& run) {
+            const auto begun = std::chrono::steady_clock::now();
+            const auto outcome = run();
+            return std::pair{outcome, std::chrono::steady_clock::now() - begun};
+        };
+        const auto before = [&](std::unique_ptr<FakeSource> source, std::function<std::uint64_t()> rest, std::uint64_t* kept) {
+            auto vfs = std::make_shared<StreamVfsFile>(Open(std::move(source)));
+            return timed([&] {
+                return StreamedGame::ReadBeforeLoad(
+                    [&] { std::uint8_t start[4096]; return vfs->Read(start, sizeof(start), 0) == sizeof(start); },
+                    [&] { return rest(); }, [&] { vfs->Stop(); }, milliseconds(300), milliseconds(800), kept);
+            });
+        };
+        std::uint64_t kept = 0;
+        auto silent = std::make_unique<FakeSource>(kSize);
+        silent->answer = milliseconds(3000);
+        const auto [no_start, waited] = before(std::move(silent), [] { return std::uint64_t{1}; }, &kept);
+        assert(no_start == StreamedGame::Before::no_start && waited < std::chrono::milliseconds(1500));
+        auto wrong = std::make_unique<FakeSource>(kSize);
+        wrong->told_length = 99;
+        const auto [start_failed, failed_in] = before(std::move(wrong), [] { return std::uint64_t{1}; }, &kept);
+        assert(start_failed == StreamedGame::Before::start_failed && failed_in < std::chrono::milliseconds(300));
+        const auto [too_slow, slow_in] = before(std::make_unique<FakeSource>(kSize), [] {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1200));
+            return std::uint64_t{1};
+        }, &kept);
+        assert(too_slow == StreamedGame::Before::too_slow && slow_in < std::chrono::milliseconds(1500) && kept == 0);
+        const auto [read, read_in] = before(std::make_unique<FakeSource>(kSize), [] { return std::uint64_t{0x0100000000010000}; }, &kept);
+        assert(read == StreamedGame::Before::read && kept == 0x0100000000010000);
+        (void)waited; (void)failed_in; (void)read_in;
+    }
+    {
         // The session's registry: the game by its path, and by no other; gone once it ended.
         auto vfs = std::make_shared<StreamVfsFile>(Open(std::make_unique<FakeSource>(kSize)));
         auto game = std::make_shared<StreamedGame::Game>();
@@ -417,7 +455,7 @@ with tempfile.TemporaryDirectory(prefix='streamed-game-') as tmp:
 print('Streamed game: PASS Eden reads every byte of a game where it lies through its own file layer, nothing is '
       'written, its folder is empty (the unpacked-game loader looks into it), a failed source fails the reads and '
       'says why once, once the game runs its reads wait for the stop instead and the session is told at once, a stop '
-      'is no failure, a slow read is said, the '
+      'is no failure, a slow read is said, a source silent, failing or too slow before the load ends it in time, the '
       "session finds the game by its path alone; GetGameFileFromPath's patch text is in the pinned Eden once and "
       'looks the path up first' + (f' (derived core.cpp of {", ".join(derived)} too)' if derived else '') +
       '; the launcher plays a game on sources only where it lies only when a source of it streams, else downloads it')

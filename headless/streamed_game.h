@@ -15,8 +15,10 @@
 // knows one.
 #pragma once
 
+#include <chrono>
 #include <cstdint>
 #include <functional>
+#include <future>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -93,9 +95,44 @@ inline std::string LostMessage(const Game& game, const std::string& reason) {
            "). Check the network and the server, then start the game again";
 }
 
+// What the session reads of a game played so before it loads it, read on a thread of its own by
+// Open: start (the start of its file; false when it did not come) within start_limit, then rest
+// (what it returns is *kept) within all_limit from the beginning. Past a limit, or when the start
+// did not come, stop ends every read and the thread is waited for: nothing that waits for the
+// network is left behind, and the result says which it was.
+enum class Before : std::uint8_t { read, no_start, start_failed, too_slow };
+inline Before ReadBeforeLoad(const std::function<bool()>& start, const std::function<std::uint64_t()>& rest,
+                             const std::function<void()>& stop, std::chrono::milliseconds start_limit,
+                             std::chrono::milliseconds all_limit, std::uint64_t* kept) {
+    const auto deadline = std::chrono::steady_clock::now() + all_limit;
+    std::promise<bool> started;
+    std::future<bool> came = started.get_future();
+    std::future<std::uint64_t> all =
+        std::async(std::launch::async, [&start, &rest, started = std::move(started)]() mutable {
+            const bool first = start();
+            started.set_value(first);
+            return first ? rest() : std::uint64_t{0};
+        });
+    Before outcome = Before::read;
+    if (came.wait_for(start_limit) != std::future_status::ready) outcome = Before::no_start;
+    else if (!came.get()) outcome = Before::start_failed;
+    else if (all.wait_until(deadline) != std::future_status::ready) outcome = Before::too_slow;
+    if (outcome != Before::read) {
+        stop();
+        all.wait();
+        return outcome;
+    }
+    *kept = all.get();
+    return outcome;
+}
+
 // Opens the game of such a path on its source for its session (remote/remote.h, OpenStream) and
-// keeps it here: true, or false with *error, a sentence in English for the player. Only in builds
-// with the launcher and the download sources (streamed_game.cpp).
+// keeps it here: true, or false with *error, a sentence in English for the player. Before it
+// returns it reads, on a thread of its own and within a time limit, what the session reads of the
+// game before the game loads (the start of its file, its title ID when the source does not know
+// it, its languages and its contents), so that a source that is off, down or stalled is told at
+// once and not while nothing can stop those reads. Only in builds with the launcher and the
+// download sources (streamed_game.cpp).
 bool Open(const std::string& path, std::string* error);
 
 } // namespace Eden::StreamedGame
