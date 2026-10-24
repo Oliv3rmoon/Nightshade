@@ -35,10 +35,11 @@ bool Open(const std::string& path, std::string* error) {
         log(game.name + ": " + why);
         return false;
     }
+    using Remote::StreamFile;
     log(game.name + " (" + file->Name() + ", " + StreamVfsFile::Size(file->Size()) + ") is played where it lies on " +
-        source_name + ": read in " + std::to_string(Remote::StreamFile::kBlock >> 20) + " MiB blocks, up to " +
-        std::to_string(Remote::StreamFile::kAhead) + " MiB ahead, " +
-        std::to_string(Remote::StreamFile::kDefaultCache) + " MiB kept");
+        source_name + ": read in " + std::to_string(StreamFile::kBlock >> 20) + " MiB blocks, up to " +
+        std::to_string((StreamFile::kAhead * StreamFile::kBlock) >> 20) + " MiB ahead, " +
+        std::to_string((StreamFile::kDefaultCache * StreamFile::kBlock) >> 20) + " MiB kept");
     auto readable = std::make_shared<StreamVfsFile>(file, log);
     auto streamed = std::make_shared<Game>();
     streamed->path = path;
