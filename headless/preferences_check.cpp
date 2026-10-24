@@ -665,6 +665,24 @@ int main() {
     assert(Eden::SaveAssetsDir("/mnt/ext1/eden", file));
     assert(Eden::LoadSavedAssetsDir(file) == "/mnt/ext1/eden");
     assert(!Eden::SaveAssetsDir("relative/path", file) && !Eden::SaveAssetsDir("/a/../b", file));
+    // A games folder of its own (#50, #149): written in the file by hand, read as the game files
+    // folder is, and kept by the settings' own writes.
+    assert(Eden::LoadSavedGamesDir(file).empty());
+    {
+        auto document = Eden::Settings::Load(file);
+        document["games_folder"] = "/mnt/usb0/games";
+        assert(Eden::Settings::Write(document, file));
+    }
+    assert(Eden::LoadSavedGamesDir(file) == "/mnt/usb0/games" && Eden::LoadSavedAssetsDir(file) == "/mnt/ext1/eden");
+    assert(Eden::SaveLastGame("Sample Quest [id].nsp", file) && Eden::LoadSavedGamesDir(file) == "/mnt/usb0/games");
+    {
+        auto document = Eden::Settings::Load(file);
+        document["games_folder"] = "../games";
+        assert(Eden::Settings::Write(document, file));
+        assert(Eden::LoadSavedGamesDir(file).empty());  // not a folder the app takes
+        document.erase("games_folder");
+        assert(Eden::Settings::Write(document, file) && Eden::LoadSavedGamesDir(file).empty());
+    }
 
     // Everything saved so far survives in one document.
     assert(Eden::LoadPreferences(file).volume == 40 && Eden::LoadLastGame(file) == "Sample Quest [id].nsp");

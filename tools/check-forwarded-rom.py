@@ -15,7 +15,7 @@ root = Path(__file__).resolve().parents[1]
 main = (root / 'headless/main.cpp').read_text()
 start = main.index('const std::string path = Eden::ResolveForwardedRom(forwarded.rom')
 block = main[start:main.index('Eden::BootTrace::Line("forwarded game:', start)]
-assert 'Eden::FindMovedForwardedRom(path, Eden::AssetsPath("roms"))' in block
+assert 'Eden::FindMovedForwardedRom(path, Eden::GamesPath("roms"))' in block
 assert block.index('Eden::FileExists(path)) forwarded_game = path;') < block.index('forwarded_game = moved;'), \
     'the path the forwarder gave comes first'
 assert 'launch_error = "Forwarded game not found: " + (path.empty() ? forwarded.rom : path);' in block

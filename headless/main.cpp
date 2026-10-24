@@ -406,7 +406,7 @@ int main(int argc, char** argv) {
             // (no longer: tools/patch-radv-disk-cache.py).
             const std::string access = "status=" + std::to_string(Eden::FilesystemAccessStatus()) +
                 " elevation=" + elevation::path() +
-                " app=" + Eden::AppDir() + " data=" + Eden::UserDir() + " game_files=" + Eden::AssetsDir() +
+                " app=" + Eden::AppDir() + " data=" + Eden::UserDir() + " game_files=" + Eden::AssetsDir() + " games=" + Eden::GamesDir() +
                 " uid=" + std::to_string(getuid()) + "/" + std::to_string(geteuid()) +
                 " gid=" + std::to_string(getgid()) + "/" + std::to_string(getegid());
             Eden::Report("filesystem access", access.c_str());
@@ -515,10 +515,10 @@ int main(int argc, char** argv) {
         std::string forwarded_game;
         bool forwarded_session = false;
         if (!forwarded.rom.empty() && last_crash.report.empty()) {
-            const std::string path = Eden::ResolveForwardedRom(forwarded.rom, Eden::AssetsPath("roms"));
+            const std::string path = Eden::ResolveForwardedRom(forwarded.rom, Eden::GamesPath("roms"));
             // A game moved into a game folder after its forwarder was made.
             const std::string moved = path.empty() || Eden::FileExists(path) ?
-                std::string{} : Eden::FindMovedForwardedRom(path, Eden::AssetsPath("roms"));
+                std::string{} : Eden::FindMovedForwardedRom(path, Eden::GamesPath("roms"));
             if (!path.empty() && Eden::FileExists(path)) forwarded_game = path;
             else if (!moved.empty()) forwarded_game = moved;
             else launch_error = "Forwarded game not found: " + (path.empty() ? forwarded.rom : path);
@@ -612,7 +612,7 @@ int main(int argc, char** argv) {
         // Match the title ID in the file name, else in the ROM's own metadata; the game files
         // folder first, then the pre-1.000.020 assets folder that still holds other test titles.
         const auto development_title = std::strtoull(development_id.c_str(), nullptr, 16);
-        for (const std::string& folder : {Eden::AssetsPath("roms"), std::string{"/data/assets/roms"}}) {
+        for (const std::string& folder : {Eden::GamesPath("roms"), std::string{"/data/assets/roms"}}) {
             std::error_code rom_error;
             for (const auto& entry : Eden::ReadNativeDirectory(folder, rom_error)) {
                 const auto filename = entry.path().filename().string();
@@ -705,7 +705,7 @@ int main(int argc, char** argv) {
         const char* guest = selected_game.c_str();
         // The game as the Library names it: its path in roms/ ("Game.nsp", or "Game/Game.nsp" in a
         // game folder), else its file name. Its cover and its place among the recent games go by it.
-        const std::string roms_folder = Eden::AssetsPath("roms/");
+        const std::string roms_folder = Eden::GamesPath("roms/");
         const std::string rom_name = selected_game.rfind(roms_folder, 0) == 0
                                          ? selected_game.substr(roms_folder.size())
                                          : std::filesystem::path(selected_game).filename().string();
@@ -1173,7 +1173,7 @@ int main(int argc, char** argv) {
             Eden::Mods::SessionGameFolder().clear();
             Eden::Mods::SessionTitle() = 0;
             if (guest) {
-                const std::string roms = Eden::AssetsPath("roms/");
+                const std::string roms = Eden::GamesPath("roms/");
                 const std::string_view path{guest};
                 if (path.starts_with(roms))
                     if (const auto slash = path.find('/', roms.size()); slash != std::string_view::npos) {
@@ -1577,7 +1577,7 @@ int main(int argc, char** argv) {
                 // Update and DLC files (NSP or XCI) in the game files' updates folder apply to their
                 // base game: Eden's ExternalContentProvider, which the patch manager checks first.
                 // So do those in the game's own folder, when it has one (roms/<folder>/, issue 168).
-                Settings::values.external_content_dirs = {Eden::AssetsPath("updates")};
+                Settings::values.external_content_dirs = {Eden::GamesPath("updates")};
                 if (const std::string& folder = Eden::Mods::SessionGameFolder(); !folder.empty())
                     Settings::values.external_content_dirs.push_back(folder);
                 system.GetFileSystemController().CreateFactories(*system.GetFilesystem());

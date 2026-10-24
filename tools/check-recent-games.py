@@ -13,7 +13,7 @@ import os, subprocess, tempfile
 
 root = Path(__file__).resolve().parents[1]
 main = (root / 'headless/main.cpp').read_text()
-start = main.index('        const std::string roms_folder = Eden::AssetsPath("roms/");')
+start = main.index('        const std::string roms_folder = Eden::GamesPath("roms/");')
 end = main.index(';', main.index('const std::string rom_name', start)) + 1
 naming = main[start:end]
 
@@ -30,7 +30,7 @@ code = r'''
 #include <filesystem>
 #include <string>
 namespace Eden {
-std::string AssetsPath(const std::string& relative) { return "/mnt/usb0/eden/" + relative; }
+std::string GamesPath(const std::string& relative) { return "/mnt/usb0/eden/" + relative; }
 }
 static std::string Name(const std::string& selected_game) {
 ''' + naming + r'''
