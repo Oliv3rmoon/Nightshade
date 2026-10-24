@@ -1351,6 +1351,17 @@ endif()
 string(REPLACE "            ShutdownMainProcess();\n            return"
     "            process.reset();\n            ShutdownMainProcess();\n            return"
     system_source "${system_source}")
+# A game played where it lies on its download source (headless/streamed_game.h) has a path that is
+# no file, "stream:<source>/<game>": its file is the one the session opened on the source. Eden's
+# load and its game card open the game by its path here (tools/check-streamed-game.py).
+set(game_file_old "FileSys::VirtualFile GetGameFileFromPath(const FileSys::VirtualFilesystem& vfs,\n                                         const std::string& path) {\n")
+set(game_file_new "    if (::Eden::StreamedGame::IsPath(path)) return ::Eden::StreamedGame::File(path);\n")
+string(FIND "${system_source}" "${game_file_old}" game_file_offset)
+if(game_file_offset LESS 0)
+    message(FATAL_ERROR "Pinned GetGameFileFromPath changed; review streamed games (headless/streamed_game.h).")
+endif()
+string(REPLACE "${game_file_old}" "${game_file_old}${game_file_new}" system_source "${system_source}")
+string(PREPEND system_source "#include \"${EDEN_PORT_DIR}/streamed_game.h\"\n")
 write_derived("${PORT_BUILD_DIR}/core.cpp" "${system_source}")
 get_target_property(core_sources core SOURCES)
 # The PS5 heap is bounded: avoid allocating/decompressing an executable merely
