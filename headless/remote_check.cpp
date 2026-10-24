@@ -8,7 +8,8 @@
 // tools/ftp-mock-server.py, what a real RomM and ftpsrv do not do on demand: a server that hands out
 // fewer games a page than asked for, games told apart by their ids at metadata providers and their
 // title IDs, the same game under another file name on a second source, an update larger than its
-// game, a server that cannot resume and a full drive. tools/check-remote.py runs it.
+// game, a server that cannot resume and a full drive; and a game played where it lies on a source
+// set to stream it (OpenStream), also while the threads are held. tools/check-remote.py runs it.
 //
 //   remote_check <server address> <empty folder> <FTP server's port>
 #include "remote/backends.h"
@@ -20,6 +21,7 @@
 #include "remote/save_archive.h"
 #include "remote/save_sync.h"
 #include "remote/stream_check.h"
+#include "remote/stream_file.h"
 
 #include "miniz.h"
 
@@ -379,6 +381,105 @@ void MockSpecials(const std::string& url, const fs::path& root, const std::strin
     Eden::Remote::Stop();
 }
 
+// ---- games played where they lie (remote.h, OpenStream) ----
+
+void StreamedGames(const std::string& url, const fs::path& root) {
+    // A streamed game's path, there and back, whatever its source's key and the game's id hold.
+    Expect(StreamPath("home", "10") == "stream:home/10", "a streamed game's path");
+    const std::vector<std::pair<std::string, std::string>> names = {
+        {"home", "10"}, {"caf%c3%a9-2", "a/b c?"}, {"x_y", "\xc3\xbc:%/.."}};
+    for (const auto& [source, id] : names) {
+        const std::string path = StreamPath(source, id);
+        std::string back_source, back_id;
+        Expect(path.starts_with("stream:") && path.find('/') == path.rfind('/') &&
+                   ParseStreamPath(path, &back_source, &back_id) && back_source == source && back_id == id,
+               "a streamed game's path has one '/' and reads back as its source and game");
+    }
+    for (const char* other : {"stream:", "stream:home", "stream:home/", "stream:/10", "stream:home/10/11", "stream:ho me/10",
+                              "stream:home/%4", "stream:home/%zz", "Stream:home/10", "roms/Game.nsp",
+                              "/data/games/roms/stream:home/10"}) {
+        std::string source, id;
+        Expect(!ParseStreamPath(other, &source, &id), "no other path reads as a streamed game's");
+    }
+
+    const fs::path config = root / "config" / "remote";
+    fs::create_directories(config);
+    const Paths paths{config.string(), (root / "covers").string(), (root / "games" / "roms").string(),
+                      (root / "games" / "updates").string(), (root / "games" / ".remote-downloads").string()};
+    const auto sources = [&](bool stream) {
+        const auto romm = [&](const std::string& name, const std::string& extra) {
+            return "{\"type\":\"romm\",\"name\":\"" + name + "\",\"url\":\"" + url + "\",\"token\":\"rmm_test\"" +
+                   extra + "}";
+        };
+        // Office first, never streaming; Home second, streaming when asked.
+        Write(config / "sources.json", "{\"sources\":[" + romm("Office", "") + "," +
+                                           romm("Home", stream ? ",\"stream\":true" : "") + "]}");
+        Eden::Remote::Start(paths, CopyCover, ListFolder);
+    };
+    const auto listed = [] {
+        return SourceOf("home").online && !SourceOf("home").refreshing && SourceOf("office").online &&
+               !SourceOf("office").refreshing;
+    };
+    sources(true);
+    Expect(WaitFor(listed), "both lists are read");
+    Expect(SourceOf("home").stream && !SourceOf("office").stream, "a source streams when its entry says so, and only then");
+    // The same title on both: played where it lies from the one that sends it so, though it comes
+    // second; a source's game says whether its source streams.
+    const auto alpha = [] {
+        for (const Title& title : Titles())
+            for (const Game& game : title.games)
+                if (game.source == "home" && game.id == "10") return title;
+        return Title{};
+    };
+    Expect(alpha().games.size() == 2 && alpha().games[0].source == "office" && StreamPathOf(alpha()) == "stream:home/10",
+           "a title is played where it lies from its source that streams");
+    Game game;
+    Expect(Eden::Remote::Find("home", "10", &game) && game.stream && Eden::Remote::Find("office", "10", &game) && !game.stream,
+           "a game says whether its source streams");
+
+    // A game runs: the threads are held, and its file is read where it lies all the same, through
+    // a source of its own, every byte right, across blocks and up to the file's end.
+    Eden::Remote::Stop();
+    std::string error;
+    std::vector<std::string> said;
+    std::shared_ptr<StreamFile> file = OpenStream("home", "10", &error, [&](const std::string& line) { said.push_back(line); });
+    Expect(file != nullptr && error.empty() && file->Size() == 10000000 &&
+               file->Name() == "Alpha Quest [0100000000010000][v0].nsp",
+           "a streamed game's file opens while the threads are held, with its name and size");
+    const std::string alpha_bytes = Pattern(100, 10000000);
+    for (const auto& [offset, size] : std::vector<std::pair<std::uint64_t, std::size_t>>{
+             {0, 4096}, {3 * StreamFile::kBlock - 100, 300000}, {9999950, 100}, {5000000, 1}, {10000000, 10}}) {
+        std::string got(size, '\0');
+        const std::size_t read = file ? file->Read(reinterpret_cast<std::uint8_t*>(got.data()), size, offset) : 0;
+        const std::size_t expect = offset >= 10000000 ? 0 : static_cast<std::size_t>(std::min<std::uint64_t>(size, 10000000 - offset));
+        Expect(read == expect && got.compare(0, read, alpha_bytes, static_cast<std::size_t>(std::min<std::uint64_t>(offset, 10000000)), read) == 0,
+               "a streamed game's file reads the source's bytes");
+    }
+    Expect(file != nullptr && file->Failed().empty() && said.empty(), "and nothing failed");
+    file.reset();
+    // Not from a source that does not stream, nor a game or a source that is not there.
+    Expect(OpenStream("office", "10", &error) == nullptr && error.find("\"stream\": true") != std::string::npos,
+           "a source that does not stream sends no game so");
+    Expect(OpenStream("home", "99", &error) == nullptr && error == "Its source no longer has this game",
+           "nor a game it does not have");
+    Expect(OpenStream("nowhere", "10", &error) == nullptr && error == "Its source is no longer in sources.json",
+           "nor a source that is not in sources.json");
+    // A server that sends a file only from its start: a piece from elsewhere fails, saying why.
+    file = OpenStream("home", "11", &error);
+    std::string piece(1000, '\0');
+    Expect(file != nullptr && file->Read(reinterpret_cast<std::uint8_t*>(piece.data()), piece.size(), 3 * StreamFile::kBlock) == 0 &&
+               file->Failed().find("only from its beginning") != std::string::npos,
+           "a server that cannot send a file from its middle fails the read with the reason");
+    file.reset();
+
+    // Turned off again: the source's list stays as it was, and its games are downloaded first.
+    sources(false);
+    Expect(!SourceOf("home").stream && SourceOf("home").games == 5 && StreamPathOf(alpha()).empty(),
+           "without \"stream\" its kept list stays, and nothing is played where it lies");
+    Expect(OpenStream("home", "10", &error) == nullptr, "nor opened so");
+    Eden::Remote::Stop();
+}
+
 // ---- the check of a download's contents ----
 
 void Put(std::string& to, std::size_t at, std::uint64_t value, int bytes) {
@@ -617,6 +718,7 @@ int main(int argc, char** argv) {
     StreamChecks();
     if (argc >= 3) SaveArchives(fs::path(argv[2]) / "archives");
     if (argc >= 4) MockSpecials(argv[1], argv[2], argv[3]);
+    if (argc >= 3) StreamedGames(argv[1], argv[2]);
     if (failures == 0) std::printf("remote check: PASS\n");
     return failures == 0 ? 0 : 1;
 }

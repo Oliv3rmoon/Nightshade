@@ -492,8 +492,9 @@ struct RuntimeLauncher::Impl {
         }
         else if (name == "launcher_updates.cancel") pack_updates->cancel();
         else if (name == "launch.request") {
-            const auto& g=game(args); if(g.remote || !launch_available(services,g.file) || launch.value("stage","idle")!="idle") throw std::runtime_error("Game cannot start now");
-            launch_file=g.file; launch_profile=current_profile(); sync_started=false; launch={{"stage",services.save_sync_wanted(g.file)?"syncing":"ready"},{"game",g.file},{"title",g.name}};
+            // A game on download sources only starts when a source of it sends it to be played where it lies (play_file).
+            const auto& g=game(args); const std::string file=play_file(g); if(file.empty() || !launch_available(services,file) || launch.value("stage","idle")!="idle") throw std::runtime_error("Game cannot start now");
+            launch_file=file; launch_profile=current_profile(); sync_started=false; launch={{"stage",services.save_sync_wanted(file)?"syncing":"ready"},{"game",g.file},{"title",g.name}};
         }
         else if (name == "launch.cancel") { services.stop_save_sync(); launch={{"stage","idle"}}; launch_file.clear(); }
         else if (name == "launch.commit") { if(launch.value("stage","idle")!="ready" || launch_profile!=current_profile()) throw std::runtime_error("Launch is not ready"); selected=commit_launch(services,launch_file); if(selected.empty()) throw std::runtime_error("Game or room state changed before launch"); launch["stage"]="committed"; }

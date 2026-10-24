@@ -27,7 +27,10 @@ assert main.index('room_lost = rooms.GameConnectionLost();') < shortcut
 assert main.index('Eden::StopLimit::Begin();', shortcut) < main.index('completion->return_to_menu = true;', shortcut)
 stop = main.index('Eden::StopLimit::Begin();', shortcut + 200)
 assert stop < main.index('jit_list.Finish();') < main.index('system.ShutdownMainProcess();', stop)
-assert 'for (;;) {\n        Eden::StopLimit::End();' in main, 'every way back to the launcher disarms the limit'
+# A game played where it lies on its download source is let go first (headless/streamed_game.h), while the limit
+# still watches: that waits for its transfer to end.
+assert re.search(r'for \(;;\) \{\n(        //[^\n]*\n)*        Eden::StreamedGame::Close\(\);\n        Eden::StopLimit::End\(\);', main), \
+    'every way back to the launcher lets a streamed game go, then disarms the limit'
 assert 'Eden::StopLimit::Start(note);' in main
 lifecycle = (root / 'src/lifecycle.c').read_text()
 restart = lifecycle.split('int eden_restart_app(void) {', 1)[1].split('\n}\n', 1)[0]

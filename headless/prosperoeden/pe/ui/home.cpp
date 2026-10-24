@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "pe/ui/launcher.hpp"
+#include "pe/ui/launch_commit.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -127,12 +128,14 @@ void Launcher::press_home(Key key)
             }
             press_ = 1.0f;
             const Game &game = games_[static_cast<std::size_t>(library_.selected)];
-            if (game.remote)
+            // One on its sources only goes into the download queue, unless a source of it sends it
+            // to be played where it lies (play_file): then it starts at once.
+            if (game.remote && play_file(game).empty())
             {
                 queue_remote(game);
                 return;
             }
-            launch(game.file, game.name, game.cover);
+            launch(play_file(game), game.name, game.cover);
             return;
         }
         case Key::triangle:
@@ -221,8 +224,8 @@ void Launcher::press_home(Key key)
             return;
         case Key::cross:
             press_ = 1.0f;
-            if (home_focus_ == kMain && has_game && !game->remote)
-                launch(game->file, game->name, game->cover);
+            if (home_focus_ == kMain && has_game && !play_file(*game).empty())
+                launch(play_file(*game), game->name, game->cover);
             else if (home_focus_ == kMain && !ready)
                 go_section(3);
             else if (home_focus_ == kGameSettings && has_game && game->title_id != 0)
@@ -443,6 +446,9 @@ void Launcher::draw_home(Canvas &c)
         const int count = static_cast<int>(games_.size());
         const Game *game = count > 0 ? &games_[static_cast<std::size_t>(library_.selected)] : nullptr;
         const bool has_game = game != nullptr && !game->remote;
+        // One played where it lies on its source is shown and played as well; its details are
+        // those of a game on the console.
+        const bool playable = game != nullptr && !play_file(*game).empty();
         constexpr float kCardTop = 110.0f;
         constexpr float kCardHeight = 836.0f;
         const Rect card{left, kCardTop, words, kCardHeight};
@@ -452,7 +458,7 @@ void Launcher::draw_home(Canvas &c)
         glass(c, card, t.radius_panel, t.panel.with_alpha(0.90f), t.panel_edge.with_alpha(0.42f), 1.2f);
         {
             const Rect band{card.x + 1.0f, card.y + 1.0f, card.w - 2.0f, 148.0f};
-            const std::string &cover_path = has_game ? game->cover : home_.last_cover;
+            const std::string &cover_path = playable ? game->cover : home_.last_cover;
             if (!cover_path.empty())
             {
                 const Cover picture = c.textures.cover(cover_path, card.w);
@@ -475,7 +481,7 @@ void Launcher::draw_home(Canvas &c)
             float y = card.y + 198.0f;
             {
                 const Heavy heavy(c);
-                const std::string &name = has_game ? game->name :
+                const std::string &name = playable ? game->name :
                     (home_.last_file.empty() ? std::string{tr("No ROM selected")} : home_.last_title);
                 const int lines = text_block(c, name, cx, baseline(y, 46.0f, t.size_lead), t.size_lead,
                                              46.0f, t.title, cw, 2, 0.8f);
@@ -551,7 +557,7 @@ void Launcher::draw_home(Canvas &c)
             const Rect first{cx, card.y + card.h - 36.0f - 68.0f - 14.0f - 76.0f, cw, 76.0f};
             const Rect second{cx, card.y + card.h - 36.0f - 68.0f, cw, 68.0f};
             primary_button(c, first, tr("Play"), translate_hint(Pad::cross), focus(kMain), press_,
-                           has_game && ready);
+                           playable && ready);
             secondary_button(c, second, tr("Game settings"), translate_hint(Pad::triangle),
                              focus(kGameSettings), press_, has_game && game->title_id != 0);
         }

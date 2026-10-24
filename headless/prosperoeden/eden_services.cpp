@@ -31,6 +31,7 @@
 #include <cerrno>
 #include <cstddef>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <ctime>
 #include <dirent.h>
@@ -254,6 +255,14 @@ std::string EnsureCover(const std::string& filename, std::string* title = nullpt
     if (metadata & EDEN_METADATA_COVER) return cover;
     Eden::Report("cover", ("No cover extracted from " + filename).c_str());
     return Eden::FileExists(cover) ? cover : std::string{};
+}
+
+// The game a path to play it where it lies on its download source names (Remote::StreamPath):
+// false for another path, or when its source no longer has it or no longer sends it so.
+bool StreamedGameOf(const std::string& path, Eden::Remote::Game* game) {
+    std::string source, id;
+    return Eden::FilesystemAccess() && Eden::Remote::ParseStreamPath(path, &source, &id) &&
+           Eden::Remote::Find(source, id, game) && game->stream;
 }
 
 // The names of the download sources, by their keys.
@@ -840,6 +849,8 @@ std::vector<pe::ui::Game> EdenServices::games() {
         game.sources = sources_of(titles[i]);
         game.key = titles[i].key;
         game.remote = true;
+        // Played where it lies, when one of its sources sends it so ("stream": true).
+        game.stream = Eden::Remote::StreamPathOf(titles[i]);
         games.push_back(std::move(game));
     }
     std::sort(games.begin(), games.end(),
@@ -847,7 +858,12 @@ std::vector<pe::ui::Game> EdenServices::games() {
     return games;
 }
 
-std::string EdenServices::game_path(const std::string& file) { return Eden::GamesPath("roms/" + file); }
+std::string EdenServices::game_path(const std::string& file) {
+    // A game played where it lies is started by its path as it is (headless/streamed_game.h).
+    Eden::Remote::Game streamed;
+    if (StreamedGameOf(file, &streamed)) return file;
+    return Eden::GamesPath("roms/" + file);
+}
 
 bool EdenServices::take_update(pe::ui::UpdateOffer* offer) {
     Eden::UpdateNotice::Offer found;
@@ -959,6 +975,9 @@ bool EdenServices::remove_profile(int index) {
 }
 
 bool EdenServices::game_exists(const std::string& file) {
+    // A game played where it lies: while its source has it and sends it so.
+    Eden::Remote::Game streamed;
+    if (StreamedGameOf(file, &streamed)) return true;
     return Eden::ValidRomPath(file) && IsFile(Eden::GamesPath("roms/" + file));
 }
 
@@ -1654,6 +1673,13 @@ void EdenServices::StartSync(std::vector<SyncJob> jobs, bool before) {
         item.job = std::move(job);
         item.game.file = item.job.file;
         item.game.name = GameTitle(item.job.file);
+        // A game played where it lies: as its source has it, with the title ID the source knows
+        // (without one there is nothing to sync, as for a game no longer on the console).
+        if (Eden::Remote::Game streamed; StreamedGameOf(item.job.file, &streamed)) {
+            item.game.file = streamed.file;
+            item.game.name = streamed.name.empty() ? CleanTitle(streamed.file) : streamed.name;
+            item.game.title_id = streamed.title_id.empty() ? 0 : std::strtoull(streamed.title_id.c_str(), nullptr, 16);
+        }
         // Turned off (save-sync.json's "auto"): neither before a game nor what waits from after one.
         item.syncs = SyncSetupOf(item.job.profile, &item.setup) && item.setup.automatic;
         item.profile_name = ProfileName(item.job.profile);

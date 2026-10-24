@@ -96,6 +96,8 @@ python3 -B "$root/tools/check-jit-patch-lookup.py"
 python3 -B "$root/tools/check-jit-assert.py"
 python3 -B "$root/tools/check-crash-report.py"
 python3 -B "$root/tools/check-system-keyboard.py"
+python3 -B "$root/tools/check-stream-file.py"
+python3 -B "$root/tools/check-streamed-game.py"
 python3 -B "$root/tools/check-launcher-theme.py"
 if [[ "$probe" == OFF ]]; then
     python3 -B "$root/tools/check-exclusive-monitor.py"

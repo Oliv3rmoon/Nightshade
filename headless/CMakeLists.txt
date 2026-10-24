@@ -1445,6 +1445,17 @@ endif()
 string(REPLACE "            ShutdownMainProcess();\n            return"
     "            process.reset();\n            ShutdownMainProcess();\n            return"
     system_source "${system_source}")
+# A game played where it lies on its download source (headless/streamed_game.h) has a path that is
+# no file, "stream:<source>/<game>": its file is the one the session opened on the source. Eden's
+# load and its game card open the game by its path here (tools/check-streamed-game.py).
+set(game_file_old "FileSys::VirtualFile GetGameFileFromPath(const FileSys::VirtualFilesystem& vfs,\n                                         const std::string& path) {\n")
+set(game_file_new "    if (::Eden::StreamedGame::IsPath(path)) return ::Eden::StreamedGame::File(path);\n")
+string(FIND "${system_source}" "${game_file_old}" game_file_offset)
+if(game_file_offset LESS 0)
+    message(FATAL_ERROR "Pinned GetGameFileFromPath changed; review streamed games (headless/streamed_game.h).")
+endif()
+string(REPLACE "${game_file_old}" "${game_file_old}${game_file_new}" system_source "${system_source}")
+string(PREPEND system_source "#include \"${EDEN_PORT_DIR}/streamed_game.h\"\n")
 write_derived("${PORT_BUILD_DIR}/core.cpp" "${system_source}")
 get_target_property(core_sources core SOURCES)
 # The PS5 heap is bounded: avoid allocating/decompressing an executable merely
@@ -3294,6 +3305,13 @@ else()
     target_include_directories(eden-romfs-check PRIVATE "${PROJECT_SOURCE_DIR}/src")
     target_link_libraries(eden-romfs-check PRIVATE core)
     target_compile_options(eden-romfs-check PRIVATE -fno-rtti)
+    # A game played where it lies on its download source, shown to Eden's own loaders and to the
+    # patched GetGameFileFromPath (streamed_game.h); written with assert().
+    add_executable(eden-streamed-game-check "${EDEN_PORT_DIR}/streamed_game_check.cpp"
+        "${EDEN_PORT_DIR}/remote/stream_file.cpp")
+    target_include_directories(eden-streamed-game-check PRIVATE "${PROJECT_SOURCE_DIR}/src" "${EDEN_PORT_DIR}")
+    target_link_libraries(eden-streamed-game-check PRIVATE core)
+    target_compile_options(eden-streamed-game-check PRIVATE -fno-rtti -UNDEBUG)
     add_executable(eden-scalar-check "${EDEN_PORT_DIR}/scalar_check.cpp")
     target_include_directories(eden-scalar-check PRIVATE "${PROJECT_SOURCE_DIR}/src")
     target_link_libraries(eden-scalar-check PRIVATE dynarmic)
@@ -3522,13 +3540,17 @@ endif()
             target_include_directories(eden-headless PRIVATE "${launcher_lua_dir}")
             target_sources(eden-headless PRIVATE ${launcher_sources} ${launcher_lua_sources})
             # Download sources and their queue (remote/remote.h), with their backends (remote/source.h,
-            # backends.h) and the console's FTP server that writes the files (remote/ftp.h); their
-            # HTTP (remote/http.c) is linked into the update check's object below, with its libcurl.
+            # backends.h), the console's FTP server that writes the files (remote/ftp.h) and a source's
+            # game read where it lies (remote/stream_file.h, opened for its session by
+            # streamed_game.cpp); their HTTP (remote/http.c) is linked into the update check's object
+            # below, with its libcurl.
             target_sources(eden-headless PRIVATE
                 "${EDEN_PORT_DIR}/remote/remote.cpp"
                 "${EDEN_PORT_DIR}/remote/backends.cpp"
                 "${EDEN_PORT_DIR}/remote/ftp.cpp"
                 "${EDEN_PORT_DIR}/remote/stream_check.cpp"
+                "${EDEN_PORT_DIR}/remote/stream_file.cpp"
+                "${EDEN_PORT_DIR}/streamed_game.cpp"
                 "${EDEN_PORT_DIR}/remote/save_archive.cpp"
                 "${EDEN_PORT_DIR}/remote/save_sync.cpp"
                 "${EDEN_PORT_DIR}/remote/romm/romm_client.cpp"

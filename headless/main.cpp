@@ -52,6 +52,7 @@
 #include "metadata_bridge.h"
 #include "game_files.h"
 #include "ncz_vfs.h"
+#include "streamed_game.h"
 #ifdef EDEN_PS5_OPENGL
 #include "graphics.h"
 #include "video_core/renderer_base.h"
@@ -567,6 +568,9 @@ int main(int argc, char** argv) {
         Eden::Multiplayer::SetDetailedLogging(Eden::LoadPreferences().detailed_logging);
         Eden::Multiplayer::RoomClient rooms;
         for (;;) {
+        // The file of a game played before where it lies on its download source, while the stop
+        // limit still watches: letting it go waits for its transfer to end.
+        Eden::StreamedGame::Close();
         Eden::StopLimit::End();  // whatever game ran before is gone
 #ifdef EDEN_PS5_OPENGL
         std::error_code trim_error;
@@ -653,6 +657,16 @@ int main(int argc, char** argv) {
         launch_error.clear();
         if (!rooms.BeginGame()) throw std::runtime_error("Join a room successfully or leave it before starting a game.");
         SCOPE_EXIT { rooms.EndGame(); };
+#ifdef EDEN_PS5_OPENGL
+        // A game played where it lies on its download source (streamed_game.h): its path is no
+        // file, and its file is opened on the source before anything reads the game. It is let go
+        // when the next game starts or the launcher opens (above), so that a failure can still say
+        // why the game stopped (below).
+        if (Eden::StreamedGame::IsPath(selected_game)) {
+            std::string error;
+            if (!Eden::StreamedGame::Open(selected_game, &error)) throw std::runtime_error(error);
+        }
+#endif
 #ifdef EDEN_DEV_VULKAN
         Eden::Performance::vulkan_cost_enabled = std::filesystem::exists(Eden::AppFile("cost-run.txt"));
         if (Eden::Performance::vulkan_cost_enabled) Eden::Performance::timers_on = true;  // a cost run
@@ -700,7 +714,8 @@ int main(int argc, char** argv) {
             throw std::runtime_error("Vulkan is not available in this build yet. Select OpenGL in Settings > Video to play.");
 #endif
         Eden::Report("launch", Eden::BackendName(backend));
-        const bool game = std::filesystem::is_regular_file(selected_game);
+        const bool game = Eden::StreamedGame::Find(selected_game) != nullptr ||
+                          std::filesystem::is_regular_file(selected_game);
         if (!game) throw std::runtime_error("Selected ROM is no longer available");
         const char* guest = selected_game.c_str();
         // The game as the Library names it: its path in roms/ ("Game.nsp", or "Game/Game.nsp" in a
@@ -717,8 +732,12 @@ int main(int argc, char** argv) {
 #endif
         Eden::session_title.store(game_title);
         // The loading screen shows the game's cover: the one the launcher keeps of it, found by
-        // the game's name in the game files folder (loading_art.h).
-        Eden::Loading::SetArtFromCover(Eden::CoverFile(rom_name));
+        // the game's name in the game files folder (loading_art.h), or for a game played where it
+        // lies, the one of its download source.
+        if (const auto streamed = Eden::StreamedGame::Find(selected_game))
+            Eden::Loading::SetArtFromCover(streamed->cover);
+        else
+            Eden::Loading::SetArtFromCover(Eden::CoverFile(rom_name));
         const unsigned cycles = game ? 1 : 3;
         const bool devices = EDEN_DEVICE_FRONTEND;
         if (game) {
@@ -1383,7 +1402,10 @@ int main(int argc, char** argv) {
             const std::string mods = Eden::Mods::Summary(all_mods, mods_off, cheats_on);
             Settings::values.disabled_addons[title] = mods_off;
             Eden::Report("launch", ("Mods: " + mods).c_str());
-            Eden::Crash::SetSession("game " + std::filesystem::path(guest).filename().string() + " (" + title_id +
+            const auto streamed = Eden::StreamedGame::Find(guest);
+            const std::string game_file = streamed ? streamed->file_name + " played where it lies on " + streamed->source :
+                                                     std::filesystem::path(guest).filename().string();
+            Eden::Crash::SetSession("game " + game_file + " (" + title_id +
                                     "), " + Eden::BackendName(backend) + ", resolution " +
                                     Eden::kResolutionKeys[resolution] + ", " + Eden::kUpscalingFilterLabels[filter] +
                                     ", output " + Eden::kOutputKeys[video.output] + ", " +
@@ -1559,10 +1581,13 @@ int main(int argc, char** argv) {
                     bool captured = false;
                     bool return_to_menu = false;
                     bool room_lost = false;
+                    bool stream_lost = false; // a game played where it lies: its source failed for good
                     std::exception_ptr failure;
                     std::string guest_fault;
                 };
                 auto completion = std::make_shared<Completion>();
+                // A game played where it lies (streamed_game.h); null for one on the console.
+                const auto streamed = Eden::StreamedGame::Find(guest);
                 system.RegisterExitCallback([completion] {
                     std::lock_guard lock(completion->mutex);
                     completion->exited = true;
@@ -1586,8 +1611,9 @@ int main(int argc, char** argv) {
                 // the patch manager looks the base up here, and without it applied only the update's
                 // code, which then ran against the old data. It also gives Eden the game's control data.
                 game_contents.ClearAllEntries();
+                // (A game played where it lies is no file: its file is the one opened on its source.)
                 if (game && guest && !game_contents.AddEntriesFromContainer(
-                        system.GetFilesystem()->OpenFile(guest, FileSys::OpenMode::Read)))
+                        streamed ? streamed->file : system.GetFilesystem()->OpenFile(guest, FileSys::OpenMode::Read)))
                     Eden::Report("loader", "Game contents not registered; an update's data will not apply");
                 system.RegisterContentProvider(FileSys::ContentProviderUnionSlot::FrontendManual, &game_contents);
                 {
@@ -1685,9 +1711,10 @@ int main(int argc, char** argv) {
                     throw std::runtime_error(text);
                 }
 #ifdef PS5_NATIVE
-                if (game) {
-                    // By its name in roms/: a game in a game folder saved by its file name alone
-                    // was not found again, and the home page left it out (issue 264).
+                // By its name in roms/: a game in a game folder saved by its file name alone was not
+                // found again, and the home page left it out (issue 264). A game played where it lies
+                // is no file in roms/, and none of the recent games.
+                if (game && !Eden::StreamedGame::Find(guest)) {
                     const bool saved_last = Eden::SaveLastGame(rom_name);
                     const bool saved_recent = Eden::SaveRecentGame(rom_name);
                     if (!saved_last || !saved_recent)
@@ -1843,6 +1870,15 @@ int main(int argc, char** argv) {
                 }
                 Eden::TakeGuestFault(); // Nothing from an earlier session belongs to this one.
                 Eden::Loading::Set(Eden::Loading::Step::starting);
+                // From here a read of a game played where it lies that its source can no longer
+                // answer waits for the stop below, instead of handing the game what did not come, and
+                // the session ends at once (streamed_game.h).
+                if (streamed)
+                    streamed->hold([completion] {
+                        std::lock_guard lock(completion->mutex);
+                        completion->stream_lost = true;
+                        completion->wake.notify_one();
+                    });
                 system.Run();
 #if defined(EDEN_DEV_PROFILE) && defined(PS5_NATIVE)
                 Eden::Stall::Trace("main running");
@@ -1886,6 +1922,14 @@ int main(int argc, char** argv) {
                         if (auto fault = Eden::TakeGuestFault(); !fault.empty()) {
                             std::lock_guard lock(completion->mutex);
                             completion->guest_fault = std::move(fault);
+                            completion->wake.notify_one();
+                            break;
+                        }
+                        // Its source failed for good and a read of the game came short: the game
+                        // cannot go on, whatever it does with the bytes that did not come.
+                        if (streamed && !streamed->failed().empty()) {
+                            std::lock_guard lock(completion->mutex);
+                            completion->stream_lost = true;
                             completion->wake.notify_one();
                             break;
                         }
@@ -1988,7 +2032,7 @@ int main(int argc, char** argv) {
                     if (shutdown_sweep) LOG_INFO(Frontend, "EDEN_SHUTDOWN_DELAY_MS {}", wait_ms);
                     const auto completed = [&] {
                         return completion->failure || completion->exited || completion->captured ||
-                            completion->return_to_menu || !completion->guest_fault.empty();
+                            completion->return_to_menu || !completion->guest_fault.empty() || completion->stream_lost;
                     };
 #ifdef EDEN_DEV_PROFILE
                     // The 30-second segments a development session samples before it only waits.
@@ -2103,6 +2147,7 @@ int main(int argc, char** argv) {
                     }
                     passed(return_to_menu ? "shortcut_return_to_menu" :
                         guest_exited ? "guest_exit_callback" : !completion->guest_fault.empty() ? "guest_fault" :
+                        completion->stream_lost ? "stream_lost" :
                         completion->captured ? "game_capture_shutdown" : "game_observation_complete");
                 }
                 input_worker.request_stop();
@@ -2124,6 +2169,10 @@ int main(int argc, char** argv) {
                     for (;;) std::this_thread::sleep_for(std::chrono::seconds(1));
                 }
 #endif
+                // A read that waits for a stalled network, or for this stop after its source failed,
+                // must not hold it: the reads of a game played where it lies end now, with what is kept
+                // (streamed_game.h).
+                if (streamed) streamed->stop();
                 system.ShutdownMainProcess();
                 Eden::Report("shutdown", "Game stopped; releasing renderer");
 #ifndef PS5_NATIVE
@@ -2135,6 +2184,10 @@ int main(int argc, char** argv) {
 #endif
                 if (system.IsPoweredOn()) return 1;
                 passed("core_shutdown");
+                // Its source failed for good: that is why it stopped, whatever the game or the renderer
+                // made of the bytes that did not come, and it is not started again.
+                if (streamed && !streamed->failed().empty())
+                    throw std::runtime_error(Eden::StreamedGame::LostMessage(*streamed, streamed->failed()));
                 if (completion->failure) {
                     try { std::rethrow_exception(completion->failure); }
                     catch (const std::exception& error) {
@@ -2210,6 +2263,13 @@ int main(int argc, char** argv) {
         } catch (const std::exception& error) {
             launch_error = error.what();
             Eden::Report("session failed", error.what());
+            // A game played where it lies whose source failed for good while Eden read it: that is
+            // why it did not start or stopped, whatever Eden made of the bytes that did not come.
+            if (const auto streamed = Eden::StreamedGame::Find(selected_game);
+                streamed && !streamed->failed().empty()) {
+                launch_error = Eden::StreamedGame::LostMessage(*streamed, streamed->failed());
+                if (launch_error != error.what()) Eden::Report("session failed", launch_error.c_str());
+            }
             std::fflush(stderr);
             std::fflush(stdout);
         }

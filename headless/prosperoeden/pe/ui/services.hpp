@@ -89,6 +89,10 @@ struct Game
     std::string key;
     // Not on the console yet: on its sources only. Its file is the name it gets in roms/.
     bool remote = false;
+    // For one on its sources only: the path it is played from where it lies, without downloading
+    // it first, when one of them sends its games so (sources.json "stream": true); empty when it
+    // is downloaded first. play_file (launch_commit.hpp) tells what playing it starts.
+    std::string stream;
 };
 
 // A download source: a place on the network with Switch games (headless/remote/remote.h).

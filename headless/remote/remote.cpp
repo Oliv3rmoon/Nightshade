@@ -6,6 +6,7 @@
 #include "backends.h"
 #include "ftp.h"
 #include "stream_check.h"
+#include "stream_file.h"
 
 #include <algorithm>
 #include <atomic>
@@ -49,6 +50,9 @@ constexpr std::uint64_t kSpare = 256ull << 20;
 // A download that goes on fetches its last bytes again: after a power cut, the end of a file may
 // not hold what was written there.
 constexpr std::uint64_t kRewind = 4u << 20;
+// How the path of a game played where it lies begins (StreamPath), as headless/streamed_game.h
+// knows it.
+constexpr std::string_view kStreamScheme = "stream:";
 
 struct Entry {
     std::uint64_t serial = 0; // tells entries apart for the threads
@@ -63,7 +67,10 @@ struct Entry {
 struct SourceState {
     std::string key;
     std::string name;
-    std::string signature;           // its entry in sources.json, to see a change
+    std::string signature;           // its entry in sources.json, to see a change ("stream" aside)
+    std::string type;                // its backend's
+    Json entry;                      // its entry, for a source of a streamed game's own (OpenStream)
+    bool stream = false;             // "stream": true: its games are played where they lie
     std::shared_ptr<Source> source;  // nullptr when the entry is not usable
     std::string error;
     bool refresh_wanted = false;
@@ -153,6 +160,26 @@ std::string Safe(const std::string& name) {
         }
     }
     return safe;
+}
+
+// Safe's way back; false for what Safe does not write.
+bool Unsafe(std::string_view safe, std::string* name) {
+    name->clear();
+    const auto digit = [](char c) {
+        return c >= '0' && c <= '9' ? c - '0' : c >= 'A' && c <= 'F' ? c - 'A' + 10 : c >= 'a' && c <= 'f' ? c - 'a' + 10 : -1;
+    };
+    for (std::size_t at = 0; at < safe.size(); ++at) {
+        const unsigned char c = static_cast<unsigned char>(safe[at]);
+        if (std::isalnum(c) || c == '-' || c == '_') {
+            *name += static_cast<char>(c);
+        } else if (c == '%' && at + 2 < safe.size() && digit(safe[at + 1]) >= 0 && digit(safe[at + 2]) >= 0) {
+            *name += static_cast<char>(digit(safe[at + 1]) * 16 + digit(safe[at + 2]));
+            at += 2;
+        } else {
+            return false;
+        }
+    }
+    return true;
 }
 
 std::int64_t FileSize(const std::string& path) {
@@ -412,19 +439,31 @@ void ReadSources(Shared& s) {
                 std::string key = Lower(Safe(name));
                 for (int n = 2; std::any_of(sources.begin(), sources.end(), [&](const auto& other) { return other->key == key; }); ++n)
                     key = Lower(Safe(name)) + "-" + std::to_string(n);
+                const auto stream = entry.find("stream");
+                const bool streams = stream != entry.end() && stream->is_boolean() && stream->get<bool>();
                 auto state = std::make_shared<SourceState>();
                 state->key = key;
                 state->name = name;
-                state->signature = std::to_string(std::hash<std::string>{}(entry.dump()));
+                // Whether its games are played where they lie is not what the source is: turned on
+                // or off, its kept list stays (and an entry without it is signed as it always was).
+                Json signed_entry = entry;
+                signed_entry.erase("stream");
+                state->signature = std::to_string(std::hash<std::string>{}(signed_entry.dump()));
                 if (const auto before = FindSource(s, key); before && before->signature == state->signature) {
+                    if (before->stream != streams && streams) Log("source " + name + ": its games are played where they lie");
+                    before->stream = streams;
                     sources.push_back(before);
                     continue;
                 }
                 std::string error;
+                state->type = type;
+                state->entry = entry;
+                state->stream = streams;
                 state->source = MakeSource(type, entry, &error);
                 state->error = error;
                 LoadCatalog(s, *state);
                 if (!state->source) Log("source " + name + ": " + error);
+                else if (streams) Log("source " + name + ": its games are played where they lie");
                 sources.push_back(std::move(state));
             }
             s.configured = !sources.empty();
@@ -478,7 +517,7 @@ class FileReceiver final : public Receiver {
     // rather than left to fill the drive.
     void limit(std::uint64_t size) { limit_ = size; }
 
-    bool begin(bool from_start) override {
+    bool begin(bool from_start, std::uint64_t) override {
         // The whole file, although a part was asked for: it is written again from its start.
         if (from_start && start_ > 0) {
             start_ = 0;
@@ -1099,6 +1138,7 @@ Status Current() {
         source.online = state->online;
         source.error = state->error;
         source.games = state->games.size();
+        source.stream = state->stream;
         status.sources.push_back(std::move(source));
     }
     return status;
@@ -1109,7 +1149,11 @@ std::vector<Game> Games() {
     std::vector<Game> games;
     {
         const std::lock_guard lock(s.lock);
-        for (const auto& state : s.sources) games.insert(games.end(), state->games.begin(), state->games.end());
+        for (const auto& state : s.sources)
+            for (Game game : state->games) {
+                game.stream = state->stream;
+                games.push_back(std::move(game));
+            }
         for (Game& game : games)
             if (const std::string cover = CoverPath(s, game.source, game.id); s.covers.contains(cover)) game.cover = cover;
     }
@@ -1148,6 +1192,7 @@ bool Find(const std::string& source, const std::string& id, Game* game) {
         if (found == nullptr) return false;
         if (game == nullptr) return true;
         *game = *found;
+        game->stream = FindSource(s, source)->stream;
         if (const std::string cover = CoverPath(s, game->source, game->id); s.covers.contains(cover)) game->cover = cover;
     }
     return true;
@@ -1241,6 +1286,70 @@ std::vector<std::string> Files(const std::string& source, const std::string& id)
             for (std::string path : {FinalPath(s.paths, *game, part), EarlierPath(s.paths, part)})
                 if (FileSize(path) >= 0) files.push_back(std::move(path));
     return files;
+}
+
+std::string StreamPath(const std::string& source, const std::string& id) {
+    return std::string{kStreamScheme} + Safe(source) + "/" + Safe(id);
+}
+
+bool ParseStreamPath(const std::string& path, std::string* source, std::string* id) {
+    if (!path.starts_with(kStreamScheme)) return false;
+    const std::string_view rest = std::string_view{path}.substr(kStreamScheme.size());
+    const auto slash = rest.find('/');
+    std::string first, second;
+    if (slash == std::string_view::npos || !Unsafe(rest.substr(0, slash), &first) ||
+        !Unsafe(rest.substr(slash + 1), &second) || first.empty() || second.empty())
+        return false;
+    *source = std::move(first);
+    *id = std::move(second);
+    return true;
+}
+
+std::string StreamPathOf(const Title& title) {
+    for (const Game& game : title.games)
+        if (game.stream) return StreamPath(game.source, game.id);
+    return {};
+}
+
+std::shared_ptr<StreamFile> OpenStream(const std::string& source, const std::string& id, std::string* error,
+                                       std::function<void(const std::string&)> log) {
+    Shared& s = State_();
+    Game game;
+    std::string type;
+    Json entry;
+    {
+        const std::lock_guard lock(s.lock);
+        const auto state = FindSource(s, source);
+        const Game* found = state != nullptr ? FindGame(s, source, id) : nullptr;
+        if (state == nullptr || state->source == nullptr || !state->stream || found == nullptr) {
+            *error = state == nullptr         ? std::string{"Its source is no longer in sources.json"} :
+                     state->source == nullptr ? state->error :
+                     !state->stream ? std::string{"Its source does not send games to be played where they lie "
+                                                  "(\"stream\": true in sources.json)"} :
+                                      std::string{"Its source no longer has this game"};
+            return nullptr;
+        }
+        game = *found;
+        type = state->type;
+        entry = state->entry;
+    }
+    // The game's file comes first (MakeGame, LoadCatalog).
+    const Part& part = game.parts.front();
+    if (part.update) {
+        *error = "The source has no game file for it";
+        return nullptr;
+    }
+    if (part.size == 0) {
+        *error = "The source does not give the size of " + part.name + ", so it cannot be played where it lies";
+        return nullptr;
+    }
+    // A source of its own: the one the threads use may be in a transfer of theirs, and is held
+    // while a game runs (Stop).
+    std::unique_ptr<Source> own = MakeSource(type, entry, error);
+    if (own == nullptr) return nullptr;
+    return std::make_shared<StreamFile>(std::move(own), AsSourceGame(game),
+                                        SourceFile{part.id, part.name, part.size, FileKind::game},
+                                        StreamFile::kDefaultCache, std::move(log));
 }
 
 } // namespace Eden::Remote
