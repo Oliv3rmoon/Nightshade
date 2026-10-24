@@ -798,7 +798,32 @@ void CheckPad() {
     { Eden::Pad pad; CHECK(!pad.Open()); }
     CHECK(state.user_terminations == 7); CHECK(state.pad_closes == 6);
     state.pad_open_result = 7;
-    std::puts("Pad mappings, a changed button mapping, calibration, motion, HD rumble over audio haptics with motor fallback, 64-sample edges, disconnect and ownership PASS");
+    // A controller whose reads keep failing (after rest mode or the home menu, #97 and #269) is
+    // opened again after a second of errors and each second after, in place, and works again.
+    {
+        Eden::Pad pad;
+        CHECK(pad.Open());
+        const int opens = state.pad_opens, closes = state.pad_closes;
+        state.read_result = -1;
+        for (unsigned i = 1; i < 250; ++i) CHECK(!pad.Poll());
+        CHECK(state.pad_opens == opens && state.pad_closes == closes);
+        CHECK(!pad.Poll());
+        CHECK(state.pad_opens == opens + 1 && state.pad_closes == closes + 1);
+        CHECK(pad.ConnectedPlayers() == 1u);
+        state.pad_open_result = -1;  // the handle does not open again yet: tried a second later
+        for (unsigned i = 0; i < 250; ++i) CHECK(!pad.Poll());
+        CHECK(state.pad_opens == opens + 2 && state.pad_closes == closes + 2);
+        state.pad_open_result = 7;
+        for (unsigned i = 0; i < 250; ++i) CHECK(!pad.Poll());
+        CHECK(state.pad_opens == opens + 3);
+        state.read_result = 0;
+        auto pressed = neutral_data(); pressed.connected = 1; pressed.buttons = kButtonCircle;
+        state.pad_samples.push_back(pressed);
+        CHECK(pad.Poll()); CHECK(pad.Engine().GetButton({}, 0));
+        for (unsigned i = 0; i < 300; ++i) CHECK(pad.Poll());
+        CHECK(state.pad_opens == opens + 3);  // working reads open nothing
+    }
+    std::puts("Pad mappings, a changed button mapping, calibration, motion, HD rumble over audio haptics with motor fallback, 64-sample edges, disconnect and ownership, a controller opened again after failed reads PASS");
 }
 
 void CheckAudio() {
