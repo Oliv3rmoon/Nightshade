@@ -3,8 +3,9 @@
  * Memory. PS5 direct memory is real from the first byte, and the CPU shares one 12 GiB pool with
  * the GPU. The heap used to take its whole 3 GiB at start; the largest game measured used
  * 1.16 GiB of it, and the rest was graphics memory that game then ran out of. So the heap now
- * reserves its 3 GiB as address space only and commits it a piece (128 MiB) at a time, from the
- * start of the range, when an allocation finds no room. Every piece (or run of pieces, for one
+ * reserves its range (6 GiB, PS5_OPENGL_HEAP_SIZE) as address space only and commits it a piece
+ * (128 MiB) at a time, from the start of the range, when an allocation finds no room. Where no
+ * range can be reserved, it takes 3 GiB at once, as it did before it grew. Every piece (or run of pieces, for one
  * request larger than a piece) is a Sony mspace of its own; an address tells its piece, and
  * the piece its mspace. Memory is not given back: a piece stays for the next game.
  *
@@ -57,9 +58,14 @@ static void *eden_heap_spaces[EDEN_HEAP_PIECES];
 static atomic_uint eden_heap_space_count;
 /* The mspace each piece belongs to. */
 static void *_Atomic eden_heap_piece_space[EDEN_HEAP_PIECES];
+/* Where no range can be reserved, the heap takes this much at once. Its 6 GiB taken whole would
+ * leave graphics too little of the 12 GiB pool. */
+#define EDEN_HEAP_WHOLE_SIZE ((size_t)3072 << 20)
 /* Pieces committed so far: [0, used). All of them when the heap could not be reserved to grow. */
 static atomic_uint eden_heap_pieces_used;
 static int eden_heap_grows;
+/* The heap's range: PS5_OPENGL_HEAP_SIZE when it grows, EDEN_HEAP_WHOLE_SIZE when taken whole. */
+static size_t eden_heap_range_size;
 static atomic_uint eden_heap_space_hint; /* where the last allocation from the spaces succeeded */
 static atomic_flag eden_heap_grow_lock = ATOMIC_FLAG_INIT;
 
@@ -240,16 +246,16 @@ static int ps5_heap_ready(void) {
     return expected == 2;
 
   /* Address space for the whole heap and memory for its first piece; where a range cannot be
-   * reserved, the whole heap at once as before. */
+   * reserved, 3 GiB at once as before. */
   void *base = eden_heap_reserve(PS5_OPENGL_HEAP_SIZE);
   size_t first_size = EDEN_HEAP_PIECE_SIZE;
   unsigned first_pieces = 1;
   if (base != NULL && eden_heap_commit(base, EDEN_HEAP_PIECE_SIZE) == 0) {
     eden_heap_grows = 1;
   } else {
-    base = eden_heap_pages(PS5_OPENGL_HEAP_SIZE);
-    first_size = PS5_OPENGL_HEAP_SIZE;
-    first_pieces = EDEN_HEAP_PIECES;
+    base = eden_heap_pages(EDEN_HEAP_WHOLE_SIZE);
+    first_size = EDEN_HEAP_WHOLE_SIZE;
+    first_pieces = (unsigned)(EDEN_HEAP_WHOLE_SIZE >> EDEN_HEAP_PIECE_SHIFT);
   }
   if (base == NULL) {
     atomic_store_explicit(&ps5_heap_state, -1, memory_order_release);
@@ -257,11 +263,12 @@ static int ps5_heap_ready(void) {
   }
 
   ps5_heap_base = base;
+  eden_heap_range_size = eden_heap_grows ? PS5_OPENGL_HEAP_SIZE : EDEN_HEAP_WHOLE_SIZE;
   ps5_heap_mspace = sceLibcMspaceCreate("Eden-headless", base, first_size, 0);
   if (ps5_heap_mspace == NULL) {
     ps5_heap_base = NULL;
     if (!eden_heap_grows)
-      eden_heap_pages_free(base, PS5_OPENGL_HEAP_SIZE);
+      eden_heap_pages_free(base, EDEN_HEAP_WHOLE_SIZE);
     atomic_store_explicit(&ps5_heap_state, -1, memory_order_release);
     return 0;
   }
@@ -284,7 +291,7 @@ static int eden_heap_in_range(const void *address) {
     return 0;
   uintptr_t value = (uintptr_t)address;
   uintptr_t base = (uintptr_t)ps5_heap_base;
-  return value >= base && value - base < PS5_OPENGL_HEAP_SIZE;
+  return value >= base && value - base < eden_heap_range_size;
 }
 
 /* Any block of this heap: one in its range, or a large block with memory of its own. */
