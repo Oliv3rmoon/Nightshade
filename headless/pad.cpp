@@ -212,6 +212,11 @@ void Pad::ReopenSlot(std::size_t player) {
     slot.stale = handle < 0;
     if (handle < 0) return;
     slot.handle = handle;
+    // Still the player's controller: connected, as it was before its reads failed.
+    if (!(connected_players & (1u << player))) {
+        connected_players |= 1u << player;
+        connection_changes |= 1u << player;
+    }
     slot.haptics = std::make_unique<HapticStream>();
     slot.haptics->Ensure(slot.user, handle);
     slot.last_haptic_stats = slot.haptics->GetStats();
@@ -274,7 +279,11 @@ void Pad::Close() {
         haptic_fallbacks += stats.fallbacks;
     }
     for (std::size_t player = 0; player < kMaxPlayers; ++player) {
-        if (slots[player].handle < 0) continue;
+        // A stale slot has no handle to close, but goes too: the next session starts afresh.
+        if (slots[player].handle < 0) {
+            slots[player] = {};
+            continue;
+        }
         if (slots[player].haptics) slots[player].haptics->Stop();
         const int closed = scePadClose(slots[player].handle);
         if (player == 0) {
