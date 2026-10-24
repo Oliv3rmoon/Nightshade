@@ -144,7 +144,7 @@ struct FakeSource final : Remote::Source {
                std::string* error) override {
         if (fail_next > 0) { --fail_next; *error = "connection reset"; return false; }
         std::this_thread::sleep_for(answer);
-        if (!receiver.begin(false)) { *error = "stopped"; return false; }
+        if (!receiver.begin(false, size - offset)) { *error = "stopped"; return false; }
         std::uint8_t chunk[64 * 1024];
         for (std::uint64_t at = offset; at < size;) {
             if (receiver.stopped()) { *error = "stopped"; return false; }

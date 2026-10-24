@@ -517,7 +517,7 @@ class FileReceiver final : public Receiver {
     // rather than left to fill the drive.
     void limit(std::uint64_t size) { limit_ = size; }
 
-    bool begin(bool from_start) override {
+    bool begin(bool from_start, std::uint64_t) override {
         // The whole file, although a part was asked for: it is written again from its start.
         if (from_start && start_ > 0) {
             start_ = 0;
