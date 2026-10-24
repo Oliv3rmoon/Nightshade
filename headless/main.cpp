@@ -47,6 +47,7 @@
 #include "error_applet.h"
 #include "keyboard_applet.h"
 #include "load_address.h"
+#include "load_failure.h"
 #include "preferences.h"
 #include "metadata_bridge.h"
 #include "game_files.h"
@@ -78,6 +79,8 @@ extern "C" std::int32_t sceKernelAvailableFlexibleMemorySize(std::size_t*);
 #include "common/scope_exit.h"
 #include "common/settings.h"
 #include "core/core.h"
+#include "core/crypto/key_manager.h"
+#include "core/loader/loader.h"
 #include "core/cpu_manager.h"
 #include "core/frontend/emu_window.h"
 #include "core/frontend/graphics_context.h"
@@ -1645,8 +1648,36 @@ int main(int argc, char** argv) {
                     if (loaded == Core::SystemResultStatus::ErrorVideoCore) {
                         throw std::runtime_error("Graphics backend initialization failed. Try another backend in Settings; see stderr.log and eden_log.txt for driver details.");
                     }
-                    throw std::runtime_error("Loader status " + std::to_string(static_cast<unsigned>(loaded)) +
-                        ". Check this ROM, its keys and firmware; see stderr.log.");
+                    // Eden's sentence for the loader's status, and for a key problem the newest
+                    // master key the keys file holds (load_failure.h).
+                    const unsigned status = static_cast<unsigned>(loaded);
+                    const unsigned base = static_cast<unsigned>(Core::SystemResultStatus::ErrorLoader);
+                    std::string message;
+                    bool key_problem = false;
+                    if (status >= base && status - base <= static_cast<unsigned>(Loader::ResultStatus::ErrorIntegrityVerificationFailed)) {
+                        const auto result = static_cast<Loader::ResultStatus>(status - base);
+                        message = Loader::GetResultStatusString(result);
+                        using Loader::ResultStatus;
+                        key_problem = result == ResultStatus::ErrorMissingProductionKeyFile ||
+                                      result == ResultStatus::ErrorMissingHeaderKey ||
+                                      result == ResultStatus::ErrorIncorrectHeaderKey ||
+                                      result == ResultStatus::ErrorMissingTitlekey ||
+                                      result == ResultStatus::ErrorMissingTitlekek ||
+                                      result == ResultStatus::ErrorInvalidRightsID ||
+                                      result == ResultStatus::ErrorMissingKeyAreaKey ||
+                                      result == ResultStatus::ErrorIncorrectKeyAreaKey ||
+                                      result == ResultStatus::ErrorIncorrectTitlekeyOrTitlekek;
+                    }
+                    int newest_master_key = -1;
+                    if (key_problem) {
+                        const auto& keys = Core::Crypto::KeyManager::Instance();
+                        for (int revision = 0; revision < 0x20; ++revision)
+                            if (keys.HasKey(Core::Crypto::S128KeyType::Master, revision)) newest_master_key = revision;
+                    }
+                    const std::string text =
+                        Eden::LoadFailure::Text(status, base, message, key_problem, newest_master_key);
+                    std::fprintf(stderr, "%s\n", text.c_str());
+                    throw std::runtime_error(text);
                 }
 #ifdef PS5_NATIVE
                 if (game) {
