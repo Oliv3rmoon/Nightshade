@@ -1304,8 +1304,11 @@ int main(int argc, char** argv) {
             // The block list is off unless the settings turn it on (block-list.txt in the app
             // folder still does, further down).
             if (!dev_block_list) Eden::JitList::enabled = speed.block_list;
-            // Set for every session: the value outlives one.
-            Settings::values.vertex_input_dynamic_state.SetValue(dev_vertex_input != 0);
+            // Set for every session: the value outlives one. dev-settings first, then the game's
+            // "vertex_input_dynamic" (settings_store.h), else on.
+            const int game_vertex_input = Eden::LoadGameSettings(eden_game_title_id(guest)).vertex_input_dynamic;
+            Settings::values.vertex_input_dynamic_state.SetValue(
+                dev_vertex_input >= 0 ? dev_vertex_input != 0 : game_vertex_input != 0);
             // The report reads the values back: what the emulator has, whoever set it.
             const auto on = [](bool value) { return value ? "on" : "off"; };
             Eden::Report("launch", (std::string("Performance: block list ") + on(Eden::JitList::enabled) +
@@ -1318,6 +1321,8 @@ int main(int argc, char** argv) {
                                     ", reactive flushing " + on(Settings::values.use_reactive_flushing.GetValue()) +
                                     ", skip invalidation " +
                                     on(Settings::values.skip_cpu_inner_invalidation.GetValue()) +
+                                    ", dynamic vertex input " +
+                                    on(Settings::values.vertex_input_dynamic_state.GetValue()) +
                                     ", speed limit " +
                                     (Settings::values.use_speed_limit.GetValue() ?
                                          std::to_string(Settings::values.speed_limit.GetValue()) + "%" :
