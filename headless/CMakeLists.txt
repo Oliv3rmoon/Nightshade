@@ -3003,9 +3003,15 @@ void Initialize() {
     # table, a 3 GiB heap and the A64 code caches were 8.6 GiB of it; where no range can be
     # reserved, the heap still takes only 3 GiB at once (EDEN_HEAP_WHOLE_SIZE). The size no longer
     # fits an unsigned int, so it is a size_t, and so is the one line that prints it.
+    # (The stock wrappers, EDEN_HEAP_ARENAS off, take the heap whole: 3 GiB there.)
+    option(EDEN_HEAP_ARENAS "Per-thread arenas inside the owned heap" ON)
+    set(heap_mib 3072)
+    if(EDEN_HEAP_ARENAS)
+        set(heap_mib 6144)
+    endif()
     file(READ "${heap_source}" heap)
-    string(REPLACE "128 MiB" "6144 MiB" heap "${heap}")
-    string(REPLACE "(128u * 1024u * 1024u)" "((size_t)6144 << 20)" heap "${heap}")
+    string(REPLACE "128 MiB" "${heap_mib} MiB" heap "${heap}")
+    string(REPLACE "(128u * 1024u * 1024u)" "((size_t)${heap_mib} << 20)" heap "${heap}")
     string(REPLACE "base=%p size=%u\\n" "base=%p size=%zu\\n" heap "${heap}")
     string(REPLACE "#include <sys/mman.h>" "#include <sys/mman.h>\nvoid *eden_heap_pages(size_t);\nvoid eden_heap_pages_free(void *, size_t);" heap "${heap}")
     string(REPLACE "mmap(NULL, PS5_OPENGL_HEAP_SIZE, PROT_READ | PROT_WRITE,\n                    MAP_PRIVATE | MAP_ANON, -1, 0)" "eden_heap_pages(PS5_OPENGL_HEAP_SIZE)" heap "${heap}")
@@ -3014,7 +3020,6 @@ void Initialize() {
     string(REPLACE "\"PS5-OpenGL\"" "\"Eden-headless\"" heap "${heap}")
     # Replace the single-mspace wrappers with per-thread arenas over the same heap
     # (headless/heap_arenas.inc). The shared source above stays pinned/unchanged.
-    option(EDEN_HEAP_ARENAS "Per-thread arenas inside the owned heap" ON)
     if(EDEN_HEAP_ARENAS)
         set(heap_wrappers_begin "static int ps5_heap_ready(void) {")
         set(heap_wrappers_end "void ps5_opengl_heap_stats_print(unsigned iteration) {")
