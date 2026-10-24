@@ -101,6 +101,10 @@ if [[ "$graphics" == ON ]]; then
     python3 -B "$root/tools/check-nvdrv-process-lifetime.py"
     python3 -B "$root/tools/check-integer-buffer-clear.py"
     python3 -B "$root/tools/check-game-capture-shutdown.py"
+    if [[ ${EDEN_PS5_VULKAN:-OFF} == ON ]]; then
+        python3 -B "$root/tools/check-staging-buffers.py" "$scratch/source/src" \
+            "$scratch/native-local/headless/vulkan_staging_buffer_pool.cpp"
+    fi
 fi
 
 python3 -B tools/check-hud.py

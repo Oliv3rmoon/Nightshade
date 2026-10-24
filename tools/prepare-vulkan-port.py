@@ -1006,6 +1006,48 @@ allocator = allocator.replace(include, include + '#include <atomic>\n#include <c
 path = output / 'vulkan_memory_allocator.cpp'
 if not path.exists() or path.read_text() != allocator:
     path.write_text(allocator)
+# Staging buffers (headless/staging_buffers.h): above 16 MiB a buffer the CPU writes or reads is its
+# transfer rounded up to 16 MiB instead of the next power of two, and a kept buffer is handed out
+# again only when it holds the transfer. Metroid Prime 4 at 2x ended asking for 256 MiB for a
+# transfer a little over 128 MiB, with 64 MiB in the pool's largest free block (#195).
+# tools/check-staging-buffers.py applies these replacements to the pinned source and runs the result.
+adapt('src/video_core/renderer_vulkan/vk_staging_buffer_pool.cpp', 'vulkan_staging_buffer_pool.cpp', [
+    ('#include "video_core/vulkan_common/vulkan_wrapper.h"\n',
+     '#include "video_core/vulkan_common/vulkan_wrapper.h"\n#include <atomic>\n#include <cstdio>\n'
+     '#include "staging_buffers.h"\n'),
+    ('    const auto is_free = [this](const StagingBuffer& entry) {\n'
+     '        return !entry.deferred && scheduler.IsFree(entry.tick);\n'
+     '    };',
+     '    const auto is_free = [this, size](const StagingBuffer& entry) {\n'
+     '        return !entry.deferred && scheduler.IsFree(entry.tick) &&\n'
+     '               ::Eden::StagingBuffers::Holds(entry.mapped_span.size(), entry.log2_level) >= size;\n'
+     '    };'),
+    ('    auto const log2_size = Common::Log2Ceil<u32>(u32(size));\n',
+     '    auto const log2_size = Common::Log2Ceil<u32>(u32(size));\n'
+     '    const bool exact = ::Eden::StagingBuffers::Exact(size, usage != MemoryUsage::DeviceLocal);\n'
+     '    const VkDeviceSize made = ::Eden::StagingBuffers::Size(size, log2_size, exact);\n'
+     '    if (exact) {\n'
+     '        // Kept buffers of this power of two too small for the transfer go before it is made.\n'
+     '        ::Eden::StagingBuffers::ReleaseFrom(GetCache(usage)[log2_size], [this, size](const StagingBuffer& entry) {\n'
+     '            return !entry.deferred && scheduler.IsFree(entry.tick) &&\n'
+     '                   ::Eden::StagingBuffers::Holds(entry.mapped_span.size(), entry.log2_level) < size;\n'
+     '        });\n'
+     '    }\n'),
+    ('        .size = 1ULL << log2_size,\n', '        .size = made,\n'),
+    ('    vk::Buffer buffer = memory_allocator.CreateBuffer(buffer_ci, usage);\n',
+     '    vk::Buffer buffer = memory_allocator.CreateBuffer(buffer_ci, usage);\n'
+     '    // A large buffer smaller than the power of two: the 1st, 2nd, 4th, 8th ... in the log.\n'
+     '    if (exact && made >= (VkDeviceSize{64} << 20) && made < (VkDeviceSize{1} << log2_size)) {\n'
+     '        static std::atomic<unsigned long long> large{0};\n'
+     '        const auto times = large.fetch_add(1, std::memory_order_relaxed) + 1;\n'
+     '        if ((times & (times - 1)) == 0) {\n'
+     '            std::fprintf(stderr, "[ProsperoEden] graphics memory: staging buffer of %llu MiB made for a transfer "\n'
+     '                         "of %llu MiB, not the %llu MiB of the next power of two (%llu so far)\\n",\n'
+     '                         static_cast<unsigned long long>(made >> 20), static_cast<unsigned long long>(size >> 20),\n'
+     '                         static_cast<unsigned long long>((VkDeviceSize{1} << log2_size) >> 20), times);\n'
+     '        }\n'
+     '    }\n'),
+])
 adapt('src/video_core/vulkan_common/vulkan.h', 'include/video_core/vulkan_common/vulkan.h',
       [('#else\n#define VK_USE_PLATFORM_XLIB_KHR', '#elif defined(PS5_NATIVE)\n// Native display-plane presentation, no desktop window-system headers.\n#else\n#define VK_USE_PLATFORM_XLIB_KHR')])
 adapt('src/video_core/vulkan_common/vulkan_instance.cpp', 'vulkan_instance.cpp', [
