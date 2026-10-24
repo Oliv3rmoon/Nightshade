@@ -10,7 +10,7 @@
 namespace Eden::Remote {
 
 namespace {
-// Transfers in a row that bring nothing before the file counts as gone.
+// Transfers in a row that bring no whole block before the file counts as gone.
 constexpr unsigned kMostFailures = 5;
 } // namespace
 
@@ -36,7 +36,6 @@ class StreamFile::Filler final : public Receiver {
             pending_.insert(pending_.end(), bytes, bytes + part);
             bytes += part;
             size -= part;
-            brought += part;
             if (pending_.size() == want && !Finish()) return false;
         }
         return true;
@@ -50,7 +49,10 @@ class StreamFile::Filler final : public Receiver {
         return redirected;
     }
 
-    std::uint64_t brought = 0;
+    // The whole blocks it brought. A part of one is dropped when the transfer breaks off (the next
+    // starts at that block again): a source that keeps breaking off before a block is whole brings
+    // nothing, however many bytes it sent.
+    std::uint64_t kept = 0;
     bool cannot_range = false;
     bool redirected = false; // stopped here, for another place or to close: no failure
 
@@ -72,6 +74,7 @@ class StreamFile::Filler final : public Receiver {
         const std::lock_guard lock(file_.lock_);
         file_.Keep(next_, std::move(pending_));
         pending_ = {};
+        ++kept;
         ++next_;
         file_.cursor_ = next_;
         file_.changed_.notify_all();
@@ -88,20 +91,25 @@ class StreamFile::Filler final : public Receiver {
     std::vector<std::uint8_t> pending_;
 };
 
-StreamFile::StreamFile(std::unique_ptr<Source> source, SourceGame game, SourceFile file, std::size_t cache_blocks)
+StreamFile::StreamFile(std::unique_ptr<Source> source, SourceGame game, SourceFile file, std::size_t cache_blocks,
+                       Log log)
     : source_(std::move(source)), game_(std::move(game)), file_(std::move(file)),
-      cache_blocks_(std::max<std::size_t>(cache_blocks, kAhead + 2)) {
+      cache_blocks_(std::max<std::size_t>(cache_blocks, kAhead + 2)), log_(std::move(log)) {
     if (file_.size == 0) failed_ = "The source does not give the file's size";
     worker_ = std::thread([this] { Run(); });
 }
 
 StreamFile::~StreamFile() {
+    Close();
+    worker_.join();
+}
+
+void StreamFile::Close() {
     {
         const std::lock_guard lock(lock_);
         quit_ = true;
     }
     changed_.notify_all();
-    worker_.join();
 }
 
 const StreamFile::Block* StreamFile::Kept(std::uint64_t index) {
@@ -205,14 +213,29 @@ void StreamFile::Run() {
         (void)source_->fetch(game_, file_, start * kBlock, filler, &error);
         lock.lock();
         running_ = false;
+        // Said without the lock: the log may take a moment.
+        const auto say = [&](const std::string& line) {
+            if (!log_) return;
+            lock.unlock();
+            log_(line);
+            lock.lock();
+        };
         if (filler.cannot_range) {
             failed_ = "This source sends a file only from its beginning, so the game cannot be read where it lies";
-        } else if (filler.brought == 0 && !filler.redirected && !quit_) {
+            changed_.notify_all();
+            say(failed_);
+        } else if (filler.kept == 0 && !filler.redirected && !quit_) {
+            const std::string why = error.empty() ? "The source stopped sending the file" : error;
             if (++failures_ >= kMostFailures) {
-                failed_ = error.empty() ? "The source stopped sending the file" : error;
+                failed_ = why;
+                changed_.notify_all();
+                say("Gave up after " + std::to_string(kMostFailures) + " transfers in a row brought nothing: " + why);
             } else {
                 // Wait a little longer each time before asking again.
                 const auto pause = std::chrono::milliseconds(250) * (1u << failures_);
+                say("A transfer from " + std::to_string(start) + " MiB in brought nothing (" + why + "); asking again in " +
+                    std::to_string(pause.count()) + " ms (" + std::to_string(failures_) + " of " +
+                    std::to_string(kMostFailures) + ")");
                 changed_.wait_for(lock, pause, [&] { return quit_; });
             }
         } else {

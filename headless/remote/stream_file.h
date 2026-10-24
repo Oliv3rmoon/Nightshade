@@ -17,6 +17,7 @@
 #include <condition_variable>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <list>
 #include <map>
 #include <memory>
@@ -35,9 +36,15 @@ class StreamFile {
     static constexpr std::size_t kAhead = 32;                      // blocks read ahead: 32 MiB
     static constexpr std::size_t kDefaultCache = 256;              // blocks kept: 256 MiB
 
+    // What becomes of the transfers that fail, one line each in English (one that brought nothing
+    // and when the source is asked again, the source failing for good); said on the file's own
+    // thread. Nothing in it comes from the source's entry but what its backend says went wrong.
+    using Log = std::function<void(const std::string& line)>;
+
     // source: the file's source, used by this file alone (one transfer at a time). size: the
     // file's size as the source gave it (it must know it). cache_blocks: how many blocks stay.
-    StreamFile(std::unique_ptr<Source> source, SourceGame game, SourceFile file, std::size_t cache_blocks = kDefaultCache);
+    StreamFile(std::unique_ptr<Source> source, SourceGame game, SourceFile file, std::size_t cache_blocks = kDefaultCache,
+               Log log = {});
     ~StreamFile();
     StreamFile(const StreamFile&) = delete;
     StreamFile& operator=(const StreamFile&) = delete;
@@ -49,6 +56,10 @@ class StreamFile {
     std::size_t Read(std::uint8_t* data, std::size_t size, std::uint64_t offset);
     // Why reads fail, once the source failed for good (English); empty while it works.
     std::string Failed() const;
+    // Ends the transfer and every read that waits for the source, at once (the game is being
+    // stopped); later reads get only what is kept. Not a failure: Failed stays as it was. The
+    // destructor does the same.
+    void Close();
 
     struct Stats {
         std::uint64_t transfers = 0;    // fetches started
@@ -75,6 +86,7 @@ class StreamFile {
     const SourceGame game_;
     const SourceFile file_;
     const std::size_t cache_blocks_;
+    const Log log_;
 
     mutable std::mutex lock_;
     std::condition_variable changed_;
@@ -85,7 +97,7 @@ class StreamFile {
     std::uint64_t cursor_ = 0;                 // the block the running transfer fills next
     bool running_ = false;                     // a transfer is running
     bool quit_ = false;
-    unsigned failures_ = 0;                    // transfers in a row that brought nothing
+    unsigned failures_ = 0;                    // transfers in a row that brought no whole block
     std::string failed_;
     Stats stats_;
     std::thread worker_;

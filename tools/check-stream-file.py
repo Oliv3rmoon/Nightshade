@@ -9,7 +9,9 @@ every byte right, read in order, at random and from eight threads at once (under
 sanitizer too); a read in order after the first block finds its blocks brought ahead, by one
 transfer; a jump starts one new transfer; a read past the end gets the bytes up to it; the kept
 blocks stay within the cache; a source that fails now and then is asked again, one that keeps
-failing, or sends files only from their start, fails the reads instead of hanging them.
+failing, keeps breaking off before a whole block came, or sends files only from their start, fails
+the reads instead of hanging them, and says so in its log; a file closed while a read waits for a
+source that stalls ends that read at once, without counting as a failure.
 """
 from pathlib import Path
 import os, subprocess, sys, tempfile
@@ -23,6 +25,7 @@ code = r'''
 #include <cassert>
 #include <chrono>
 #include <cstdio>
+#include <mutex>
 #include <random>
 #include <thread>
 using namespace Eden::Remote;
@@ -33,6 +36,8 @@ struct FakeSource final : Source {
     std::atomic<int> fetches{0};
     std::atomic<int> fail_next{0};      // fetches that bring nothing
     bool from_start_only = false;
+    std::uint64_t cut_after = 0;        // each fetch breaks off after this many bytes (0: never)
+    std::uint64_t stall_from = 0;       // the bytes from here on never come (0: they all do)
     explicit FakeSource(std::uint64_t size_) : size(size_) {}
     std::string address() const override { return "fake"; }
     bool list(std::vector<SourceGame>*, std::string*, const Stopped&) override { return false; }
@@ -45,6 +50,11 @@ struct FakeSource final : Source {
         std::uint8_t chunk[64 * 1024];
         for (std::uint64_t at = offset; at < size;) {
             if (receiver.stopped()) { *error = "stopped"; return false; }
+            if (cut_after > 0 && at - offset >= cut_after) { *error = "connection reset"; return false; }
+            if (stall_from > 0 && at >= stall_from) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                continue;
+            }
             const std::size_t part = static_cast<std::size_t>(std::min<std::uint64_t>(sizeof(chunk), size - at));
             for (std::size_t i = 0; i < part; ++i) chunk[i] = Byte(at + i);
             std::this_thread::sleep_for(std::chrono::microseconds(20));  // a network
@@ -105,12 +115,32 @@ int main() {
         assert(file.Failed().empty());
     }
     {
-        // One that keeps failing: the read ends short, with the reason, instead of waiting for ever.
+        // One that keeps failing: the read ends short, with the reason, instead of waiting for ever,
+        // and the log says what came of each transfer.
         auto owned = std::make_unique<FakeSource>(kSize);
         owned->fail_next = 1000;
-        StreamFile file(std::move(owned), SourceGame{}, name, 40);
+        std::vector<std::string> said;
+        std::mutex said_lock;
+        StreamFile file(std::move(owned), SourceGame{}, name, 40, [&](const std::string& line) {
+            const std::lock_guard lock(said_lock);
+            said.push_back(line);
+        });
         std::vector<std::uint8_t> got(1000);
         assert(file.Read(got.data(), got.size(), 0) == 0 && file.Failed() == "connection reset");
+        const std::lock_guard lock(said_lock);
+        assert(said.size() == 5 && said[0].find("asking again in 500 ms (1 of 5)") != std::string::npos &&
+               said[4] == "Gave up after 5 transfers in a row brought nothing: connection reset");
+    }
+    {
+        // One that breaks off every transfer before a block is whole: what it sent is dropped each
+        // time, so it brings nothing, and the read fails rather than asking again for ever.
+        auto owned = std::make_unique<FakeSource>(kSize);
+        owned->cut_after = 300 * 1024;
+        FakeSource& source = *owned;
+        StreamFile file(std::move(owned), SourceGame{}, name, 40);
+        std::vector<std::uint8_t> got(1000);
+        assert(file.Read(got.data(), got.size(), 7 * StreamFile::kBlock) == 0 && file.Failed() == "connection reset");
+        assert(source.fetches == 5);
     }
     {
         // A source that sends a file only from its start cannot be read where it lies.
@@ -119,6 +149,29 @@ int main() {
         StreamFile file(std::move(owned), SourceGame{}, name, 40);
         std::vector<std::uint8_t> got(10);
         assert(file.Read(got.data(), got.size(), 3 * StreamFile::kBlock) == 0 && !file.Failed().empty());
+    }
+    {
+        // Closed while a read waits for a source that has stalled: the read ends at once, short;
+        // what is kept is still read; closing is no failure.
+        auto owned = std::make_unique<FakeSource>(kSize);
+        owned->stall_from = 2 * StreamFile::kBlock;
+        StreamFile file(std::move(owned), SourceGame{}, name, 40);
+        Check(file, 0, 1000);
+        std::atomic<bool> ended{false};
+        std::size_t read = 1;
+        std::thread reader([&] {
+            std::vector<std::uint8_t> got(1000);
+            read = file.Read(got.data(), got.size(), 5 * StreamFile::kBlock);
+            ended = true;
+        });
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        assert(!ended);
+        const auto closed = std::chrono::steady_clock::now();
+        file.Close();
+        reader.join();
+        assert(read == 0 && std::chrono::steady_clock::now() - closed < std::chrono::seconds(2));
+        assert(file.Failed().empty());
+        Check(file, 100, 5000);
     }
     {
         // Closed while a transfer runs and a read waits: both end.
@@ -146,4 +199,5 @@ with tempfile.TemporaryDirectory() as tmp:
             sys.stderr.write(result.stderr[-3000:])
             sys.exit(f'stream file check failed ({label}): exit {result.returncode}')
 print('Stream file: PASS every byte right in order, at random and from 8 threads, blocks read ahead by one transfer, '
-      'a jump one more, the cache bounded, a failing source retried, a broken or start-only one failing the read')
+      'a jump one more, the cache bounded, a failing source retried and logged, a broken, breaking-off or start-only '
+      'one failing the read, a close ending a waiting read')
