@@ -136,7 +136,7 @@ if __name__ == '__main__':
         retail_launch = frontend['guest_fixture'] == 'retail-game' or bool(frontend.get('development_rom_id'))
         value = dict(gate='G7', title_id='PPSA99008', firmware='6.02', hardware_run=False,
                      classification='offline-validated', needed_libraries=needed,
-                     data_heap_bytes=3072 * 1024**2, guest_backing_bytes=4 * 1024**3,
+                     data_heap_bytes=6144 * 1024**2, guest_backing_bytes=4 * 1024**3,
                      observation_seconds=120 if retail_launch else 60,
                      guest_sessions=1 if retail_launch else 3,
                      frontend=json.loads((OUT / 'frontend.json').read_text()),

@@ -2994,14 +2994,19 @@ void Initialize() {
     if(NOT heap_hash STREQUAL "df61acb51502c3b75c4fda62859c42eac6d19a6690f9b68c0e2dfbf20ae72c0f")
         message(FATAL_ERROR "The shared heap changed since G6; qualify it before using it here.")
     endif()
-    # The heap may grow to 3 GiB: with guest cores 1/2 at 192 MiB of code, a large game's
-    # blocks (~0.5 KiB of metadata each) once exhausted 2 GiB. That is its address range, not its
-    # memory: the heap commits 128 MiB pieces as allocations need them (heap_arenas.inc), because
-    # everything the CPU holds comes out of the 12 GiB it shares with the GPU. Taken whole at
-    # start, guest RAM, a dense page table, this heap and the A64 code caches were 8.6 GiB of it.
+    # The heap may grow to 6 GiB: with guest cores 1/2 at 192 MiB of code, a large game's
+    # blocks (~0.5 KiB of metadata each) once exhausted 2 GiB, and Tears of the Kingdom with the
+    # UltraCam mod filled 3 GiB building the mod's RomFS while the console had 8 GiB free
+    # (Swordpdf/ProsperoEden#246). That is its address range, not its memory: the heap commits
+    # 128 MiB pieces as allocations need them (heap_arenas.inc), because everything the CPU holds
+    # comes out of the 12 GiB it shares with the GPU. Taken whole at start, guest RAM, a dense page
+    # table, a 3 GiB heap and the A64 code caches were 8.6 GiB of it; where no range can be
+    # reserved, the heap still takes only 3 GiB at once (EDEN_HEAP_WHOLE_SIZE). The size no longer
+    # fits an unsigned int, so it is a size_t, and so is the one line that prints it.
     file(READ "${heap_source}" heap)
-    string(REPLACE "128 MiB" "3072 MiB" heap "${heap}")
-    string(REPLACE "(128u * 1024u * 1024u)" "(3072u * 1024u * 1024u)" heap "${heap}")
+    string(REPLACE "128 MiB" "6144 MiB" heap "${heap}")
+    string(REPLACE "(128u * 1024u * 1024u)" "((size_t)6144 << 20)" heap "${heap}")
+    string(REPLACE "base=%p size=%u\\n" "base=%p size=%zu\\n" heap "${heap}")
     string(REPLACE "#include <sys/mman.h>" "#include <sys/mman.h>\nvoid *eden_heap_pages(size_t);\nvoid eden_heap_pages_free(void *, size_t);" heap "${heap}")
     string(REPLACE "mmap(NULL, PS5_OPENGL_HEAP_SIZE, PROT_READ | PROT_WRITE,\n                    MAP_PRIVATE | MAP_ANON, -1, 0)" "eden_heap_pages(PS5_OPENGL_HEAP_SIZE)" heap "${heap}")
     string(REPLACE "if (base == MAP_FAILED)" "if (base == NULL)" heap "${heap}")
