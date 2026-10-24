@@ -20,6 +20,7 @@
 //                      "skip_invalidation": false, "compact_memory": false, "memory_layout": "4Gb",
 //                      "speed_limit": "100" },
 //     "game_files": "/mnt/ext1/eden",
+//     "games_folder": "/mnt/usb0/games",   (roms/ and updates/ apart from game_files; file only)
 //     "library": { "last_game": "Game [id].nsp", "recent": ["Game [id].nsp"] },
 //     "games": { "0100000000010000": { "console_mode": "handheld", "renderer": "opengl",
 //                                      "resolution": "0.75x", "upscaling_filter": "fsr",
@@ -311,7 +312,7 @@ inline Json LoadWhole(const std::string& file) {
 // them where they always were, at the top of the file; every other profile has the same layout
 // under "profile_settings"/<its ID>. What belongs to the console and not to a person stays at the
 // top for everyone: the game files folder and the profiles themselves.
-inline constexpr const char* kSharedKeys[] = {"version", "game_files", "profiles", "profile_settings"};
+inline constexpr const char* kSharedKeys[] = {"version", "game_files", "games_folder", "profiles", "profile_settings"};
 
 // Where the chosen profile's settings are in the whole file; empty for the top of the file.
 inline std::string ProfileAt(const Json& whole) {
@@ -355,6 +356,7 @@ inline bool Write(const Json& document, const std::string& file) {
     whole["version"] = 1;
     // The game files folder is the console's: a profile that changes it changes it for everyone.
     if (document.contains("game_files")) whole["game_files"] = document["game_files"];
+    if (document.contains("games_folder")) whole["games_folder"] = document["games_folder"];
     return WriteWhole(whole, file);
 }
 
@@ -1038,6 +1040,14 @@ inline bool SaveRecentGame(std::string_view name, const std::string& file = Sett
 // The saved game files folder, or empty when none is saved.
 inline std::string LoadSavedAssetsDir(const std::string& file = SettingsFile()) {
     const std::string value = Settings::String(Settings::Load(file), Settings::Json::json_pointer("/game_files"));
+    return ValidAssetsDir(value) ? value : std::string{};
+}
+
+// The saved games folder: the folder whose roms/ and updates/ hold the games when they are kept
+// apart from keys, firmware and mods (on a USB drive, Swordpdf/ProsperoEden#50, #149). Set in the
+// settings file only ("games_folder"); empty when none is saved.
+inline std::string LoadSavedGamesDir(const std::string& file = SettingsFile()) {
+    const std::string value = Settings::String(Settings::Load(file), Settings::Json::json_pointer("/games_folder"));
     return ValidAssetsDir(value) ? value : std::string{};
 }
 

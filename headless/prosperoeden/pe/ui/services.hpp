@@ -578,6 +578,9 @@ class Services
     virtual std::string saved_files_folder() = 0; // used from the next start; empty when none
     virtual std::string default_files_folder() = 0;
     virtual bool set_files_folder(const std::string &directory) = 0;
+    // Where roms/ and updates/ are: the game files folder unless the settings file keeps the
+    // games apart ("games_folder").
+    virtual std::string games_folder() { return files_folder(); }
     virtual int filesystem_access() = 0; // 0: the whole filesystem
 
     // ---- save transfer: a game's save in from, or out to, a folder (not in every build) ----

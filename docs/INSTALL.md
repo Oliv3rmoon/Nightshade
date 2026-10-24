@@ -38,6 +38,14 @@ Each game sits in a folder of its own in `roms/`, with everything that belongs t
 
 The folder browser shows how many keys, firmware files, and games each folder holds, so you can check a folder before selecting it. Moving your files later only needs a new selection in Settings; saved settings, covers, and recently played games carry over.
 
+**Games on a drive of their own.** The games can be kept apart from the rest: `roms/` and `updates/` in one folder (a USB drive, say), keys, firmware, mods and cheats in the game files folder on the console. Name that folder as `"games_folder"` in `/data/prosperoeden/config/prosperoeden.json`, next to `"game_files"`:
+
+```json
+{ "game_files": "/data/prosperoeden", "games_folder": "/mnt/usb0/games" }
+```
+
+It applies from the next start, and the Library, the home page, downloads and forwarders then use its `roms/` and `updates/`; Settings > Game files and About show where they are. Without it, or when it does not name an absolute folder, the games are in the game files folder as before. Whatever the folders, the shader caches, saves and everything else written during play stay in `/data/prosperoeden` on the console (see App data).
+
 ## App data
 
 ProsperoEden keeps its own data in `/data/prosperoeden`, separately from the game files folder:
