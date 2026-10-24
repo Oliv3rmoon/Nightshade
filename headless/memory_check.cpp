@@ -1878,10 +1878,18 @@ static void CheckGuestMemoryService() {
                 require(base[22 * slot + (std::size_t{place} * writers + thread) * 8192] ==
                         last[thread][place]);
     }
+    // One place written each time its slot was given back: every write faults with a slot to
+    // promote, and 17 of them in a row at the same address are not taken for a real fault (#246).
+    for (unsigned round = 0; round < 40; ++round) {
+        base[30 * slot + 4096] = static_cast<std::uint8_t>(round + 1);
+        require(Common::GuestMemorySlotState(30 * slot) == 1 && base[30 * slot + 4096] == round + 1);
+        Common::ClearGuestMemory(base + 30 * slot, 30 * slot, slot, 0);
+        require(Common::GuestMemorySlotState(30 * slot) == 0);
+    }
     Common::FreeGuestMemory(base, size);
     require(usage() == 0 && span == 0);
     std::puts("Guest memory service PASS: writes promote, clears and frees give whole slots back, the scanner "
-              "gives back zero slots, no write lost under the scanner");
+              "gives back zero slots, no write lost under the scanner, one place written after each clear");
 }
 
 int main(int argc, char** argv) {

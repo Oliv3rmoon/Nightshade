@@ -403,7 +403,24 @@ SparseRange* WriteRangeOf(std::uintptr_t address) noexcept {
 }
 std::atomic<std::uintptr_t> probe_expected{0}; // the self-test's write, whatever si_addr says
 std::atomic<bool> probe_mismatch{false};
+// The last write the service refused, for the crash report: the address, then why (1: it faulted
+// again and again with nothing to change, 2: no block was left for its slot) and the slot's state.
+std::atomic<std::uintptr_t> refused_address{0};
+std::atomic<unsigned> refused_detail{0}; // why | state << 8
+void Refused(std::uintptr_t address, unsigned why, std::uint8_t state) noexcept {
+    refused_detail.store(why | unsigned{state} << 8, std::memory_order_relaxed);
+    refused_address.store(address, std::memory_order_release);
+}
 } // namespace
+
+// The last write the service refused (headless/crash_report.cpp): its address, 0 for none.
+extern "C" std::uintptr_t eden_guest_write_refused(unsigned* why, unsigned* state) noexcept {
+    const std::uintptr_t address = refused_address.load(std::memory_order_acquire);
+    const unsigned detail = refused_detail.load(std::memory_order_relaxed);
+    *why = detail & 0xff;
+    *state = detail >> 8;
+    return address;
+}
 
 // A write fault at `address`: true when it was a write to a slot of the guest's memory that is
 // now writable (the faulting instruction repeats), false for anything else.
@@ -415,17 +432,20 @@ bool HandleGuestWriteFault(void* fault) noexcept {
     }
     SparseRange* const range = WriteRangeOf(address);
     if (range == nullptr) return false;
-    // The same address faulting again and again is not a slot to promote but a real fault.
+    const std::size_t slot = (address - range->begin.load(std::memory_order_relaxed)) / SparseSlot;
+    // The same address faulting again and again with nothing to change is not a slot to promote
+    // but a real fault. A promotion starts the count again (below).
     static thread_local std::uintptr_t last = 0;
     static thread_local unsigned repeats = 0;
     repeats = address == last ? repeats + 1 : 1;
     last = address;
     if (repeats > 16) {
         repeats = 0;
+        Refused(address, 1, SlotState(*range, slot));
+        Note("EDEN_CRAM refused a write: 17 faults in a row at one address, its slot unchanged\n");
         return false;
     }
     counters.faults.fetch_add(1, std::memory_order_relaxed);
-    const std::size_t slot = (address - range->begin.load(std::memory_order_relaxed)) / SparseSlot;
     const bool waited = LockSlot(*range, slot, true);
     const std::uint8_t state = SlotState(*range, slot);
     if (waited) {
@@ -446,7 +466,14 @@ bool HandleGuestWriteFault(void* fault) noexcept {
     UnlockSlot(*range, slot, ok ? SlotOwn : state);
     if (!ok) {
         counters.failures.fetch_add(1, std::memory_order_relaxed);
+        Refused(address, 2, state);
         Note("EDEN_CRAM out of memory: a written slot of the guest's memory found no block\n");
+    } else if (state != SlotOwn) {
+        // The slot was made writable. A game that writes one place each time its slot was given
+        // back (cleared, freed or scanned) faults there again and again over a session, each time
+        // with something to do: counted as repeats, the 17th such write ended the game after
+        // 15 to 60 minutes (Swordpdf/ProsperoEden#246).
+        repeats = 0;
     }
     return ok;
 }
