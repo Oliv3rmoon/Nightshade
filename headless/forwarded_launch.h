@@ -4,6 +4,10 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <vector>
+#if defined(__PROSPERO__)
+#include "native_directory.h"
+#endif
 
 namespace Eden {
 
@@ -64,12 +68,21 @@ inline std::string FindMovedForwardedRom(const std::string& path, const std::str
     const fs::path roms{roms_dir};
     const fs::path own = roms / missing.stem() / name;
     if (fs::is_regular_file(own, error)) return own.string();
+    // The console's directory iterator does not read its folders: its own reader does (as mods.h).
+    std::vector<fs::directory_entry> entries;
+#if defined(__PROSPERO__)
+    entries = Eden::ReadNativeDirectory(roms, error);
+    if (error) return {};
+#else
+    for (fs::directory_iterator it{roms, error}, end; !error && it != end; it.increment(error)) entries.push_back(*it);
+#endif
     std::string found;
-    for (fs::directory_iterator it{roms, error}, end; !error && it != end; it.increment(error)) {
-        const std::string folder = it->path().filename().string();
-        if (folder.empty() || folder.front() == '.' || !it->is_directory(error)) continue;
-        const fs::path candidate = it->path() / name;
-        if (!fs::is_regular_file(candidate, error)) continue;
+    for (const fs::directory_entry& entry : entries) {
+        const std::string folder = entry.path().filename().string();
+        std::error_code status;
+        if (folder.empty() || folder.front() == '.' || !entry.is_directory(status) || status) continue;
+        const fs::path candidate = entry.path() / name;
+        if (!fs::is_regular_file(candidate, status) || status) continue;
         if (!found.empty()) return {}; // in two game folders: not ours to choose
         found = candidate.string();
     }
