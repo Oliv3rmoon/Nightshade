@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright 2026 Oliv3rmoon
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Check the staging buffer sizes (#195).
+"""Check the staging buffer sizes and the second request for a refused one (#195).
 
 Usage: check-staging-buffers.py EDEN_SRC [BUILT_STAGING_BUFFER_POOL_CPP]
 
@@ -9,16 +9,19 @@ EDEN_SRC is Eden's src folder at the pinned revision. This applies the replaceme
 tools/prepare-vulkan-port.py makes to its renderer_vulkan/vk_staging_buffer_pool.cpp, exactly as
 the build does (each must match once), and checks that the file the build wrote is that one when
 it is given. Then it compiles the result with Eden's own header and its common/ helpers, and with
-stand-ins for the allocator, the scheduler and the device, and runs it under ASan and UBSan:
+stand-ins for the allocator (a pool of fixed size that refuses what does not fit), the scheduler
+and the device, and runs it under ASan and UBSan:
 
 - up to 16 MiB, and for buffers only the GPU uses, a staging buffer is Eden's power of two; above
   16 MiB a buffer the CPU writes or reads is its transfer rounded up to 16 MiB (130 MiB: 144, not
   256);
 - a kept buffer is handed out only when it holds the request, and an idle kept buffer too small
-  for a new one goes before the new one is made.
+  for a new one goes before the new one is made;
+- a refused buffer is asked for once more after every idle kept buffer is let go, buffers the GPU
+  still uses and deferred ones stay, and a second refusal or another error goes on to the caller.
 
 Eden's own file runs the same way as the control: for a transfer of 130 MiB it asks for the
-268435456-byte buffer with usage 0x8f3 that #195's log shows refused.
+268435456-byte buffer with usage 0x8f3 that #195's log shows refused, and it does not ask again.
 """
 from pathlib import Path
 import ast, subprocess, sys, tempfile
@@ -331,6 +334,44 @@ int main() {
         }
         for (auto& ref : deferred) rig.staging->FreeDeferred(ref);
     }
+    // Refused: the idle kept buffers go and the buffer is asked for once more.
+    {
+        Rig rig{400 * MiB};
+        assert(rig.Made(100 * MiB, MemoryUsage::Upload) == 112 * MiB);
+        assert(rig.Made(120 * MiB, MemoryUsage::Download) == 128 * MiB);
+        rig.scheduler.Finish();                                         // both idle, 160 MiB left
+        unsigned attempts = pool.attempts;
+        assert(rig.Made(200 * MiB, MemoryUsage::Upload) == 208 * MiB);
+        assert(pool.attempts == attempts + 2);
+        assert(pool.live == rig.stream + 208 * MiB);
+        // Buffers the GPU still uses and deferred ones stay, and a second refusal reaches the caller.
+        auto deferred = rig.staging->Request(40 * MiB, MemoryUsage::Download, true);  // 48 MiB
+        assert(rig.Made(60 * MiB, MemoryUsage::Upload) == 64 * MiB);               // 80 MiB left
+        attempts = pool.attempts;
+        bool refused = false;
+        try {
+            rig.Made(100 * MiB, MemoryUsage::Upload);                   // 112 MiB, none idle
+        } catch (const vk::Exception& error) {
+            refused = error.GetResult() == VK_ERROR_OUT_OF_DEVICE_MEMORY;
+        }
+        assert(refused && pool.attempts == attempts + 2);
+        assert(pool.live == rig.stream + 208 * MiB + 48 * MiB + 64 * MiB);
+        rig.staging->FreeDeferred(deferred);
+        rig.scheduler.Finish();
+        assert(rig.Made(100 * MiB, MemoryUsage::Upload) == 112 * MiB);  // once those three go
+        assert(pool.live == rig.stream + 112 * MiB);
+        // Another error is not asked again.
+        pool.refusal = VK_ERROR_OUT_OF_HOST_MEMORY;
+        pool.capacity = pool.live;
+        attempts = pool.attempts;
+        refused = false;
+        try {
+            rig.Made(300 * MiB, MemoryUsage::Upload);
+        } catch (const vk::Exception& error) {
+            refused = error.GetResult() == VK_ERROR_OUT_OF_HOST_MEMORY;
+        }
+        assert(refused && pool.attempts == attempts + 1);
+    }
     std::puts("patched: PASS");
     return 0;
 }
@@ -338,12 +379,25 @@ int main() {
 
 control_main = r'''
 int main() {
-    // Eden's own pool: a transfer a little over 128 MiB asks for #195's buffer.
+    // Eden's own pool: a transfer a little over 128 MiB asks for #195's buffer, and a refusal ends it.
     {
         Rig rig;
         assert(rig.Made(130 * MiB, MemoryUsage::Upload) == 256 * MiB && pool.last_usage == kStagingUsage);
         rig.scheduler.Finish();
         assert(rig.Made(250 * MiB, MemoryUsage::Upload) == 0);
+    }
+    {
+        Rig rig{200 * MiB};
+        assert(rig.Made(100 * MiB, MemoryUsage::Upload) == 128 * MiB);
+        rig.scheduler.Finish();
+        const unsigned attempts = pool.attempts;
+        bool refused = false;
+        try {
+            rig.Made(130 * MiB, MemoryUsage::Upload);
+        } catch (const vk::Exception&) {
+            refused = true;
+        }
+        assert(refused && pool.attempts == attempts + 1);
     }
     std::puts("control: PASS");
     return 0;
@@ -370,10 +424,16 @@ with tempfile.TemporaryDirectory() as tmp:
         outputs[name] = run.stdout + run.stderr
 
 log = outputs['patched']
-# What a tester sees on the console: the first large buffer.
+# What a tester sees on the console: the first large buffer, then the refused one asked again.
 assert ('graphics memory: staging buffer of 144 MiB made for a transfer of 130 MiB, not the 256 MiB '
         'of the next power of two (1 so far)') in log
+assert ('graphics memory: a staging buffer of 218103808 bytes was refused; released 2 idle staging buffers '
+        '(240 MiB) and asked again') in log
+assert 'graphics memory: the staging buffer was made when asked again' in log
+assert ('graphics memory: a staging buffer of 117440512 bytes was refused; released 0 idle staging buffers '
+        '(0 MiB) and asked again') in log
+assert 'released 3 idle staging buffers (320 MiB)' in log
 assert 'staging buffer' not in outputs['control']
 print('Staging buffers: PASS Eden\'s power of two up to 16 MiB and for GPU-only buffers, 16 MiB steps above '
       '(130 MiB: 144, Eden 256 with #195\'s usage 0x8f3), kept buffers only when they hold the request, '
-      'idle too-small ones let go')
+      'idle too-small ones let go, a refused buffer asked for again once after the idle ones go')

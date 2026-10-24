@@ -1007,9 +1007,10 @@ path = output / 'vulkan_memory_allocator.cpp'
 if not path.exists() or path.read_text() != allocator:
     path.write_text(allocator)
 # Staging buffers (headless/staging_buffers.h): above 16 MiB a buffer the CPU writes or reads is its
-# transfer rounded up to 16 MiB instead of the next power of two, and a kept buffer is handed out
-# again only when it holds the transfer. Metroid Prime 4 at 2x ended asking for 256 MiB for a
-# transfer a little over 128 MiB, with 64 MiB in the pool's largest free block (#195).
+# transfer rounded up to 16 MiB instead of the next power of two, a kept buffer is handed out again
+# only when it holds the transfer, and a refused buffer is asked for once more after the kept ones
+# the GPU is done with are let go. Metroid Prime 4 at 2x ended asking for 256 MiB for a transfer
+# a little over 128 MiB, with 64 MiB in the pool's largest free block (#195).
 # tools/check-staging-buffers.py applies these replacements to the pinned source and runs the result.
 adapt('src/video_core/renderer_vulkan/vk_staging_buffer_pool.cpp', 'vulkan_staging_buffer_pool.cpp', [
     ('#include "video_core/vulkan_common/vulkan_wrapper.h"\n',
@@ -1035,7 +1036,31 @@ adapt('src/video_core/renderer_vulkan/vk_staging_buffer_pool.cpp', 'vulkan_stagi
      '    }\n'),
     ('        .size = 1ULL << log2_size,\n', '        .size = made,\n'),
     ('    vk::Buffer buffer = memory_allocator.CreateBuffer(buffer_ci, usage);\n',
-     '    vk::Buffer buffer = memory_allocator.CreateBuffer(buffer_ci, usage);\n'
+     '    vk::Buffer buffer;\n'
+     '    try {\n'
+     '        buffer = memory_allocator.CreateBuffer(buffer_ci, usage);\n'
+     '    } catch (const vk::Exception& refused) {\n'
+     '        if (refused.GetResult() != VK_ERROR_OUT_OF_DEVICE_MEMORY) {\n'
+     '            throw;\n'
+     '        }\n'
+     '        // Refused: the kept buffers the GPU is done with go, and the buffer is asked for once\n'
+     '        // more. Refused again, the error goes on as before.\n'
+     '        const auto idle = [this](const StagingBuffer& entry) {\n'
+     '            return !entry.deferred && scheduler.IsFree(entry.tick);\n'
+     '        };\n'
+     '        ::Eden::StagingBuffers::Released released;\n'
+     '        for (StagingBuffersCache* const cache : {&device_local_cache, &upload_cache, &download_cache}) {\n'
+     '            for (StagingBuffers& level : *cache) {\n'
+     '                released += ::Eden::StagingBuffers::ReleaseFrom(level, idle);\n'
+     '            }\n'
+     '        }\n'
+     '        std::fprintf(stderr, "[ProsperoEden] graphics memory: a staging buffer of %llu bytes was refused; "\n'
+     '                     "released %zu idle staging buffers (%llu MiB) and asked again\\n",\n'
+     '                     static_cast<unsigned long long>(made), released.buffers,\n'
+     '                     static_cast<unsigned long long>(released.bytes >> 20));\n'
+     '        buffer = memory_allocator.CreateBuffer(buffer_ci, usage);\n'
+     '        std::fprintf(stderr, "[ProsperoEden] graphics memory: the staging buffer was made when asked again\\n");\n'
+     '    }\n'
      '    // A large buffer smaller than the power of two: the 1st, 2nd, 4th, 8th ... in the log.\n'
      '    if (exact && made >= (VkDeviceSize{64} << 20) && made < (VkDeviceSize{1} << log2_size)) {\n'
      '        static std::atomic<unsigned long long> large{0};\n'

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright 2026 Oliv3rmoon
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Eden PS5 port: the size of the staging buffers Eden's staging pool makes, and which kept ones it
-// hands out again (tools/prepare-vulkan-port.py, vulkan_staging_buffer_pool.cpp).
+// Eden PS5 port: the size of the staging buffers Eden's staging pool makes, and what the pool lets
+// go of when the console refuses one (tools/prepare-vulkan-port.py, vulkan_staging_buffer_pool.cpp).
 //
 // Eden makes a staging buffer the next power of two above its transfer: 256 MiB for a transfer of
 // 130 MiB. On the console a buffer that large is a block of its own, in one piece, in the pool the
@@ -15,6 +15,10 @@
 // Above 16 MiB such a buffer can now be smaller than that transfer, so it is handed out only when
 // it holds the transfer. A kept buffer too small for a new transfer is let go before the new one
 // is made, instead of staying beside it until Eden's own release comes round to its size.
+//
+// When the console refuses a staging buffer, every kept one the GPU is done with is let go and the
+// buffer is asked for once more. Refused again, the error goes on as before, and the session ends
+// with "ran out of graphics memory".
 #pragma once
 #include <algorithm>
 #include <cstddef>
