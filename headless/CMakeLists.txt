@@ -3307,14 +3307,16 @@ endif()
             target_sources(eden-headless PRIVATE ${launcher_sources} ${launcher_lua_sources})
             # Download sources and their queue (remote/remote.h), with their backends (remote/source.h,
             # backends.h), the console's FTP server that writes the files (remote/ftp.h) and a source's
-            # game read where it lies (remote/stream_file.h); their HTTP (remote/http.c) is linked
-            # into the update check's object below, with its libcurl.
+            # game read where it lies (remote/stream_file.h, opened for its session by
+            # streamed_game.cpp); their HTTP (remote/http.c) is linked into the update check's object
+            # below, with its libcurl.
             target_sources(eden-headless PRIVATE
                 "${EDEN_PORT_DIR}/remote/remote.cpp"
                 "${EDEN_PORT_DIR}/remote/backends.cpp"
                 "${EDEN_PORT_DIR}/remote/ftp.cpp"
                 "${EDEN_PORT_DIR}/remote/stream_check.cpp"
                 "${EDEN_PORT_DIR}/remote/stream_file.cpp"
+                "${EDEN_PORT_DIR}/streamed_game.cpp"
                 "${EDEN_PORT_DIR}/remote/save_archive.cpp"
                 "${EDEN_PORT_DIR}/remote/save_sync.cpp"
                 "${EDEN_PORT_DIR}/remote/romm/romm_client.cpp"
