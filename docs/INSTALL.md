@@ -44,7 +44,7 @@ The folder browser shows how many keys, firmware files, and games each folder ho
 { "game_files": "/data/prosperoeden", "games_folder": "/mnt/usb0/games" }
 ```
 
-It applies from the next start, and the Library, the home page, downloads and forwarders then use its `roms/` and `updates/`; Settings > Game files and About show where they are. Without it, or when it does not name an absolute folder, the games are in the game files folder as before. Whatever the folders, the shader caches, saves and everything else written during play stay in `/data/prosperoeden` on the console (see App data).
+It applies from the next start, and the Library, the home page, downloads and forwarders then use its `roms/` and `updates/`; the GAMES and UPDATES lines in Settings > Game files and in About show where they are (the folder browser still counts each folder's own `roms/`). When the folder is not there at start (a drive not plugged in), the Library lists no games from it and downloads wait; the log says `games folder: Not found`. Without it, or when it does not name an absolute folder, the games are in the game files folder as before. Whatever the folders, the shader caches, saves and everything else written during play stay in `/data/prosperoeden` on the console (see App data).
 
 ## App data
 

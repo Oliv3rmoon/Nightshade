@@ -8,7 +8,7 @@ ProsperoEden starts that game directly instead of opening its launcher.
 
 | Argument | Meaning |
 | --- | --- |
-| `--rom <file>` or `--rom=<file>` | The game to start. An absolute path (`/mnt/usb0/eden/roms/Game.nsp`), or a path inside the game files folder's `roms/` (`Game.nsp`, `rpg/Game.xci`). A relative path may not contain `..`. |
+| `--rom <file>` or `--rom=<file>` | The game to start. An absolute path (`/mnt/usb0/eden/roms/Game.nsp`), or a path inside the games folder's `roms/` (the game files folder's, unless `"games_folder"` names another: [INSTALL.md](INSTALL.md#game-files-folder)) (`Game.nsp`, `rpg/Game.xci`). A relative path may not contain `..`. |
 | `--exit-after-game` | When that game ends normally, close ProsperoEden so the console returns to the home screen. Without it, the library opens. |
 
 Unknown arguments are ignored. Parsing is in `headless/forwarded_launch.h`; `headless/main.cpp`
