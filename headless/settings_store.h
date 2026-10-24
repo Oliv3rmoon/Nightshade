@@ -729,7 +729,7 @@ inline bool SaveGameSettings(uint64_t title_id, const GameSettings& value, const
         value.speed_limit >= int(std::size(kSpeedLimitKeys)) ||
         !flag_ok(value.hud) || !flag_ok(value.frame_gen) ||
         !flag_ok(value.mute) ||
-        !flag_ok(value.vibration) || !flag_ok(value.vertex_input_dynamic) ||
+        !flag_ok(value.vibration) ||
         !std::all_of(value.performance.begin(), value.performance.end(), flag_ok) ||
         (value.post_processing && !ValidPostProcessing(*value.post_processing)) ||
         (value.own_mapping && !ValidMapping(value.mapping))) return false;
@@ -763,7 +763,8 @@ inline bool SaveGameSettings(uint64_t title_id, const GameSettings& value, const
     flag(game, "frame_gen", value.frame_gen);
     flag(game, "mute", value.mute);
     flag(game, "vibration", value.vibration);
-    flag(game, "vertex_input_dynamic", value.vertex_input_dynamic);
+    // "vertex_input_dynamic" is the file's alone: the Library has no switch for it, and a game's
+    // settings saved from the Library keep it as the player wrote it.
     if (value.volume < 0) game.erase("volume");
     else game["volume"] = value.volume;
     if (value.rng_seed < 0) game.erase("rng_seed");

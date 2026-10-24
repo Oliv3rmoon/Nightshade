@@ -637,20 +637,27 @@ int main() {
         wrong = game;
         wrong.mute = 2;
         assert(!Eden::SaveGameSettings(quest, wrong, file));
-        // Dynamic vertex input: absent (on), switched off by hand in the file, kept by a save.
+        // Dynamic vertex input: absent (on), switched off by hand in the file, and kept by every save
+        // from the Library, which starts from settings that do not have it (set_game_settings).
         assert(Eden::LoadGameSettings(quest, file).vertex_input_dynamic == -1);
         {
             auto document = Eden::Settings::Load(file);
             document["games"][Eden::Settings::TitleKey(quest)]["vertex_input_dynamic"] = false;
             assert(Eden::Settings::Write(document, file));
         }
-        auto vertex = Eden::LoadGameSettings(quest, file);
-        assert(vertex.vertex_input_dynamic == 0 && Eden::LoadGameSettings(racer, file).vertex_input_dynamic == -1);
-        assert(Eden::SaveGameSettings(quest, vertex, file) && Eden::LoadGameSettings(quest, file).vertex_input_dynamic == 0);
-        vertex.vertex_input_dynamic = 2;
-        assert(!Eden::SaveGameSettings(quest, vertex, file));
-        vertex.vertex_input_dynamic = -1;
-        assert(Eden::SaveGameSettings(quest, vertex, file) && Read(file).find("vertex_input_dynamic") == std::string::npos);
+        assert(Eden::LoadGameSettings(quest, file).vertex_input_dynamic == 0 &&
+               Eden::LoadGameSettings(racer, file).vertex_input_dynamic == -1);
+        Eden::GameSettings from_library = game;  // as the Library hands it over: no such field
+        from_library.vertex_input_dynamic = -1;
+        assert(Eden::SaveGameSettings(quest, from_library, file) &&
+               Eden::LoadGameSettings(quest, file).vertex_input_dynamic == 0);
+        assert(Eden::SaveGameSettings(quest, Eden::GameSettings{}, file) &&
+               Eden::LoadGameSettings(quest, file).vertex_input_dynamic == 0);
+        {
+            auto document = Eden::Settings::Load(file);
+            document["games"][Eden::Settings::TitleKey(quest)].erase("vertex_input_dynamic");
+            assert(Eden::Settings::Write(document, file));
+        }
         wrong = game;
         wrong.mapping[Eden::game_b] = wrong.mapping[Eden::game_a];
         assert(!Eden::SaveGameSettings(quest, wrong, file));
