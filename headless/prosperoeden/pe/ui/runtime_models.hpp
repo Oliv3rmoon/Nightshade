@@ -4,7 +4,7 @@
 #include <nlohmann/json.hpp>
 #include "pe/ui/services.hpp"
 namespace pe::ui {
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Game, name, format, size, file, cover, title_id, addons, addons_short, language, language_note, mods, mods_on, mods_enabled, sources, key, remote)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Game, name, format, size, file, cover, title_id, addons, addons_short, language, language_note, mods, mods_on, mods_enabled, sources, key, remote, stream)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(SourceInfo, name, address, refreshing, online, error, games)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Sources, configured, setup_file, error, list, generation, ftp_port)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(SaveSync, stage, before, game, profile, server, outcome, error, too_old, server_version, needed_version, console_time, server_time, server_device)

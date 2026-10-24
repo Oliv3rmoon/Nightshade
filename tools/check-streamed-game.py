@@ -18,6 +18,12 @@ function looks the path up first; and the patched lines themselves, built here, 
 streamed game's file for its path, nothing for another streamed path, and leave every other
 path to Eden's own code. A build's own derived core.cpp is checked as well when there is one.
 
+The launcher (headless/prosperoeden/pe/ui): what playing a game starts (play_file): a game on the
+console its file, one on download sources only its streamed path when a source of it streams
+(Game::stream, which the launcher's service sets only for those, remote_check.cpp), else nothing,
+so it is downloaded first; and the Library's, the home screen's and the launcher packs' play
+actions start what play_file says.
+
 The pinned Eden's sources come from .deps/mirror-<commit>/ when it is there, else from the
 build's unpacked tree, else from .deps/eden-<commit>.tar.gz (checked against UPSTREAM.json).
 Without any of them the check says so and is skipped.
@@ -66,6 +72,28 @@ def cmake_string(name):
     assert len(found) == 1, f'headless/CMakeLists.txt sets {name} once'
     return re.sub(r'\\(.)', lambda m: {'n': '\n', 't': '\t'}.get(m.group(1), m.group(1)), found[0])
 
+
+launcher_code = r'''
+#include "pe/ui/launch_commit.hpp"
+#include <cassert>
+#include <cstdio>
+int main() {
+    pe::ui::Game local;
+    local.file = "Alpha Quest/Alpha Quest.nsp";
+    local.sources = {"Home"};
+    pe::ui::Game download = local;
+    download.remote = true;
+    pe::ui::Game streamed = download;
+    streamed.stream = "stream:home/10";
+    pe::ui::Game on_console = local; // a game on the console is played from its file, whatever else
+    on_console.stream = "stream:home/10";
+    assert(pe::ui::play_file(local) == "Alpha Quest/Alpha Quest.nsp");
+    assert(pe::ui::play_file(download).empty());
+    assert(pe::ui::play_file(streamed) == "stream:home/10");
+    assert(pe::ui::play_file(on_console) == "Alpha Quest/Alpha Quest.nsp");
+    std::puts("ok");
+}
+'''
 
 code = r'''
 #include "stream_vfs.h"
@@ -288,6 +316,28 @@ with tempfile.TemporaryDirectory(prefix='streamed-game-') as tmp:
                 assert old + new in made.read_text(), f'{made} is patched'
                 derived.append(build)
     source = code.replace('@PATCHED@', old + new)
+    # The launcher's play actions start what play_file says: a game on sources only is downloaded
+    # first unless it is streamed, then it starts as one on the console does.
+    ui = headless / 'prosperoeden/pe/ui'
+    library = (ui / 'library.cpp').read_text()
+    cross = library.split('    case Key::cross:\n        if (game == nullptr || !home_.setup_ready)', 1)[1].split('    default:', 1)[0]
+    assert 'if (game->remote && play_file(*game).empty())' in cross and 'play_remote(*game);' in cross and \
+        'launch(play_file(*game), game->name, game->cover);' in cross, 'the Library plays what play_file says'
+    home = (ui / 'home.cpp').read_text()
+    assert home.count('if (game.remote && play_file(game).empty())') == 1 and \
+        home.count('launch(play_file(game), game.name, game.cover);') == 1 and \
+        home.count('launch(play_file(*game), game->name, game->cover);') == 1, 'the home screen plays what play_file says'
+    runtime = (ui / 'runtime_launcher.cpp').read_text()
+    request = runtime.split('else if (name == "launch.request") {', 1)[1].split('else if (name == "launch.cancel")', 1)[0]
+    assert 'const std::string file=play_file(g); if(file.empty() ||' in request and 'launch_file=file;' in request, \
+        "a launcher pack's launch.request starts what play_file says"
+    exe = work / 'play-file'
+    subprocess.run([os.environ.get('CXX', 'c++'), '-std=c++20', '-Wall', '-Wextra', '-Werror', '-I' + str(headless / 'prosperoeden'),
+                    '-x', 'c++', '-', '-o', str(exe)], input=launcher_code, text=True, check=True)
+    result = subprocess.run([str(exe)], capture_output=True, text=True, timeout=60)
+    if result.returncode != 0 or result.stdout.strip() != 'ok':
+        sys.exit('play_file check failed: ' + result.stderr[-2000:])
+    print('[launcher] ok')
     for flags, label in ((['-O1', '-g', '-fsanitize=address,undefined', '-fno-sanitize-recover=all'], 'checked'),
                          (['-O1', '-g', '-fsanitize=thread'], 'thread sanitizer')):
         compiler = os.environ.get('CXX', 'c++')
@@ -307,4 +357,5 @@ with tempfile.TemporaryDirectory(prefix='streamed-game-') as tmp:
 print('Streamed game: PASS Eden reads every byte of a game where it lies through its own file layer, nothing is '
       'written, a failed source fails the reads and says why once, a stop is no failure, a slow read is said, the '
       "session finds the game by its path alone; GetGameFileFromPath's patch text is in the pinned Eden once and "
-      'looks the path up first' + (f' (derived core.cpp of {", ".join(derived)} too)' if derived else ''))
+      'looks the path up first' + (f' (derived core.cpp of {", ".join(derived)} too)' if derived else '') +
+      '; the launcher plays a game on sources only where it lies only when a source of it streams, else downloads it')

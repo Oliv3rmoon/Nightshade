@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "pe/ui/launcher.hpp"
+#include "pe/ui/launch_commit.hpp"
 
 #include "pe/core/log.hpp"
 
@@ -473,7 +474,9 @@ void Launcher::press_library(Key key)
             cue(Cue::error);
             return;
         }
-        if (game->remote)
+        // One on its sources only is downloaded first, unless a source of it sends it to be
+        // played where it lies (play_file): then it starts at once, as one on the console.
+        if (game->remote && play_file(*game).empty())
         {
             play_remote(*game);
             return;
@@ -481,7 +484,7 @@ void Launcher::press_library(Key key)
         launch_from_ = {layout::kLeft + static_cast<float>(library_.selected % kColumns) * kCellPitchX,
                         kGridTop + static_cast<float>(library_.selected / kColumns) * kCellPitchY - grid_rows_.scroll(),
                         kCover, kCover};
-        launch(game->file, game->name, game->cover);
+        launch(play_file(*game), game->name, game->cover);
         return;
     default:
         return;
@@ -771,10 +774,15 @@ void Launcher::draw_library(Canvas &c)
     const Rect first{x, kDetail.y + kDetail.h - 36.0f - 68.0f - 14.0f - 76.0f, width, 76.0f};
     const Rect second{x, kDetail.y + kDetail.h - 36.0f - 68.0f, width, 68.0f};
     const Download *queued = remote ? download_of(game->key) : nullptr;
+    // One played where it lies on its source plays at once; it can still be downloaded.
+    const bool streamed = remote && !play_file(*game).empty();
     if (remote)
     {
-        primary_button(c, first, queued != nullptr ? tr("Play when downloaded") : tr("Download and play"),
-                       translate_hint(Pad::cross), 0.0f, 0.0f);
+        primary_button(c, first,
+                       streamed           ? tr("Play") :
+                       queued != nullptr  ? tr("Play when downloaded") :
+                                            tr("Download and play"),
+                       translate_hint(Pad::cross), 0.0f, 0.0f, !streamed || home_.setup_ready);
         secondary_button(c, second, queued != nullptr ? tr("Cancel download") : tr("Download"),
                          translate_hint(Pad::square), 0.0f, 0.0f);
     }
@@ -799,7 +807,16 @@ void Launcher::draw_library(Canvas &c)
                                            {Pad::square, TR("Cancel download")},
                                            {Pad::circle, TR("Back")},
                                            {Pad::l1, TR("Sections"), Pad::r1}};
-        draw_footer(c, queued != nullptr ? kQueued : kRemote, 4, failed);
+        static constexpr Hint kStreamed[] = {{Pad::cross, TR("Play")},
+                                             {Pad::square, TR("Download")},
+                                             {Pad::circle, TR("Back")},
+                                             {Pad::l1, TR("Sections"), Pad::r1}};
+        static constexpr Hint kStreamedQueued[] = {{Pad::cross, TR("Play")},
+                                                   {Pad::square, TR("Cancel download")},
+                                                   {Pad::circle, TR("Back")},
+                                                   {Pad::l1, TR("Sections"), Pad::r1}};
+        draw_footer(c, streamed ? (queued != nullptr ? kStreamedQueued : kStreamed) : queued != nullptr ? kQueued : kRemote,
+                    4, failed);
         return;
     }
     static constexpr Hint kHints[] = {{Pad::cross, TR("Play")},
