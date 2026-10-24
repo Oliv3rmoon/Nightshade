@@ -1006,6 +1006,73 @@ allocator = allocator.replace(include, include + '#include <atomic>\n#include <c
 path = output / 'vulkan_memory_allocator.cpp'
 if not path.exists() or path.read_text() != allocator:
     path.write_text(allocator)
+# Staging buffers (headless/staging_buffers.h): above 16 MiB a buffer the CPU writes or reads is its
+# transfer rounded up to 16 MiB instead of the next power of two, a kept buffer is handed out again
+# only when it holds the transfer, and a refused buffer is asked for once more after the kept ones
+# the GPU is done with are let go. Metroid Prime 4 at 2x ended asking for 256 MiB for a transfer
+# a little over 128 MiB, with 64 MiB in the pool's largest free block (#195).
+# tools/check-staging-buffers.py applies these replacements to the pinned source and runs the result.
+adapt('src/video_core/renderer_vulkan/vk_staging_buffer_pool.cpp', 'vulkan_staging_buffer_pool.cpp', [
+    ('#include "video_core/vulkan_common/vulkan_wrapper.h"\n',
+     '#include "video_core/vulkan_common/vulkan_wrapper.h"\n#include <atomic>\n#include <cstdio>\n'
+     '#include "staging_buffers.h"\n'),
+    ('    const auto is_free = [this](const StagingBuffer& entry) {\n'
+     '        return !entry.deferred && scheduler.IsFree(entry.tick);\n'
+     '    };',
+     '    const auto is_free = [this, size](const StagingBuffer& entry) {\n'
+     '        return !entry.deferred && scheduler.IsFree(entry.tick) &&\n'
+     '               ::Eden::StagingBuffers::Holds(entry.mapped_span.size(), entry.log2_level) >= size;\n'
+     '    };'),
+    ('    auto const log2_size = Common::Log2Ceil<u32>(u32(size));\n',
+     '    auto const log2_size = Common::Log2Ceil<u32>(u32(size));\n'
+     '    const bool exact = ::Eden::StagingBuffers::Exact(size, usage != MemoryUsage::DeviceLocal);\n'
+     '    const VkDeviceSize made = ::Eden::StagingBuffers::Size(size, log2_size, exact);\n'
+     '    if (exact) {\n'
+     '        // Kept buffers of this power of two too small for the transfer go before it is made.\n'
+     '        ::Eden::StagingBuffers::ReleaseFrom(GetCache(usage)[log2_size], [this, size](const StagingBuffer& entry) {\n'
+     '            return !entry.deferred && scheduler.IsFree(entry.tick) &&\n'
+     '                   ::Eden::StagingBuffers::Holds(entry.mapped_span.size(), entry.log2_level) < size;\n'
+     '        });\n'
+     '    }\n'),
+    ('        .size = 1ULL << log2_size,\n', '        .size = made,\n'),
+    ('    vk::Buffer buffer = memory_allocator.CreateBuffer(buffer_ci, usage);\n',
+     '    vk::Buffer buffer;\n'
+     '    try {\n'
+     '        buffer = memory_allocator.CreateBuffer(buffer_ci, usage);\n'
+     '    } catch (const vk::Exception& refused) {\n'
+     '        if (refused.GetResult() != VK_ERROR_OUT_OF_DEVICE_MEMORY) {\n'
+     '            throw;\n'
+     '        }\n'
+     '        // Refused: the kept buffers the GPU is done with go, and the buffer is asked for once\n'
+     '        // more. Refused again, the error goes on as before.\n'
+     '        const auto idle = [this](const StagingBuffer& entry) {\n'
+     '            return !entry.deferred && scheduler.IsFree(entry.tick);\n'
+     '        };\n'
+     '        ::Eden::StagingBuffers::Released released;\n'
+     '        for (StagingBuffersCache* const cache : {&device_local_cache, &upload_cache, &download_cache}) {\n'
+     '            for (StagingBuffers& level : *cache) {\n'
+     '                released += ::Eden::StagingBuffers::ReleaseFrom(level, idle);\n'
+     '            }\n'
+     '        }\n'
+     '        std::fprintf(stderr, "[ProsperoEden] graphics memory: a staging buffer of %llu bytes was refused; "\n'
+     '                     "released %zu idle staging buffers (%llu MiB) and asked again\\n",\n'
+     '                     static_cast<unsigned long long>(made), released.buffers,\n'
+     '                     static_cast<unsigned long long>(released.bytes >> 20));\n'
+     '        buffer = memory_allocator.CreateBuffer(buffer_ci, usage);\n'
+     '        std::fprintf(stderr, "[ProsperoEden] graphics memory: the staging buffer was made when asked again\\n");\n'
+     '    }\n'
+     '    // A large buffer smaller than the power of two: the 1st, 2nd, 4th, 8th ... in the log.\n'
+     '    if (exact && made >= (VkDeviceSize{64} << 20) && made < (VkDeviceSize{1} << log2_size)) {\n'
+     '        static std::atomic<unsigned long long> large{0};\n'
+     '        const auto times = large.fetch_add(1, std::memory_order_relaxed) + 1;\n'
+     '        if ((times & (times - 1)) == 0) {\n'
+     '            std::fprintf(stderr, "[ProsperoEden] graphics memory: staging buffer of %llu MiB made for a transfer "\n'
+     '                         "of %llu MiB, not the %llu MiB of the next power of two (%llu so far)\\n",\n'
+     '                         static_cast<unsigned long long>(made >> 20), static_cast<unsigned long long>(size >> 20),\n'
+     '                         static_cast<unsigned long long>((VkDeviceSize{1} << log2_size) >> 20), times);\n'
+     '        }\n'
+     '    }\n'),
+])
 adapt('src/video_core/vulkan_common/vulkan.h', 'include/video_core/vulkan_common/vulkan.h',
       [('#else\n#define VK_USE_PLATFORM_XLIB_KHR', '#elif defined(PS5_NATIVE)\n// Native display-plane presentation, no desktop window-system headers.\n#else\n#define VK_USE_PLATFORM_XLIB_KHR')])
 adapt('src/video_core/vulkan_common/vulkan_instance.cpp', 'vulkan_instance.cpp', [
@@ -1098,6 +1165,13 @@ for old, new in [
     # Configure(true) pair above, whose first line this matches.
     ('        Configure(true);',
      '        Configure(true);\n        num_scanned = 0;'),
+    # What it frees because memory is short, for a line in the log (headless/texture_evictions.h).
+    ('        UnregisterImage(image_id);\n        DeleteImage(image_id, image.scale_tick > frame_tick + 5);',
+     '        if constexpr (std::is_same_v<Runtime, Vulkan::TextureCacheRuntime>) {\n'
+     '            ::Eden::TextureEvictions::Freed(aggressive_mode, True(image.flags & ImageFlagBits::Converted),\n'
+     '                                            must_download);\n'
+     '        }\n'
+     '        UnregisterImage(image_id);\n        DeleteImage(image_id, image.scale_tick > frame_tick + 5);'),
 ]:
     if gc.count(old) != 1:
         raise RuntimeError(f'Pinned GC anchor changed: {old}')
@@ -1186,13 +1260,21 @@ texture_partial = [
 ]
 adapt('src/video_core/texture_cache/texture_cache.h',
       'vulkan-cache/video_core/texture_cache/texture_cache.h', [
-    ('namespace VideoCommon {', '#include "performance.h"\n#include "texture_partial.h"\n#include "image_pages.h"\n#include "astc_policy.h"\n#include "common/scope_exit.h"\nnamespace Vulkan { class TextureCacheRuntime; }\n\nnamespace VideoCommon {'),
+    ('namespace VideoCommon {', '#include "performance.h"\n#include "texture_partial.h"\n#include "image_pages.h"\n#include "astc_policy.h"\n#include "texture_evictions.h"\n#include "common/scope_exit.h"\nnamespace Vulkan { class TextureCacheRuntime; }\n\nnamespace VideoCommon {'),
     # An ASTC texture kept as BC3 is converted in the background in a busy frame only, and in
     # place on a light screen (headless/astc_policy.h). The frame is counted where the texture
     # cache ends its own.
     ('    if (True(image.flags & ImageFlagBits::AsynchronousDecode)) {\n        QueueAsyncDecode(image, image_id);\n        return;\n    }',
      '    if (True(image.flags & ImageFlagBits::AsynchronousDecode) && ::Eden::AstcPolicy::InBackground()) {\n        QueueAsyncDecode(image, image_id);\n        return;\n    }'),
     ('    TickAsyncDecode();\n    TickAsyncUnswizzle();', '    ::Eden::AstcPolicy::Frame();\n    TickAsyncDecode();\n    TickAsyncUnswizzle();'),
+    # Every 10 s at most, what the collector freed because memory was short (texture_evictions.h).
+    ('    sentenced_images.Tick();\n',
+     '    ' + VULKAN_CACHE + '\n'
+     '        ::Eden::TextureEvictions::Frame(async_decodes.size(),\n'
+     '            ::Eden::Performance::graphics_memory_free.load(std::memory_order_relaxed),\n'
+     '            ::Eden::Performance::graphics_memory_held.load(std::memory_order_acquire));\n'
+     '    }\n'
+     '    sentenced_images.Tick();\n'),
     # Every place an image is registered at is marked before the texture cache can find the
     # image there (headless/image_pages.h): the two inserts below are the only ones.
     ('        auto map_id =\n            slot_map_views.insert(image.gpu_addr, image.cpu_addr, image.guest_size_bytes, image_id);',
