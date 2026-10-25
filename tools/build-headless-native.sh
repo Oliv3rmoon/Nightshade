@@ -93,6 +93,8 @@ python3 -B "$root/tools/check-system-font-mod.py"
 python3 -B "$root/tools/check-library-file.py" "$scratch"
 python3 -B "$root/tools/check-start-wait.py"
 python3 -B "$root/tools/check-loose-addons.py"
+python3 -B "$root/tools/check-update-helper.py"
+python3 -B "$root/tools/launcher/strings.py" check
 python3 -B "$root/tools/check-nso-memory.py"
 python3 -B "$root/tools/check-performance.py"
 python3 -B "$root/tools/check-performance-settings.py"
