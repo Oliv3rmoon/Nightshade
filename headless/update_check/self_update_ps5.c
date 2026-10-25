@@ -13,6 +13,7 @@
 #include "self_update.h"
 
 #include "console_curl.h"
+#include "github_release.h"
 #include "update_check.h"
 #include "self_update_protocol.h"
 
@@ -369,4 +370,29 @@ self_update_check_result self_update_check_self(self_update_offer *offer)
     (void)snprintf(self_update_agent, sizeof(self_update_agent), "homebrew-self-update/1 (%s)",
                    title);
     return self_update_check(self_update_console(), title, version, offer);
+}
+
+/* ProsperoEden: the same, asking the releases of a GitHub repository instead when one is named
+   (github_release.h). With none, it is self_update_check_self() above. */
+self_update_check_result self_update_check_self_from(const char *repository, const char *name,
+                                                     self_update_offer *offer,
+                                                     github_release_report *report)
+{
+    char title[10];
+    char version[12];
+    if (report != NULL)
+        memset(report, 0, sizeof(*report));
+    if (offer == NULL || !update_check_read_param(SELF_UPDATE_PARAM_PATH, title, version))
+    {
+        if (offer != NULL)
+            memset(offer, 0, sizeof(*offer));
+        if (report != NULL)
+            report->reason = GITHUB_RELEASE_BAD_ARGUMENT;
+        return SELF_UPDATE_UNKNOWN;
+    }
+    /* The agent names the app, as above (GitHub's API refuses a request without one). */
+    (void)snprintf(self_update_agent, sizeof(self_update_agent), "homebrew-self-update/1 (%s)",
+                   title);
+    return self_update_check_from(self_update_console(), repository, name, title, version, offer,
+                                  report);
 }

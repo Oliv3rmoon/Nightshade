@@ -3372,6 +3372,18 @@ endif()
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${PORT_ROOT}/sce_sys/param.json")
 write_derived("${PORT_BUILD_DIR}/version/app_version.h"
     "// Generated from sce_sys/param.json (contentVersion).\n#pragma once\n#define EDEN_APP_VERSION \"${app_version}\"\n")
+# Where the update check asks (update_notice.h): empty, the homebrew.page catalog, which lists the
+# official releases; a GitHub repository as owner/name, that repository's newest release instead
+# (update_check/github_release.h). A header of its own too, read by update_notice.cpp alone.
+set(EDEN_UPDATE_REPOSITORY "" CACHE STRING
+    "GitHub repository (owner/name) whose releases the update check asks; empty: the homebrew.page catalog")
+if(NOT EDEN_UPDATE_REPOSITORY STREQUAL "" AND
+   (NOT EDEN_UPDATE_REPOSITORY MATCHES "^[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9._-]+$" OR
+    EDEN_UPDATE_REPOSITORY MATCHES "/[.][.]?$"))
+    message(FATAL_ERROR "EDEN_UPDATE_REPOSITORY must be a GitHub repository as owner/name, not '${EDEN_UPDATE_REPOSITORY}'")
+endif()
+write_derived("${PORT_BUILD_DIR}/version/update_repository.h"
+    "// Generated from EDEN_UPDATE_REPOSITORY (headless/CMakeLists.txt).\n#pragma once\n#define EDEN_UPDATE_REPOSITORY \"${EDEN_UPDATE_REPOSITORY}\"\n")
 target_include_directories(eden-headless PRIVATE "${PORT_BUILD_DIR}/version")
 target_link_libraries(eden-headless PRIVATE core eden-pad)
 # A game's text entry on the PS5's own on-screen keyboard (system_keyboard.h, keyboard_applet.h).
@@ -3594,6 +3606,7 @@ endif()
             add_library(update-check OBJECT
                 "${EDEN_PORT_DIR}/update_check/update_check.c"
                 "${EDEN_PORT_DIR}/update_check/console_curl.c"
+                "${EDEN_PORT_DIR}/update_check/github_release.c"
                 "${EDEN_PORT_DIR}/update_check/self_update.c"
                 "${EDEN_PORT_DIR}/update_check/self_update_ps5.c"
                 "${EDEN_PORT_DIR}/update_check/self_update_sha256.c"
