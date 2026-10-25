@@ -669,6 +669,65 @@ void AnswerSize() {
     assert((network.asked == std::vector<std::string>{kApi}) && offer.artifact[0] == '\0');
 }
 
+// The release with these files in place of its own.
+std::string WithAssets(const std::string& assets) {
+    const std::string compact = Compact(kRelease);
+    const std::size_t from = compact.find("\"assets\":[") + 10, to = compact.find("],\"tarball_url\"");
+    return compact.substr(0, from) + assets + compact.substr(to);
+}
+
+std::string Asset(const std::string& name, unsigned size = 10, const char* state = "uploaded") {
+    return "{\"name\":\"" + name + "\",\"state\":\"" + state + "\",\"size\":" + std::to_string(size) + "}";
+}
+
+void AssetList() {
+    // The list is read once, element after element.
+    const std::string array = "[ 1, \"a\" ,{\"b\":[2,{}]} , null ]";
+    std::size_t at = 0;
+    const char* value = nullptr;
+    std::size_t length = 0;
+    std::vector<std::string> seen;
+    while (update_check_json_array_next(array.data(), array.size(), &at, &value, &length) == 1)
+        seen.emplace_back(value, length);
+    assert((seen == std::vector<std::string>{"1", "\"a\"", "{\"b\":[2,{}]}", "null"}));
+    assert(update_check_json_array_next(array.data(), array.size(), &at, &value, &length) == 0);
+    at = 0;
+    assert(update_check_json_array_next("[ ]", 3, &at, &value, &length) == 0 &&
+           update_check_json_array_next("[ ]", 3, &at, &value, &length) == 0);
+    for (const std::string bad : {"[1,]", "[1 2]", "[1] x", "{\"a\":1}", "[", "", "[\"open]"}) {
+        at = 0;
+        int found = 1;
+        while (found == 1) found = update_check_json_array_next(bad.data(), bad.size(), &at, &value, &length);
+        assert(found == -1);
+    }
+
+    static self_update_offer offer;
+    github_release_report report{};
+    const std::string zip = Asset("Nightshade-v1.005.100.zip", 42651073), sums = Asset("SHA256SUMS", 94);
+    // All of GitHub's 1,000 files are looked at: the release's ZIP may come last.
+    std::string many;
+    for (int i = 0; i < 998; ++i) many += Asset("file-" + std::to_string(i) + ".bin") + ",";
+    Serve(200, WithAssets(many + sums + "," + zip));
+    assert(Check(kRepository, "01.005.000", &offer, &report) == SELF_UPDATE_AVAILABLE &&
+           std::strcmp(offer.artifact, kZip) == 0 && offer.size == 42651073);
+    // Up to eight ZIPs of the version, SHA256SUMS choosing; a ninth is not dropped (eight decoys
+    // before the release's would leave it out) but refused, saying so.
+    std::string decoys;
+    for (int i = 0; i < 7; ++i) decoys += Asset("decoy" + std::to_string(i) + "-v1.005.100.zip") + ",";
+    Serve(200, WithAssets(decoys + zip + "," + sums));
+    assert(Check(kRepository, "01.005.000", &offer, &report) == SELF_UPDATE_AVAILABLE && std::strcmp(offer.artifact, kZip) == 0);
+    decoys += Asset("decoy7-v1.005.100.zip") + ",";
+    Serve(200, WithAssets(decoys + zip + "," + sums));
+    assert(Check(kRepository, "01.005.000", &offer, &report) == SELF_UPDATE_UNKNOWN);
+    assert(report.reason == GITHUB_RELEASE_TOO_MANY_ZIPS && std::strcmp(github_release_reason_text(report.reason), "too-many-zips") == 0);
+    assert((network.asked == std::vector<std::string>{kApi}));
+    // ZIPs that can't be the release (not uploaded in full, empty) are not counted.
+    Serve(200, WithAssets(decoys + Asset("decoy8-v1.005.100.zip", 10, "starter") + "," + Asset("decoy9-v1.005.100.zip", 0) +
+                          "," + sums));
+    assert(Check(kRepository, "01.005.000", &offer, &report) == SELF_UPDATE_UNKNOWN &&
+           report.reason == GITHUB_RELEASE_SUMS_NO_LINE);
+}
+
 void CatalogUnchanged() {
     static self_update_offer offer, direct;
     github_release_report report{};
@@ -744,6 +803,7 @@ int main() {
     ChooseZip();
     GitHubCheck();
     AnswerSize();
+    AssetList();
     CatalogUnchanged();
     std::puts("update check: versions, request address, newer/same/older and silent answers PASS");
     std::puts("update check from GitHub: tag versions, addresses and redirects, SHA256SUMS lines, release notes, "

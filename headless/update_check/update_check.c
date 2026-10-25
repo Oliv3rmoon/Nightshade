@@ -350,28 +350,39 @@ int update_check_json_array_string(const char *json, size_t length, size_t index
     json_skip_space(&c); return c.at == c.end ? found : -1;
 }
 
-int update_check_json_array_value(const char *json, size_t length, size_t index,
-                                  const char **value, size_t *value_length)
+int update_check_json_array_next(const char *json, size_t length, size_t *at,
+                                 const char **value, size_t *value_length)
 {
+    static const size_t done = (size_t)-1;
     json_cursor c;
-    size_t at = 0;
-    int found = 0;
-    if (!json || !value || !value_length) return -1;
-    c.at = json; c.end = json + length; json_skip_space(&c);
-    if (c.at == c.end || *c.at++ != '[') return -1;
+    const char *begin;
+    if (!json || !at || !value || !value_length) return -1;
+    if (*at == done) return 0;
+    if (*at > length) return -1;
+    c.at = json + *at; c.end = json + length;
+    if (*at == 0) {
+        json_skip_space(&c);
+        if (c.at == c.end || *c.at++ != '[') return -1;
+        json_skip_space(&c);
+        if (c.at < c.end && *c.at == ']') {
+            ++c.at; json_skip_space(&c);
+            if (c.at != c.end) return -1;
+            *at = done; return 0;
+        }
+    }
+    begin = c.at;
+    if (!json_skip_value(&c)) return -1;
+    *value = begin; *value_length = (size_t)(c.at - begin);
     json_skip_space(&c);
-    while (c.at < c.end && *c.at != ']') {
-        const char *begin = c.at;
-        if (!json_skip_value(&c)) return -1;
-        if (at++ == index) { found = 1; *value = begin; *value_length = (size_t)(c.at - begin); }
-        json_skip_space(&c);
-        if (c.at < c.end && *c.at == ']') break;
-        if (c.at == c.end || *c.at++ != ',') return -1;
-        json_skip_space(&c);
+    if (c.at < c.end && *c.at == ',') {
+        ++c.at; json_skip_space(&c);
         if (c.at == c.end || *c.at == ']') return -1;
+        *at = (size_t)(c.at - json); return 1;
     }
     if (c.at == c.end || *c.at++ != ']') return -1;
-    json_skip_space(&c); return c.at == c.end ? found : -1;
+    json_skip_space(&c);
+    if (c.at != c.end) return -1;
+    *at = done; return 1;
 }
 
 int update_check_json_string(const char *json, size_t length, const char *key, char *out,

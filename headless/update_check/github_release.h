@@ -48,7 +48,8 @@ extern "C"
 #define GITHUB_RELEASE_API GITHUB_RELEASE_HOST "repos/"
 /* Redirects of the release's request followed, to api.github.com only. */
 #define GITHUB_RELEASE_REDIRECTS 3
-/* The release's files whose name ends in -<tag>.zip that are told apart by SHA256SUMS. */
+/* The release's files whose name ends in -<tag>.zip that are told apart by SHA256SUMS; a release
+ * with more is not offered. */
 #define GITHUB_RELEASE_MAX_ZIPS 8
 /* The release's answer with its notes: GitHub allows 125,000 characters of them, which in
  * Chinese or Japanese is some 380 KB, and a release's files take about 1.4 KB each. */
@@ -77,7 +78,8 @@ extern "C"
         GITHUB_RELEASE_SUMS_MALFORMED = 14, /* its line for a ZIP is malformed or repeated */
         GITHUB_RELEASE_SUMS_TWO_ZIPS = 15,  /* it lists two of them: which one is meant? */
         GITHUB_RELEASE_REDIRECT_REFUSED = 16, /* a redirect elsewhere than api.github.com, or too many */
-        GITHUB_RELEASE_TOO_LARGE = 17        /* an answer over GITHUB_RELEASE_MAX_ANSWER */
+        GITHUB_RELEASE_TOO_LARGE = 17,       /* an answer over GITHUB_RELEASE_MAX_ANSWER */
+        GITHUB_RELEASE_TOO_MANY_ZIPS = 18    /* more than GITHUB_RELEASE_MAX_ZIPS *-<tag>.zip */
     } github_release_reason;
 
     /* What the check found, for the log. */

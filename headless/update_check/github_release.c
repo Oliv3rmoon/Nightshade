@@ -171,7 +171,7 @@ github_release_reason github_release_evaluate(const char *json, size_t length,
     const char *value = NULL;
     size_t assets_length = 0;
     size_t size = 0;
-    size_t index;
+    size_t cursor = 0;
     char suffix[48];
     size_t suffix_length;
     int sums = 0;
@@ -204,10 +204,11 @@ github_release_reason github_release_evaluate(const char *json, size_t length,
     if (update_check_version_compare(release->available, installed, &comparable) <= 0 || !comparable)
         return GITHUB_RELEASE_NOT_NEWER;
 
-    /* Its files, each uploaded in full: SHA256SUMS, and the ZIPs of this version, whatever the
-     * release line calls itself before "-<tag>.zip" (SHA256SUMS says which one is the release). */
+    /* Its files, each uploaded in full, read once from first to last (GitHub allows 1,000):
+     * SHA256SUMS, and the ZIPs of this version, whatever the release line calls itself before
+     * "-<tag>.zip" (SHA256SUMS says which one is the release). */
     suffix_length = (size_t)snprintf(suffix, sizeof(suffix), "-%s.zip", release->tag);
-    for (index = 0; index < 256; ++index)
+    for (;;)
     {
         const char *asset = NULL;
         size_t asset_length = 0;
@@ -216,8 +217,7 @@ github_release_reason github_release_evaluate(const char *json, size_t length,
         unsigned bytes = 0;
         size_t file_length;
         int is_zip;
-        const int found =
-            update_check_json_array_value(assets, assets_length, index, &asset, &asset_length);
+        const int found = update_check_json_array_next(assets, assets_length, &cursor, &asset, &asset_length);
         if (found == 0)
             break;
         if (found != 1)
@@ -239,8 +239,11 @@ github_release_reason github_release_evaluate(const char *json, size_t length,
             ++sums;
             release->sums_size = bytes;
         }
-        else if (bytes != 0 && bytes <= SELF_UPDATE_MAX_ARCHIVE && release->zip_count < GITHUB_RELEASE_MAX_ZIPS)
+        else if (bytes != 0 && bytes <= SELF_UPDATE_MAX_ARCHIVE)
         {
+            /* More ZIPs of the version than are told apart: none is dropped to make room. */
+            if (release->zip_count == GITHUB_RELEASE_MAX_ZIPS)
+                return GITHUB_RELEASE_TOO_MANY_ZIPS;
             memcpy(release->zips[release->zip_count], file, file_length + 1);
             release->zip_sizes[release->zip_count++] = bytes;
         }
@@ -762,6 +765,8 @@ const char *github_release_reason_text(github_release_reason reason)
         return "redirect-refused";
     case GITHUB_RELEASE_TOO_LARGE:
         return "too-large";
+    case GITHUB_RELEASE_TOO_MANY_ZIPS:
+        return "too-many-zips";
     }
     return "unknown";
 }
