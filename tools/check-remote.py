@@ -81,7 +81,7 @@ def main():
         subprocess.run([compiler, "-std=c++20", *flags, "-fno-rtti", *includes,
                         str(HEADLESS / "remote_check.cpp"), str(HEADLESS / "remote/remote.cpp"),
                         str(HEADLESS / "remote/backends.cpp"), str(HEADLESS / "remote/ftp.cpp"),
-                        str(HEADLESS / "remote/stream_check.cpp"),
+                        str(HEADLESS / "remote/stream_check.cpp"), str(HEADLESS / "remote/stream_file.cpp"),
                         str(HEADLESS / "remote/romm/romm_client.cpp"), str(HEADLESS / "remote/romm/romm_source.cpp"),
                         str(HEADLESS / "remote/romm/romm_saves.cpp"), str(HEADLESS / "remote/save_archive.cpp"),
                         str(HEADLESS / "remote/save_sync.cpp"), str(http), *map(str, miniz_objects),

@@ -29,4 +29,17 @@ inline const std::string& AssetsDir() {
     return directory;
 }
 inline std::string AssetsPath(std::string_view child) { return AssetsDir() + "/" + std::string(child); }
+
+// The folder whose roms/ and updates/ hold the games: "games_folder" in the settings file when it
+// names one, so that the games can be on a USB drive while keys, firmware, mods and everything
+// written during play stay on the console (#50, #149); else the game files folder.
+inline const std::string& GamesDir() {
+    static const std::string directory = [] {
+        if (!FilesystemAccess()) return AssetsDir();
+        const std::string saved = LoadSavedGamesDir();
+        return saved.empty() ? AssetsDir() : saved;
+    }();
+    return directory;
+}
+inline std::string GamesPath(std::string_view child) { return GamesDir() + "/" + std::string(child); }
 } // namespace Eden

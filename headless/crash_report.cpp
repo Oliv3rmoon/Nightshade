@@ -31,6 +31,7 @@ std::int32_t sceKernelAvailableDirectMemorySize(std::int64_t, std::int64_t, std:
 std::size_t eden_heap_committed(void);
 std::size_t eden_heap_large_held(unsigned* blocks);
 std::size_t eden_heap_last_failure(unsigned* why, std::size_t* count);
+std::uintptr_t eden_guest_write_refused(unsigned* why, unsigned* state) noexcept;
 #endif
 // The app's code, from the link (tools/unwind.ld).
 extern const char __eden_text_start[];
@@ -379,6 +380,18 @@ void Compose(const Kind* kind, int code, std::uint64_t address, const Registers&
                 t.Put(" bytes");
             }
             t.Put(why < sizeof(kWhy) / sizeof(kWhy[0]) ? kWhy[why] : "");
+            t.Put('\n');
+        }
+        // A write to the guest's memory the memory service gave up on (src/guest_memory_service.inc).
+        unsigned refused_why = 0, refused_state = 0;
+        if (const std::uintptr_t refused = eden_guest_write_refused(&refused_why, &refused_state)) {
+            static constexpr const char* kState[] = {"Zero", "Own", "Shared", "Fine"};
+            t.Put("guest memory: a write at 0x");
+            t.Hex(refused);
+            t.Put(refused_why == 1 ? " was refused after 17 faults in a row with nothing to change"
+                                   : " was refused: no block was left for its slot");
+            t.Put(", the slot ");
+            t.Put(refused_state < 4 ? kState[refused_state] : "locked");
             t.Put('\n');
         }
     }

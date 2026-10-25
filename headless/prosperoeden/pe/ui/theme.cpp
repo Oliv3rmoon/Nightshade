@@ -143,6 +143,75 @@ Theme canopy()
     return t;
 }
 
+// Nightly: black and red, clean and dark. Slate's clean layout (tabs at the top, a quiet home
+// screen, settings as a list) over a near-black sky with a low red glow and a few stars, and a
+// red accent. The look of Oliv3rmoon's builds, and the one they start with.
+Theme nightly()
+{
+    Theme t;
+    theme_from_kit("acrylic", &t);
+    t.id = "nightly";
+    t.name = "Nightly";
+    t.summary = TR("Black and red, clean and dark.");
+
+    t.base = rgb(0x09090b);
+    t.scrim = rgb(0x050506);
+    t.glass = rgb(0x141417);
+    t.panel = rgb(0x0e0e11);
+    t.panel_edge = rgb(0x2b2b31);
+    t.row = rgb(0x161619);
+    t.row_edge = rgb(0x27272d);
+    t.row_focus = rgb(0x26161a);
+
+    t.accent = rgb(0xe5484d);
+    t.accent_deep = rgb(0x5a1419);
+    t.accent_pale = rgb(0xf3a9ad);
+    t.on_accent = rgb(0x0b0b0d);
+    t.highlight = rgb(0xff6b72);
+
+    t.text = rgb(0xededf0);
+    t.title = rgb(0xf6f6f8);
+    t.value = rgb(0xe8e8ec);
+    t.body = rgb(0xcacad0);
+    t.copy = rgb(0xa9a9b1);
+    t.meta = rgb(0x8f8f98);
+    t.label = rgb(0x80808a);
+    t.muted = rgb(0x70707a);
+    t.faint = rgb(0x50505a);
+    t.warning = rgb(0xf0a35e); // amber: never the accent's red, so a warning still reads as one
+    t.rule = rgb(0x27272d);
+
+    t.size_hero = 64.0f;
+    t.size_display = 38.0f;
+    t.size_heading = 28.0f;
+    t.tracking_kicker = 3.0f;
+
+    t.radius_row = 12.0f;
+    t.radius_card = 14.0f;
+    t.radius_panel = 20.0f;
+    t.pill_chips = true;
+    t.focus_width = 2.0f;
+    t.focus_glow = 22.0f;
+    t.shadow_blur = 32.0f;
+    t.shadow_offset = 12.0f;
+    t.motes = 10;
+    t.drift = 0.0f;
+
+    t.list_settings = true;
+    t.game_backdrop = false;
+    t.minimal_home = true;
+    t.top_nav = true;
+    t.scrim_opacity = 0.88f;
+    t.game_page_offset = 60.0f;
+
+    t.backdrop = "nightly-backdrop.tga";
+    t.backdrop_blur = "nightly-backdrop-blur.tga";
+    t.brand = "brand.tga";
+    t.light_x = 0.78f;
+    t.light_y = 0.86f;
+    return t;
+}
+
 // ---- accent presets: named colour sets a user can pick per theme ----
 
 const AccentPreset kSlateAccents[] = {
@@ -167,9 +236,18 @@ const AccentPreset kCanopyAccents[] = {
     {"copper",   "Copper",   Color::rgb(0xd0905c), Color::rgb(0x4a2818), Color::rgb(0xe8c4a0), Color::rgb(0x100c08), Color::rgb(0xf0d0a8)},
 };
 
+const AccentPreset kNightlyAccents[] = {
+    {"red",      "Red",      Color::rgb(0xe5484d), Color::rgb(0x5a1419), Color::rgb(0xf3a9ad), Color::rgb(0x0b0b0d), Color::rgb(0xff6b72)},
+    {"crimson",  "Crimson",  Color::rgb(0xc8243c), Color::rgb(0x4a0c16), Color::rgb(0xec98a6), Color::rgb(0x0b0b0d), Color::rgb(0xf05068)},
+    {"rose",     "Rose",     Color::rgb(0xe88ca0), Color::rgb(0x5c2232), Color::rgb(0xf2c0cc), Color::rgb(0x0b0b0d), Color::rgb(0xf5d4dc)},
+    {"white",    "White",    Color::rgb(0xe6e6ea), Color::rgb(0x3a3a40), Color::rgb(0xf4f4f6), Color::rgb(0x0b0b0d), Color::rgb(0xffffff)},
+    {"violet",   "Violet",   Color::rgb(0xa080d0), Color::rgb(0x342060), Color::rgb(0xccb8e8), Color::rgb(0x0b0b0d), Color::rgb(0xdcc8f0)},
+    {"ice",      "Ice",      Color::rgb(0x7ec8e3), Color::rgb(0x1c4966), Color::rgb(0xb8e0f0), Color::rgb(0x0b0b0d), Color::rgb(0xd0ecf8)},
+};
+
 struct Store
 {
-    std::array<Theme, 2> all{canopy(), slate()};
+    std::array<Theme, 3> all{canopy(), slate(), nightly()};
     int index = 0;
     int accent = -1;
     Theme active = all[0];
@@ -220,6 +298,7 @@ static std::span<const AccentPreset> presets_for(int theme_index)
     {
     case 0: return kCanopyAccents;
     case 1: return kSlateAccents;
+    case 2: return kNightlyAccents;
     default: return {};
     }
 }

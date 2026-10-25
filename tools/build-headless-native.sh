@@ -67,13 +67,23 @@ python3 -B "$root/headless/check_slab_lifetime.py" \
     "$scratch/source/src/core/hle/kernel/slab_helpers.h"
 echo "Building Eden with $jobs parallel jobs"
 cmake --build "$scratch/native-local" --target eden-headless core -j "$jobs"
+python3 -B "$root/tools/check-timing-stop.py" "$scratch/native-local"
+python3 -B "$root/tools/check-post-processing-paths.py" "$scratch/native-local"
 # In every build: an object that saw Eden's own table header would write a table the rest keeps sparse.
 python3 -B "$root/tools/check-sparse-header.py" "$scratch/native-local"
 python3 -B "$root/tools/check-multiplayer-headers.py" "$scratch/native-local"
 # Source checks of the release configuration (development builds opt out: EDEN_SKIP_SOURCE_CHECKS=1).
 [[ ${EDEN_SKIP_SOURCE_CHECKS:-0} == 1 ]] && exit 0
 python3 -B "$root/headless/check_audio_shutdown.py" "$scratch/native-local/headless/core.cpp" "$scratch/source/src/core/core.cpp"
+python3 -B "$root/tools/check-audio-queue.py" "$scratch/native-local/headless/sink_stream.cpp" "$scratch/source/src"
 python3 -B "$root/tools/check-load-failure.py"
+python3 -B "$root/tools/check-recent-games.py"
+python3 -B "$root/tools/check-update-versions.py" "$scratch/native-local/headless/ncz-registered_cache.cpp"
+python3 -B "$root/tools/check-game-folder-mods.py"
+python3 -B "$root/tools/check-forwarded-rom.py"
+python3 -B "$root/tools/check-game-files-count.py"
+python3 -B "$root/tools/check-loader-message.py"
+python3 -B "$root/tools/check-system-font-mod.py"
 python3 -B "$root/tools/check-nso-memory.py"
 python3 -B "$root/tools/check-performance.py"
 python3 -B "$root/tools/check-performance-settings.py"
@@ -86,6 +96,8 @@ python3 -B "$root/tools/check-jit-patch-lookup.py"
 python3 -B "$root/tools/check-jit-assert.py"
 python3 -B "$root/tools/check-crash-report.py"
 python3 -B "$root/tools/check-system-keyboard.py"
+python3 -B "$root/tools/check-stream-file.py"
+python3 -B "$root/tools/check-streamed-game.py"
 python3 -B "$root/tools/check-launcher-theme.py"
 if [[ "$probe" == OFF ]]; then
     python3 -B "$root/tools/check-exclusive-monitor.py"
@@ -101,6 +113,12 @@ if [[ "$graphics" == ON ]]; then
     python3 -B "$root/tools/check-nvdrv-process-lifetime.py"
     python3 -B "$root/tools/check-integer-buffer-clear.py"
     python3 -B "$root/tools/check-game-capture-shutdown.py"
+    if [[ ${EDEN_PS5_VULKAN:-OFF} == ON ]]; then
+        python3 -B "$root/tools/check-staging-buffers.py" "$scratch/source/src" \
+            "$scratch/native-local/headless/vulkan_staging_buffer_pool.cpp"
+        python3 -B "$root/tools/check-texture-evictions.py" "$scratch/source/src" \
+            "$scratch/native-local/headless/vulkan-cache/video_core/texture_cache/texture_cache.h"
+    fi
 fi
 
 python3 -B tools/check-hud.py

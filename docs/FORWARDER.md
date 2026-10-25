@@ -8,7 +8,7 @@ ProsperoEden starts that game directly instead of opening its launcher.
 
 | Argument | Meaning |
 | --- | --- |
-| `--rom <file>` or `--rom=<file>` | The game to start. An absolute path (`/mnt/usb0/eden/roms/Game.nsp`), or a path inside the game files folder's `roms/` (`Game.nsp`, `rpg/Game.xci`). A relative path may not contain `..`. |
+| `--rom <file>` or `--rom=<file>` | The game to start. An absolute path (`/mnt/usb0/eden/roms/Game.nsp`), or a path inside the games folder's `roms/` (the game files folder's, unless `"games_folder"` names another: [INSTALL.md](INSTALL.md#game-files-folder)) (`Game.nsp`, `rpg/Game.xci`). A relative path may not contain `..`. |
 | `--exit-after-game` | When that game ends normally, close ProsperoEden so the console returns to the home screen. Without it, the library opens. |
 
 Unknown arguments are ignored. Parsing is in `headless/forwarded_launch.h`; `headless/main.cpp`
@@ -19,6 +19,10 @@ uses it after filesystem access is set up, so `roms/` resolves against the folde
 
 - The forwarded game starts once. Quitting it (Touchpad + L1) opens the library, or, with
   `--exit-after-game`, ends ProsperoEden.
+- A game moved into its own game folder after the forwarder was made is still found: for a
+  missing `roms/Game.nsp`, ProsperoEden starts `roms/Game/Game.nsp`, or else the `Game.nsp` in
+  the only game folder that has one. Only a game the forwarder put directly in `roms/` is looked
+  for this way.
 - If the file is missing (or filesystem access was not granted, so the path cannot be read), the
   launcher opens and shows `Forwarded game not found: <path>`.
 - After a crash, ProsperoEden restarts without arguments and shows the crash notice; the

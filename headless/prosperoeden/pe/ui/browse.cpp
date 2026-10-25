@@ -483,8 +483,9 @@ void Launcher::draw_about(Canvas &c)
         };
         info_line(696.0f, tr("KEYS"), folder + "/keys/prod.keys");
         info_line(730.0f, tr("FIRMWARE"), folder + "/firmware/*.nca");
-        info_line(764.0f, tr("GAMES"), folder + "/roms");
-        info_line(798.0f, tr("UPDATES, DLC"), folder + "/updates");
+        const std::string games = services_.games_folder();
+        info_line(764.0f, tr("GAMES"), games + "/roms");
+        info_line(798.0f, tr("UPDATES, DLC"), games + "/updates");
         info_line(832.0f, tr("MODS"), folder + "/mods");
         text_shrink(c, tr("Menu sound effects made with ElevenLabs."), x,
                     baseline(880.0f, 26.0f, t.size_small), t.size_small, t.meta, w);
@@ -527,6 +528,8 @@ void Launcher::draw_about(Canvas &c)
                748.0f, 2, kShrink);
     text_shrink(c, tr("Menu sound effects made with ElevenLabs."), 144.0f,
                 baseline(788.0f, 30.0f, th().size_small), th().size_small, th().meta, 748.0f);
+    text_shrink(c, kBuildCredit, 144.0f, baseline(826.0f, 28.0f, th().size_small), th().size_small,
+                th().accent_pale, 748.0f);
     text(c, version_, 892.0f, baseline(866.0f, 28.0f, th().size_small), th().size_small,
          th().accent_pale, Align::right);
     // A newer release the check found (with Update notices off, the one place that says so).
@@ -554,8 +557,9 @@ void Launcher::draw_about(Canvas &c)
     // the Library show it (and create it).
     line(384.0f, tr("KEYS"), short_path(folder + "/keys/prod.keys", 36));
     line(450.0f, tr("FIRMWARE"), short_path(folder + "/firmware/*.nca", 36));
-    line(516.0f, tr("GAMES"), fill(tr("{0}/ (NSP or XCI)"), {short_path(folder + "/roms", 36)}));
-    line(582.0f, tr("UPDATES, DLC"), fill(tr("{0}/ (NSP or XCI)"), {short_path(folder + "/updates", 36)}));
+    const std::string games = services_.games_folder();
+    line(516.0f, tr("GAMES"), fill(tr("{0}/ (NSP or XCI)"), {short_path(games + "/roms", 36)}));
+    line(582.0f, tr("UPDATES, DLC"), fill(tr("{0}/ (NSP or XCI)"), {short_path(games + "/updates", 36)}));
     line(648.0f, tr("MODS"), fill(tr("{0}/ (one folder per game ID)"), {short_path(folder + "/mods", 36)}));
     list.rounded_rect({1016.0f, 712.0f, 748.0f, 1.0f}, 0.0f, th().rule);
     text_block(c,

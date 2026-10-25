@@ -178,6 +178,10 @@ msgstr "Bikuubinen"
 msgid "Bilinear"
 msgstr "Bilineaarinen"
 
+#: pe/ui/theme.cpp
+msgid "Black and red, clean and dark."
+msgstr "Mustaa ja punaista, selkeää ja tummaa."
+
 #: pe/ui/game_options.cpp
 msgid "Bottom left"
 msgstr "Vasen alakulma"

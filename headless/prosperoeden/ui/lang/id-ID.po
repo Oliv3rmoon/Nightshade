@@ -178,6 +178,10 @@ msgstr "Bikubik"
 msgid "Bilinear"
 msgstr "Bilinear"
 
+#: pe/ui/theme.cpp
+msgid "Black and red, clean and dark."
+msgstr "Hitam dan merah, bersih dan gelap."
+
 #: pe/ui/game_options.cpp
 msgid "Bottom left"
 msgstr "Kiri bawah"

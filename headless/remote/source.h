@@ -46,8 +46,9 @@ class Receiver {
   public:
     virtual ~Receiver() = default;
     // Before the first byte: from_start when the file comes from its beginning, not from the
-    // offset asked for (a source that cannot go on). False stops the transfer.
-    virtual bool begin(bool from_start) = 0;
+    // offset asked for (a source that cannot go on); length: the bytes that follow, as the server
+    // said (0 when it did not). False stops the transfer.
+    virtual bool begin(bool from_start, std::uint64_t length) = 0;
     // The next bytes; false stops the transfer.
     virtual bool take(const void* data, std::size_t size) = 0;
     // Asked often while the transfer runs: true stops it (a game starts, a cancel).

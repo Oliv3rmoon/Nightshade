@@ -178,6 +178,10 @@ msgstr ""
 msgid "Bilinear"
 msgstr ""
 
+#: pe/ui/theme.cpp
+msgid "Black and red, clean and dark."
+msgstr ""
+
 #: pe/ui/game_options.cpp
 msgid "Bottom left"
 msgstr ""
@@ -697,6 +701,10 @@ msgid "FPS overlay"
 msgstr ""
 
 #: pe/ui/game_options.cpp, pe/ui/settings.cpp
+msgid "Frame gen method"
+msgstr ""
+
+#: pe/ui/game_options.cpp, pe/ui/settings.cpp
 msgid "Frame gen multiplier"
 msgstr ""
 
@@ -710,6 +718,10 @@ msgstr ""
 
 #: pe/ui/game_options.cpp, pe/ui/settings.cpp
 msgid "Frame generation needs Lossless.dll, from Lossless Scaling, in the lossless folder."
+msgstr ""
+
+#: pe/ui/settings.cpp
+msgid "Frame generation needs MihawkGen weights (network.fgw)."
 msgstr ""
 
 #: pe/ui/settings.cpp

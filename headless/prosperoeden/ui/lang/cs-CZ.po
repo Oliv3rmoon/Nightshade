@@ -178,6 +178,10 @@ msgstr "Bikubický"
 msgid "Bilinear"
 msgstr "Bilineární"
 
+#: pe/ui/theme.cpp
+msgid "Black and red, clean and dark."
+msgstr "Černá a červená, čisté a tmavé."
+
 #: pe/ui/game_options.cpp
 msgid "Bottom left"
 msgstr "Vlevo dole"

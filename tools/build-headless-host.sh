@@ -65,7 +65,10 @@ cmake -S "$eden" -B "$scratch/build" -G Ninja \
 python3 -B "$root/headless/check_slab_lifetime.py" \
     "$scratch/build/headless/include/core/hle/kernel/slab_helpers.h" \
     "$scratch/source/src/core/hle/kernel/slab_helpers.h"
-cmake --build "$scratch/build" --target eden-headless eden-romfs-check eden-devices-check eden-scalar-check eden-memory-check eden-ryujinx-check eden-mods-check eden-shader-cache-check eden-settings-check eden-patch-library-check eden-update-check eden-update-files-check eden-profiles-check eden-save-sync-check -j 6
+cmake --build "$scratch/build" --target eden-headless eden-romfs-check eden-streamed-game-check eden-devices-check eden-scalar-check eden-memory-check eden-ryujinx-check eden-mods-check eden-shader-cache-check eden-settings-check eden-patch-library-check eden-update-check eden-update-files-check eden-profiles-check eden-save-sync-check -j 6
+python3 -B "$root/tools/check-timing-stop.py" "$scratch/build"
+python3 -B "$root/tools/check-post-processing-paths.py" "$scratch/build"
+python3 -B "$root/tools/check-guest-hooks.py"
 python3 -B "$root/tools/check-sparse-header.py" "$scratch/build"
 python3 -B "$root/tools/check-multiplayer-headers.py" "$scratch/build"
 python3 -B "$root/tools/check-heap-growth.py"
@@ -74,12 +77,15 @@ python3 -B "$root/tools/check-stop-limit.py"
 python3 -B "$root/tools/check-image-pages.py"
 python3 -B "$root/tools/check-astc-policy.py"
 python3 -B "$root/tools/check-guest-clock.py"
+python3 -B "$root/tools/check-guest-idle.py" "$scratch/source/src/core/hle/kernel/physical_core.cpp"
+python3 -B "$root/tools/check-ncz.py"
 python3 -B "$root/tools/check-gc-scan.py"
 "$scratch/build/bin/eden-scalar-check"
 "$scratch/build/bin/eden-memory-check"
 python3 -B "$root/tools/check-decoder-startup.py"
 python3 -B "$root/headless/check_audio_shutdown.py" "$scratch/build/headless/core.cpp" "$scratch/source/src/core/core.cpp"
 "$scratch/build/bin/eden-romfs-check"
+"$scratch/build/bin/eden-streamed-game-check"
 "$scratch/build/bin/eden-ryujinx-check"
 "$scratch/build/bin/eden-patch-library-check"
 "$scratch/build/bin/eden-update-check"

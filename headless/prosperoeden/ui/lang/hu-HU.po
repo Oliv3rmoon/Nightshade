@@ -178,6 +178,10 @@ msgstr "Bikubikus"
 msgid "Bilinear"
 msgstr "Bilineáris"
 
+#: pe/ui/theme.cpp
+msgid "Black and red, clean and dark."
+msgstr "Fekete és vörös, letisztult és sötét."
+
 #: pe/ui/game_options.cpp
 msgid "Bottom left"
 msgstr "Bal alsó"

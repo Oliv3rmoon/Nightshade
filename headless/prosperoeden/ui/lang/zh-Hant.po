@@ -178,6 +178,10 @@ msgstr "雙立方"
 msgid "Bilinear"
 msgstr "雙線性"
 
+#: pe/ui/theme.cpp
+msgid "Black and red, clean and dark."
+msgstr "黑與紅，簡潔而深沉。"
+
 #: pe/ui/game_options.cpp
 msgid "Bottom left"
 msgstr "左下"

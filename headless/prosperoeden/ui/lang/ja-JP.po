@@ -178,6 +178,10 @@ msgstr "バイキュービック"
 msgid "Bilinear"
 msgstr "バイリニア"
 
+#: pe/ui/theme.cpp
+msgid "Black and red, clean and dark."
+msgstr "黒と赤、すっきりとダーク。"
+
 #: pe/ui/game_options.cpp
 msgid "Bottom left"
 msgstr "左下"

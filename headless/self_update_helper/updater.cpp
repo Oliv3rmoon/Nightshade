@@ -439,6 +439,16 @@ std::string drive_root(const std::vector<std::string> &drives, const std::string
     return {};
 }
 
+std::vector<std::string> title_sandboxes(const std::string &sandboxes, const std::string &title)
+{
+    std::vector<std::string> names, found;
+    if (title_id(title) && list_entries(sandboxes, 1024, names))
+        for (const auto &name : names)
+            if (name.size() > 10 && name[9] == '_' && name.compare(0, 9, title) == 0)
+                found.push_back(name);
+    return found;
+}
+
 int title_running(const std::string &sandboxes, const std::string &title)
 {
     if (!title_id(title))
@@ -732,9 +742,16 @@ int run(const Environment &environment, const Io &io)
         if (waited >= environment.exit_wait_ms)
         {
             clean();
-            session.log("the app did not close; nothing was changed");
+            // What still counts as the app (Swordpdf/ProsperoEden#232): after a crash, or a close
+            // the system did not finish, its sandbox can stay until the console restarts.
+            std::string left;
+            for (const auto &entry : title_sandboxes(environment.sandboxes, title))
+                left += (left.empty() ? "" : ", ") + entry;
+            session.log("the app did not close; nothing was changed; in " + environment.sandboxes + ": " +
+                        (left.empty() ? "(could not be listed)" : left));
             if (environment.notify)
-                environment.notify(name + " wasn't updated: it didn't close. Nothing was changed.");
+                environment.notify(name + " wasn't updated: it didn't close. Nothing was changed. "
+                                   "Restart the console and update again.");
             return 1;
         }
         session.sleep(250);

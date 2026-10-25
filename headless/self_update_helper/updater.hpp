@@ -56,6 +56,8 @@ std::string drive_root(const std::vector<std::string> &drives, const std::string
 
 // 1: running, 0: not, -1: unknown.
 int title_running(const std::string &sandboxes, const std::string &title);
+// The title's entries in the sandbox folder (TITLE_000 ...), for the log of an update it refused.
+std::vector<std::string> title_sandboxes(const std::string &sandboxes, const std::string &title);
 
 // Puts every top-level entry of staged in target's place, moving target's own
 // entries to backup first. On failure target is as it was. Both folders must be

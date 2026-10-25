@@ -178,6 +178,10 @@ msgstr "ไบคิวบิก"
 msgid "Bilinear"
 msgstr "ไบลิเนียร์"
 
+#: pe/ui/theme.cpp
+msgid "Black and red, clean and dark."
+msgstr "ดำและแดง สะอาดและมืด"
+
 #: pe/ui/game_options.cpp
 msgid "Bottom left"
 msgstr "ล่างซ้าย"

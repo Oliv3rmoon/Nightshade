@@ -1,15 +1,23 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Download sources: places on the network that have Switch games (source.h), listed in the
 // Library beside the games on the console. A game is downloaded to the game files folder when it
-// is played or put in the download queue; nothing is streamed: it runs from its file on the
-// console, as one copied there by hand. The same game on several sources is one title that can be
-// downloaded from any of them (SameGame tells), and a game already on the console is not offered.
+// is played or put in the download queue: it runs from its file on the console, as one copied
+// there by hand. The same game on several sources is one title that can be downloaded from any of
+// them (SameGame tells), and a game already on the console is not offered.
+//
+// A source whose entry says "stream": true sends its games to be played where they lie, without
+// downloading them first (Swordpdf/ProsperoEden#111): the game's file is read from the source as
+// the game asks for its pieces (OpenStream, stream_file.h). Its updates and DLC on the source are
+// not read so; those on the console apply, as to any game. Without it nothing is streamed.
 //
 // The sources are set up in config/remote/sources.json, which the player writes (over FTP, like
 // the keys); each entry names its backend's "type" (backends.cpp), an optional "name" for the menu,
 // and what the backend needs (see its header, remote/<type>/):
 //
 //   { "sources": [ { "type": "<type>", "name": "Home", ... } ] }
+//
+// ("stream": true in an entry: its games are played where they lie, see above. It is no part of
+// what the entry is: turning it on or off keeps the source's kept list.)
 //
 // What is kept, in config/remote/: queue.json (the download queue, one for all sources, so it goes
 // on after the app was closed) and <source>/catalog.json (each source's game list, so the Library
@@ -31,11 +39,15 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
 namespace Eden::Remote {
+
+class StreamFile;
 
 struct Paths {
     std::string config;    // config/remote: sources.json, queue.json, <source>/catalog.json
@@ -75,6 +87,9 @@ struct Game {
     std::map<std::string, std::string> ids;
     bool identified = false;
     std::string normal_name; // NormalName(name), kept for comparing
+    // Its source sends its games to be played where they lie ("stream": true): from Games, Titles
+    // and Find, as its source's entry says now.
+    bool stream = false;
 };
 
 // The same game on several sources: one title, which can be downloaded from any of them.
@@ -130,6 +145,7 @@ struct SourceStatus {
     bool online = false;  // the last look at it worked
     std::string error;    // why the last look failed, or what is wrong with its entry
     std::size_t games = 0;
+    bool stream = false;  // its entry says "stream": true: its games are played where they lie
 };
 
 struct Status {
@@ -172,5 +188,24 @@ bool Cancel(const std::string& source, const std::string& id);
 // The files of a game that are on the console, as full paths: in its game folder, and where a
 // download before game folders put them.
 std::vector<std::string> Files(const std::string& source, const std::string& id);
+
+// ---- games played where they lie ----
+// The path a source's game is played from without downloading it, which the launcher hands back
+// in place of a file in roms/: "stream:<source>/<game>", each of the two as Safe makes a name
+// (letters, digits, '-' and '_', the rest %XX), so neither holds a '/'. The session knows it by
+// its "stream:" (headless/streamed_game.h).
+std::string StreamPath(const std::string& source, const std::string& id);
+// Such a path read back; false for any other path, or a part that is empty or not so written.
+bool ParseStreamPath(const std::string& path, std::string* source, std::string* id);
+// The path a title is played from where it lies: from its first source that sends it so (in the
+// order of sources.json); empty when none of them does, and it is downloaded first.
+std::string StreamPathOf(const Title& title);
+// A source's game's file (its game file, not its updates or DLC), read where it lies on the
+// source: through a Source of its own, made again from the source's entry, so that it works while
+// Stop holds the threads (a game runs) and its transfers are the only ones. log: what becomes of
+// its failed transfers (StreamFile::Log). nullptr with *error (English) when the source does not
+// send games so, has no such game, or does not give its file's size.
+std::shared_ptr<StreamFile> OpenStream(const std::string& source, const std::string& id, std::string* error,
+                                       std::function<void(const std::string&)> log = {});
 
 } // namespace Eden::Remote

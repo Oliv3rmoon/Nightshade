@@ -178,6 +178,10 @@ msgstr "双三次"
 msgid "Bilinear"
 msgstr "双线性"
 
+#: pe/ui/theme.cpp
+msgid "Black and red, clean and dark."
+msgstr "黑与红，简洁而深沉。"
+
 #: pe/ui/game_options.cpp
 msgid "Bottom left"
 msgstr "左下"

@@ -27,6 +27,10 @@ for statement in (
     'Common::SetGuestMemoryFine(speed.compact_memory || dev_cram_fine);',
     'Settings::values.use_speed_limit.SetValue(speed_percent > 0);',
     'Settings::values.speed_limit.SetValue(static_cast<u16>(speed_percent > 0 ? speed_percent : 100));',
+    # A game's "vertex_input_dynamic" (Pokemon Legends: Z-A, #59/#112), under dev-settings.
+    'const int game_vertex_input = Eden::LoadGameSettings(eden_game_title_id(guest)).vertex_input_dynamic;',
+    'dev_vertex_input >= 0 ? dev_vertex_input != 0 : game_vertex_input != 0);',
+    '", dynamic vertex input " +',
 ):
     assert statement in release, statement
 for guard in ('if (speed.fast_gpu) {', 'if (speed.unsafe_cpu)', 'if (speed.unsafe_dma)'):

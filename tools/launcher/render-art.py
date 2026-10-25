@@ -12,7 +12,7 @@
                      twice the size it is drawn at
 
 render-art.py [name...] renders only the named pictures (backdrop, brand, controller,
-                     slate-backdrop).
+                     slate-backdrop, nightly-backdrop).
 """
 
 import sys
@@ -147,6 +147,48 @@ def slate_backdrop():
     return art
 
 
+def nightly_backdrop():
+    """Nightly: near black, a low red glow at the right and a few faint stars. Procedural."""
+    import random
+    size = (2048, 1152)
+    base = (9, 9, 11)
+    art = Image.new("RGBA", size, (*base, 255))
+    # A deep red glow low on the right, like the last light of a red sky.
+    glow = Image.new("RGBA", size)
+    draw = ImageDraw.Draw(glow)
+    centre, reach = (0.78 * size[0], 0.92 * size[1]), 0.62 * size[0]
+    for step in range(120, 0, -1):
+        radius = reach * step / 120
+        strength = (1 - step / 120) ** 2.2 * 0.42
+        draw.ellipse((centre[0] - radius, centre[1] - radius * 0.62, centre[0] + radius, centre[1] + radius * 0.62),
+                     fill=(150, 18, 28, round(strength * 255)))
+    art.alpha_composite(glow.filter(ImageFilter.GaussianBlur(40)))
+    # Faint stars, more of them where the sky is dark; a few red ones.
+    stars = Image.new("RGBA", size)
+    draw = ImageDraw.Draw(stars)
+    rng = random.Random(1008)
+    for _ in range(340):
+        x, y = rng.random() * size[0], rng.random() * size[1] * 0.8
+        light = rng.random() ** 3
+        colour = (235, 70, 80) if rng.random() < 0.12 else (230, 228, 236)
+        radius = 0.6 + 1.3 * light
+        draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill=(*colour, round((0.18 + 0.55 * light) * 255)))
+    art.alpha_composite(stars.filter(ImageFilter.GaussianBlur(0.6)))
+    # Dark on the left, where titles and lists sit (the same stops as the other backdrops).
+    overlay = Image.new("RGBA", size)
+    draw = ImageDraw.Draw(overlay)
+    stops = ((0, .97), (.26, .94), (.48, .70), (.72, .28), (1, .05))
+    for x in range(size[0]):
+        fraction = x / (size[0] - 1)
+        for (a, first), (b, second) in zip(stops, stops[1:]):
+            if fraction <= b:
+                opacity = first + (second - first) * (fraction - a) / (b - a)
+                break
+        draw.line((x, 0, x, size[1]), fill=(*base, round(opacity * 255)))
+    art.alpha_composite(overlay)
+    return art
+
+
 def main():
     ART.mkdir(parents=True, exist_ok=True)
     wanted = set(sys.argv[1:]) or {"backdrop", "brand", "controller"}
@@ -162,6 +204,11 @@ def main():
         save_tga(grain(art, .02), "slate-backdrop.tga")
         small = art.resize((512, 288), Image.Resampling.LANCZOS).filter(ImageFilter.GaussianBlur(9))
         save_tga(small, "slate-backdrop-blur.tga")
+    if "nightly-backdrop" in wanted:
+        art = nightly_backdrop()
+        save_tga(grain(art, .015), "nightly-backdrop.tga")
+        small = art.resize((512, 288), Image.Resampling.LANCZOS).filter(ImageFilter.GaussianBlur(9))
+        save_tga(small, "nightly-backdrop-blur.tga")
     if "brand" in wanted:
         icon = Image.open(ROOT / "sce_sys/icon-source.png").convert("RGBA")
         save_tga(icon.resize((384, 384), Image.Resampling.LANCZOS), "brand.tga")

@@ -192,9 +192,47 @@ void Pad::OpenSlot(std::size_t player, int user) {
     connection_changes |= 1u << player;
     LOG_INFO(Input, "EDEN_PAD_OPEN player={} user={} handle={}", player + 1, user, handle);
 }
+// A controller whose reads keep failing gets its handle again, in place: the player stays
+// connected and keeps its slot, whether or not the new handle opens. One that does not open leaves
+// the slot stale, with no handle (the system may give the closed number to another controller), and
+// it is tried again: a second later at first, then twice as long each time up to half a minute.
+void Pad::ReopenSlot(std::size_t player) {
+    auto& slot = slots[player];
+    if (slot.haptics) slot.haptics->Stop();
+    const int old = slot.handle;
+    const int closed = old >= 0 ? scePadClose(old) : 0;
+    slot.handle = -1;
+    int handle = scePadOpen(slot.user, ps5::pad::kPortTypeStandard, 0, nullptr);
+    if (handle < 0) handle = scePadGetHandle(slot.user, ps5::pad::kPortTypeStandard, 0);
+    ++slot.reopens;
+    slot.polls_to_reopen = kPollsPerScan << std::min(slot.reopens, 5u);
+    if (slot.reopens <= 3 || slot.reopens % 10 == 0)
+        LOG_INFO(Input, "EDEN_PAD_REOPEN player={} user={} old={} close={} new={:#x} errors={} reopens={}", player + 1,
+                 slot.user, old, closed, static_cast<unsigned>(handle), slot.errors_in_a_row, slot.reopens);
+    slot.stale = handle < 0;
+    if (handle < 0) return;
+    slot.handle = handle;
+    // Still the player's controller: connected, as it was before its reads failed.
+    if (!(connected_players & (1u << player))) {
+        connected_players |= 1u << player;
+        connection_changes |= 1u << player;
+    }
+    slot.haptics = std::make_unique<HapticStream>();
+    slot.haptics->Ensure(slot.user, handle);
+    slot.last_haptic_stats = slot.haptics->GetStats();
+    (void)scePadSetMotionSensorState(handle, true);
+}
 void Pad::CloseSlot(std::size_t player) {
     auto& slot = slots[player];
-    if (slot.handle < 0) return;
+    if (slot.handle < 0 && !slot.stale) return;
+    if (slot.handle < 0) {
+        // A stale slot has nothing to close.
+        LOG_INFO(Input, "EDEN_PAD_CLOSE player={} user={} stale", player + 1, slot.user);
+        slot = {};
+        connected_players &= ~(1u << player);
+        connection_changes |= 1u << player;
+        return;
+    }
     // Stop haptics first: it still uses the pad handle.
     if (slot.haptics) slot.haptics->Stop();
     const auto neutral = ps5::pad::neutral_data();
@@ -213,15 +251,17 @@ void Pad::Rescan() {
         return std::find(std::begin(list.user_id), std::end(list.user_id), user) != std::end(list.user_id);
     };
     // Player 1 stays with the launching user; other players leave when their user signs out.
+    // A stale slot is its user's still (ReopenSlot).
+    const auto taken = [](const Slot& slot) { return slot.handle >= 0 || slot.stale; };
     for (std::size_t player = 1; player < kMaxPlayers; ++player) {
-        if (slots[player].handle >= 0 && !signed_in(slots[player].user)) CloseSlot(player);
+        if (taken(slots[player]) && !signed_in(slots[player].user)) CloseSlot(player);
     }
     for (const int user : list.user_id) {
-        if (user < 0 || std::any_of(slots.begin(), slots.end(), [user](const Slot& slot) {
-                return slot.handle >= 0 && slot.user == user; }))
+        if (user < 0 || std::any_of(slots.begin(), slots.end(), [&](const Slot& slot) {
+                return taken(slot) && slot.user == user; }))
             continue;
         for (std::size_t player = 1; player < kMaxPlayers; ++player) {
-            if (slots[player].handle < 0) {
+            if (!taken(slots[player])) {
                 OpenSlot(player, user);
                 break;
             }
@@ -239,7 +279,11 @@ void Pad::Close() {
         haptic_fallbacks += stats.fallbacks;
     }
     for (std::size_t player = 0; player < kMaxPlayers; ++player) {
-        if (slots[player].handle < 0) continue;
+        // A stale slot has no handle to close, but goes too: the next session starts afresh.
+        if (slots[player].handle < 0) {
+            slots[player] = {};
+            continue;
+        }
         if (slots[player].haptics) slots[player].haptics->Stop();
         const int closed = scePadClose(slots[player].handle);
         if (player == 0) {
@@ -252,6 +296,7 @@ void Pad::Close() {
         slots[player] = {};
     }
     GameplayTest::Report();
+    last_poll = {};  // the time between sessions is no pause
     connected_players = 0;
     connection_changes = 0;
     if (owns_user_service) { sceUserServiceTerminate(); owns_user_service = false; }
@@ -265,16 +310,26 @@ bool Pad::Poll() {
         while (GameplayTest::Take(sample)) Consume(0, {&sample, 1});
         return true;
     }
-    if (slots[0].handle >= 0 && ++polls_since_scan >= kPollsPerScan) {
+    if ((slots[0].handle >= 0 || slots[0].stale) && ++polls_since_scan >= kPollsPerScan) {
         polls_since_scan = 0;
         Rescan();
     }
+    // Polls stop while the console sleeps (rest mode) and can while the home menu is shown: say how
+    // long, beside what the controller does afterwards (#97, #269).
+    const auto now = std::chrono::steady_clock::now();
+    if (last_poll != std::chrono::steady_clock::time_point{} && now - last_poll > std::chrono::seconds(1))
+        LOG_INFO(Input, "EDEN_PAD_PAUSE seconds={:.1f}",
+                 std::chrono::duration<double>(now - last_poll).count());
+    last_poll = now;
     ++polls;
     bool primary = false;
     std::array<ps5::pad::Data, ps5::pad::kMaxSamples> samples{};
     for (std::size_t player = 0; player < kMaxPlayers; ++player) {
         const int handle = slots[player].handle;
-        if (handle < 0) continue;
+        if (handle < 0) {
+            if (slots[player].stale && --slots[player].polls_to_reopen == 0) ReopenSlot(player);
+            continue;
+        }
         PadEngine::Rumble rumble;
         if (engine->TakeRumble(player, rumble)) {
             const HapticLevels levels{.large = rumble.large,
@@ -291,9 +346,26 @@ bool Pad::Poll() {
         if (player == 0) last_result = count;
         if (count < 0 || count > static_cast<int>(samples.size())) {
             ++read_errors;
+            auto& slot = slots[player];
+            if (slot.errors_in_a_row++ == 0) {
+                LOG_WARNING(Input, "EDEN_PAD_READ_ERROR player={} result={:#x}", player + 1,
+                            static_cast<unsigned>(count));
+                if (slot.reopens == 0) slot.polls_to_reopen = kPollsPerScan;
+            }
+            // After rest mode or a visit to the home menu a game's controller stayed dead
+            // (#97, #269): after about a second of failed reads its handle is opened again, and
+            // again later while they go on (ReopenSlot).
+            if (--slot.polls_to_reopen == 0) ReopenSlot(player);
             const auto neutral = ps5::pad::neutral_data();
             Consume(player, {&neutral, 1});
             continue;
+        }
+        if (slots[player].errors_in_a_row != 0) {
+            LOG_INFO(Input, "EDEN_PAD_READ_RECOVERED player={} after={} errors", player + 1,
+                     slots[player].errors_in_a_row);
+            slots[player].errors_in_a_row = 0;
+            slots[player].reopens = 0;
+            slots[player].polls_to_reopen = 0;
         }
         for (int i = 0; i < count; ++i) {
             ++samples_read;

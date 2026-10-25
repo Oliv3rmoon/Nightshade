@@ -135,6 +135,11 @@ path. `source` and public-room/pairing indices are zero based. Library generatio
 changes require the pack to refresh its displayed model. Profiles include a stable
 native `handle`; use it instead of a display name.
 
+A game on download sources only (`remote`) has a non-empty `stream` when one of its
+sources is set to stream its games ([Playing a game where it lies](DOWNLOADS.md#playing-a-game-where-it-lies)):
+`launch.request` then starts it at once. Without `stream` it is refused, as before;
+`download.start` downloads it.
+
 `launch.request` captures the current profile and enters `ready` or `syncing`. A pack
 must wait for `ready` before its animation finishes and calls `launch.commit`. The host
 rechecks game existence, the captured profile and room readiness, resolves the native

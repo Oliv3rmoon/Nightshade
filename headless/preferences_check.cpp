@@ -449,6 +449,26 @@ int main() {
         assert(!Eden::SaveGameSettings(racer, own, speed_file));
     }
 
+    // Guest clock adjustment is off unless explicitly chosen for this title. Launcher saves
+    // preserve the advanced option without applying it to another game or accepting bad types.
+    {
+        const std::string clock_file = std::string(directory) + "/clock.json";
+        assert(!Eden::LoadAdaptiveClock(racer, clock_file));
+        std::ofstream(clock_file) << R"({"adaptive_clock": true,
+            "games": {"0100000000010000": {"adaptive_clock": true},
+                      "0100000000020000": {"adaptive_clock": "true"}}})";
+        assert(Eden::LoadAdaptiveClock(racer, clock_file));
+        assert(!Eden::LoadAdaptiveClock(quest, clock_file));
+        assert(!Eden::LoadAdaptiveClock(0, clock_file));
+        assert(Eden::SavePreferences(Eden::LoadPreferences(clock_file), clock_file));
+        assert(Eden::SavePerformance(racer, Eden::LoadPerformance(racer, clock_file), clock_file));
+        assert(Eden::SaveGameSettings(racer, Eden::LoadGameSettings(racer, clock_file), clock_file));
+        assert(Eden::LoadAdaptiveClock(racer, clock_file));
+        assert(!Eden::LoadAdaptiveClock(quest, clock_file));
+        std::ofstream(clock_file) << R"({"games": {"0100000000010000": {"adaptive_clock": false}}})";
+        assert(!Eden::LoadAdaptiveClock(racer, clock_file));
+    }
+
     // Button mapping (button_mapping.h): the usual one, a changed one, and one the file names
     // badly. Choosing a button another game button has swaps the two.
     {
@@ -617,6 +637,27 @@ int main() {
         wrong = game;
         wrong.mute = 2;
         assert(!Eden::SaveGameSettings(quest, wrong, file));
+        // Dynamic vertex input: absent (on), switched off by hand in the file, and kept by every save
+        // from the Library, which starts from settings that do not have it (set_game_settings).
+        assert(Eden::LoadGameSettings(quest, file).vertex_input_dynamic == -1);
+        {
+            auto document = Eden::Settings::Load(file);
+            document["games"][Eden::Settings::TitleKey(quest)]["vertex_input_dynamic"] = false;
+            assert(Eden::Settings::Write(document, file));
+        }
+        assert(Eden::LoadGameSettings(quest, file).vertex_input_dynamic == 0 &&
+               Eden::LoadGameSettings(racer, file).vertex_input_dynamic == -1);
+        Eden::GameSettings from_library = game;  // as the Library hands it over: no such field
+        from_library.vertex_input_dynamic = -1;
+        assert(Eden::SaveGameSettings(quest, from_library, file) &&
+               Eden::LoadGameSettings(quest, file).vertex_input_dynamic == 0);
+        assert(Eden::SaveGameSettings(quest, Eden::GameSettings{}, file) &&
+               Eden::LoadGameSettings(quest, file).vertex_input_dynamic == 0);
+        {
+            auto document = Eden::Settings::Load(file);
+            document["games"][Eden::Settings::TitleKey(quest)].erase("vertex_input_dynamic");
+            assert(Eden::Settings::Write(document, file));
+        }
         wrong = game;
         wrong.mapping[Eden::game_b] = wrong.mapping[Eden::game_a];
         assert(!Eden::SaveGameSettings(quest, wrong, file));
@@ -631,6 +672,24 @@ int main() {
     assert(Eden::SaveAssetsDir("/mnt/ext1/eden", file));
     assert(Eden::LoadSavedAssetsDir(file) == "/mnt/ext1/eden");
     assert(!Eden::SaveAssetsDir("relative/path", file) && !Eden::SaveAssetsDir("/a/../b", file));
+    // A games folder of its own (#50, #149): written in the file by hand, read as the game files
+    // folder is, and kept by the settings' own writes.
+    assert(Eden::LoadSavedGamesDir(file).empty());
+    {
+        auto document = Eden::Settings::Load(file);
+        document["games_folder"] = "/mnt/usb0/games";
+        assert(Eden::Settings::Write(document, file));
+    }
+    assert(Eden::LoadSavedGamesDir(file) == "/mnt/usb0/games" && Eden::LoadSavedAssetsDir(file) == "/mnt/ext1/eden");
+    assert(Eden::SaveLastGame("Sample Quest [id].nsp", file) && Eden::LoadSavedGamesDir(file) == "/mnt/usb0/games");
+    {
+        auto document = Eden::Settings::Load(file);
+        document["games_folder"] = "../games";
+        assert(Eden::Settings::Write(document, file));
+        assert(Eden::LoadSavedGamesDir(file).empty());  // not a folder the app takes
+        document.erase("games_folder");
+        assert(Eden::Settings::Write(document, file) && Eden::LoadSavedGamesDir(file).empty());
+    }
 
     // Everything saved so far survives in one document.
     assert(Eden::LoadPreferences(file).volume == 40 && Eden::LoadLastGame(file) == "Sample Quest [id].nsp");

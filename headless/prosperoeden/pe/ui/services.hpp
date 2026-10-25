@@ -89,6 +89,10 @@ struct Game
     std::string key;
     // Not on the console yet: on its sources only. Its file is the name it gets in roms/.
     bool remote = false;
+    // For one on its sources only: the path it is played from where it lies, without downloading
+    // it first, when one of them sends its games so (sources.json "stream": true); empty when it
+    // is downloaded first. play_file (launch_commit.hpp) tells what playing it starts.
+    std::string stream;
 };
 
 // A download source: a place on the network with Switch games (headless/remote/remote.h).
@@ -347,7 +351,7 @@ struct Preferences
     int vibration_strength = 100; // percent of what a game asks for: 25, 50, 75 or 100
     int language = 0;
     int menu_volume = 70; // launcher sounds, 0-100
-    std::string theme = "canopy"; // the launcher's look (theme.hpp); one this build lacks reads as the first
+    std::string theme = "nightly"; // the launcher's look (theme.hpp); one this build lacks reads as the first
     std::string accent;           // Settings > Colour: one of the theme's accent presets ("": its own colours)
     // Accessibility: how the launcher itself is shown (theme.hpp, Look).
     bool large_text = false;
@@ -578,6 +582,9 @@ class Services
     virtual std::string saved_files_folder() = 0; // used from the next start; empty when none
     virtual std::string default_files_folder() = 0;
     virtual bool set_files_folder(const std::string &directory) = 0;
+    // Where roms/ and updates/ are: the game files folder unless the settings file keeps the
+    // games apart ("games_folder").
+    virtual std::string games_folder() { return files_folder(); }
     virtual int filesystem_access() = 0; // 0: the whole filesystem
 
     // ---- save transfer: a game's save in from, or out to, a folder (not in every build) ----

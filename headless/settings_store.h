@@ -13,13 +13,14 @@
 //                   "mapping": { "a": "cross", "b": "circle" } },
 //     "system": { "language": "en-US", "update_notices": true },
 //     "accessibility": { "large_text": false, "high_contrast": false, "reduce_motion": false },
-//     "launcher": { "theme": "canopy" },
+//     "launcher": { "theme": "nightly" },
 //     "diagnostics": { "detailed_logging": false, "immediate_logs": false },
 //     "performance": { "block_list": false, "async_shaders": false, "fast_gpu": false,
 //                      "unsafe_cpu": false, "unsafe_dma": false, "reactive_flushing": true,
 //                      "skip_invalidation": false, "compact_memory": false, "memory_layout": "4Gb",
 //                      "speed_limit": "100" },
 //     "game_files": "/mnt/ext1/eden",
+//     "games_folder": "/mnt/usb0/games",   (roms/ and updates/ apart from game_files; file only)
 //     "library": { "last_game": "Game [id].nsp", "recent": ["Game [id].nsp"] },
 //     "games": { "0100000000010000": { "console_mode": "handheld", "renderer": "opengl",
 //                                      "resolution": "0.75x", "upscaling_filter": "fsr",
@@ -59,6 +60,7 @@
 
 #include "button_mapping.h"
 #include "storage_paths.h"
+#include "game_files.h"
 #include "multiplayer.h"
 
 namespace Eden {
@@ -156,7 +158,7 @@ struct Preferences {
     bool large_text = false;             // Settings > Accessibility: the launcher's look
     bool high_contrast = false;
     bool reduce_motion = false;
-    std::string theme = "canopy";        // Settings > Theme: the launcher's look, by its id
+    std::string theme = "nightly";       // Settings > Theme: the launcher's look, by its id
     std::string accent;                   // Settings > Theme > Colour: accent preset id ("": theme's own)
     ButtonMapping mapping = kDefaultMapping;  // Settings > Controls > Button mapping
     int controller = -1;                 // a game's own Controller type (kControllerKeys); -1: automatic
@@ -186,8 +188,9 @@ inline int KeyIndex(const std::string& value, const char* const* keys, int count
 }
 
 // A game's file as the Library names it: its path in the game files folder's roms/, either its
-// name ("Game.nsp") or a game folder and its name ("Game/Game.nsp", the game's update and DLC
-// beside it). Readable characters, one folder at most, never a hidden folder, "." or "..".
+// name ("Game.nsp"; .xci, .nsz and .xcz too) or a game folder and its name ("Game/Game.nsp", the
+// game's update and DLC beside it). Readable characters, one folder at most, never a hidden
+// folder, "." or "..".
 inline bool ValidRomPath(std::string_view name) {
     if (name.size() < 5 || name.size() > 511) return false;
     for (unsigned char c : name)
@@ -198,9 +201,7 @@ inline bool ValidRomPath(std::string_view name) {
     } else if (name.size() > 255) {
         return false;
     }
-    std::string extension(name.substr(name.size() - 4));
-    for (char& c : extension) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return extension == ".nsp" || extension == ".xci";
+    return IsGameFile(name);
 }
 
 // A wallpaper's file name: the name alone (the image lives in the wallpapers folder), readable
@@ -311,7 +312,7 @@ inline Json LoadWhole(const std::string& file) {
 // them where they always were, at the top of the file; every other profile has the same layout
 // under "profile_settings"/<its ID>. What belongs to the console and not to a person stays at the
 // top for everyone: the game files folder and the profiles themselves.
-inline constexpr const char* kSharedKeys[] = {"version", "game_files", "profiles", "profile_settings"};
+inline constexpr const char* kSharedKeys[] = {"version", "game_files", "games_folder", "profiles", "profile_settings"};
 
 // Where the chosen profile's settings are in the whole file; empty for the top of the file.
 inline std::string ProfileAt(const Json& whole) {
@@ -355,6 +356,7 @@ inline bool Write(const Json& document, const std::string& file) {
     whole["version"] = 1;
     // The game files folder is the console's: a profile that changes it changes it for everyone.
     if (document.contains("game_files")) whole["game_files"] = document["game_files"];
+    if (document.contains("games_folder")) whole["games_folder"] = document["games_folder"];
     return WriteWhole(whole, file);
 }
 
@@ -633,6 +635,10 @@ struct GameSettings {
     std::array<int, kPerformanceSwitches> performance{-1, -1, -1, -1, -1, -1, -1, -1};  // kPerformanceKeys
     int64_t rng_seed = -1;      // 0 to 4294967295, or -1: no seed (load_address.h)
     int speed_limit = -1;       // index into kSpeedLimitKeys ("performance" / "speed_limit")
+    // VK_EXT_vertex_input_dynamic_state, on unless the game's entry has "vertex_input_dynamic":
+    // false. In the settings file only (docs/SETTINGS.md): Pokemon Legends: Z-A draws flashing
+    // colour after the train station with it on desktop RADV (Swordpdf/ProsperoEden#59, #112).
+    int vertex_input_dynamic = -1;
 };
 // The seed a typed text names: digits and nothing else, 0 to 4294967295. -1 for any other text.
 inline int64_t RngSeedFromText(std::string_view text) {
@@ -685,6 +691,7 @@ inline GameSettings LoadGameSettings(uint64_t title_id, const std::string& file 
     result.frame_gen = flag("/frame_gen");
     result.mute = flag("/mute");
     result.vibration = flag("/vibration");
+    result.vertex_input_dynamic = flag("/vertex_input_dynamic");
     for (int i = 0; i < kPerformanceSwitches; ++i)
         result.performance[i] = flag(std::string("/performance/") + kPerformanceKeys[i]);
     result.speed_limit = KeyIndex(key("performance/speed_limit"), kSpeedLimitKeys,
@@ -756,6 +763,8 @@ inline bool SaveGameSettings(uint64_t title_id, const GameSettings& value, const
     flag(game, "frame_gen", value.frame_gen);
     flag(game, "mute", value.mute);
     flag(game, "vibration", value.vibration);
+    // "vertex_input_dynamic" is the file's alone: the Library has no switch for it, and a game's
+    // settings saved from the Library keep it as the player wrote it.
     if (value.volume < 0) game.erase("volume");
     else game["volume"] = value.volume;
     if (value.rng_seed < 0) game.erase("rng_seed");
@@ -801,6 +810,16 @@ inline Preferences PreferencesFor(uint64_t title_id, const std::string& file = S
 // The game the running session belongs to (0 at the launcher): what the audio and the renderer
 // read their game's settings for.
 inline std::atomic<uint64_t> session_title{0};
+
+// Advanced, file-only workaround, deliberately per game: reducing the guest's tick rate helps
+// some dynamic frame-rate games but also slows games that pace themselves by that counter.
+// Keep it outside "performance", whose visible switches SavePerformance replaces as a group.
+inline bool LoadAdaptiveClock(uint64_t title_id, const std::string& file = SettingsFile()) {
+    if (!title_id) return false;
+    using Settings::Json;
+    return Settings::Bool(Settings::Load(file),
+                          Json::json_pointer("/games/" + Settings::TitleKey(title_id) + "/adaptive_clock"), false);
+}
 
 // Speed against accuracy, for every game ("performance") and for one ("games/<title>/performance",
 // whose values go before the general ones, one value at a time). Settings > Performance has
@@ -1038,6 +1057,14 @@ inline bool SaveRecentGame(std::string_view name, const std::string& file = Sett
 // The saved game files folder, or empty when none is saved.
 inline std::string LoadSavedAssetsDir(const std::string& file = SettingsFile()) {
     const std::string value = Settings::String(Settings::Load(file), Settings::Json::json_pointer("/game_files"));
+    return ValidAssetsDir(value) ? value : std::string{};
+}
+
+// The saved games folder: the folder whose roms/ and updates/ hold the games when they are kept
+// apart from keys, firmware and mods (on a USB drive, Swordpdf/ProsperoEden#50, #149). Set in the
+// settings file only ("games_folder"); empty when none is saved.
+inline std::string LoadSavedGamesDir(const std::string& file = SettingsFile()) {
+    const std::string value = Settings::String(Settings::Load(file), Settings::Json::json_pointer("/games_folder"));
     return ValidAssetsDir(value) ? value : std::string{};
 }
 

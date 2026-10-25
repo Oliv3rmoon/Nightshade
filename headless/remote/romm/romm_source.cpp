@@ -20,12 +20,12 @@ struct Transfer {
     int status = 0;
 };
 
-int TransferBegin(void* user, int status, std::uint64_t) {
+int TransferBegin(void* user, int status, std::uint64_t length) {
     Transfer& transfer = *static_cast<Transfer*>(user);
     transfer.status = status;
     // 206: from the offset asked for; 200: the whole file. Anything else is an error page.
     if (status != 200 && status != 206) return 0;
-    return transfer.receiver->begin(status == 200) ? 1 : 0;
+    return transfer.receiver->begin(status == 200, length) ? 1 : 0;
 }
 
 int TransferTake(void* user, const void* data, std::size_t size) {

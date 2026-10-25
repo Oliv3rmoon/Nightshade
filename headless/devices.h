@@ -2,6 +2,7 @@
 #pragma once
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <memory>
 #include <mutex>
@@ -114,9 +115,16 @@ private:
         unsigned select_pulse = 0; // polls left of a tap's press
         unsigned touch_width = 0; // no coordinates: retain the configured touchpad mapping
         bool touch_right = false; // latched when clicked, until the release pulse ends
+        unsigned errors_in_a_row = 0; // reads that failed since the last one that worked
+        unsigned polls_to_reopen = 0; // failed polls left before the handle is opened again
+        unsigned reopens = 0;         // since the last read that worked
+        // Its handle was closed to be opened again and did not open yet: no handle, but the
+        // player keeps the slot (and its user) and the opening is tried again.
+        bool stale = false;
     };
     void Rescan();
     void OpenSlot(std::size_t player, int user);
+    void ReopenSlot(std::size_t player);
     void CloseSlot(std::size_t player);
     std::shared_ptr<PadEngine> engine;
     float deadzone;
@@ -130,6 +138,7 @@ private:
     std::atomic<unsigned> connected_players = 0;
     std::atomic<unsigned> connection_changes = 0;
     unsigned polls_since_scan = 0;
+    std::chrono::steady_clock::time_point last_poll{};
     u64 polls = 0, samples_read = 0, usable_samples = 0, intercepted_samples = 0, circle_samples = 0, read_errors = 0;
     u64 rumble_updates = 0, rumble_errors = 0;
     int rumble_last_error = 0;

@@ -69,6 +69,7 @@ public:
     std::string saved_files_folder() override;
     std::string default_files_folder() override;
     bool set_files_folder(const std::string& directory) override;
+    std::string games_folder() override;
     int filesystem_access() override;
 
     std::vector<pe::ui::Profile> profiles() override;

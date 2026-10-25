@@ -9,7 +9,7 @@ is checked when the block changes hands, so an owner looked up wrongly, a block 
 twice or a piece used before it has memory shows as a damaged pattern or header (or a fault:
 the range is unreadable until committed). Then the limits: one request larger than a piece, a
 large request when the console has no memory for a block of its own, the heap filled to its
-3 GiB, and the same run with the range refused (the old whole-heap path).
+6 GiB, and the same run with the range refused (the old whole-heap path, 3 GiB at once).
 """
 import pathlib
 import subprocess
@@ -19,8 +19,9 @@ import tempfile
 root = pathlib.Path(__file__).resolve().parents[1]
 heap = (root / 'third_party/app_heap.c').read_text()
 for old, new in (
-    ('128 MiB', '3072 MiB'),
-    ('(128u * 1024u * 1024u)', '(3072u * 1024u * 1024u)'),
+    ('128 MiB', '6144 MiB'),
+    ('(128u * 1024u * 1024u)', '((size_t)6144 << 20)'),
+    ('base=%p size=%u\\n', 'base=%p size=%zu\\n'),
     ('#include <sys/mman.h>', '#include <sys/mman.h>\nvoid *eden_heap_pages(size_t);\nvoid eden_heap_pages_free(void *, size_t);'),
     ('"PS5-OpenGL"', '"Eden-headless"'),
 ):
@@ -181,8 +182,11 @@ static int refuse_range;
 static atomic_size_t committed_bytes;
 void *eden_heap_reserve(size_t size) {
     if (refuse_range) return NULL;
-    void *address = mmap(NULL, size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
-    return address == MAP_FAILED ? NULL : address;
+    // The console's ranges are 2 MiB aligned; so is this one, wherever the host places a mapping
+    // of the heap's 6 GiB.
+    const size_t align = (size_t)2 << 20;
+    char *address = mmap(NULL, size + align, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
+    return address == MAP_FAILED ? NULL : (void *)(((uintptr_t)address + align - 1) & ~(uintptr_t)(align - 1));
 }
 int eden_heap_commit(void *address, size_t size) {
     assert(((uintptr_t)address & 0x1fffff) == 0 && (size & 0x1fffff) == 0);
@@ -276,7 +280,7 @@ static void *worker(void *argument) {
 
 int main(int argc, char **argv) {
     refuse_range = argc > 1 && strcmp(argv[1], "whole") == 0;
-    const size_t piece = (size_t)128 << 20, heap = (size_t)3072 << 20;
+    const size_t piece = (size_t)128 << 20, heap = (size_t)6144 << 20, whole = (size_t)3072 << 20;
     void *first = __wrap_malloc(100);
     assert(first != NULL);
     if (!refuse_range) {
@@ -284,7 +288,7 @@ int main(int argc, char **argv) {
         assert(eden_heap_committed() == piece && atomic_load(&committed_bytes) == piece);
         assert(__wrap_posix_memalign(&first, 24, 100) == EINVAL && eden_heap_committed() == piece);
     } else {
-        assert(eden_heap_committed() == heap && atomic_load(&committed_bytes) == 0);
+        assert(eden_heap_committed() == whole && atomic_load(&committed_bytes) == 0);
     }
     pthread_t threads[8];
     for (uintptr_t i = 0; i < 8; ++i) assert(pthread_create(&threads[i], NULL, worker, (void *)(i + 1)) == 0);
@@ -342,8 +346,8 @@ int main(int argc, char **argv) {
         __wrap_free(outside);
         assert(eden_heap_large_held(&blocks_alive) == 0 && blocks_alive == 0);
     }
-    // Fill the heap with blocks under the large size: the limit is its 3 GiB, and running out
-    // returns NULL without damage.
+    // Fill the heap with blocks under the large size: the limit is its 6 GiB (3 GiB taken whole),
+    // past the old 3 GiB, and running out returns NULL without damage.
     enum { MANY = 4096 };
     static unsigned char *blocks[MANY];
     int count = 0;
@@ -351,7 +355,8 @@ int main(int argc, char **argv) {
         fill(blocks[count], (size_t)24 << 20, (unsigned)count);
         ++count;
     }
-    assert(count > 20 && count < MANY && eden_heap_committed() <= heap);
+    assert(count > 20 && count < MANY && eden_heap_committed() <= (refuse_range ? whole : heap));
+    assert(refuse_range || (size_t)count * ((size_t)24 << 20) > whole);
     assert(__wrap_malloc((size_t)-1 - 4096) == NULL);
     void *unaligned = NULL;
     assert(__wrap_posix_memalign(&unaligned, 4096, (size_t)-1 - 8192) != 0);
@@ -387,5 +392,5 @@ with tempfile.TemporaryDirectory(prefix='eden-heap-') as work:
             if result.returncode != 0:
                 sys.stderr.write(result.stderr[-3000:])
                 sys.exit(f'heap check failed ({label} {" ".join(mode)}): exit {result.returncode}')
-print('Heap by pieces: growth on demand, owners by address, requests larger than a piece, the 3 GiB limit, '
-      'the whole-heap fallback and eight threads under the thread sanitizer PASS')
+print('Heap by pieces: growth on demand, owners by address, requests larger than a piece, the 6 GiB limit, '
+      'the 3 GiB whole-heap fallback and eight threads under the thread sanitizer PASS')

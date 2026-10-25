@@ -54,7 +54,7 @@ def check():
     assert all(not (APP / p).is_symlink() and (APP / p).stat().st_size for p in REQUIRED)
     param = json.loads((APP / 'sce_sys/param.json').read_text())
     assert param['titleId'] == 'PPSA99008' and param['contentId'].endswith('PROSPEROEDEN0001')
-    assert param['localizedParameters']['en-US']['titleName'] == 'ProsperoEden'
+    assert param['localizedParameters']['en-US']['titleName'] == 'ProsperoEden Oliv3rmoon'
     assert param['pubtools']['loudnessSnd0'] == '-28.00'
     lapy = json.loads((APP / 'lapy-manifest.json').read_text())
     assert lapy['schema'] == 'lapy-owned-build/1'
@@ -136,7 +136,7 @@ if __name__ == '__main__':
         retail_launch = frontend['guest_fixture'] == 'retail-game' or bool(frontend.get('development_rom_id'))
         value = dict(gate='G7', title_id='PPSA99008', firmware='6.02', hardware_run=False,
                      classification='offline-validated', needed_libraries=needed,
-                     data_heap_bytes=3072 * 1024**2, guest_backing_bytes=4 * 1024**3,
+                     data_heap_bytes=6144 * 1024**2, guest_backing_bytes=4 * 1024**3,
                      observation_seconds=120 if retail_launch else 60,
                      guest_sessions=1 if retail_launch else 3,
                      frontend=json.loads((OUT / 'frontend.json').read_text()),
