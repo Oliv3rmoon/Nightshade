@@ -128,11 +128,12 @@ void Launcher::press_home(Key key)
             }
             press_ = 1.0f;
             const Game &game = games_[static_cast<std::size_t>(library_.selected)];
-            // One on its sources only goes into the download queue, unless a source of it sends it
-            // to be played where it lies (play_file): then it starts at once.
+            // One on its sources only is downloaded and then played, as Cross does in the Library
+            // (Square only queues it), unless a source of it sends it to be played where it lies
+            // (play_file): then it starts at once.
             if (game.remote && play_file(game).empty())
             {
-                queue_remote(game);
+                play_remote(game);
                 return;
             }
             launch(play_file(game), game.name, game.cover);
@@ -143,8 +144,12 @@ void Launcher::press_home(Key key)
             if (count == 0)
                 return;
             const Game &game = games_[static_cast<std::size_t>(library_.selected)];
+            // As in the Library: says why there are no settings to open.
             if (game.remote || game.title_id == 0)
             {
+                say(game.remote ? tr("Download the game to change its settings.")
+                                : tr("This game's settings cannot be saved (no title ID)."),
+                    true);
                 cue(Cue::error);
                 return;
             }
@@ -226,6 +231,8 @@ void Launcher::press_home(Key key)
             press_ = 1.0f;
             if (home_focus_ == kMain && has_game && !play_file(*game).empty())
                 launch(play_file(*game), game->name, game->cover);
+            else if (home_focus_ == kMain && has_game && ready && game->remote)
+                play_remote(*game); // one on its sources only: downloaded, then played
             else if (home_focus_ == kMain && !ready)
                 go_section(3);
             else if (home_focus_ == kGameSettings && has_game && game->title_id != 0)

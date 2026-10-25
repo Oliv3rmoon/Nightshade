@@ -107,14 +107,19 @@ struct Stage
                 wait(pause);
         }
     }
-    // The sections from the home screen: R1 goes to the next one, L1 to the one before.
+    // The sections from the home screen: R1 goes to the next one, L1 to the one before. With
+    // the section tabs at the top (Slate's layout, and Nightshade's) the Library is the home
+    // screen's grid, Right from its game panel, and has no tab: R1 goes on to Multiplayer.
     void library()
     {
-        press({Key::r1});
+        press({pe::ui::th().top_nav ? Key::right : Key::r1});
     }
     void multiplayer()
     {
-        press({Key::r1, Key::r1});
+        if (pe::ui::th().top_nav)
+            press({Key::r1});
+        else
+            press({Key::r1, Key::r1});
     }
     void settings()
     {
