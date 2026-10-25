@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Oliv3rmoon/ProsperoEden/releases/latest"><img src="https://img.shields.io/github/v/release/Oliv3rmoon/ProsperoEden?style=for-the-badge&label=download&color=e5484d&labelColor=0d0d0f" alt="Download the latest release"></a>
+  <a href="https://github.com/Oliv3rmoon/Nightshade/releases/latest"><img src="https://img.shields.io/github/v/release/Oliv3rmoon/Nightshade?style=for-the-badge&label=download&color=e5484d&labelColor=0d0d0f" alt="Download the latest release"></a>
   <a href="https://discord.gg/pSqgRU3YP9"><img src="https://img.shields.io/badge/discord-nightly-0d0d0f?style=for-the-badge&logo=discord&logoColor=e5484d" alt="Discord: nightly"></a>
   <a href="https://buymeacoffee.com/oliv3rmoon"><img src="https://img.shields.io/badge/buy%20me%20a%20coffee-0d0d0f?style=for-the-badge&logo=buymeacoffee&logoColor=e5484d" alt="Buy me a coffee"></a>
 </p>
@@ -25,19 +25,19 @@ Nightshade is **[Oliv3rmoon](https://github.com/Oliv3rmoon)**'s release of [Pros
 - **Games on a USB drive** while keys, firmware, mods and saves stay on the console.
 - **Logs that say why.** When something still goes wrong, the logs name the cause, so it can be fixed.
 
-Every release lists exactly what's in it: see [Releases](https://github.com/Oliv3rmoon/ProsperoEden/releases) and the [changelog](docs/CHANGELOG.md).
+Every release lists exactly what's in it: see [Releases](https://github.com/Oliv3rmoon/Nightshade/releases) and the [changelog](docs/CHANGELOG.md).
 
 ## Install
 
 1. Close ProsperoEden (or Nightshade).
-2. Download the ZIP from the [latest release](https://github.com/Oliv3rmoon/ProsperoEden/releases/latest) and unzip it.
+2. Download the ZIP from the [latest release](https://github.com/Oliv3rmoon/Nightshade/releases/latest) and unzip it.
 3. Copy its `PPSA99008` folder over your current one (for example `/data/homebrew/PPSA99008`), replacing the files.
 
 It keeps the official app's ID, so it replaces the official app, and your settings, saves, covers, games and forwarders stay as they are (they live in `/data/prosperoeden`). The home screen calls it **Nightshade**. To go back, copy an [official release](https://github.com/Swordpdf/ProsperoEden/releases) over it the same way.
 
 ## Requests, bugs and support
 
-- **Ask for a fix, a feature or a mod for a game:** [open a request](https://github.com/Oliv3rmoon/ProsperoEden/issues/new/choose), or ask in **[nightly on Discord](https://discord.gg/pSqgRU3YP9)** (#requests).
+- **Ask for a fix, a feature or a mod for a game:** [open a request](https://github.com/Oliv3rmoon/Nightshade/issues/new/choose), or ask in **[nightly on Discord](https://discord.gg/pSqgRU3YP9)** (#requests).
 - **Bugs in my releases:** open an issue here with the logs from `/data/prosperoeden/logs`.
 - **If my work helps you,** you can [buy me a coffee](https://buymeacoffee.com/oliv3rmoon). It keeps the fixes coming.
 
