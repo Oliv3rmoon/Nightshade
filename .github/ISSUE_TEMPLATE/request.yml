@@ -1,12 +1,12 @@
-name: "Request a fix (Oliv3rmoon builds)"
-description: "Ask for a game fix or a feature in the Oliv3rmoon builds"
+name: "Request a fix (Nightshade)"
+description: "Ask for a game fix, a feature or a mod in Nightshade"
 title: "[Request] "
 labels: ["request"]
 body:
   - type: markdown
     attributes:
       value: |
-        Requests for the **Oliv3rmoon builds** of ProsperoEden: a game that doesn't work, a crash, a feature you'd like. Fixes made here are also sent to the official ProsperoEden as pull requests.
+        Requests for **Nightshade**, Oliv3rmoon's release of ProsperoEden: a game that doesn't work, a crash, a feature or mod you'd like. Fixes made here are also sent to the official ProsperoEden as pull requests.
 
         **Before you post**
 
@@ -20,7 +20,7 @@ body:
       label: "What is it?"
       options:
         - "A game doesn't start, crashes or runs badly"
-        - "Something in ProsperoEden doesn't work"
+        - "Something in Nightshade doesn't work"
         - "A feature or improvement"
     validations:
       required: true
@@ -28,7 +28,7 @@ body:
     id: build
     attributes:
       label: "Build"
-      description: "The build you use: \"Oliv3rmoon build 2\", a dev build's date, or the official version (for example 01.005.000)"
+      description: "The version you use: Nightshade's (for example 01.005.100, on the home screen), a test build's name, or the official ProsperoEden version"
     validations:
       required: true
   - type: input
