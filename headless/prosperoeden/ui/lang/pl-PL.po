@@ -697,6 +697,10 @@ msgid "FPS overlay"
 msgstr "Licznik FPS"
 
 #: pe/ui/game_options.cpp, pe/ui/settings.cpp
+msgid "Frame gen method"
+msgstr "Metoda generowania klatek"
+
+#: pe/ui/game_options.cpp, pe/ui/settings.cpp
 msgid "Frame gen multiplier"
 msgstr "Mnożnik generowania klatek"
 
@@ -711,6 +715,10 @@ msgstr "Generowanie klatek"
 #: pe/ui/game_options.cpp, pe/ui/settings.cpp
 msgid "Frame generation needs Lossless.dll, from Lossless Scaling, in the lossless folder."
 msgstr "Generowanie klatek wymaga pliku Lossless.dll z Lossless Scaling w folderze lossless."
+
+#: pe/ui/settings.cpp
+msgid "Frame generation needs MihawkGen weights (network.fgw)."
+msgstr "Generowanie klatek wymaga wag MihawkGen (network.fgw)."
 
 #: pe/ui/settings.cpp
 msgid "Frame time"

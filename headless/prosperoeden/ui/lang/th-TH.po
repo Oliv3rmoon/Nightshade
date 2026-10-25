@@ -697,6 +697,10 @@ msgid "FPS overlay"
 msgstr "ตัวแสดง FPS"
 
 #: pe/ui/game_options.cpp, pe/ui/settings.cpp
+msgid "Frame gen method"
+msgstr "วิธีการสร้างเฟรม"
+
+#: pe/ui/game_options.cpp, pe/ui/settings.cpp
 msgid "Frame gen multiplier"
 msgstr "ตัวคูณการสร้างเฟรม"
 
@@ -711,6 +715,10 @@ msgstr "การสร้างเฟรม"
 #: pe/ui/game_options.cpp, pe/ui/settings.cpp
 msgid "Frame generation needs Lossless.dll, from Lossless Scaling, in the lossless folder."
 msgstr "การสร้างเฟรมต้องใช้ Lossless.dll จาก Lossless Scaling ในโฟลเดอร์ lossless"
+
+#: pe/ui/settings.cpp
+msgid "Frame generation needs MihawkGen weights (network.fgw)."
+msgstr "การสร้างเฟรมต้องใช้ค่าน้ำหนักของ MihawkGen (network.fgw)"
 
 #: pe/ui/settings.cpp
 msgid "Frame time"

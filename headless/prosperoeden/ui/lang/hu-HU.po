@@ -697,6 +697,10 @@ msgid "FPS overlay"
 msgstr "FPS-kijelző"
 
 #: pe/ui/game_options.cpp, pe/ui/settings.cpp
+msgid "Frame gen method"
+msgstr "Képkockagenerálás módszere"
+
+#: pe/ui/game_options.cpp, pe/ui/settings.cpp
 msgid "Frame gen multiplier"
 msgstr "Képkockagenerálás szorzója"
 
@@ -711,6 +715,10 @@ msgstr "Képkockagenerálás"
 #: pe/ui/game_options.cpp, pe/ui/settings.cpp
 msgid "Frame generation needs Lossless.dll, from Lossless Scaling, in the lossless folder."
 msgstr "A képkockagenerálásnak a Lossless Scaling Lossless.dll fájlja kell a lossless mappában."
+
+#: pe/ui/settings.cpp
+msgid "Frame generation needs MihawkGen weights (network.fgw)."
+msgstr "A képkockagenerálásnak a MihawkGen súlyai kellenek (network.fgw)."
 
 #: pe/ui/settings.cpp
 msgid "Frame time"

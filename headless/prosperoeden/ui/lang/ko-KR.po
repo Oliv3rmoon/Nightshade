@@ -697,6 +697,10 @@ msgid "FPS overlay"
 msgstr "FPS 표시"
 
 #: pe/ui/game_options.cpp, pe/ui/settings.cpp
+msgid "Frame gen method"
+msgstr "프레임 생성 방식"
+
+#: pe/ui/game_options.cpp, pe/ui/settings.cpp
 msgid "Frame gen multiplier"
 msgstr "프레임 생성 배율"
 
@@ -711,6 +715,10 @@ msgstr "프레임 생성"
 #: pe/ui/game_options.cpp, pe/ui/settings.cpp
 msgid "Frame generation needs Lossless.dll, from Lossless Scaling, in the lossless folder."
 msgstr "프레임 생성에는 lossless 폴더에 Lossless Scaling의 Lossless.dll이 필요합니다."
+
+#: pe/ui/settings.cpp
+msgid "Frame generation needs MihawkGen weights (network.fgw)."
+msgstr "프레임 생성에는 MihawkGen 가중치(network.fgw)가 필요합니다."
 
 #: pe/ui/settings.cpp
 msgid "Frame time"

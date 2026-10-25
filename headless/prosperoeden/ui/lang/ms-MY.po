@@ -697,6 +697,10 @@ msgid "FPS overlay"
 msgstr "Lapisan FPS"
 
 #: pe/ui/game_options.cpp, pe/ui/settings.cpp
+msgid "Frame gen method"
+msgstr "Kaedah Frame Gen"
+
+#: pe/ui/game_options.cpp, pe/ui/settings.cpp
 msgid "Frame gen multiplier"
 msgstr "Pengganda Frame Gen"
 
@@ -711,6 +715,10 @@ msgstr "Penjanaan bingkai"
 #: pe/ui/game_options.cpp, pe/ui/settings.cpp
 msgid "Frame generation needs Lossless.dll, from Lossless Scaling, in the lossless folder."
 msgstr "Penjanaan bingkai memerlukan Lossless.dll, daripada Lossless Scaling, dalam folder lossless."
+
+#: pe/ui/settings.cpp
+msgid "Frame generation needs MihawkGen weights (network.fgw)."
+msgstr "Penjanaan bingkai memerlukan pemberat MihawkGen (network.fgw)."
 
 #: pe/ui/settings.cpp
 msgid "Frame time"

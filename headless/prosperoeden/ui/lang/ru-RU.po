@@ -697,6 +697,10 @@ msgid "FPS overlay"
 msgstr "Счетчик FPS"
 
 #: pe/ui/game_options.cpp, pe/ui/settings.cpp
+msgid "Frame gen method"
+msgstr "Метод генерации кадров"
+
+#: pe/ui/game_options.cpp, pe/ui/settings.cpp
 msgid "Frame gen multiplier"
 msgstr "Множитель генерации кадров"
 
@@ -711,6 +715,10 @@ msgstr "Генерация кадров"
 #: pe/ui/game_options.cpp, pe/ui/settings.cpp
 msgid "Frame generation needs Lossless.dll, from Lossless Scaling, in the lossless folder."
 msgstr "Для генерации кадров нужен Lossless.dll из Lossless Scaling в папке lossless."
+
+#: pe/ui/settings.cpp
+msgid "Frame generation needs MihawkGen weights (network.fgw)."
+msgstr "Для генерации кадров нужны веса MihawkGen (network.fgw)."
 
 #: pe/ui/settings.cpp
 msgid "Frame time"

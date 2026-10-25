@@ -697,6 +697,10 @@ msgid "FPS overlay"
 msgstr "FPS 顯示"
 
 #: pe/ui/game_options.cpp, pe/ui/settings.cpp
+msgid "Frame gen method"
+msgstr "補幀方式"
+
+#: pe/ui/game_options.cpp, pe/ui/settings.cpp
 msgid "Frame gen multiplier"
 msgstr "補幀倍率"
 
@@ -711,6 +715,10 @@ msgstr "幀生成"
 #: pe/ui/game_options.cpp, pe/ui/settings.cpp
 msgid "Frame generation needs Lossless.dll, from Lossless Scaling, in the lossless folder."
 msgstr "畫格生成需要將 Lossless Scaling 的 Lossless.dll 放在 lossless 資料夾中。"
+
+#: pe/ui/settings.cpp
+msgid "Frame generation needs MihawkGen weights (network.fgw)."
+msgstr "畫格生成需要 MihawkGen 權重 (network.fgw)。"
 
 #: pe/ui/settings.cpp
 msgid "Frame time"
