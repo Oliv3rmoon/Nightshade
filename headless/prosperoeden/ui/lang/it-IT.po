@@ -178,6 +178,10 @@ msgstr "Bicubico"
 msgid "Bilinear"
 msgstr "Bilineare"
 
+#: pe/ui/theme.cpp
+msgid "Black and red, clean and dark."
+msgstr "Nero e rosso, pulito e scuro."
+
 #: pe/ui/game_options.cpp
 msgid "Bottom left"
 msgstr "In basso a sinistra"

@@ -178,6 +178,10 @@ msgstr "مكعّب ثنائي"
 msgid "Bilinear"
 msgstr "خطي ثنائي"
 
+#: pe/ui/theme.cpp
+msgid "Black and red, clean and dark."
+msgstr "أسود وأحمر، نظيف وداكن."
+
 #: pe/ui/game_options.cpp
 msgid "Bottom left"
 msgstr "أسفل اليسار"

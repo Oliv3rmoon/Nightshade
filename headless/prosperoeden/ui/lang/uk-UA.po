@@ -178,6 +178,10 @@ msgstr "Бікубічний"
 msgid "Bilinear"
 msgstr "Білінійний"
 
+#: pe/ui/theme.cpp
+msgid "Black and red, clean and dark."
+msgstr "Чорний і червоний, чисто й темно."
+
 #: pe/ui/game_options.cpp
 msgid "Bottom left"
 msgstr "Зліва внизу"

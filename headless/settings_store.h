@@ -13,7 +13,7 @@
 //                   "mapping": { "a": "cross", "b": "circle" } },
 //     "system": { "language": "en-US", "update_notices": true },
 //     "accessibility": { "large_text": false, "high_contrast": false, "reduce_motion": false },
-//     "launcher": { "theme": "canopy" },
+//     "launcher": { "theme": "nightly" },
 //     "diagnostics": { "detailed_logging": false, "immediate_logs": false },
 //     "performance": { "block_list": false, "async_shaders": false, "fast_gpu": false,
 //                      "unsafe_cpu": false, "unsafe_dma": false, "reactive_flushing": true,
@@ -158,7 +158,7 @@ struct Preferences {
     bool large_text = false;             // Settings > Accessibility: the launcher's look
     bool high_contrast = false;
     bool reduce_motion = false;
-    std::string theme = "canopy";        // Settings > Theme: the launcher's look, by its id
+    std::string theme = "nightly";       // Settings > Theme: the launcher's look, by its id
     std::string accent;                   // Settings > Theme > Colour: accent preset id ("": theme's own)
     ButtonMapping mapping = kDefaultMapping;  // Settings > Controls > Button mapping
     int controller = -1;                 // a game's own Controller type (kControllerKeys); -1: automatic

@@ -178,6 +178,10 @@ msgstr "Bikübik"
 msgid "Bilinear"
 msgstr "Bilineer"
 
+#: pe/ui/theme.cpp
+msgid "Black and red, clean and dark."
+msgstr "Siyah ve kırmızı, sade ve koyu."
+
 #: pe/ui/game_options.cpp
 msgid "Bottom left"
 msgstr "Sol alt"

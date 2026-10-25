@@ -351,7 +351,7 @@ struct Preferences
     int vibration_strength = 100; // percent of what a game asks for: 25, 50, 75 or 100
     int language = 0;
     int menu_volume = 70; // launcher sounds, 0-100
-    std::string theme = "canopy"; // the launcher's look (theme.hpp); one this build lacks reads as the first
+    std::string theme = "nightly"; // the launcher's look (theme.hpp); one this build lacks reads as the first
     std::string accent;           // Settings > Colour: one of the theme's accent presets ("": its own colours)
     // Accessibility: how the launcher itself is shown (theme.hpp, Look).
     bool large_text = false;

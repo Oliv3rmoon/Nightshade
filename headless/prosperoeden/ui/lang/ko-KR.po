@@ -178,6 +178,10 @@ msgstr "바이큐빅"
 msgid "Bilinear"
 msgstr "바이리니어"
 
+#: pe/ui/theme.cpp
+msgid "Black and red, clean and dark."
+msgstr "검정과 빨강, 깔끔하고 어둡게."
+
 #: pe/ui/game_options.cpp
 msgid "Bottom left"
 msgstr "왼쪽 아래"

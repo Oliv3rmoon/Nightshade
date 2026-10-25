@@ -178,6 +178,10 @@ msgstr "Δικυβικό"
 msgid "Bilinear"
 msgstr "Διγραμμικό"
 
+#: pe/ui/theme.cpp
+msgid "Black and red, clean and dark."
+msgstr "Μαύρο και κόκκινο, καθαρό και σκοτεινό."
+
 #: pe/ui/game_options.cpp
 msgid "Bottom left"
 msgstr "Κάτω αριστερά"
