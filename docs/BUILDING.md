@@ -133,7 +133,8 @@ The tools that made them are in `tools/launcher`:
 
 What the PS5's home screen shows for the app is in `sce_sys/`, as it goes into the package:
 `param.json` (title, ID, version, and the 120 Hz output declaration), `icon0.png`, `pic0.dds`,
-`pic1.dds` and `snd0.at9`. The pictures' sources are beside them.
+`pic1.dds` and `snd0.at9`. The pictures' sources are beside them; `tools/render-home-art.py` draws
+them all (Nightshade's flower, berries and leaves) and writes the DDS files from them.
 
 ## Host tools
 
