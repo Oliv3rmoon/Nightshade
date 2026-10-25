@@ -535,7 +535,7 @@ msgstr ""
 msgid "Download size: {0}"
 msgstr ""
 
-#: pe/ui/library.cpp
+#: pe/ui/home.cpp, pe/ui/library.cpp
 msgid "Download the game to change its settings."
 msgstr ""
 
@@ -1998,7 +1998,7 @@ msgstr ""
 msgid "This game has no save to export yet."
 msgstr ""
 
-#: pe/ui/library.cpp
+#: pe/ui/home.cpp, pe/ui/library.cpp
 msgid "This game's settings cannot be saved (no title ID)."
 msgstr ""
 

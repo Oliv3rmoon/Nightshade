@@ -107,14 +107,35 @@ struct Stage
                 wait(pause);
         }
     }
-    // The sections from the home screen: R1 goes to the next one, L1 to the one before.
+    // The sections from the home screen: R1 goes to the next one, L1 to the one before. With
+    // the section tabs at the top (Slate's layout, and Nightshade's) the Library is the home
+    // screen's grid, Right from its game panel, and has no tab: R1 goes on to Multiplayer.
     void library()
     {
-        press({Key::r1});
+        if (!pe::ui::th().top_nav)
+        {
+            press({Key::r1});
+            return;
+        }
+        // Right goes onto the grid once the games are listed, which the launcher reads after a
+        // start on a thread of its own: the focus sound says it went.
+        for (int tries = 0; tries < 600; ++tries)
+        {
+            const std::size_t before = heard.size();
+            press({Key::right});
+            if (std::find(heard.begin() + static_cast<std::ptrdiff_t>(before), heard.end(),
+                          pe::audio::Cue::focus) != heard.end())
+                return;
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        }
+        std::fprintf(stderr, "warning: the home screen's grid did not take the focus\n");
     }
     void multiplayer()
     {
-        press({Key::r1, Key::r1});
+        if (pe::ui::th().top_nav)
+            press({Key::r1});
+        else
+            press({Key::r1, Key::r1});
     }
     void settings()
     {
@@ -132,6 +153,12 @@ struct Stage
             press({Key::right});
         for (int column = from % columns; column > to % columns; --column)
             press({Key::left});
+    }
+    // The Settings rows: tiles four to a row, or a list one to a row in a theme that shows
+    // Settings as a list (Slate's layout, and Nightshade's).
+    void walk_settings(int from, int to)
+    {
+        walk(from, to, pe::ui::th().list_settings ? 1 : 4);
     }
     void render()
     {
@@ -554,7 +581,7 @@ void pictures(Stage &s)
         }
     }
     s.press({Key::circle});
-    s.walk(0, 1);
+    s.walk_settings(0, 1);
     s.press({Key::cross});
     s.wait(0.8f);
     s.shoot("14-video");
@@ -575,7 +602,7 @@ void pictures(Stage &s)
     // Performance: seven switches, four of them showing. Reactive flushing starts on, the
     // others off, and a press on each one reaches the settings.
     s.press({Key::circle});
-    s.walk(1, 2);
+    s.walk_settings(1, 2);
     s.press({Key::cross});
     s.wait(0.8f);
     s.shoot("46-performance");
@@ -659,12 +686,12 @@ void pictures(Stage &s)
         }
     }
     s.press({Key::circle});
-    s.walk(2, 3);
+    s.walk_settings(2, 3);
     s.press({Key::cross});
     s.wait(0.8f);
     s.shoot("16-audio");
     s.press({Key::circle});
-    s.walk(3, 4);
+    s.walk_settings(3, 4);
     s.press({Key::cross});
     s.wait(0.8f);
     s.shoot("17-controls");
@@ -696,7 +723,7 @@ void pictures(Stage &s)
     s.press({Key::circle});
     s.wait(0.4f);
     s.press({Key::circle});
-    s.walk(4, 5);
+    s.walk_settings(4, 5);
     s.press({Key::cross});
     s.wait(0.8f);
     s.shoot("30-accessibility");
@@ -704,7 +731,7 @@ void pictures(Stage &s)
     s.wait(0.6f);
     s.shoot("31-accessibility-motion");
     s.press({Key::circle});
-    s.walk(5, 6);
+    s.walk_settings(5, 6);
     s.press({Key::cross});
     s.wait(0.8f);
     s.shoot("18-diagnostics");
@@ -727,7 +754,7 @@ void pictures(Stage &s)
         s.ok = false;
     }
     s.press({Key::circle});
-    s.walk(6, 7);
+    s.walk_settings(6, 7);
     s.press({Key::cross});
     s.wait(1.0f);
     s.shoot("19-game-files");
@@ -802,7 +829,7 @@ void pictures(Stage &s)
     if (s.services.room.phase != Eden::Multiplayer::Phase::Idle) s.ok = false;
     s.press({Key::circle, Key::r1}); // back to Settings, where Game files still has the highlight
     s.wait(1.0f);
-    s.walk(7, 10);
+    s.walk_settings(7, 10);
     s.press({Key::cross});
     s.wait(1.0f);
     s.shoot("21-language");
@@ -813,7 +840,7 @@ void pictures(Stage &s)
     // Settings > Theme: the themes this build has, the one in use marked.
     s.press({Key::circle});
     s.wait(0.6f);
-    s.walk(10, 11);
+    s.walk_settings(10, 11);
     s.wait(0.6f);
     s.shoot("T0-settings-theme");
     s.press({Key::cross});
