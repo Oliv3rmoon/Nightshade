@@ -3375,7 +3375,8 @@ write_derived("${PORT_BUILD_DIR}/version/app_version.h"
 # Where the update check asks (update_notice.h): empty, the homebrew.page catalog, which lists the
 # official releases; a GitHub repository as owner/name, that repository's newest release instead
 # (update_check/github_release.h). A header of its own too, read by update_notice.cpp alone.
-set(EDEN_UPDATE_REPOSITORY "" CACHE STRING
+# Nightshade, this release line, asks its own repository (EDEN_UPDATE_REPOSITORY= for the catalog).
+set(EDEN_UPDATE_REPOSITORY "Oliv3rmoon/Nightshade" CACHE STRING
     "GitHub repository (owner/name) whose releases the update check asks; empty: the homebrew.page catalog")
 if(NOT EDEN_UPDATE_REPOSITORY STREQUAL "" AND
    (NOT EDEN_UPDATE_REPOSITORY MATCHES "^[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9._-]+$" OR

@@ -54,7 +54,8 @@ already exists: the dependencies, this checkout's build cache in
 `EDEN_UPDATE_REPOSITORY=<owner>/<name>` makes the app's update check ([Updating](INSTALL.md#updating))
 ask that GitHub repository's releases instead of the homebrew.page catalog;
 `EDEN_UPDATE_REPOSITORY=` (empty) asks the catalog. Left unset, the default in
-`headless/CMakeLists.txt` applies: none, the catalog. A build with a repository offers a release
+`headless/CMakeLists.txt` applies: `Oliv3rmoon/Nightshade`, this release line's own, so
+`make release` and the release workflow build a Nightshade that is offered Nightshade's releases. A build with a repository offers a release
 when it is the repository's newest one that is neither a draft nor a pre-release
 (`releases/latest`), its tag is `v` and the content version as `tools/ci/make-dist.py` names it
 (`v1.005.100` for `01.005.100`) and higher than the running one, and it has `SHA256SUMS` and a ZIP
