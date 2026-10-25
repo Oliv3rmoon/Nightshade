@@ -2,53 +2,46 @@
   <img src="sce_sys/icon0.png" width="128" alt="ProsperoEden icon">
 </p>
 
-<h1 align="center">ProsperoEden · Oliv3rmoon builds</h1>
+<h1 align="center">ProsperoEden · Oliv3rmoon</h1>
 
 <p align="center">
-  <strong>The Switch emulator for PS5 homebrew, with fixes that aren't in the official release yet</strong>
+  <strong>My own release of the Switch emulator for PS5 homebrew: the official ProsperoEden, plus my fixes, my features and a darker look.</strong>
 </p>
 
 <p align="center">
-  <a href="https://github.com/Oliv3rmoon/ProsperoEden/releases"><img src="https://img.shields.io/badge/Download-latest%20build-2ea44f?style=for-the-badge" alt="Download the latest build"></a>
-  <a href="https://discord.gg/pSqgRU3YP9"><img src="https://img.shields.io/badge/Discord-The%20Commons-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord: The Commons"></a>
-  <a href="https://buymeacoffee.com/oliv3rmoon"><img src="https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black" alt="Buy me a coffee"></a>
+  <a href="https://github.com/Oliv3rmoon/ProsperoEden/releases/latest"><img src="https://img.shields.io/github/v/release/Oliv3rmoon/ProsperoEden?style=for-the-badge&label=download&color=e5484d&labelColor=0d0d0f" alt="Download the latest release"></a>
+  <a href="https://discord.gg/pSqgRU3YP9"><img src="https://img.shields.io/badge/discord-nightly-0d0d0f?style=for-the-badge&logo=discord&logoColor=e5484d" alt="Discord: nightly"></a>
+  <a href="https://buymeacoffee.com/oliv3rmoon"><img src="https://img.shields.io/badge/buy%20me%20a%20coffee-0d0d0f?style=for-the-badge&logo=buymeacoffee&logoColor=e5484d" alt="Buy me a coffee"></a>
 </p>
 
-These are builds of [ProsperoEden](https://github.com/Swordpdf/ProsperoEden) by **[Oliv3rmoon](https://github.com/Oliv3rmoon)**. Each one is the official release plus fixes I've made that are still waiting to be merged there. Every fix is also sent to the official project as a pull request, so they reach everyone in the end.
+This is **[Oliv3rmoon](https://github.com/Oliv3rmoon)**'s release line of [ProsperoEden](https://github.com/Swordpdf/ProsperoEden). Each release is built on the newest official one, with my work on top. My fixes also go to the official project as pull requests, so they reach everyone in the end.
 
-## What's better in these builds
+## What you get
 
-**Game folders** (`roms/<game>/`, new in 1.005.000)
-- A game folder's mods no longer break its DLC: Mario Kart 8 Deluxe with the Booster Course and a `mods` folder boots again ([#288](https://github.com/Swordpdf/ProsperoEden/pull/288))
-- Home screen forwarders find games in game folders ([#290](https://github.com/Swordpdf/ProsperoEden/pull/290))
-- Last game and Recent on the home page show games from game folders ([#286](https://github.com/Swordpdf/ProsperoEden/pull/286))
-- With several updates beside a game, all of it comes from the newest ([#287](https://github.com/Swordpdf/ProsperoEden/pull/287))
-- Settings › Game files counts games in game folders instead of "0 games" ([#291](https://github.com/Swordpdf/ProsperoEden/pull/291))
+- **A new look.** The Nightly theme: black and red, clean and dark. The other themes are still there.
+- **More games and mods that run.** UltraCam-size mods, compressed NSZ/XCZ games, Smash Skyline mods, translation fonts, game folders that keep their mods and DLC apart.
+- **Fewer crashes.** Long sessions that died on a write to game memory, a full audio queue, Metroid Prime 4's graphics memory, controls after rest mode.
+- **Play from your server.** A download source can stream its games instead of downloading them first (experimental).
+- **Games on a USB drive** while keys, firmware, mods and saves stay on the console.
+- **Logs that say why.** When something still goes wrong, the logs name the cause, so it can be fixed.
 
-**Games and performance**
-- NSZ and XCZ (compressed) games play without converting them first ([#285](https://github.com/Swordpdf/ProsperoEden/pull/285))
-- No more "Audio PCM queue capacity exceeded" crash (If My Heart Had Wings and others) ([#289](https://github.com/Swordpdf/ProsperoEden/pull/289))
-- Idle emulated cores stop wasting a PS5 core, with Kirby and the Forgotten Land's 30 FPS timing fix ([#284](https://github.com/Swordpdf/ProsperoEden/pull/284))
-- The CPU overlay shows each core's real work: waiting no longer reads as 100% busy ([#284](https://github.com/Swordpdf/ProsperoEden/pull/284), [#293](https://github.com/Swordpdf/ProsperoEden/pull/293))
-- Skyline hook fixes for Smash 13.0.4 mods, and post-processing that no longer stops a game from starting ([#276](https://github.com/Swordpdf/ProsperoEden/pull/276), from @thatboialex and @andrescera)
-
-Each release lists exactly what it contains.
+Every release lists exactly what's in it: see [Releases](https://github.com/Oliv3rmoon/ProsperoEden/releases) and the [changelog](docs/CHANGELOG.md).
 
 ## Install
 
 1. Close ProsperoEden.
-2. Download the newest ZIP from [Releases](https://github.com/Oliv3rmoon/ProsperoEden/releases) and unzip it.
+2. Download the ZIP from the [latest release](https://github.com/Oliv3rmoon/ProsperoEden/releases/latest) and unzip it.
 3. Copy its `PPSA99008` folder over your current one (for example `/data/homebrew/PPSA99008`), replacing the files.
 
-Your settings, saves, covers and game list are in `/data/prosperoeden`, outside the app folder, so they stay as they are. The app keeps the official app's ID, so your forwarders keep working. To go back, copy the [official release](https://github.com/Swordpdf/ProsperoEden/releases) over it the same way.
+It keeps the official app's ID, so it replaces the official app, and your settings, saves, covers, games and forwarders stay as they are (they live in `/data/prosperoeden`). The home screen calls it **ProsperoEden Oliv3rmoon**. To go back, copy an [official release](https://github.com/Swordpdf/ProsperoEden/releases) over it the same way.
 
 ## Requests, bugs and support
 
-- **Ask for a fix or a feature:** [open a request](https://github.com/Oliv3rmoon/ProsperoEden/issues/new/choose), or ask in **[The Commons on Discord](https://discord.gg/pSqgRU3YP9)** (#requests).
-- **If these builds help you,** you can [buy me a coffee](https://buymeacoffee.com/oliv3rmoon). It keeps the fixes coming.
-- Problems with the official release belong on the [official tracker](https://github.com/Swordpdf/ProsperoEden/issues).
+- **Ask for a fix, a feature or a mod for a game:** [open a request](https://github.com/Oliv3rmoon/ProsperoEden/issues/new/choose), or ask in **[nightly on Discord](https://discord.gg/pSqgRU3YP9)** (#requests).
+- **Bugs in my releases:** open an issue here with the logs from `/data/prosperoeden/logs`.
+- **If my work helps you,** you can [buy me a coffee](https://buymeacoffee.com/oliv3rmoon). It keeps the fixes coming.
 
-These builds are unofficial. ProsperoEden is made by BlackBearReloaded and its contributors, on the Eden emulator; neither project endorses these builds. Everything below is the official README.
+This is an unofficial release. ProsperoEden is made by BlackBearReloaded and its contributors, on the Eden emulator; neither project endorses it. Everything below is the official README.
 
 ---
 
