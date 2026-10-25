@@ -112,7 +112,23 @@ struct Stage
     // screen's grid, Right from its game panel, and has no tab: R1 goes on to Multiplayer.
     void library()
     {
-        press({pe::ui::th().top_nav ? Key::right : Key::r1});
+        if (!pe::ui::th().top_nav)
+        {
+            press({Key::r1});
+            return;
+        }
+        // Right goes onto the grid once the games are listed, which the launcher reads after a
+        // start on a thread of its own: the focus sound says it went.
+        for (int tries = 0; tries < 600; ++tries)
+        {
+            const std::size_t before = heard.size();
+            press({Key::right});
+            if (std::find(heard.begin() + static_cast<std::ptrdiff_t>(before), heard.end(),
+                          pe::audio::Cue::focus) != heard.end())
+                return;
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        }
+        std::fprintf(stderr, "warning: the home screen's grid did not take the focus\n");
     }
     void multiplayer()
     {
