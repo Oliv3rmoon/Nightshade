@@ -4,12 +4,12 @@ What changed in each release of ProsperoEden, newest first. A release's notes on
 
 ## v1.005.100
 
-**Oliv3rmoon's own release of ProsperoEden.** It's the official 1.005.000 with my fixes and features on top: everything from my test builds 2 and 3, a new dark look, and updates from this repository. It installs over the official app (same title ID, same `/data/prosperoeden`), so your games, settings, saves and covers stay. Built and checked by this repository's release workflow and test suite; not every change has been run on a console yet, so tell me how it goes.
+**Nightshade: Oliv3rmoon's own release of ProsperoEden.** It's the official 1.005.000 with my fixes and features on top: everything from my test builds 2 and 3, every open community fix, a new name and a dark look of its own, and updates from this repository. It installs over the official app (same title ID, same `/data/prosperoeden`), so your games, settings, saves and covers stay. Built and checked by this repository's release workflow and test suite; not every change has been run on a console yet, so tell me how it goes.
 
-### New look
+### New name, new look
 
-- **Nightly theme (the new default).** Black and red, clean and dark: tabs at the top, a quiet home screen, settings as a list, a near-black sky with a low red glow. Accent presets: Red, Crimson, Rose, White, Violet, Ice. Canopy and Slate are still in **Settings > Appearance > Theme**, and a theme you chose before stays.
-- The PS5 home screen calls the app **ProsperoEden Oliv3rmoon**, and the launcher shows **Oliv3rmoon build 4** beside the version.
+- **Nightshade.** The PS5 home screen and the launcher call it Nightshade, with its own icon (a red nightshade flower with its black berries), home background and launch picture.
+- **Nightshade theme (the new default).** Black and red, clean and dark: tabs at the top, a quiet home screen, settings as a list, a near-black sky with a low red glow. Accent presets: Red, Crimson, Rose, White, Violet, Ice. Canopy and Slate are still in **Settings > Appearance > Theme**, and a theme you chose before stays.
 
 ### New
 
@@ -18,6 +18,7 @@ What changed in each release of ProsperoEden, newest first. A release's notes on
 - **Fonts for translation mods.** A mod's replacement system font goes in `mods/0100000000000811/romfs/`. (Swordpdf/ProsperoEden#248)
 - **Pokémon Legends: Z-A:** a per-game `"vertex_input_dynamic": false` for the flashing colour after the train station. (Swordpdf/ProsperoEden#59, Swordpdf/ProsperoEden#112)
 - **Compressed games:** NSZ and XCZ play as they are. (Swordpdf/ProsperoEden#285)
+- **library.json for forwarder makers:** the Library's games, with their paths, names and covers, for other homebrew to read. (Swordpdf/ProsperoEden#292)
 - **Mihawk's newest PS5 graphics driver** (2026-10-13). Each game builds its shaders again the first time you play it.
 
 ### Fixes
@@ -38,7 +39,7 @@ When a game hits one of these, the logs now say why: GPU stalls (`radv/ps5 stall
 
 ### Install
 
-Close ProsperoEden, copy this ZIP's `PPSA99008` folder over your current one (usually `/data/homebrew/PPSA99008`), and start it. To go back, copy the official [v1.005.000](https://github.com/Swordpdf/ProsperoEden/releases/tag/v1.005.000) over it the same way.
+Close ProsperoEden (or Nightshade), copy this ZIP's `PPSA99008` folder over your current one (usually `/data/homebrew/PPSA99008`), and start it. To go back, copy the official [v1.005.000](https://github.com/Swordpdf/ProsperoEden/releases/tag/v1.005.000) over it the same way.
 
 ### Thank you
 
