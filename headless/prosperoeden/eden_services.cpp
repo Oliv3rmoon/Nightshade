@@ -12,6 +12,7 @@
 #include "update_notice.h"
 #include "game_name.h"
 #include "game_files.h"
+#include "library_file.h"
 #include "native_directory.h"
 #include "reshade_folder.h"
 #include "pe/core/strings.hpp"
@@ -655,15 +656,15 @@ pe::ui::Home EdenServices::home() {
     home.setup_ready = setup_.empty() && Eden::FilesystemAccess();
     if (!Eden::FilesystemAccess()) {
         // No data is kept anywhere else (storage_paths.h): say so, and start nothing.
-        home.status = fill(tr("ProsperoEden could not get access to the console's storage, so it cannot read your settings, saves and games. Nothing was changed. Close ProsperoEden and open it again. (Code {0})"),
+        home.status = fill(tr("Nightshade could not get access to the console's storage, so it cannot read your settings, saves and games. Nothing was changed. Close Nightshade and open it again. (Code {0})"),
                            {std::to_string(Eden::FilesystemAccessStatus())});
     } else if (!home.setup_ready) {
         home.status = fill(tr("Setup required: {0} Open Settings, Game files to choose the folder that holds your "
-                              "keys, firmware and roms folders (or add the files to {1}), then reopen ProsperoEden."),
+                              "keys, firmware and roms folders (or add the files to {1}), then reopen Nightshade."),
                            {SetupMessage(setup_), Eden::AssetsDir()});
     } else if (launch_error_.starts_with(Eden::Crash::kNotice)) {
         // The previous run ended with a crash report (headless/crash_report.h).
-        home.status = fill(tr("ProsperoEden stopped because of an error. A report was saved to {0}."),
+        home.status = fill(tr("Nightshade stopped because of an error. A report was saved to {0}."),
                            {launch_error_.substr(Eden::Crash::kNotice.size())});
         home.launch_failed = true;
     } else if (!launch_error_.empty()) {
@@ -818,6 +819,19 @@ std::vector<pe::ui::Game> EdenServices::games() {
             Eden::Report("library", (file + ": " + error.what()).c_str());
         }
         games.push_back(std::move(game));
+    }
+    // The games on the console, for other homebrew to read (library_file.h): a forwarder maker
+    // lists them with their names and covers.
+    if (Eden::FilesystemAccess()) {
+        std::vector<Eden::LibraryFile::Game> listed;
+        for (const pe::ui::Game& game : games) {
+            const std::string cover = CoverPath(game.file);
+            listed.push_back({game.file, Eden::GamesPath("roms/" + game.file), game.name, game.title_id,
+                              Eden::FileExists(cover) ? cover : std::string{}});
+        }
+        if (!Eden::LibraryFile::Write(std::string{Eden::kDataDir} + "/library.json",
+                                      Eden::LibraryFile::Text(Eden::AssetsDir(), listed)))
+            Eden::Report("library", "Could not write library.json");
     }
     // Which games of the console a title is: by title ID, by name or by file (Remote::SameAsLocal).
     for (pe::ui::Game& game : games) {

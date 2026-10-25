@@ -1,12 +1,12 @@
 # Themes
 
-The launcher's look is a theme. This build has three: **Nightly** (black and red, clean and
+The launcher's look is a theme. This build has three: **Nightshade** (black and red, clean and
 dark), **Canopy** (a tropical dusk, dark green glass and lime) and **Slate** (neutral glass, clean
-and still). Nightly is the default for a new install; a theme chosen before stays. **Settings >
+and still). Nightshade is the default for a new install; a theme chosen before stays. **Settings >
 Appearance > Theme** lists the themes a build has; the choice is kept in the settings file as
 `"launcher": { "theme": "nightly" }`.
 
-Nightly takes Slate's layout variants over a near-black backdrop with a low red glow and a few
+Nightshade takes Slate's layout variants over a near-black backdrop with a low red glow and a few
 stars (`tools/launcher/render-art.py nightly-backdrop`), smaller corners, ten slow motes in the
 red highlight and a red accent; its warnings are amber, so they never read as the accent. Its
 accent presets are Red, Crimson, Rose, White, Violet and Ice.

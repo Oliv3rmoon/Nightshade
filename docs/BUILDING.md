@@ -9,7 +9,7 @@ make
 The first run fetches every dependency at its pinned revision, builds the RADV driver and
 Eden for the PS5, and writes the release files to `dist/`:
 
-- `ProsperoEden-vX.Y.Z.zip`: the `PPSA99008` folder to copy to `/data/homebrew/PPSA99008`;
+- `Nightshade-vX.Y.Z.zip`: the `PPSA99008` folder to copy to `/data/homebrew/PPSA99008`;
 - `SHA256SUMS` (the ZIP's checksum) and `release-notes.md`.
 
 The app package includes an exact-title one-shot helper built from the pinned upstream
@@ -133,7 +133,8 @@ The tools that made them are in `tools/launcher`:
 
 What the PS5's home screen shows for the app is in `sce_sys/`, as it goes into the package:
 `param.json` (title, ID, version, and the 120 Hz output declaration), `icon0.png`, `pic0.dds`,
-`pic1.dds` and `snd0.at9`. The pictures' sources are beside them.
+`pic1.dds` and `snd0.at9`. The pictures' sources are beside them; `tools/render-home-art.py` draws
+them all (Nightshade's flower, berries and leaves) and writes the DDS files from them.
 
 ## Host tools
 
@@ -163,12 +164,12 @@ When the app crashes it writes `crash-YYYYMMDD-HHMMSS.txt` to its logs folder
 The report lists addresses as `eboot+0x...`. To get function names, files and lines:
 
 ```bash
-python3 tools/symbolize-crash.py crash-20261001-121314.txt build/symbols/ProsperoEden-v1.000.040.elf
+python3 tools/symbolize-crash.py crash-20261001-121314.txt build/symbols/Nightshade-v1.000.040.elf
 ```
 
 The second argument is the unstripped executable of the build that wrote the report:
 `build/headless-native/llvm-pie.elf` right after a build. `make release` copies it to
-`build/symbols/ProsperoEden-vX.Y.Z.elf`; keep that file with the release, it is not published.
+`build/symbols/Nightshade-vX.Y.Z.elf`; keep that file with the release, it is not published.
 
 `make test` checks the report on the host (`tools/check-crash-report.py`). A development build
 crashes on request, to try it on a console: write `segv`, `thread`, `abort` or `throw` to
@@ -219,7 +220,7 @@ dependencies are reused instead of fetched) for a build on your own machine.
   for a tag, 7 days otherwise.
 - A tag's or a manual run's ZIP is attested (signed build provenance): a release ZIP built by
   the workflow can be checked with
-  `gh attestation verify ProsperoEden-vX.Y.Z.zip -R blackbearreloaded/ProsperoEden` (GitHub
+  `gh attestation verify Nightshade-vX.Y.Z.zip -R Oliv3rmoon/ProsperoEden` (GitHub
   CLI). This covers releases built by GitHub Actions from now on (after v1.000.090), not
   earlier ones.
 
@@ -239,5 +240,5 @@ To cut a release:
    current release in the README.
 3. Test the build on a console.
 4. Push a `vX.Y.Z` tag.
-5. Keep `build/symbols/ProsperoEden-vX.Y.Z.elf` from the build that was published (crash reports
+5. Keep `build/symbols/Nightshade-vX.Y.Z.elf` from the build that was published (crash reports
    are read with it): download the tag run's `ProsperoEden-symbols` artifact before it expires.

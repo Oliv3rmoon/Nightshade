@@ -17,13 +17,13 @@
 namespace pe::ui
 {
 
-// Oliv3rmoon's own release of ProsperoEden (github.com/Oliv3rmoon/ProsperoEden), built on the
-// official one with his fixes and features. The home screen names it beside the version, the About
+// Nightshade: Oliv3rmoon's own release of ProsperoEden (github.com/Oliv3rmoon/ProsperoEden), built
+// on the official one with his fixes and features. The home screen names it beside the version, the About
 // screen says who made it and where to reach them. Plain text (not tr()): a name and two
 // addresses, the same in every language.
-inline constexpr const char* kBuildLabel = "Oliv3rmoon build 4";
+inline constexpr const char* kBuildLabel = "Nightshade";
 inline constexpr const char* kBuildCredit =
-    "Oliv3rmoon build 4  /  discord.gg/pSqgRU3YP9  /  buymeacoffee.com/oliv3rmoon";
+    "Nightshade by Oliv3rmoon  /  discord.gg/pSqgRU3YP9  /  buymeacoffee.com/oliv3rmoon";
 
 // Every screen of the launcher as one state machine. The frontend feeds it
 // pressed buttons and frame time, draws its list and plays its cues; it ends

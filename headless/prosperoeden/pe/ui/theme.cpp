@@ -143,7 +143,7 @@ Theme canopy()
     return t;
 }
 
-// Nightly: black and red, clean and dark. Slate's clean layout (tabs at the top, a quiet home
+// Nightshade: black and red, clean and dark. Slate's clean layout (tabs at the top, a quiet home
 // screen, settings as a list) over a near-black sky with a low red glow and a few stars, and a
 // red accent. The look of Oliv3rmoon's builds, and the one they start with.
 Theme nightly()
@@ -151,7 +151,7 @@ Theme nightly()
     Theme t;
     theme_from_kit("acrylic", &t);
     t.id = "nightly";
-    t.name = "Nightly";
+    t.name = "Nightshade";
     t.summary = TR("Black and red, clean and dark.");
 
     t.base = rgb(0x09090b);

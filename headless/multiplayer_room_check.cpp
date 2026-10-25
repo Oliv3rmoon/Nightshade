@@ -601,7 +601,7 @@ void CheckTestRoom(u16 port, TestRoom mode) {
     Wait([&] { return client.GetSnapshot().phase == Phase::Failed; });
     assert(client.GetSnapshot().error == (stall ? "Connection lost. Check your internet connection, then rejoin the room before restarting Local Wireless in the game." :
         mode == TestRoom::JoinTimeout ? "Room join timed out. The server connection opened, but room acceptance did not finish. Retry; if it repeats, ask the host to check the server log." :
-        mode == TestRoom::VersionMismatch ? "Incompatible room version. Update ProsperoEden or choose a compatible room; the host may also need to update the server." : "Connection failed. Try again. If it repeats, enable detailed logging in Settings and share the log with support."));
+        mode == TestRoom::VersionMismatch ? "Incompatible room version. Update Nightshade or choose a compatible room; the host may also need to update the server." : "Connection failed. Try again. If it repeats, enable detailed logging in Settings and share the log with support."));
     paused = false;
     client.Leave();
     Wait([&] { return client.GetSnapshot().phase == Phase::Idle; });

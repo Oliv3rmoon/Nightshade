@@ -225,12 +225,12 @@ ui::Home FakeServices::home()
     if (!setup_ready)
         home.status = fill(tr("Setup required: {0} Open Settings, Game files to choose the folder that "
                               "holds your keys, firmware and roms folders (or add the files to {1}), "
-                              "then reopen ProsperoEden."),
+                              "then reopen Nightshade."),
                            {fill(tr("Missing or empty keys/prod.keys in {0}."), {"/data/prosperoeden"}),
                             "/data/prosperoeden"});
     else if (!crash_report.empty())
     {
-        home.status = fill(tr("ProsperoEden stopped because of an error. A report was saved to {0}."), {crash_report});
+        home.status = fill(tr("Nightshade stopped because of an error. A report was saved to {0}."), {crash_report});
         home.launch_failed = true;
     }
     else if (!launch_error.empty())

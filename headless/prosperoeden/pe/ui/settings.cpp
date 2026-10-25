@@ -951,7 +951,7 @@ void Launcher::press_dialog(Key key)
     else if (modal_ == Modal::diagnostics && option_ == 2)
     {
         // Update notices: the check and its answer come as the app opens.
-        say(tr("Saved. Applies the next time ProsperoEden opens."));
+        say(tr("Saved. Applies the next time Nightshade opens."));
     }
     apply_look();
     cue(sound);

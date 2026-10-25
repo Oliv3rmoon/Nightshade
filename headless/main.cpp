@@ -372,7 +372,7 @@ int main(int argc, char** argv) {
         static Eden::LogFlusher log_flusher;
         if (!log_flusher.Start(Eden::LoadPreferences().immediate_logs)) return 2;
         // A crash report says which build it came from: this one is not an official release.
-        static const std::string crash_version = std::string{Eden::kAppVersion} + " (Oliv3rmoon build 4)";
+        static const std::string crash_version = std::string{Eden::kAppVersion} + " (Nightshade)";
         Eden::Crash::Install(Eden::LogsDir(), crash_version.c_str(), last_crash.restarted);
         Eden::BootTrace::Ready(Eden::LogsDir(), Eden::FilesystemAccess());
         Eden::BootTrace::Line("logs and crash handler ready (%s)", Eden::LogsDir().c_str());
