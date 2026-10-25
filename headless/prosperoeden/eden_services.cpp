@@ -11,6 +11,7 @@
 #include "profiles.h"
 #include "update_notice.h"
 #include "game_name.h"
+#include "loose_addons.h"
 #include "game_files.h"
 #include "library_file.h"
 #include "native_directory.h"
@@ -296,7 +297,7 @@ bool WriteCover(const std::string& encoded, const std::string& path) {
 
 // Whether a file in a game folder is an update or DLC rather than a game (eden_rom_content),
 // remembered by its size and time so that each file is read once. A file that cannot be read is
-// taken for a game, as one directly in roms/ always is. Called with the metadata reader held.
+// taken for a game. Called with the metadata reader held.
 bool AddOnInGameFolder(const std::string& path) {
     struct Seen {
         off_t size;
@@ -316,15 +317,18 @@ bool AddOnInGameFolder(const std::string& path) {
 }
 
 // The games in roms/, by their paths in it: its NSP, XCI, NSZ and XCZ files, and those in its game
-// folders (one level down, issue 168) that hold a game and not its update or DLC. Called with the
-// metadata reader held.
+// folders (one level down, issue 168) that hold a game and not its update or DLC. Directly in
+// roms/, a file whose name says an update or DLC (loose_addons.h) and that holds one is its game's,
+// not a game. Called with the metadata reader held.
 std::vector<std::string> GameFiles() {
     const auto rom = [](const std::string& name) { return Eden::IsGameFile(name); };
     const std::string roms = Eden::GamesPath("roms");
     std::vector<std::string> files;
     bool ok = false;
     for (const std::string& name : ListEntries(roms, false, ok))
-        if (rom(name) && Eden::ValidRomPath(name)) files.push_back(name);
+        if (rom(name) && Eden::ValidRomPath(name) &&
+            !(Eden::LooseAddOns::AddOn(name) && AddOnInGameFolder(JoinPath(roms, name))))
+            files.push_back(name);
     for (const std::string& folder : ListEntries(roms, true, ok)) {
         if (folder.empty() || folder[0] == '.') continue;
         bool listed = false;
@@ -1614,6 +1618,10 @@ bool EdenServices::delete_game(const pe::ui::Game& game, std::string* message) {
                                     static_cast<std::vector<std::string>*>(user)->emplace_back(path);
                                 },
                                 &files);
+    // And those beside a game directly in roms/ (loose_addons.h) that hold an update or DLC.
+    if (folder.empty())
+        for (std::string& path : Eden::LooseAddOns::FilesOf(Eden::GamesPath("roms"), title_id))
+            if (AddOnInGameFolder(path)) files.push_back(std::move(path));
     std::sort(files.begin(), files.end());
     files.erase(std::unique(files.begin(), files.end()), files.end());
     int deleted = 0;

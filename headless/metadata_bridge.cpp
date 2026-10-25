@@ -6,6 +6,7 @@
 #include "profiles.h"
 #include "ryujinx_saves.h"
 #include "streamed_game.h"
+#include "loose_addons.h"
 #if defined(__PROSPERO__)
 #include "native_directory.h"
 #endif
@@ -44,6 +45,7 @@
 #include "core/file_sys/nca_metadata.h"
 #include "core/file_sys/registered_cache.h"
 #include "core/file_sys/romfs.h"
+#include "core/file_sys/vfs/vfs_vector.h"
 #include "core/file_sys/submission_package.h"
 #include "core/file_sys/vfs/vfs_real.h"
 #include "core/hle/service/ns/language.h"
@@ -353,9 +355,19 @@ namespace {
 std::vector<FileSys::VirtualDir> GameFolders(FileSys::RealVfsFilesystem& vfs, const char* roms_dir) {
     std::vector<FileSys::VirtualDir> folders;
     if (!roms_dir) return folders;
-    if (const auto roms = vfs.OpenDirectory(roms_dir, FileSys::OpenMode::Read))
+    if (const auto roms = vfs.OpenDirectory(roms_dir, FileSys::OpenMode::Read)) {
         for (auto& folder : roms->GetSubdirectories())
             if (!folder->GetName().empty() && folder->GetName().front() != '.') folders.push_back(std::move(folder));
+        // The updates and DLC left directly in roms/ beside their games, by their names
+        // (loose_addons.h), as one more folder.
+        std::vector<FileSys::VirtualFile> loose;
+        for (auto& file : roms->GetFiles())
+            if (Eden::LooseAddOns::PackageName(file->GetName()) && Eden::LooseAddOns::AddOn(file->GetName()))
+                loose.push_back(std::move(file));
+        if (!loose.empty())
+            folders.push_back(std::make_shared<FileSys::VectorVfsDirectory>(
+                std::move(loose), std::vector<FileSys::VirtualDir>{}, "roms"));
+    }
     return folders;
 }
 } // namespace

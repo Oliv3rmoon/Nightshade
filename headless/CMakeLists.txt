@@ -3140,8 +3140,14 @@ ${paths_source}")
     file(READ "${PROJECT_SOURCE_DIR}/src/core/hle/service/filesystem/filesystem.cpp" fs_service)
     string(REPLACE "nand_directory, std::move(load_directory), std::move(dump_directory));"
         "nand_directory, std::move(load_directory), std::move(dump_directory), vfs.OpenDirectory(Eden::AssetsPath(\"firmware\"), FileSys::OpenMode::Read));" fs_service "${fs_service}")
+    # Update and DLC files left directly in roms/ beside their game (headless/loose_addons.h): the
+    # session's, in a folder of their own for the external content provider, after updates/.
+    eden_patch(fs_service "        LOG_DEBUG(Service_FS, \"Creating ExternalContentProvider with {} opened directories\",\n"
+        "        if (!::Eden::LooseAddOns::SessionFiles().empty()) {\n            std::vector<FileSys::VirtualFile> loose;\n            for (const auto& path : ::Eden::LooseAddOns::SessionFiles())\n                if (auto file = vfs.OpenFile(path, FileSys::OpenMode::Read)) loose.push_back(std::move(file));\n            if (!loose.empty())\n                external_dirs.push_back(std::make_shared<FileSys::VectorVfsDirectory>(\n                    std::move(loose), std::vector<FileSys::VirtualDir>{}, \"roms\"));\n        }\n        LOG_DEBUG(Service_FS, \"Creating ExternalContentProvider with {} opened directories\",\n")
     # Firmware lives in the player's game files folder (Settings > Game files, assets_dir.h).
     set(fs_service "#include \"${EDEN_PORT_DIR}/assets_dir.h\"
+#include \"${EDEN_PORT_DIR}/loose_addons.h\"
+#include \"core/file_sys/vfs/vfs_vector.h\"
 ${fs_service}")
     write_derived("${PORT_BUILD_DIR}/filesystem.cpp" "${fs_service}")
     list(REMOVE_ITEM core_sources hle/service/filesystem/filesystem.cpp)
