@@ -3346,11 +3346,16 @@ else()
     add_executable(eden-save-sync-check "${EDEN_PORT_DIR}/save_sync_check.cpp")
     target_link_libraries(eden-save-sync-check PRIVATE core)
     target_compile_options(eden-save-sync-check PRIVATE -UNDEBUG)
-    # The update check's decision, without its network side (update_notice.h).
+    # The update check's decisions, the catalog's and a GitHub repository's, through a stand-in
+    # for the network (update_notice.h).
     add_executable(eden-update-check
-        "${EDEN_PORT_DIR}/update_check_check.cpp" "${EDEN_PORT_DIR}/update_check/update_check.c")
+        "${EDEN_PORT_DIR}/update_check_check.cpp" "${EDEN_PORT_DIR}/update_check/update_check.c"
+        "${EDEN_PORT_DIR}/update_check/github_release.c" "${EDEN_PORT_DIR}/update_check/self_update.c"
+        "${EDEN_PORT_DIR}/update_check/self_update_sha256.c")
     target_compile_definitions(eden-update-check PRIVATE UPDATE_CHECK_NO_NETWORK=1)
     target_compile_options(eden-update-check PRIVATE -UNDEBUG)
+    find_package(Threads REQUIRED)
+    target_link_libraries(eden-update-check PRIVATE Threads::Threads)
     # The self-update helper keeps the version it replaces: moving it to where it is kept.
     add_executable(eden-update-files-check
         "${EDEN_PORT_DIR}/self_update_files_check.cpp" "${EDEN_PORT_DIR}/self_update_helper/files.cpp")
@@ -3367,6 +3372,19 @@ endif()
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${PORT_ROOT}/sce_sys/param.json")
 write_derived("${PORT_BUILD_DIR}/version/app_version.h"
     "// Generated from sce_sys/param.json (contentVersion).\n#pragma once\n#define EDEN_APP_VERSION \"${app_version}\"\n")
+# Where the update check asks (update_notice.h): empty, the homebrew.page catalog, which lists the
+# official releases; a GitHub repository as owner/name, that repository's newest release instead
+# (update_check/github_release.h). A header of its own too, read by update_notice.cpp alone.
+# Nightshade, this release line, asks its own repository (EDEN_UPDATE_REPOSITORY= for the catalog).
+set(EDEN_UPDATE_REPOSITORY "Oliv3rmoon/Nightshade" CACHE STRING
+    "GitHub repository (owner/name) whose releases the update check asks; empty: the homebrew.page catalog")
+if(NOT EDEN_UPDATE_REPOSITORY STREQUAL "" AND
+   (NOT EDEN_UPDATE_REPOSITORY MATCHES "^[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9._-]+$" OR
+    EDEN_UPDATE_REPOSITORY MATCHES "/[.][.]?$"))
+    message(FATAL_ERROR "EDEN_UPDATE_REPOSITORY must be a GitHub repository as owner/name, not '${EDEN_UPDATE_REPOSITORY}'")
+endif()
+write_derived("${PORT_BUILD_DIR}/version/update_repository.h"
+    "// Generated from EDEN_UPDATE_REPOSITORY (headless/CMakeLists.txt).\n#pragma once\n#define EDEN_UPDATE_REPOSITORY \"${EDEN_UPDATE_REPOSITORY}\"\n")
 target_include_directories(eden-headless PRIVATE "${PORT_BUILD_DIR}/version")
 target_link_libraries(eden-headless PRIVATE core eden-pad)
 # A game's text entry on the PS5's own on-screen keyboard (system_keyboard.h, keyboard_applet.h).
@@ -3589,6 +3607,7 @@ endif()
             add_library(update-check OBJECT
                 "${EDEN_PORT_DIR}/update_check/update_check.c"
                 "${EDEN_PORT_DIR}/update_check/console_curl.c"
+                "${EDEN_PORT_DIR}/update_check/github_release.c"
                 "${EDEN_PORT_DIR}/update_check/self_update.c"
                 "${EDEN_PORT_DIR}/update_check/self_update_ps5.c"
                 "${EDEN_PORT_DIR}/update_check/self_update_sha256.c"

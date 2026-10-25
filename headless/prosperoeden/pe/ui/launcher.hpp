@@ -385,6 +385,8 @@ class Launcher
     void press_language(Key key);
     void draw_language(Canvas &c);
     void draw_about(Canvas &c);
+    // An update text with the place the check asks in it (Services::update_source).
+    std::string update_text(std::string_view text);
 
     Services &services_;
     Textures &textures_;

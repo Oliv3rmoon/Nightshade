@@ -968,6 +968,7 @@ void Launcher::draw_dialog(Canvas &c, Modal modal, float open)
 
     const char *title = "";
     const char *copy = "";
+    std::string sourced; // an update text with the place the check asks in it
     switch (modal)
     {
     case Modal::video:
@@ -1008,9 +1009,10 @@ void Launcher::draw_dialog(Canvas &c, Modal modal, float open)
         break;
     default:
         title = tr("Diagnostics");
+        sourced = update_text(tr("Says when homebrew.page has a newer version. Off, only About names it."));
         copy = option_ == 0 ? tr("Detailed logs apply to the next game launch.") :
                option_ == 1 ? tr("Keeps the last line before a crash, but games stutter. From the next start.") :
-                              tr("Says when homebrew.page has a newer version. Off, only About names it.");
+                              sourced.c_str();
         break;
     }
     text_shrink(c, title, 592.0f, baseline(218.0f, 62.0f, th().size_display), th().size_display,
@@ -1385,7 +1387,7 @@ void Launcher::draw_dialog(Canvas &c, Modal modal, float open)
         }
         // The folder stays available after the startup notice is gone.
         const std::string reports = services_.crash_reports_folder();
-        text_block(c, reports.empty() ? std::string{tr(kAbout[std::clamp(option_, 0, 2)])} :
+        text_block(c, reports.empty() ? update_text(tr(kAbout[std::clamp(option_, 0, 2)])) :
                        fill(tr("Crash reports (FTP): {0}\nAttach crash-*.txt and its matching logs to your issue."), {reports}),
                    592.0f, baseline(772.0f, 26.0f, th().size_small),
                    th().size_small, 26.0f, th().body, 736.0f, 3, kShrink);
