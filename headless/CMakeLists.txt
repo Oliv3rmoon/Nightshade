@@ -3346,11 +3346,16 @@ else()
     add_executable(eden-save-sync-check "${EDEN_PORT_DIR}/save_sync_check.cpp")
     target_link_libraries(eden-save-sync-check PRIVATE core)
     target_compile_options(eden-save-sync-check PRIVATE -UNDEBUG)
-    # The update check's decision, without its network side (update_notice.h).
+    # The update check's decisions, the catalog's and a GitHub repository's, through a stand-in
+    # for the network (update_notice.h).
     add_executable(eden-update-check
-        "${EDEN_PORT_DIR}/update_check_check.cpp" "${EDEN_PORT_DIR}/update_check/update_check.c")
+        "${EDEN_PORT_DIR}/update_check_check.cpp" "${EDEN_PORT_DIR}/update_check/update_check.c"
+        "${EDEN_PORT_DIR}/update_check/github_release.c" "${EDEN_PORT_DIR}/update_check/self_update.c"
+        "${EDEN_PORT_DIR}/update_check/self_update_sha256.c")
     target_compile_definitions(eden-update-check PRIVATE UPDATE_CHECK_NO_NETWORK=1)
     target_compile_options(eden-update-check PRIVATE -UNDEBUG)
+    find_package(Threads REQUIRED)
+    target_link_libraries(eden-update-check PRIVATE Threads::Threads)
     # The self-update helper keeps the version it replaces: moving it to where it is kept.
     add_executable(eden-update-files-check
         "${EDEN_PORT_DIR}/self_update_files_check.cpp" "${EDEN_PORT_DIR}/self_update_helper/files.cpp")
