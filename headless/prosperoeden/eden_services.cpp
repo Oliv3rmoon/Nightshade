@@ -12,6 +12,7 @@
 #include "update_notice.h"
 #include "game_name.h"
 #include "game_files.h"
+#include "library_file.h"
 #include "native_directory.h"
 #include "reshade_folder.h"
 #include "pe/core/strings.hpp"
@@ -818,6 +819,19 @@ std::vector<pe::ui::Game> EdenServices::games() {
             Eden::Report("library", (file + ": " + error.what()).c_str());
         }
         games.push_back(std::move(game));
+    }
+    // The games on the console, for other homebrew to read (library_file.h): a forwarder maker
+    // lists them with their names and covers.
+    if (Eden::FilesystemAccess()) {
+        std::vector<Eden::LibraryFile::Game> listed;
+        for (const pe::ui::Game& game : games) {
+            const std::string cover = CoverPath(game.file);
+            listed.push_back({game.file, Eden::GamesPath("roms/" + game.file), game.name, game.title_id,
+                              Eden::FileExists(cover) ? cover : std::string{}});
+        }
+        if (!Eden::LibraryFile::Write(std::string{Eden::kDataDir} + "/library.json",
+                                      Eden::LibraryFile::Text(Eden::AssetsDir(), listed)))
+            Eden::Report("library", "Could not write library.json");
     }
     // Which games of the console a title is: by title ID, by name or by file (Remote::SameAsLocal).
     for (pe::ui::Game& game : games) {
