@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="sce_sys/icon0.png" width="128" alt="ProsperoEden icon">
+  <img src="sce_sys/icon0.png" width="128" alt="Nightshade icon">
 </p>
 
-<h1 align="center">ProsperoEden · Oliv3rmoon</h1>
+<h1 align="center">Nightshade</h1>
 
 <p align="center">
-  <strong>My own release of the Switch emulator for PS5 homebrew: the official ProsperoEden, plus my fixes, my features and a darker look.</strong>
+  <strong>The Switch emulator for PS5 homebrew, by Oliv3rmoon: everything in ProsperoEden, plus my fixes, my features and a look of its own.</strong>
 </p>
 
 <p align="center">
@@ -14,11 +14,11 @@
   <a href="https://buymeacoffee.com/oliv3rmoon"><img src="https://img.shields.io/badge/buy%20me%20a%20coffee-0d0d0f?style=for-the-badge&logo=buymeacoffee&logoColor=e5484d" alt="Buy me a coffee"></a>
 </p>
 
-This is **[Oliv3rmoon](https://github.com/Oliv3rmoon)**'s release line of [ProsperoEden](https://github.com/Swordpdf/ProsperoEden). Each release is built on the newest official one, with my work on top. My fixes also go to the official project as pull requests, so they reach everyone in the end.
+Nightshade is **[Oliv3rmoon](https://github.com/Oliv3rmoon)**'s release of [ProsperoEden](https://github.com/Swordpdf/ProsperoEden). Each release is built on the newest official one, with my work and every open community fix on top. My fixes also go to the official project as pull requests, so they reach everyone in the end.
 
 ## What you get
 
-- **A new look.** The Nightly theme: black and red, clean and dark. The other themes are still there.
+- **Its own look.** A red nightshade flower for the icon and home screen, and the Nightshade theme: black and red, clean and dark. The other themes are still there.
 - **More games and mods that run.** UltraCam-size mods, compressed NSZ/XCZ games, Smash Skyline mods, translation fonts, game folders that keep their mods and DLC apart.
 - **Fewer crashes.** Long sessions that died on a write to game memory, a full audio queue, Metroid Prime 4's graphics memory, controls after rest mode.
 - **Play from your server.** A download source can stream its games instead of downloading them first (experimental).
@@ -29,11 +29,11 @@ Every release lists exactly what's in it: see [Releases](https://github.com/Oliv
 
 ## Install
 
-1. Close ProsperoEden.
+1. Close ProsperoEden (or Nightshade).
 2. Download the ZIP from the [latest release](https://github.com/Oliv3rmoon/ProsperoEden/releases/latest) and unzip it.
 3. Copy its `PPSA99008` folder over your current one (for example `/data/homebrew/PPSA99008`), replacing the files.
 
-It keeps the official app's ID, so it replaces the official app, and your settings, saves, covers, games and forwarders stay as they are (they live in `/data/prosperoeden`). The home screen calls it **ProsperoEden Oliv3rmoon**. To go back, copy an [official release](https://github.com/Swordpdf/ProsperoEden/releases) over it the same way.
+It keeps the official app's ID, so it replaces the official app, and your settings, saves, covers, games and forwarders stay as they are (they live in `/data/prosperoeden`). The home screen calls it **Nightshade**. To go back, copy an [official release](https://github.com/Swordpdf/ProsperoEden/releases) over it the same way.
 
 ## Requests, bugs and support
 
@@ -41,7 +41,7 @@ It keeps the official app's ID, so it replaces the official app, and your settin
 - **Bugs in my releases:** open an issue here with the logs from `/data/prosperoeden/logs`.
 - **If my work helps you,** you can [buy me a coffee](https://buymeacoffee.com/oliv3rmoon). It keeps the fixes coming.
 
-This is an unofficial release. ProsperoEden is made by BlackBearReloaded and its contributors, on the Eden emulator; neither project endorses it. Everything below is the official README.
+Nightshade is an unofficial release. ProsperoEden is made by BlackBearReloaded and its contributors, on the Eden emulator; neither project endorses Nightshade. Everything below is the official README.
 
 ---
 
