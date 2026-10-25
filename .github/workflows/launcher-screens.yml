@@ -57,17 +57,17 @@
     "matrix": {
      "include": [
       {
-       "ref": "9ff504bc7896f71d890153611cda47eb476f5a23",
+       "ref": "dd73ba92d2bec918c2ef359486a4a0743df56ccc",
        "theme": "",
        "what": "Canopy tour"
       },
       {
-       "ref": "9ff504bc7896f71d890153611cda47eb476f5a23",
+       "ref": "dd73ba92d2bec918c2ef359486a4a0743df56ccc",
        "theme": "nightly",
        "what": "Nightshade theme"
       },
       {
-       "ref": "9ff504bc7896f71d890153611cda47eb476f5a23",
+       "ref": "dd73ba92d2bec918c2ef359486a4a0743df56ccc",
        "theme": "slate",
        "what": "Slate theme"
       }
