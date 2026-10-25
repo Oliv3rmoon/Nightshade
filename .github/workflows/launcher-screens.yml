@@ -1,5 +1,5 @@
 {
- "name": "Launcher screens: which change breaks the preview's checks",
+ "name": "Launcher screens: Nightshade release",
  "on": {
   "push": {
    "branches": [
@@ -57,24 +57,14 @@
     "matrix": {
      "include": [
       {
-       "ref": "f0eeafcaf70416783748fa19f5e58dda3376edff",
-       "theme": "canopy",
-       "what": "release, Canopy theme"
-      },
-      {
-       "ref": "f0eeafcaf70416783748fa19f5e58dda3376edff",
-       "theme": "slate",
-       "what": "release, Slate theme"
-      },
-      {
-       "ref": "e0e5c45451552252d2f18b6fa81e3657b9213a34",
-       "theme": "slate",
-       "what": "build 3, Slate theme"
-      },
-      {
-       "ref": "56a6e35a813462205d62cc68eef5fbb5ce0f52dc",
+       "ref": "7f4e10e81c774ab556da3670af79660a78b8ba21",
        "theme": "",
-       "what": "update feature alone, default theme"
+       "what": "release, default tour"
+      },
+      {
+       "ref": "7f4e10e81c774ab556da3670af79660a78b8ba21",
+       "theme": "nightly",
+       "what": "release, Nightshade theme"
       }
      ]
     }
