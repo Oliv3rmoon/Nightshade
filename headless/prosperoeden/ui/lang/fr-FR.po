@@ -697,6 +697,10 @@ msgid "FPS overlay"
 msgstr "Compteur de FPS"
 
 #: pe/ui/game_options.cpp, pe/ui/settings.cpp
+msgid "Frame gen method"
+msgstr "Méthode de génération d'images"
+
+#: pe/ui/game_options.cpp, pe/ui/settings.cpp
 msgid "Frame gen multiplier"
 msgstr "Multiplicateur de génération d'images"
 
@@ -711,6 +715,10 @@ msgstr "Génération d'images"
 #: pe/ui/game_options.cpp, pe/ui/settings.cpp
 msgid "Frame generation needs Lossless.dll, from Lossless Scaling, in the lossless folder."
 msgstr "La génération d’images nécessite Lossless.dll, de Lossless Scaling, dans le dossier lossless."
+
+#: pe/ui/settings.cpp
+msgid "Frame generation needs MihawkGen weights (network.fgw)."
+msgstr "La génération d’images nécessite les poids de MihawkGen (network.fgw)."
 
 #: pe/ui/settings.cpp
 msgid "Frame time"

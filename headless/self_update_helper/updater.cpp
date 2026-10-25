@@ -249,6 +249,9 @@ struct Session
     }
     bool say(const std::string &line)
     {
+        // ProsperoEden: a refusal is in the log too, not only on the app's screen.
+        if (line.rfind("fail ", 0) == 0)
+            log(line.substr(0, line.size() - (line.empty() || line.back() != '\n' ? 0 : 1)));
         std::lock_guard lock(output);
         std::size_t done = 0;
         while (done < line.size())
@@ -447,6 +450,37 @@ std::vector<std::string> title_sandboxes(const std::string &sandboxes, const std
             if (name.size() > 10 && name[9] == '_' && name.compare(0, 9, title) == 0)
                 found.push_back(name);
     return found;
+}
+
+CloseWait wait_for_close(const Environment &environment, const std::string &title,
+                         const std::function<bool()> &connection_closed,
+                         const std::function<bool()> &cancelled)
+{
+    const auto pause = [&](unsigned milliseconds)
+    {
+        if (environment.sleep)
+            environment.sleep(milliseconds);
+        else
+            usleep(milliseconds * 1000u);
+    };
+    unsigned waited = 0, gone_for = 0;
+    for (;;)
+    {
+        if (cancelled && cancelled())
+            return CloseWait::cancelled;
+        if (title_running(environment.sandboxes, title) == 0)
+            return CloseWait::closed;
+        if (connection_closed && connection_closed())
+        {
+            if (gone_for >= environment.stale_sandbox_ms)
+                return CloseWait::left_behind;
+            gone_for += 250;
+        }
+        else if (waited >= environment.exit_wait_ms)
+            return CloseWait::timed_out;
+        pause(250);
+        waited += 250;
+    }
 }
 
 int title_running(const std::string &sandboxes, const std::string &title)
@@ -735,28 +769,35 @@ int run(const Environment &environment, const Io &io)
     if(!launcher_update_compatible(environment.launcher_data,staged,error)) return fail(error);
     session.say("applying\n");
 
-    // Only a closed app is touched. Unknown counts as running.
-    unsigned waited = 0;
-    while (title_running(environment.sandboxes, title) != 0)
+    // Only a closed app is touched. Unknown counts as running, until the app's connection has
+    // ended: then its process is gone, and a sandbox that stays is the system's leftover
+    // (Swordpdf/ProsperoEden#232, wait_for_close).
+    const auto sandboxes = [&]
     {
-        if (waited >= environment.exit_wait_ms)
-        {
-            clean();
-            // What still counts as the app (Swordpdf/ProsperoEden#232): after a crash, or a close
-            // the system did not finish, its sandbox can stay until the console restarts.
-            std::string left;
-            for (const auto &entry : title_sandboxes(environment.sandboxes, title))
-                left += (left.empty() ? "" : ", ") + entry;
-            session.log("the app did not close; nothing was changed; in " + environment.sandboxes + ": " +
-                        (left.empty() ? "(could not be listed)" : left));
-            if (environment.notify)
-                environment.notify(name + " wasn't updated: it didn't close. Nothing was changed. "
-                                   "Restart the console and update again.");
-            return 1;
-        }
-        session.sleep(250);
-        waited += 250;
+        std::string left;
+        for (const auto &entry : title_sandboxes(environment.sandboxes, title))
+            left += (left.empty() ? "" : ", ") + entry;
+        return left.empty() ? std::string{"(could not be listed)"} : left;
+    };
+    const CloseWait close = wait_for_close(
+        environment, title, [&] { return session.closed.load(); }, [&] { return session.cancelled.load(); });
+    if (close == CloseWait::cancelled)
+    {
+        clean();
+        return 1;
     }
+    if (close == CloseWait::timed_out)
+    {
+        clean();
+        session.log("the app did not close; nothing was changed; in " + environment.sandboxes + ": " + sandboxes());
+        if (environment.notify)
+            environment.notify(name + " wasn't updated: it didn't close. Nothing was changed. "
+                               "Restart the console and update again.");
+        return 1;
+    }
+    if (close == CloseWait::left_behind)
+        session.log("the app has closed (its connection ended); its sandbox stayed, which the system "
+                    "leaves until a restart; in " + environment.sandboxes + ": " + sandboxes());
     session.sleep(environment.settle_ms);
 
     if (!swap_entries(target, staged, work + "/backup"))

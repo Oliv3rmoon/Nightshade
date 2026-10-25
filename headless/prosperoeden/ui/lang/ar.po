@@ -697,6 +697,10 @@ msgid "FPS overlay"
 msgstr "عدّاد FPS"
 
 #: pe/ui/game_options.cpp, pe/ui/settings.cpp
+msgid "Frame gen method"
+msgstr "طريقة توليد الإطارات"
+
+#: pe/ui/game_options.cpp, pe/ui/settings.cpp
 msgid "Frame gen multiplier"
 msgstr "مضاعف توليد الإطارات"
 
@@ -711,6 +715,10 @@ msgstr "توليد الإطارات"
 #: pe/ui/game_options.cpp, pe/ui/settings.cpp
 msgid "Frame generation needs Lossless.dll, from Lossless Scaling, in the lossless folder."
 msgstr "يحتاج توليد الإطارات إلى Lossless.dll من Lossless Scaling في مجلد lossless."
+
+#: pe/ui/settings.cpp
+msgid "Frame generation needs MihawkGen weights (network.fgw)."
+msgstr "يحتاج توليد الإطارات إلى أوزان MihawkGen (network.fgw)."
 
 #: pe/ui/settings.cpp
 msgid "Frame time"

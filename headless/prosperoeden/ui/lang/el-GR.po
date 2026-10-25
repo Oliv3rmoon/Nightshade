@@ -697,6 +697,10 @@ msgid "FPS overlay"
 msgstr "Ένδειξη FPS"
 
 #: pe/ui/game_options.cpp, pe/ui/settings.cpp
+msgid "Frame gen method"
+msgstr "Μέθοδος παραγωγής καρέ"
+
+#: pe/ui/game_options.cpp, pe/ui/settings.cpp
 msgid "Frame gen multiplier"
 msgstr "Πολλαπλασιαστής παραγωγής καρέ"
 
@@ -711,6 +715,10 @@ msgstr "Δημιουργία καρέ"
 #: pe/ui/game_options.cpp, pe/ui/settings.cpp
 msgid "Frame generation needs Lossless.dll, from Lossless Scaling, in the lossless folder."
 msgstr "Η δημιουργία καρέ χρειάζεται το Lossless.dll από το Lossless Scaling στον φάκελο lossless."
+
+#: pe/ui/settings.cpp
+msgid "Frame generation needs MihawkGen weights (network.fgw)."
+msgstr "Η δημιουργία καρέ χρειάζεται τα βάρη του MihawkGen (network.fgw)."
 
 #: pe/ui/settings.cpp
 msgid "Frame time"

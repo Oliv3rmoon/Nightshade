@@ -697,6 +697,10 @@ msgid "FPS overlay"
 msgstr "FPS sayacı"
 
 #: pe/ui/game_options.cpp, pe/ui/settings.cpp
+msgid "Frame gen method"
+msgstr "Kare üretimi yöntemi"
+
+#: pe/ui/game_options.cpp, pe/ui/settings.cpp
 msgid "Frame gen multiplier"
 msgstr "Kare üretimi çarpanı"
 
@@ -711,6 +715,10 @@ msgstr "Kare oluşturma"
 #: pe/ui/game_options.cpp, pe/ui/settings.cpp
 msgid "Frame generation needs Lossless.dll, from Lossless Scaling, in the lossless folder."
 msgstr "Kare üretimi için lossless klasöründe Lossless Scaling'in Lossless.dll dosyası gerekir."
+
+#: pe/ui/settings.cpp
+msgid "Frame generation needs MihawkGen weights (network.fgw)."
+msgstr "Kare üretimi için MihawkGen ağırlıkları (network.fgw) gerekir."
 
 #: pe/ui/settings.cpp
 msgid "Frame time"

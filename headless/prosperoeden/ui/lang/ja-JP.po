@@ -697,6 +697,10 @@ msgid "FPS overlay"
 msgstr "FPS表示"
 
 #: pe/ui/game_options.cpp, pe/ui/settings.cpp
+msgid "Frame gen method"
+msgstr "フレーム生成の方式"
+
+#: pe/ui/game_options.cpp, pe/ui/settings.cpp
 msgid "Frame gen multiplier"
 msgstr "フレーム生成の倍率"
 
@@ -711,6 +715,10 @@ msgstr "フレーム生成"
 #: pe/ui/game_options.cpp, pe/ui/settings.cpp
 msgid "Frame generation needs Lossless.dll, from Lossless Scaling, in the lossless folder."
 msgstr "フレーム生成には、lossless フォルダーに Lossless Scaling の Lossless.dll が必要です。"
+
+#: pe/ui/settings.cpp
+msgid "Frame generation needs MihawkGen weights (network.fgw)."
+msgstr "フレーム生成には MihawkGen の重み (network.fgw) が必要です。"
 
 #: pe/ui/settings.cpp
 msgid "Frame time"
