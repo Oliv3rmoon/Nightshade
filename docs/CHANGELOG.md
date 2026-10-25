@@ -2,6 +2,16 @@
 
 What changed in each release of ProsperoEden, newest first. A release's notes on GitHub are its section here.
 
+## v1.005.103
+
+**Cross on a game from your server plays it, on the home screen too.** In the Nightshade theme (and Slate) the home screen's grid is the Library, but Cross on a game that is only on a download source put it in the download queue, and on one already downloading cancelled it. Now it downloads the game and starts it, as Cross does in the Library (Square still only queues it), and so does Play on the game panel. Game settings on such a game says why it has none yet.
+
+This is the first update that 1.005.102's fixed update helper installs: **Update now** should apply it. If it doesn't, send `/data/prosperoeden/logs/updater.log`.
+
+### Also
+
+- The launcher's own preview walks the Nightshade and Slate layouts as it walks Canopy's, and all of its checks pass in all three.
+
 ## v1.005.102
 
 **Update now works.** The in-app update said it had finished, but the old version opened again and the update was offered again. The update helper waits for the app to close before it replaces its files, and took the app's sandbox in `/mnt/sandbox` for the app itself; the system can leave that sandbox behind after the app has closed, until the console restarts (Swordpdf/ProsperoEden#232), so the helper gave up after two minutes. Now the app's connection to the helper ending is the app closing: a sandbox that stays 10 s longer is taken for the system's leftover, and the files are replaced. The helper also writes what it did to `/data/prosperoeden/logs/updater.log`.
