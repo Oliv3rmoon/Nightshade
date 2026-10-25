@@ -25,7 +25,7 @@ const char* ErrorText(Member::Error error) {
     case Member::Error::HostKicked: return "Removed by the host. Ask the host before trying to rejoin, or choose another room.";
     case Member::Error::NameCollision: return "Nickname already in use. Enter a different nickname and try again.";
     case Member::Error::IpCollision: return "Player address unavailable. Try joining again. If it repeats, ask the host to check the room server.";
-    case Member::Error::WrongVersion: return "Incompatible room version. Update ProsperoEden or choose a compatible room; the host may also need to update the server.";
+    case Member::Error::WrongVersion: return "Incompatible room version. Update Nightshade or choose a compatible room; the host may also need to update the server.";
     case Member::Error::WrongPassword: return "Incorrect password. Enter the room password again; it is case-sensitive.";
     case Member::Error::CouldNotConnect: return "Could not reach the room. Check the address and UDP port, then retry. Ask the host to check that the server is online and its UDP port is reachable.";
     case Member::Error::RoomIsFull: return "Room full. Wait for a free place or choose another room.";
@@ -179,7 +179,7 @@ struct RoomClient::Impl {
             try {
                 Join(std::move(connection), stop);
             } catch (const std::exception&) {
-                Fail("Could not start the connection. Restart ProsperoEden and try again. If it repeats, enable detailed logging in Settings.");
+                Fail("Could not start the connection. Restart Nightshade and try again. If it repeats, enable detailed logging in Settings.");
                 member->Leave();
             }
             {
@@ -197,7 +197,7 @@ RoomClient::RoomClient() : impl(std::make_unique<Impl>()) {
     auto& p = *impl;
     p.initialized = Network::Init();
     if (!p.initialized) {
-        p.snapshot.error = "Networking unavailable. Restart ProsperoEden and check the console network connection before trying again.";
+        p.snapshot.error = "Networking unavailable. Restart Nightshade and check the console network connection before trying again.";
         return;
     }
     p.member = Network::GetRoomMember().lock();

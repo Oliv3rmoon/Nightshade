@@ -216,7 +216,7 @@ jobs:
 
       - name: Match the tag to the package version
         if: startsWith(github.ref, 'refs/tags/')
-        run: test -f "dist/ProsperoEden-${GITHUB_REF_NAME}.zip"
+        run: test -f "dist/Nightshade-${GITHUB_REF_NAME}.zip"
 
       # tools/ci/make-dist.py writes every entry as 0777 (the console only starts an app whose
       # files are open to all); this looks at the finished file once more.
@@ -224,7 +224,7 @@ jobs:
         run: |
           set -euo pipefail
           cd dist
-          python3 - ProsperoEden-v*.zip <<'PY'
+          python3 - Nightshade-v*.zip <<'PY'
           import json, sys, zipfile
           assert len(sys.argv) == 2, f"expected one ZIP: {sys.argv[1:]}"
           archive = sys.argv[1]
@@ -235,7 +235,7 @@ jobs:
               wrong = [i.filename for i in z.infolist() if (i.external_attr >> 16) & 0o777 != 0o777]
               assert not wrong, f"entries not stored as 0777: {wrong[:3]}"
               version = json.loads(z.read("PPSA99008/sce_sys/param.json"))["contentVersion"]
-              assert archive == f"ProsperoEden-v{version.removeprefix('0')}.zip", (archive, version)
+              assert archive == f"Nightshade-v{version.removeprefix('0')}.zip", (archive, version)
               print(f"{archive}: {len(names)} entries, all 0777, version {version}")
           PY
           sha256sum -c SHA256SUMS
@@ -248,7 +248,7 @@ jobs:
         if: (github.ref_type == 'tag' || github.event_name == 'workflow_dispatch') && !github.event.repository.private
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
-          subject-path: dist/ProsperoEden-v*.zip
+          subject-path: dist/Nightshade-v*.zip
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -287,7 +287,7 @@ jobs:
             # No release yet: this run makes it.
             gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --prerelease \
               --title "ProsperoEden $GITHUB_REF_NAME" --notes-file dist/release-notes.md \
-              "dist/ProsperoEden-$GITHUB_REF_NAME.zip" dist/SHA256SUMS
+              "dist/Nightshade-$GITHUB_REF_NAME.zip" dist/SHA256SUMS
           elif grep -qi '\.zip$' <<< "$assets"; then
             # A published ZIP is never replaced or deleted: the catalog at homebrew.page records
             # each release ZIP's checksum.
@@ -296,6 +296,6 @@ jobs:
             # A release written in advance (notes only, or a draft): it gets this run's files;
             # its title, notes and state stay as they are. Without --clobber, nothing is replaced.
             gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
-              "dist/ProsperoEden-$GITHUB_REF_NAME.zip" dist/SHA256SUMS
+              "dist/Nightshade-$GITHUB_REF_NAME.zip" dist/SHA256SUMS
             echo "::notice title=Files added to the existing release::The release for $GITHUB_REF_NAME had no ZIP; this run's ZIP and SHA256SUMS were added. Its title and notes were not changed."
           fi

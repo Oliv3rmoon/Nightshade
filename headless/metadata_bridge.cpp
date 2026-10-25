@@ -504,7 +504,7 @@ std::string EdenUserFolder(const std::filesystem::path& saves, std::string& erro
         if (name.size() == 32 && name != std::string(32, '0')) users.push_back(name);
     }
     if (users.size() == 1) return users.front();
-    error = "start any game once first, so ProsperoEden creates its user";
+    error = "start any game once first, so Nightshade creates its user";
     return {};
 }
 } // namespace

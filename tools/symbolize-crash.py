@@ -6,7 +6,7 @@
 
 REPORT is logs/crash-YYYYMMDD-HHMMSS.txt from a console. ELF is the unstripped executable of the
 build that wrote it: build/headless-native/llvm-pie.elf right after a build, and for a release
-the copy `make release` keeps (build/symbols/ProsperoEden-vX.Y.Z.elf). Every "eboot+0x..." in the
+the copy `make release` keeps (build/symbols/Nightshade-vX.Y.Z.elf). Every "eboot+0x..." in the
 report is an offset into that file's code; the report is printed again with the function, file
 and line after each one.
 

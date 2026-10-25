@@ -53,8 +53,8 @@ msgid "About"
 msgstr "Acerca de"
 
 #: pe/ui/browse.cpp
-msgid "About ProsperoEden"
-msgstr "Acerca de ProsperoEden"
+msgid "About Nightshade"
+msgstr "Acerca de Nightshade"
 
 #. Time left while downloading; {0} is a number of minutes. Keep it short.
 #: pe/ui/remote.cpp, pe/ui/update.cpp
@@ -458,8 +458,8 @@ msgid "Default folder"
 msgstr "Carpeta predeterminada"
 
 #: pe/ui/browse.cpp
-msgid "Default folder saved. Reopen ProsperoEden to use it."
-msgstr "Carpeta predeterminada guardada. Vuelve a abrir ProsperoEden para usarla."
+msgid "Default folder saved. Reopen Nightshade to use it."
+msgstr "Carpeta predeterminada guardada. Vuelve a abrir Nightshade para usarla."
 
 #: pe/ui/library.cpp
 msgid "Delete"
@@ -1420,16 +1420,16 @@ msgid "PROJECT CREDITS"
 msgstr "CRÉDITOS DEL PROYECTO"
 
 #: pe/ui/update.cpp
-msgid "ProsperoEden closes now."
-msgstr "ProsperoEden se cerrará ahora."
+msgid "Nightshade closes now."
+msgstr "Nightshade se cerrará ahora."
 
 #: pe/ui/update.cpp
-msgid "ProsperoEden closes to finish the update."
-msgstr "ProsperoEden se cerrará para terminar la actualización."
+msgid "Nightshade closes to finish the update."
+msgstr "Nightshade se cerrará para terminar la actualización."
 
 #: eden_services.cpp
-msgid "ProsperoEden could not get access to the console's storage, so it cannot read your settings, saves and games. Nothing was changed. Close ProsperoEden and open it again. (Code {0})"
-msgstr "ProsperoEden no ha podido acceder al almacenamiento de la consola, así que no puede leer tus ajustes, tus datos guardados ni tus juegos. No se ha cambiado nada. Cierra ProsperoEden y vuelve a abrirlo. (Código {0})"
+msgid "Nightshade could not get access to the console's storage, so it cannot read your settings, saves and games. Nothing was changed. Close Nightshade and open it again. (Code {0})"
+msgstr "Nightshade no ha podido acceder al almacenamiento de la consola, así que no puede leer tus ajustes, tus datos guardados ni tus juegos. No se ha cambiado nada. Cierra Nightshade y vuelve a abrirlo. (Código {0})"
 
 #: pe/ui/browse.cpp
 msgid "ProsperoEden is an unofficial PS5 port brought to you by BlackBearReloaded."
@@ -1437,12 +1437,12 @@ msgstr "ProsperoEden es un port no oficial para PS5, de la mano de BlackBearRelo
 
 #. Shown on the home screen after the app crashed and started again; {0} is a file.
 #: eden_services.cpp, host/fake_services.cpp
-msgid "ProsperoEden stopped because of an error. A report was saved to {0}."
-msgstr "ProsperoEden se ha detenido debido a un error. Se ha guardado un informe en {0}."
+msgid "Nightshade stopped because of an error. A report was saved to {0}."
+msgstr "Nightshade se ha detenido debido a un error. Se ha guardado un informe en {0}."
 
 #: pe/ui/update.cpp
-msgid "ProsperoEden was not changed."
-msgstr "ProsperoEden no ha cambiado."
+msgid "Nightshade was not changed."
+msgstr "Nightshade no ha cambiado."
 
 #. Why a game did not start.
 #: eden_services.cpp
@@ -1648,8 +1648,8 @@ msgid "Saved. A display that cannot show 120 Hz stays at 60 Hz."
 msgstr "Guardado. Una pantalla que no admite 120 Hz se queda en 60 Hz."
 
 #: pe/ui/settings.cpp
-msgid "Saved. Applies the next time ProsperoEden opens."
-msgstr "Guardado. Se aplica la próxima vez que abras ProsperoEden."
+msgid "Saved. Applies the next time Nightshade opens."
+msgstr "Guardado. Se aplica la próxima vez que abras Nightshade."
 
 #: pe/ui/browse.cpp, pe/ui/launcher.cpp
 msgid "Saved. Applies when a game starts."
@@ -1665,8 +1665,8 @@ msgid "Saved. Post-processing needs the Vulkan renderer."
 msgstr "Guardado. El posprocesado necesita el renderizador Vulkan."
 
 #: pe/ui/browse.cpp
-msgid "Saved. Reopen ProsperoEden to use this folder."
-msgstr "Guardado. Vuelve a abrir ProsperoEden para usar esta carpeta."
+msgid "Saved. Reopen Nightshade to use this folder."
+msgstr "Guardado. Vuelve a abrir Nightshade para usar esta carpeta."
 
 #. About the Update notices switch; homebrew.page is a site's name and stays as it is; About is the menu's last section (use its translation).
 #: pe/ui/settings.cpp
@@ -1723,8 +1723,8 @@ msgid "Setup required"
 msgstr "Configuración necesaria"
 
 #: eden_services.cpp, host/fake_services.cpp
-msgid "Setup required: {0} Open Settings, Game files to choose the folder that holds your keys, firmware and roms folders (or add the files to {1}), then reopen ProsperoEden."
-msgstr "Configuración necesaria: {0} Abre Ajustes > Archivos de juego para elegir la carpeta que contiene tus carpetas keys, firmware y roms (o añade los archivos a {1}) y vuelve a abrir ProsperoEden."
+msgid "Setup required: {0} Open Settings, Game files to choose the folder that holds your keys, firmware and roms folders (or add the files to {1}), then reopen Nightshade."
+msgstr "Configuración necesaria: {0} Abre Ajustes > Archivos de juego para elegir la carpeta que contiene tus carpetas keys, firmware y roms (o añade los archivos a {1}) y vuelve a abrir Nightshade."
 
 #: pe/ui/settings.cpp
 msgid "Setup status and detailed logs."
@@ -1863,8 +1863,8 @@ msgid "THANKS"
 msgstr "AGRADECIMIENTOS"
 
 #: pe/ui/browse.cpp
-msgid "Thanks to the whole PS5 homebrew community and to every developer whose drivers, tools and libraries make ProsperoEden possible."
-msgstr "Gracias a toda la comunidad homebrew de PS5 y a quienes crean los controladores, herramientas y bibliotecas que hacen posible ProsperoEden."
+msgid "Thanks to the whole PS5 homebrew community and to every developer whose drivers, tools and libraries make Nightshade possible."
+msgstr "Gracias a toda la comunidad homebrew de PS5 y a quienes crean los controladores, herramientas y bibliotecas que hacen posible Nightshade."
 
 #: pe/ui/settings.cpp
 msgid "The accent colour of the current theme."

@@ -4,7 +4,7 @@
 
   tools/ci/make-dist.py APP_DIR
 
-dist/ProsperoEden-vX.Y.Z.zip (the folder plus README, LICENSE and THIRD_PARTY_NOTICES; fixed
+dist/Nightshade-vX.Y.Z.zip (the folder plus README, LICENSE and THIRD_PARTY_NOTICES; fixed
 timestamps, so equal inputs give equal bytes), SHA256SUMS (of the ZIP) and release-notes.md (the
 changelog's "vX.Y.Z" section, docs/CHANGELOG.md).
 """
@@ -28,7 +28,7 @@ tag = 'v' + version.removeprefix('0')
 dist = root / 'dist'
 shutil.rmtree(dist, ignore_errors=True)
 dist.mkdir()
-archive = dist / f'ProsperoEden-{tag}.zip'
+archive = dist / f'Nightshade-{tag}.zip'
 files = [(p, 'PPSA99008/' + p.relative_to(app).as_posix()) for p in sorted(app.rglob('*')) if p.is_file()]
 files += [(root / name, name) for name in ('README.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md') if (root / name).exists()]
 with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as zip_file:
@@ -51,7 +51,7 @@ digest = hashlib.sha256(archive.read_bytes()).hexdigest()
 # (tools/symbolize-crash.py). Kept out of dist/: it is not a release file.
 unstripped = root / 'build/headless-native/llvm-pie.elf'
 if unstripped.exists():
-    symbols = root / 'build/symbols' / f'ProsperoEden-{tag}.elf'
+    symbols = root / 'build/symbols' / f'Nightshade-{tag}.elf'
     symbols.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(unstripped, symbols)
     print(f'{symbols} (keep it with the release: crash reports are read with it)')

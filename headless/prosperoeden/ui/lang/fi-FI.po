@@ -53,8 +53,8 @@ msgid "About"
 msgstr "Tietoja"
 
 #: pe/ui/browse.cpp
-msgid "About ProsperoEden"
-msgstr "Tietoja ProsperoEdenistä"
+msgid "About Nightshade"
+msgstr "Tietoja Nightshadeistä"
 
 #. Time left while downloading; {0} is a number of minutes. Keep it short.
 #: pe/ui/remote.cpp, pe/ui/update.cpp
@@ -458,8 +458,8 @@ msgid "Default folder"
 msgstr "Oletuskansio"
 
 #: pe/ui/browse.cpp
-msgid "Default folder saved. Reopen ProsperoEden to use it."
-msgstr "Oletuskansio tallennettu. Avaa ProsperoEden uudelleen, niin se otetaan käyttöön."
+msgid "Default folder saved. Reopen Nightshade to use it."
+msgstr "Oletuskansio tallennettu. Avaa Nightshade uudelleen, niin se otetaan käyttöön."
 
 #: pe/ui/library.cpp
 msgid "Delete"
@@ -1420,16 +1420,16 @@ msgid "PROJECT CREDITS"
 msgstr "PROJEKTIN TEKIJÄT"
 
 #: pe/ui/update.cpp
-msgid "ProsperoEden closes now."
-msgstr "ProsperoEden sulkeutuu nyt."
+msgid "Nightshade closes now."
+msgstr "Nightshade sulkeutuu nyt."
 
 #: pe/ui/update.cpp
-msgid "ProsperoEden closes to finish the update."
-msgstr "ProsperoEden sulkeutuu päivityksen viimeistelemiseksi."
+msgid "Nightshade closes to finish the update."
+msgstr "Nightshade sulkeutuu päivityksen viimeistelemiseksi."
 
 #: eden_services.cpp
-msgid "ProsperoEden could not get access to the console's storage, so it cannot read your settings, saves and games. Nothing was changed. Close ProsperoEden and open it again. (Code {0})"
-msgstr "ProsperoEden ei saanut pääsyä konsolin tallennustilaan, joten se ei voi lukea asetuksiasi, tallennuksiasi eikä pelejäsi. Mitään ei muutettu. Sulje ProsperoEden ja avaa se uudelleen. (Koodi {0})"
+msgid "Nightshade could not get access to the console's storage, so it cannot read your settings, saves and games. Nothing was changed. Close Nightshade and open it again. (Code {0})"
+msgstr "Nightshade ei saanut pääsyä konsolin tallennustilaan, joten se ei voi lukea asetuksiasi, tallennuksiasi eikä pelejäsi. Mitään ei muutettu. Sulje Nightshade ja avaa se uudelleen. (Koodi {0})"
 
 #: pe/ui/browse.cpp
 msgid "ProsperoEden is an unofficial PS5 port brought to you by BlackBearReloaded."
@@ -1437,12 +1437,12 @@ msgstr "ProsperoEden on epävirallinen PS5-versio, jonka tarjoaa BlackBearReload
 
 #. Shown on the home screen after the app crashed and started again; {0} is a file.
 #: eden_services.cpp, host/fake_services.cpp
-msgid "ProsperoEden stopped because of an error. A report was saved to {0}."
-msgstr "ProsperoEden pysähtyi virheen vuoksi. Raportti tallennettiin kohteeseen {0}."
+msgid "Nightshade stopped because of an error. A report was saved to {0}."
+msgstr "Nightshade pysähtyi virheen vuoksi. Raportti tallennettiin kohteeseen {0}."
 
 #: pe/ui/update.cpp
-msgid "ProsperoEden was not changed."
-msgstr "ProsperoEdeniä ei muutettu."
+msgid "Nightshade was not changed."
+msgstr "Nightshadeiä ei muutettu."
 
 #. Why a game did not start.
 #: eden_services.cpp
@@ -1648,8 +1648,8 @@ msgid "Saved. A display that cannot show 120 Hz stays at 60 Hz."
 msgstr "Tallennettu. Näyttö, joka ei tue 120 Hz:ää, pysyy 60 Hz:ssä."
 
 #: pe/ui/settings.cpp
-msgid "Saved. Applies the next time ProsperoEden opens."
-msgstr "Tallennettu. Tulee voimaan, kun ProsperoEden avataan seuraavan kerran."
+msgid "Saved. Applies the next time Nightshade opens."
+msgstr "Tallennettu. Tulee voimaan, kun Nightshade avataan seuraavan kerran."
 
 #: pe/ui/browse.cpp, pe/ui/launcher.cpp
 msgid "Saved. Applies when a game starts."
@@ -1665,8 +1665,8 @@ msgid "Saved. Post-processing needs the Vulkan renderer."
 msgstr "Tallennettu. Jälkikäsittely vaatii Vulkan-hahmontimen."
 
 #: pe/ui/browse.cpp
-msgid "Saved. Reopen ProsperoEden to use this folder."
-msgstr "Tallennettu. Avaa ProsperoEden uudelleen, niin kansio otetaan käyttöön."
+msgid "Saved. Reopen Nightshade to use this folder."
+msgstr "Tallennettu. Avaa Nightshade uudelleen, niin kansio otetaan käyttöön."
 
 #. About the Update notices switch; homebrew.page is a site's name and stays as it is; About is the menu's last section (use its translation).
 #: pe/ui/settings.cpp
@@ -1723,8 +1723,8 @@ msgid "Setup required"
 msgstr "Määritys vaaditaan"
 
 #: eden_services.cpp, host/fake_services.cpp
-msgid "Setup required: {0} Open Settings, Game files to choose the folder that holds your keys, firmware and roms folders (or add the files to {1}), then reopen ProsperoEden."
-msgstr "Määritys vaaditaan: {0} Valitse kohdasta Asetukset, Pelitiedostot kansio, jossa keys-, firmware- ja roms-kansiot ovat (tai lisää tiedostot kansioon {1}), ja avaa sitten ProsperoEden uudelleen."
+msgid "Setup required: {0} Open Settings, Game files to choose the folder that holds your keys, firmware and roms folders (or add the files to {1}), then reopen Nightshade."
+msgstr "Määritys vaaditaan: {0} Valitse kohdasta Asetukset, Pelitiedostot kansio, jossa keys-, firmware- ja roms-kansiot ovat (tai lisää tiedostot kansioon {1}), ja avaa sitten Nightshade uudelleen."
 
 #: pe/ui/settings.cpp
 msgid "Setup status and detailed logs."
@@ -1863,8 +1863,8 @@ msgid "THANKS"
 msgstr "KIITOKSET"
 
 #: pe/ui/browse.cpp
-msgid "Thanks to the whole PS5 homebrew community and to every developer whose drivers, tools and libraries make ProsperoEden possible."
-msgstr "Kiitos koko PS5:n homebrew-yhteisölle ja kaikille kehittäjille, joiden ajurien, työkalujen ja kirjastojen ansiosta ProsperoEden on mahdollinen."
+msgid "Thanks to the whole PS5 homebrew community and to every developer whose drivers, tools and libraries make Nightshade possible."
+msgstr "Kiitos koko PS5:n homebrew-yhteisölle ja kaikille kehittäjille, joiden ajurien, työkalujen ja kirjastojen ansiosta Nightshade on mahdollinen."
 
 #: pe/ui/settings.cpp
 msgid "The accent colour of the current theme."

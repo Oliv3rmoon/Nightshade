@@ -146,7 +146,7 @@ void Launcher::press_files(Key key)
     case Key::triangle:
     {
         const bool saved = services_.set_files_folder(browse_dir_);
-        say(saved ? tr("Saved. Reopen ProsperoEden to use this folder.") :
+        say(saved ? tr("Saved. Reopen Nightshade to use this folder.") :
                     tr("Could not save the folder. Please try again."),
             !saved);
         cue(saved ? Cue::saved : Cue::error);
@@ -157,7 +157,7 @@ void Launcher::press_files(Key key)
         const std::string fallback = services_.default_files_folder();
         const bool saved = services_.set_files_folder(fallback);
         (void)browse_to(fallback);
-        say(saved ? tr("Default folder saved. Reopen ProsperoEden to use it.") :
+        say(saved ? tr("Default folder saved. Reopen Nightshade to use it.") :
                     tr("Could not save the folder. Please try again."),
             !saved);
         cue(saved ? Cue::saved : Cue::error);
@@ -438,7 +438,7 @@ void Launcher::draw_language(Canvas &c)
 void Launcher::draw_about(Canvas &c)
 {
     gfx::DrawList &list = c.list;
-    draw_frame(c, tr("About ProsperoEden"), tr("Credits and setup"));
+    draw_frame(c, tr("About Nightshade"), tr("Credits and setup"));
 
     if (th().top_nav)
     {
@@ -462,7 +462,7 @@ void Launcher::draw_about(Canvas &c)
              Align::left, 2.0f);
         text_block(c,
                    tr("Thanks to the whole PS5 homebrew community and to every developer whose drivers, "
-                   "tools and libraries make ProsperoEden possible."),
+                   "tools and libraries make Nightshade possible."),
                    x, baseline(374.0f, 30.0f, t.size_text), t.size_text, 30.0f, t.body, w, 3, kShrink);
         list.rounded_rect({x, 472.0f, w, 1.0f}, 0.0f, t.rule);
         text(c, tr("PS5 EDITION"), x, baseline(488.0f, 28.0f, t.size_small), t.size_small,
@@ -517,7 +517,7 @@ void Launcher::draw_about(Canvas &c)
          th().accent_pale, Align::left, 2.0f);
     text_block(c,
                tr("Thanks to the whole PS5 homebrew community and to every developer whose drivers, "
-               "tools and libraries make ProsperoEden possible."),
+               "tools and libraries make Nightshade possible."),
                144.0f, baseline(500.0f, 36.0f, th().size_text), th().size_text, 36.0f, th().body,
                748.0f, 3, kShrink);
     list.rounded_rect({144.0f, 628.0f, 748.0f, 1.0f}, 0.0f, th().rule);

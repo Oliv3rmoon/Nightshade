@@ -148,7 +148,7 @@ def slate_backdrop():
 
 
 def nightly_backdrop():
-    """Nightly: near black, a low red glow at the right and a few faint stars. Procedural."""
+    """Nightshade: near black, a low red glow at the right and a few faint stars. Procedural."""
     import random
     size = (2048, 1152)
     base = (9, 9, 11)
