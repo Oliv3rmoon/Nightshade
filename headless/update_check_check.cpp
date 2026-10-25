@@ -819,6 +819,38 @@ void LoggedTag() {
     assert(tagged("v1.005.100") == SELF_UPDATE_AVAILABLE && std::strcmp(report.tag, "v1.005.100") == 0);
 }
 
+// A field that is there twice says two things: the answer is read as neither.
+void TwiceSaid() {
+    assert(Evaluate(With(kRelease, "\"tag_name\": \"v1.005.100\",", "\"tag_name\": \"v1.005.100\", \"tag_name\": \"v9.000.000\","),
+                    "01.005.000") == GITHUB_RELEASE_BAD_RESPONSE);
+    assert(Evaluate(With(kRelease, "\"name\": \"Nightshade-v1.005.100.zip\",",
+                         "\"name\": \"Nightshade-v1.005.100.zip\", \"name\": \"Nightshade-v1.005.100.bin\","),
+                    "01.005.000") == GITHUB_RELEASE_BAD_RESPONSE);
+    assert(Evaluate(With(kRelease, "\"state\": \"uploaded\",\n      \"size\": 42651073",
+                         "\"state\": \"uploaded\", \"state\": \"starter\",\n      \"size\": 42651073"),
+                    "01.005.000") == GITHUB_RELEASE_BAD_RESPONSE);
+    assert(Evaluate(With(kRelease, "\"body\": \"", "\"body\": \"Other notes\", \"body\": \""), "01.005.000") ==
+           GITHUB_RELEASE_BAD_RESPONSE);
+    // Already so: a size, draft, prerelease or assets twice.
+    assert(Evaluate(With(kRelease, "\"size\": 42651073", "\"size\": 42651073, \"size\": 1"), "01.005.000") ==
+           GITHUB_RELEASE_NO_ZIP);
+    assert(Evaluate(With(kRelease, "\"prerelease\": false,", "\"prerelease\": false, \"prerelease\": true,"),
+                    "01.005.000") == GITHUB_RELEASE_BAD_RESPONSE);
+    // A redirect naming two addresses is not followed, even when the first is GitHub's.
+    static self_update_offer offer;
+    github_release_report report{};
+    Serve(200, kRelease);
+    network.answers.clear();
+    network.answers[kOldApi] = {301, std::string("{\"message\":\"Moved Permanently\",\"url\":\"") + kMoved +
+                                         "\",\"url\":\"https://example.net/releases/latest\"}"};
+    network.answers[kMoved] = {200, kRelease};
+    assert(Check(kOldRepository, "01.005.000", &offer, &report) == SELF_UPDATE_UNKNOWN &&
+           report.reason == GITHUB_RELEASE_REDIRECT_REFUSED);
+    assert((network.asked == std::vector<std::string>{kOldApi}));
+    // Names that are the same in nested objects (the release's and its files') are not twice said.
+    assert(Evaluate(kRelease, "01.005.000") == GITHUB_RELEASE_NEWER);
+}
+
 void CatalogUnchanged() {
     static self_update_offer offer, direct;
     github_release_report report{};
@@ -903,6 +935,7 @@ int main(int argc, char** argv) {
     AnswerSize();
     AssetList();
     LoggedTag();
+    TwiceSaid();
     CatalogUnchanged();
     std::puts("update check: versions, request address, newer/same/older and silent answers PASS");
     std::puts("update check from GitHub: tag versions, addresses and redirects, SHA256SUMS lines, release notes, "

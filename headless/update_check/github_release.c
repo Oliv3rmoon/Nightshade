@@ -151,6 +151,17 @@ static int is_literal(const char *value, size_t length, const char *literal)
     return length == strlen(literal) && memcmp(value, literal, length) == 0;
 }
 
+/* update_check_json_string, and -2 when `key` is there twice: an answer that says two things is
+ * read as neither (update_check_json_value refuses it so for the members it reads). */
+static int string_member(const char *json, size_t length, const char *key, char *out, size_t size)
+{
+    const char *value = NULL;
+    size_t value_length = 0;
+    if (update_check_json_value(json, length, key, &value, &value_length) < 0)
+        return -2;
+    return update_check_json_string(json, length, key, out, size);
+}
+
 /* GITHUB_RELEASE_NEWER when the boolean `key` is false, NOT_PUBLISHED when it is true. */
 static github_release_reason published(const char *json, size_t length, const char *key)
 {
@@ -175,6 +186,7 @@ github_release_reason github_release_evaluate(const char *json, size_t length,
     size_t suffix_length;
     int sums = 0;
     int comparable = 0;
+    int found;
     github_release_reason state;
     if (release == NULL)
         return GITHUB_RELEASE_BAD_ARGUMENT;
@@ -189,9 +201,11 @@ github_release_reason github_release_evaluate(const char *json, size_t length,
     if ((state = published(json, length, "draft")) != GITHUB_RELEASE_NEWER ||
         (state = published(json, length, "prerelease")) != GITHUB_RELEASE_NEWER)
         return state;
-    if (update_check_json_string(json, length, "tag_name", release->tag, sizeof(release->tag)) != 1)
+    if ((found = string_member(json, length, "tag_name", release->tag, sizeof(release->tag))) != 1)
     {
         release->tag[0] = '\0';
+        if (found == -2)
+            return GITHUB_RELEASE_BAD_RESPONSE;
         /* A tag too long to be a version is still a tag. */
         return update_check_json_value(json, length, "tag_name", &value, &size) == 1 && size > 0 &&
                        value[0] == '"'
@@ -216,21 +230,25 @@ github_release_reason github_release_evaluate(const char *json, size_t length,
         unsigned bytes = 0;
         size_t file_length;
         int is_zip;
-        const int found = update_check_json_array_next(assets, assets_length, &cursor, &asset, &asset_length);
+        int named;
+        found = update_check_json_array_next(assets, assets_length, &cursor, &asset, &asset_length);
         if (found == 0)
             break;
         if (found != 1)
             return GITHUB_RELEASE_BAD_RESPONSE;
         /* A name too long for `file` is neither. */
-        if (update_check_json_string(asset, asset_length, "name", file, sizeof(file)) != 1)
+        if ((named = string_member(asset, asset_length, "name", file, sizeof(file))) == -2)
+            return GITHUB_RELEASE_BAD_RESPONSE;
+        if (named != 1)
             continue;
         file_length = strlen(file);
         is_zip = file_length > suffix_length && strcmp(file + file_length - suffix_length, suffix) == 0 &&
                  is_file_name(file, sizeof(file));
         if (!is_zip && strcmp(file, "SHA256SUMS") != 0)
             continue;
-        if (update_check_json_string(asset, asset_length, "state", upload, sizeof(upload)) != 1 ||
-            strcmp(upload, "uploaded") != 0 ||
+        if ((named = string_member(asset, asset_length, "state", upload, sizeof(upload))) == -2)
+            return GITHUB_RELEASE_BAD_RESPONSE;
+        if (named != 1 || strcmp(upload, "uploaded") != 0 ||
             update_check_json_uint(asset, asset_length, "size", &bytes) != 1)
             continue;
         if (!is_zip)
@@ -255,7 +273,9 @@ github_release_reason github_release_evaluate(const char *json, size_t length,
     /* For the What's new view; none (null, or not text) is no notes. They are read as GitHub has
      * them first, which is never longer than they are in the answer, into memory of that size
      * for as long as they are made plain text (none: no notes). */
-    if (update_check_json_value(json, length, "body", &value, &size) == 1 && size > 0 && value[0] == '"')
+    if ((found = update_check_json_value(json, length, "body", &value, &size)) < 0)
+        return GITHUB_RELEASE_BAD_RESPONSE;
+    if (found == 1 && size > 0 && value[0] == '"')
     {
         char *body = (char *)malloc(size);
         if (body != NULL && update_check_json_string(json, length, "body", body, size) == 1)
@@ -865,8 +885,7 @@ self_update_check_result github_release_check(const self_update_platform *platfo
         /* A renamed repository: GitHub's redirect names its new address in its body as well as in
          * its Location header, and the kit's fetch gives the body. Followed to that address alone
          * (github_release_api_url_allowed). */
-        if (hop >= GITHUB_RELEASE_REDIRECTS ||
-            update_check_json_string(answer, length, "url", next, sizeof(next)) != 1 ||
+        if (hop >= GITHUB_RELEASE_REDIRECTS || string_member(answer, length, "url", next, sizeof(next)) != 1 ||
             !github_release_api_url_allowed(next))
             return no_offer(offer, report, GITHUB_RELEASE_REDIRECT_REFUSED);
         memcpy(url, next, sizeof(url));
