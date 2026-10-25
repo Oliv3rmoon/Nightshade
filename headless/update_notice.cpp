@@ -11,8 +11,10 @@
 #include "diagnostics.h"
 #include "prosperoeden/version.h"
 #include "storage_paths.h"
+#include "update_check/github_release.h"
 #include "update_check/self_update.h"
 #include "update_check/update_check.h"
+#include "update_repository.h"
 #ifdef EDEN_DEV_PROFILE
 #include <fstream>
 #endif
@@ -30,6 +32,12 @@ namespace Eden::UpdateNotice {
 namespace {
 // libcurl and OpenSSL want more stack than a default thread of the console has.
 constexpr std::size_t kStackSize = 1024 * 1024;
+// Where the check asks (EDEN_UPDATE_REPOSITORY, headless/CMakeLists.txt): empty, the catalog;
+// "owner/name", that GitHub repository's releases.
+constexpr const char* kRepository = EDEN_UPDATE_REPOSITORY;
+// The app's name as the update says it (the helper's notification: "Nightshade was updated to
+// v1.005.100"): a build that asks a repository's releases is the Nightshade release line.
+constexpr const char* kAppName = kRepository[0] != '\0' ? "Nightshade" : "ProsperoEden";
 
 std::mutex lock;
 bool started = false;
@@ -45,10 +53,11 @@ const char* ResultName(self_update_check_result result) {
 }
 
 #ifdef EDEN_DEV_PROFILE
-// Development: update-offer.txt in the app folder replaces the catalog's answer (it skips the
-// catalog's signature), so the update can be tried before the catalog lists a newer release. Five
-// lines, as the boilerplate's example takes them: the new content version, the release's name,
-// its ZIP on GitHub, its SHA-256, its size in bytes; any further lines are the release notes.
+// Development: update-offer.txt in the app folder replaces the check's answer (it skips the
+// catalog's signature, or GitHub's SHA256SUMS), so the update can be tried before a newer release
+// is out. Five lines, as the boilerplate's example takes them: the new content version, the
+// release's name, its ZIP on GitHub, its SHA-256, its size in bytes; any further lines are the
+// release notes.
 bool DevelopmentOffer(self_update_offer& out) {
     std::ifstream file(AppFile("update-offer.txt"));
     std::string available, version, artifact, sha256, size;
@@ -57,7 +66,7 @@ bool DevelopmentOffer(self_update_offer& out) {
         return false;
     self_update_offer filled{};
     if (!update_check_read_param(AppFile("sce_sys/param.json").c_str(), filled.title, filled.installed)) return false;
-    std::snprintf(filled.name, sizeof(filled.name), "ProsperoEden");
+    std::snprintf(filled.name, sizeof(filled.name), "%s", kAppName);
     std::snprintf(filled.available, sizeof(filled.available), "%s", available.c_str());
     std::snprintf(filled.version, sizeof(filled.version), "%s", version.c_str());
     std::snprintf(filled.artifact, sizeof(filled.artifact), "%s", artifact.c_str());
@@ -75,10 +84,20 @@ bool DevelopmentOffer(self_update_offer& out) {
 
 void* Check(void*) {
     self_update_offer result{};
-    self_update_check_result state = self_update_check_self(&result);
+    github_release_report github{};
+    // With no repository named, this is self_update_check_self(): the catalog, as before.
+    self_update_check_result state = self_update_check_self_from(kRepository, kAppName, &result, &github);
+    if (kRepository[0] != '\0') {
+        char line[640];
+        std::snprintf(line, sizeof(line),
+                      "GitHub %s releases/latest: reason=%s http=%d redirects=%d error=%d tag=%s zip=%s", kRepository,
+                      github_release_reason_text(github.reason), github.http_status, github.redirects,
+                      github.platform_error, github.tag[0] ? github.tag : "-", github.zip[0] ? github.zip : "-");
+        Report("update check", line);
+    }
 #ifdef EDEN_DEV_PROFILE
     if (DevelopmentOffer(result)) {
-        Report("update check", "Development: update-offer.txt replaces the catalog's answer");
+        Report("update check", "Development: update-offer.txt replaces the check's answer");
         state = SELF_UPDATE_AVAILABLE;
     }
 #endif
@@ -121,6 +140,8 @@ Phase FromKit(self_update_phase phase) {
     }
 }
 } // namespace
+
+const char* Source() { return kRepository[0] != '\0' ? "GitHub" : "homebrew.page"; }
 
 void Start() {
     {

@@ -551,6 +551,18 @@ void Launcher::draw_screen(Canvas &c, Screen screen)
     }
 }
 
+std::string Launcher::update_text(std::string_view text)
+{
+    // The update texts name homebrew.page, which every catalog keeps as it is
+    // (tools/launcher/strings.py checks it): a build that asks GitHub says GitHub there.
+    std::string out{text};
+    const std::string source = services_.update_source();
+    const std::size_t at = out.find("homebrew.page");
+    if (at != std::string::npos && source != "homebrew.page")
+        out.replace(at, std::string_view{"homebrew.page"}.size(), source);
+    return out;
+}
+
 void Launcher::draw_update_notice(Canvas &c)
 {
     const float shown = tween::clamp01(update_notice_in_.value);
@@ -575,7 +587,7 @@ void Launcher::draw_update_notice(Canvas &c)
         text_shrink(c, tr("Update available"), card.x + 88.0f, baseline(card.y + 18.0f, 34.0f, t.size_text),
                     t.size_text, t.title, card.w - 112.0f);
     }
-    text_shrink(c, fill(tr("Version {0} is on homebrew.page"), {update_version_}), card.x + 88.0f,
+    text_shrink(c, update_text(fill(tr("Version {0} is on homebrew.page"), {update_version_})), card.x + 88.0f,
                 baseline(card.y + 54.0f, 30.0f, t.size_small), t.size_small, t.copy, card.w - 112.0f);
     // The time it has left.
     const float left = tween::clamp01(update_notice_left_ / kUpdateNoticeSeconds);

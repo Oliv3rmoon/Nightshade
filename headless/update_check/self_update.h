@@ -45,6 +45,8 @@ extern "C"
 /* GitHub's redirect to its release file host carries a signed query of about a thousand
  * characters. */
 #define SELF_UPDATE_MAX_URL 4096u
+/* ProsperoEden: fetch's answer for one that doesn't fit (as UPDATE_CHECK_FETCH_TOO_LARGE). */
+#define SELF_UPDATE_FETCH_TOO_LARGE 1
 
     /* ---- What the console provides (and what tests replace) ------------------------------ */
 
@@ -63,7 +65,9 @@ extern "C"
 
     typedef struct self_update_platform
     {
-        /* GET a small file into body. 0: an answer arrived (see *status); negative: failed. */
+        /* GET a small file into body. 0: an answer arrived (see *status); negative: failed;
+         * ProsperoEden: SELF_UPDATE_FETCH_TOO_LARGE, an answer longer than capacity (*status
+         * set). */
         int (*fetch)(void *user, const char *url, char *body, size_t capacity, size_t *length,
                      int *status);
         /* GET a large file into sink, refusing more than limit bytes. Redirects are followed

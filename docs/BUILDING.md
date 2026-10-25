@@ -51,6 +51,23 @@ already exists: the dependencies, this checkout's build cache in
 
 `JOBS=<n>` sets the number of parallel compile jobs (default: all cores).
 
+`EDEN_UPDATE_REPOSITORY=<owner>/<name>` makes the app's update check ([Updating](INSTALL.md#updating))
+ask that GitHub repository's releases instead of the homebrew.page catalog;
+`EDEN_UPDATE_REPOSITORY=` (empty) asks the catalog. Left unset, the default in
+`headless/CMakeLists.txt` applies: `Oliv3rmoon/Nightshade`, this release line's own, so
+`make release` and the release workflow build a Nightshade that is offered Nightshade's releases. A build with a repository offers a release
+when it is the repository's newest one that is neither a draft nor a pre-release
+(`releases/latest`), its tag is `v` and the content version as `tools/ci/make-dist.py` names it
+(`v1.005.100` for `01.005.100`) and higher than the running one, and it has `SHA256SUMS` and a ZIP
+named `<anything>-<tag>.zip` that `SHA256SUMS` lists (one). The ZIP is checked against that
+SHA-256, and the update helper still checks the title ID and version in what it unpacks. There is
+no signature as the catalog has: the check trusts TLS to api.github.com and github.com and the
+release's own `SHA256SUMS`. A renamed repository keeps working: GitHub's redirect to its new
+address, `https://api.github.com/repositories/<number>/releases/latest`, is followed, to exactly
+that address and nowhere else. The update check's host test is
+`tools/check-update-check.py` (also run by every release build, and as `eden-update-check` by
+`make test`).
+
 The download sources and the save sync can be checked against real RomM servers and
 ftpsrv, the console's FTP server, in Docker (`ROMM_CHECK=1 tools/check-romm.py`, or `ROMM_CHECK=1 make
 test`; it is not part of a plain `make test`, since it pulls several server images and, while it
@@ -242,3 +259,6 @@ To cut a release:
 4. Push a `vX.Y.Z` tag.
 5. Keep `build/symbols/Nightshade-vX.Y.Z.elf` from the build that was published (crash reports
    are read with it): download the tag run's `ProsperoEden-symbols` artifact before it expires.
+6. For builds that ask a GitHub repository's releases (`EDEN_UPDATE_REPOSITORY`): the workflow
+   publishes a pre-release, which they are not offered. Once it is tested, edit the release on
+   GitHub and make it the latest release (not a pre-release); from then on they offer it.
