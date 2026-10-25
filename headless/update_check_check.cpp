@@ -263,7 +263,10 @@ int Fetch(void*, const char* url, char* body, size_t capacity, size_t* length, i
         *status = 404;
         return 0;
     }
-    if (found->second.second.size() > capacity) return -10023;
+    if (found->second.second.size() > capacity) { // as console_fetch: told from a failed transfer
+        *status = found->second.first;
+        return SELF_UPDATE_FETCH_TOO_LARGE;
+    }
     std::memcpy(body, found->second.second.data(), found->second.second.size());
     *length = found->second.second.size();
     *status = found->second.first;
@@ -345,20 +348,77 @@ void Addresses() {
     assert(self_update_url_allowed("https://github.com/Oliv3rmoon/Nightshade/x y.zip", 0) == 0);
     assert(self_update_url_allowed((redirect + std::string(4096, 'a')).c_str(), 1) == 0);
 
-    // The release's own request follows GitHub's redirect for a renamed repository, to
-    // api.github.com and nowhere else.
+    // The release's own request follows GitHub's redirect for a renamed repository to the address
+    // GitHub gives it, exactly, and to nothing else: not another repository's path, another host,
+    // port, case or spelling of the same, nothing more after it.
     assert(github_release_api_url_allowed(kMoved) == 1);
-    assert(github_release_api_url_allowed(kApi) == 1);
-    for (const char* elsewhere : {"http://api.github.com/repositories/1/releases/latest",
-                                  "https://api.github.com.example.net/repositories/1/releases/latest",
-                                  "https://example.net/https://api.github.com/repositories/1",
-                                  "https://github.com/Oliv3rmoon/ProsperoEden/releases/latest",
-                                  "https://uploads.github.com/repos/Oliv3rmoon/Nightshade/releases",
-                                  "https://user@api.github.com/repositories/1/releases/latest",
-                                  "https://api.github.com/repositories/1/releases/latest#x",
-                                  "https://api.github.com/repositories/1 /releases/latest", "https://api.github.com/", ""})
+    assert(github_release_api_url_allowed("https://api.github.com/repositories/1/releases/latest") == 1);
+    assert(github_release_api_url_allowed("https://api.github.com/repositories/9223372036854775807/releases/latest") == 1);
+    for (const char* elsewhere : {
+             kApi, "https://api.github.com/repos/someone/else/releases/latest",
+             "https://api.github.com/repositories/1421452418/releases/1",
+             "https://api.github.com/repositories/1421452418/releases",
+             "https://api.github.com/repositories/1421452418/tags/latest",
+             "https://api.github.com/repositories/1421452418/../1/releases/latest",
+             "https://api.github.com/repositories//releases/latest",
+             "https://api.github.com/repositories/01421452418/releases/latest",
+             "https://api.github.com/repositories/12345678901234567890/releases/latest",
+             "https://api.github.com:443/repositories/1421452418/releases/latest",
+             "https://API.GITHUB.COM/repositories/1421452418/releases/latest",
+             "HTTPS://api.github.com/repositories/1421452418/releases/latest",
+             "https://api.github.com/Repositories/1421452418/releases/latest",
+             "https://api.github.com/repositories/1421452418/releases/LATEST",
+             "https://api.github.com/repositories\\1421452418/releases/latest",
+             "https://api.github.com/repositories/1421452418\\releases/latest",
+             "https://api.github.com/repositories/1421452418%40example.net/releases/latest",
+             "https://api.github.com%40example.net/repositories/1421452418/releases/latest",
+             "https://api.github.com/repositories/%31421452418/releases/latest",
+             "https://api.github.com./repositories/1421452418/releases/latest",
+             "https://api.github.com.example.net/repositories/1421452418/releases/latest",
+             "https://user@api.github.com/repositories/1421452418/releases/latest",
+             "http://api.github.com/repositories/1421452418/releases/latest",
+             "https://api.github.com/repositories/1421452418/releases/latest/",
+             "https://api.github.com/repositories/1421452418/releases/latest?per_page=1",
+             "https://api.github.com/repositories/1421452418/releases/latest#x",
+             "https://api.github.com/repositories/1421452418/releases/latest ",
+             " https://api.github.com/repositories/1421452418/releases/latest",
+             "https://api.github.com/repositories/1421452418/releases/latest\n", "https://api.github.com/", ""})
         assert(github_release_api_url_allowed(elsewhere) == 0);
-    assert(github_release_api_url_allowed(("https://api.github.com/" + std::string(240, 'a')).c_str()) == 0);
+    assert(github_release_api_url_allowed(nullptr) == 0);
+}
+
+// The address in the redirect as GitHub writes it, in JSON: what counts is what it reads as.
+void RedirectTargets() {
+    static self_update_offer offer;
+    github_release_report report{};
+    const std::string old_sums = "https://github.com/Oliv3rmoon/ProsperoEden/releases/download/v1.005.100/SHA256SUMS";
+    const auto moved_to = [&](const std::string& json_url) {
+        Serve(200, kRelease);
+        network.answers.clear();
+        network.answers[kOldApi] = {301, "{\"message\":\"Moved Permanently\",\"url\":\"" + json_url + "\"}"};
+        network.answers[kMoved] = {200, kRelease};
+        network.files[old_sums] = kSumsText;
+        return Check(kOldRepository, "01.005.000", &offer, &report);
+    };
+    // Escapes that read as the very address are followed to it.
+    for (const char* same : {"https:\\/\\/api.github.com\\/repositories\\/1421452418\\/releases\\/latest",
+                             "\\u0068ttps://api.github.com/repositories/1421452418/releases/latest"}) {
+        assert(moved_to(same) == SELF_UPDATE_AVAILABLE && report.redirects == 1);
+        assert((network.asked == std::vector<std::string>{kOldApi, kMoved, old_sums}));
+    }
+    // Ones that read as something else, or not as text, are not.
+    for (const char* other : {"https://api.github.com/repositories/1421452418/releases/latest\\u0000",
+                              "https://api.github.com/repositories/1421452418/releases/latest\\n",
+                              "https://api.github.com\\u002erepositories/1421452418/releases/latest",
+                              "https://api.github.com/repositories/1421452418\\u002f..\\u002f1/releases/latest",
+                              "https://api.github.com\\u0040example.net/repositories/1421452418/releases/latest",
+                              "https://api.github.com/repositories/1421452418\\\\releases/latest",
+                              "https://api.github.com/repositories/\\uff11421452418/releases/latest",
+                              "https://api.github.com/repositories/1421452418/releases/latest\\"}) {
+        assert(moved_to(other) == SELF_UPDATE_UNKNOWN && report.reason == GITHUB_RELEASE_REDIRECT_REFUSED &&
+               report.http_status == 301 && report.redirects == 0);
+        assert((network.asked == std::vector<std::string>{kOldApi}));
+    }
 }
 
 void SumsLines() {
@@ -625,9 +685,11 @@ void GitHubCheck() {
     assert(Check(kRepository, "01.005.000", &offer, &report) == SELF_UPDATE_UNKNOWN &&
            report.reason == GITHUB_RELEASE_REDIRECT_REFUSED);
     Serve(200, kRelease);
-    network.answers[kApi] = redirect(301, kApi); // to itself, again and again
+    network.answers[kApi] = redirect(301, kMoved);
+    network.answers[kMoved] = redirect(301, kMoved); // to itself, again and again
     assert(Check(kRepository, "01.005.000", &offer, &report) == SELF_UPDATE_UNKNOWN &&
-           report.reason == GITHUB_RELEASE_REDIRECT_REFUSED && network.asked.size() == 1 + GITHUB_RELEASE_REDIRECTS);
+           report.reason == GITHUB_RELEASE_REDIRECT_REFUSED && report.redirects == GITHUB_RELEASE_REDIRECTS &&
+           network.asked.size() == 1 + GITHUB_RELEASE_REDIRECTS);
 
     // A repository, title ID or installed version that can't be used asks nothing.
     Serve(200, kRelease);
@@ -636,6 +698,157 @@ void GitHubCheck() {
     assert(Check(kRepository, "development", &offer, &report) == SELF_UPDATE_UNKNOWN && network.asked.empty());
     assert(self_update_check_from(&kPlatform, kRepository, "ProsperoEden", "../PPSA99008", "01.005.000", &offer,
                                   &report) == SELF_UPDATE_UNKNOWN);
+}
+
+// The release's notes in the answer, in place of the fixture's.
+std::string WithBody(const std::string& body) {
+    const std::size_t from = kRelease.find("\"body\": \""), to = kRelease.find("\"reactions\"");
+    return kRelease.substr(0, from) + "\"body\": \"" + body + "\",\n  " + kRelease.substr(to);
+}
+
+void AnswerSize() {
+    static self_update_offer offer;
+    github_release_report report{};
+    // As long as GitHub lets notes be (125,000 characters), in Chinese: some 380 KB of answer,
+    // offered, with its notes cut to what the dialog takes.
+    std::string notes;
+    for (int i = 0; i < 125000; ++i) notes += "\xe6\xbc\xa2"; // U+6F22
+    Serve(200, WithBody(notes));
+    assert(network.answers[kApi].second.size() > 375000);
+    assert(Check(kRepository, "01.005.000", &offer, &report) == SELF_UPDATE_AVAILABLE && report.reason == GITHUB_RELEASE_NEWER);
+    assert(offer.notes_truncated == 1 && std::string(offer.notes) == notes.substr(0, 3 * GITHUB_RELEASE_NOTES_CHARACTERS));
+    // Up to 1 MiB in all; a longer answer is too large, said as such (not as a network failure).
+    Serve(200, WithBody(std::string(GITHUB_RELEASE_MAX_ANSWER - 8000, 'x')));
+    assert(network.answers[kApi].second.size() <= GITHUB_RELEASE_MAX_ANSWER);
+    assert(Check(kRepository, "01.005.000", &offer, &report) == SELF_UPDATE_AVAILABLE);
+    Serve(200, WithBody(std::string(GITHUB_RELEASE_MAX_ANSWER, 'x')));
+    assert(Check(kRepository, "01.005.000", &offer, &report) == SELF_UPDATE_UNKNOWN);
+    assert(report.reason == GITHUB_RELEASE_TOO_LARGE && report.http_status == 200 && report.platform_error == 0 &&
+           std::strcmp(github_release_reason_text(report.reason), "too-large") == 0);
+    assert((network.asked == std::vector<std::string>{kApi}) && offer.artifact[0] == '\0');
+}
+
+// The release with these files in place of its own.
+std::string WithAssets(const std::string& assets) {
+    const std::string compact = Compact(kRelease);
+    const std::size_t from = compact.find("\"assets\":[") + 10, to = compact.find("],\"tarball_url\"");
+    return compact.substr(0, from) + assets + compact.substr(to);
+}
+
+std::string Asset(const std::string& name, unsigned size = 10, const char* state = "uploaded") {
+    return "{\"name\":\"" + name + "\",\"state\":\"" + state + "\",\"size\":" + std::to_string(size) + "}";
+}
+
+void AssetList() {
+    // The list is read once, element after element.
+    const std::string array = "[ 1, \"a\" ,{\"b\":[2,{}]} , null ]";
+    std::size_t at = 0;
+    const char* value = nullptr;
+    std::size_t length = 0;
+    std::vector<std::string> seen;
+    while (update_check_json_array_next(array.data(), array.size(), &at, &value, &length) == 1)
+        seen.emplace_back(value, length);
+    assert((seen == std::vector<std::string>{"1", "\"a\"", "{\"b\":[2,{}]}", "null"}));
+    assert(update_check_json_array_next(array.data(), array.size(), &at, &value, &length) == 0);
+    at = 0;
+    assert(update_check_json_array_next("[ ]", 3, &at, &value, &length) == 0 &&
+           update_check_json_array_next("[ ]", 3, &at, &value, &length) == 0);
+    for (const std::string bad : {"[1,]", "[1 2]", "[1] x", "{\"a\":1}", "[", "", "[\"open]"}) {
+        at = 0;
+        int found = 1;
+        while (found == 1) found = update_check_json_array_next(bad.data(), bad.size(), &at, &value, &length);
+        assert(found == -1);
+    }
+
+    static self_update_offer offer;
+    github_release_report report{};
+    const std::string zip = Asset("Nightshade-v1.005.100.zip", 42651073), sums = Asset("SHA256SUMS", 94);
+    // All of GitHub's 1,000 files are looked at: the release's ZIP may come last.
+    std::string many;
+    for (int i = 0; i < 998; ++i) many += Asset("file-" + std::to_string(i) + ".bin") + ",";
+    Serve(200, WithAssets(many + sums + "," + zip));
+    assert(Check(kRepository, "01.005.000", &offer, &report) == SELF_UPDATE_AVAILABLE &&
+           std::strcmp(offer.artifact, kZip) == 0 && offer.size == 42651073);
+    // Up to eight ZIPs of the version, SHA256SUMS choosing; a ninth is not dropped (eight decoys
+    // before the release's would leave it out) but refused, saying so.
+    std::string decoys;
+    for (int i = 0; i < 7; ++i) decoys += Asset("decoy" + std::to_string(i) + "-v1.005.100.zip") + ",";
+    Serve(200, WithAssets(decoys + zip + "," + sums));
+    assert(Check(kRepository, "01.005.000", &offer, &report) == SELF_UPDATE_AVAILABLE && std::strcmp(offer.artifact, kZip) == 0);
+    decoys += Asset("decoy7-v1.005.100.zip") + ",";
+    Serve(200, WithAssets(decoys + zip + "," + sums));
+    assert(Check(kRepository, "01.005.000", &offer, &report) == SELF_UPDATE_UNKNOWN);
+    assert(report.reason == GITHUB_RELEASE_TOO_MANY_ZIPS && std::strcmp(github_release_reason_text(report.reason), "too-many-zips") == 0);
+    assert((network.asked == std::vector<std::string>{kApi}));
+    // ZIPs that can't be the release (not uploaded in full, empty) are not counted.
+    Serve(200, WithAssets(decoys + Asset("decoy8-v1.005.100.zip", 10, "starter") + "," + Asset("decoy9-v1.005.100.zip", 0) +
+                          "," + sums));
+    assert(Check(kRepository, "01.005.000", &offer, &report) == SELF_UPDATE_UNKNOWN &&
+           report.reason == GITHUB_RELEASE_SUMS_NO_LINE);
+}
+
+// A release's tag goes into the log: whatever it holds, it stays on its line, and says what it is.
+void LoggedTag() {
+    static self_update_offer offer;
+    github_release_report report{};
+    const auto tagged = [&](const std::string& json_tag) {
+        Serve(200, With(kRelease, "\"tag_name\": \"v1.005.100\"", "\"tag_name\": \"" + json_tag + "\""));
+        return Check(kRepository, "01.005.000", &offer, &report);
+    };
+    const auto one_line = [](const char* text) {
+        for (const char* at = text; *at != '\0'; ++at)
+            if (*at <= ' ' || *at >= 0x7f) return false;
+        return true;
+    };
+    assert(tagged("v1\\n[ProsperoEden] update check: forged") == SELF_UPDATE_UNKNOWN &&
+           report.reason == GITHUB_RELEASE_NOT_A_VERSION);
+    assert(std::string(report.tag) == "v1\\x0a[ProsperoEden]\\x20update\\x20check:\\x20forged" && one_line(report.tag));
+    assert(tagged("a\\rb\\tc\\\\d\u00e9\\u2028e\\u001b[2J") == SELF_UPDATE_UNKNOWN);
+    assert(std::string(report.tag) == "a\\x0db\\x09c\\x5cd\\xc3\\xa9\\xe2\\x80\\xa8e\\x1b[2J" && one_line(report.tag));
+    // The longest tag read (39 bytes) is shown whole, escaped.
+    std::string ends;
+    for (int i = 0; i < 39; ++i) ends += "\\n";
+    assert(tagged(ends) == SELF_UPDATE_UNKNOWN && std::strlen(report.tag) == 39 * 4 && one_line(report.tag));
+    // And so the log line update_notice.cpp writes is one line.
+    char line[640];
+    std::snprintf(line, sizeof(line), "GitHub %s releases/latest: reason=%s http=%d redirects=%d error=%d tag=%s zip=%s",
+                  kRepository, github_release_reason_text(report.reason), report.http_status, report.redirects,
+                  report.platform_error, report.tag[0] ? report.tag : "-", report.zip[0] ? report.zip : "-");
+    assert(std::strchr(line, '\n') == nullptr && std::strchr(line, '\r') == nullptr);
+    // A tag that is a version is shown as it is.
+    assert(tagged("v1.005.100") == SELF_UPDATE_AVAILABLE && std::strcmp(report.tag, "v1.005.100") == 0);
+}
+
+// A field that is there twice says two things: the answer is read as neither.
+void TwiceSaid() {
+    assert(Evaluate(With(kRelease, "\"tag_name\": \"v1.005.100\",", "\"tag_name\": \"v1.005.100\", \"tag_name\": \"v9.000.000\","),
+                    "01.005.000") == GITHUB_RELEASE_BAD_RESPONSE);
+    assert(Evaluate(With(kRelease, "\"name\": \"Nightshade-v1.005.100.zip\",",
+                         "\"name\": \"Nightshade-v1.005.100.zip\", \"name\": \"Nightshade-v1.005.100.bin\","),
+                    "01.005.000") == GITHUB_RELEASE_BAD_RESPONSE);
+    assert(Evaluate(With(kRelease, "\"state\": \"uploaded\",\n      \"size\": 42651073",
+                         "\"state\": \"uploaded\", \"state\": \"starter\",\n      \"size\": 42651073"),
+                    "01.005.000") == GITHUB_RELEASE_BAD_RESPONSE);
+    assert(Evaluate(With(kRelease, "\"body\": \"", "\"body\": \"Other notes\", \"body\": \""), "01.005.000") ==
+           GITHUB_RELEASE_BAD_RESPONSE);
+    // Already so: a size, draft, prerelease or assets twice.
+    assert(Evaluate(With(kRelease, "\"size\": 42651073", "\"size\": 42651073, \"size\": 1"), "01.005.000") ==
+           GITHUB_RELEASE_NO_ZIP);
+    assert(Evaluate(With(kRelease, "\"prerelease\": false,", "\"prerelease\": false, \"prerelease\": true,"),
+                    "01.005.000") == GITHUB_RELEASE_BAD_RESPONSE);
+    // A redirect naming two addresses is not followed, even when the first is GitHub's.
+    static self_update_offer offer;
+    github_release_report report{};
+    Serve(200, kRelease);
+    network.answers.clear();
+    network.answers[kOldApi] = {301, std::string("{\"message\":\"Moved Permanently\",\"url\":\"") + kMoved +
+                                         "\",\"url\":\"https://example.net/releases/latest\"}"};
+    network.answers[kMoved] = {200, kRelease};
+    assert(Check(kOldRepository, "01.005.000", &offer, &report) == SELF_UPDATE_UNKNOWN &&
+           report.reason == GITHUB_RELEASE_REDIRECT_REFUSED);
+    assert((network.asked == std::vector<std::string>{kOldApi}));
+    // Names that are the same in nested objects (the release's and its files') are not twice said.
+    assert(Evaluate(kRelease, "01.005.000") == GITHUB_RELEASE_NEWER);
 }
 
 void CatalogUnchanged() {
@@ -668,7 +881,13 @@ void CatalogUnchanged() {
 }
 } // namespace
 
-int main() {
+int main(int argc, char** argv) {
+    // tools/check-update-check.py: whether the update check takes a repository's name (1) or not
+    // (0), for headless/update_repository.cmake to be checked against.
+    if (argc == 3 && std::strcmp(argv[1], "--repository") == 0) {
+        std::printf("%d\n", github_release_repository_valid(argv[2]));
+        return 0;
+    }
     // The app's content version (sce_sys/param.json) is NN.NNN.NNN; a release's name is not one.
     unsigned parts[3];
     assert(update_check_version_parse("01.000.040", parts) == 1 && parts[0] == 1 && parts[1] == 0 && parts[2] == 40);
@@ -707,11 +926,16 @@ int main() {
 
     TagVersions();
     Addresses();
+    RedirectTargets();
     SumsLines();
     ReleaseNotes();
     Releases();
     ChooseZip();
     GitHubCheck();
+    AnswerSize();
+    AssetList();
+    LoggedTag();
+    TwiceSaid();
     CatalogUnchanged();
     std::puts("update check: versions, request address, newer/same/older and silent answers PASS");
     std::puts("update check from GitHub: tag versions, addresses and redirects, SHA256SUMS lines, release notes, "

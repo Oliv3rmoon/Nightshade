@@ -11,8 +11,9 @@
  *   1. https://api.github.com/repos/<owner/name>/releases/latest: the newest release that is
  *      neither a draft nor a pre-release. Its tag must be a content version as tools/ci/
  *      make-dist.py names it ("v1.005.100" for contentVersion 01.005.100), higher than the
- *      running one. A repository that was renamed answers with a redirect to its new address on
- *      api.github.com, which is followed (there only);
+ *      running one. A repository that was renamed answers with a redirect to its new address,
+ *      https://api.github.com/repositories/<its number>/releases/latest, which is followed (to
+ *      that address alone);
  *   2. its files must include SHA256SUMS and a ZIP named "<anything>-<tag>.zip"
  *      ("Nightshade-v1.005.100.zip"), all uploaded;
  *   3. SHA256SUMS (small, downloaded like the ZIP) must list exactly one of those ZIPs, on one
@@ -46,12 +47,14 @@ extern "C"
 
 #define GITHUB_RELEASE_HOST "https://api.github.com/"
 #define GITHUB_RELEASE_API GITHUB_RELEASE_HOST "repos/"
-/* Redirects of the release's request followed, to api.github.com only. */
+/* Redirects of the release's request followed, to a renamed repository's address only. */
 #define GITHUB_RELEASE_REDIRECTS 3
-/* The release's files whose name ends in -<tag>.zip that are told apart by SHA256SUMS. */
+/* The release's files whose name ends in -<tag>.zip that are told apart by SHA256SUMS; a release
+ * with more is not offered. */
 #define GITHUB_RELEASE_MAX_ZIPS 8
-/* The release's answer with its notes (GitHub allows 125,000 characters of them). */
-#define GITHUB_RELEASE_MAX_ANSWER (256u * 1024u)
+/* The release's answer with its notes: GitHub allows 125,000 characters of them, which in
+ * Chinese or Japanese is some 380 KB, and a release's files take about 1.4 KB each. */
+#define GITHUB_RELEASE_MAX_ANSWER (1024u * 1024u)
 /* SHA256SUMS: a line or a few. */
 #define GITHUB_RELEASE_MAX_SUMS 4096u
 /* As the catalog bounds release_notes (self_update_offer.notes). */
@@ -75,7 +78,9 @@ extern "C"
         GITHUB_RELEASE_SUMS_NO_LINE = 13,   /* SHA256SUMS lists none of the ZIPs */
         GITHUB_RELEASE_SUMS_MALFORMED = 14, /* its line for a ZIP is malformed or repeated */
         GITHUB_RELEASE_SUMS_TWO_ZIPS = 15,  /* it lists two of them: which one is meant? */
-        GITHUB_RELEASE_REDIRECT_REFUSED = 16 /* a redirect elsewhere than api.github.com, or too many */
+        GITHUB_RELEASE_REDIRECT_REFUSED = 16, /* a redirect elsewhere than api.github.com, or too many */
+        GITHUB_RELEASE_TOO_LARGE = 17,       /* an answer over GITHUB_RELEASE_MAX_ANSWER */
+        GITHUB_RELEASE_TOO_MANY_ZIPS = 18    /* more than GITHUB_RELEASE_MAX_ZIPS *-<tag>.zip */
     } github_release_reason;
 
     /* What the check found, for the log. */
@@ -85,7 +90,9 @@ extern "C"
         int http_status;    /* of the release query's last answer; 0 when none arrived */
         int platform_error; /* the failed request's code, or 0 */
         int redirects;      /* followed (a renamed repository) */
-        char tag[40];       /* the newest release's tag, once read */
+        /* As the log may show them, on one line: printable ASCII as it is, anything else (a line
+         * end, a space, a backslash, every byte of a non-ASCII character) as \xNN. */
+        char tag[160];      /* the newest release's tag, once read (at most 39 bytes, escaped) */
         char zip[128];      /* the ZIP's file name, once known */
     } github_release_report;
 
@@ -120,8 +127,9 @@ extern "C"
     size_t github_release_file_url(char *out, size_t size, const char *repository, const char *tag,
                                    const char *file);
 
-    /* 1 when a redirect of the release's request may be followed to `url`: https, api.github.com,
-     * printable ASCII without a user name, shorter than 256. */
+    /* 1 when a redirect of the release's request may be followed to `url`: the address GitHub
+     * gives a renamed repository's newest release, exactly
+     * https://api.github.com/repositories/<its number>/releases/latest. */
     int github_release_api_url_allowed(const char *url);
 
     /* Reads releases/latest's answer: the tag, the files named *-<tag>.zip and SHA256SUMS, the

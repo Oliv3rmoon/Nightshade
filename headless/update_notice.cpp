@@ -88,7 +88,7 @@ void* Check(void*) {
     // With no repository named, this is self_update_check_self(): the catalog, as before.
     self_update_check_result state = self_update_check_self_from(kRepository, kAppName, &result, &github);
     if (kRepository[0] != '\0') {
-        char line[480];
+        char line[640];
         std::snprintf(line, sizeof(line),
                       "GitHub %s releases/latest: reason=%s http=%d redirects=%d error=%d tag=%s zip=%s", kRepository,
                       github_release_reason_text(github.reason), github.http_status, github.redirects,

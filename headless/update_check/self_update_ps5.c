@@ -125,8 +125,14 @@ static int console_fetch(void *user, const char *url, char *body, size_t capacit
     result = curl_easy_perform(easy);
     (void)curl_easy_getinfo(easy, CURLINFO_RESPONSE_CODE, &code);
     curl_easy_cleanup(easy);
-    if (result != CURLE_OK || sink.overflow)
-        return -(10000 + (int)(result != CURLE_OK ? result : CURLE_WRITE_ERROR));
+    /* ProsperoEden: an answer too long is told from a failed transfer. */
+    if (sink.overflow)
+    {
+        *status = (int)code;
+        return SELF_UPDATE_FETCH_TOO_LARGE;
+    }
+    if (result != CURLE_OK)
+        return -(10000 + (int)result);
     *status = (int)code;
     *length = sink.used;
     return 0;

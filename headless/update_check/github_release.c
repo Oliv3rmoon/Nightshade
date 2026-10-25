@@ -16,6 +16,7 @@
 #include "update_check.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 /* ---- Names --------------------------------------------------------------------------------- */
@@ -129,19 +130,18 @@ size_t github_release_file_url(char *out, size_t size, const char *repository, c
 
 int github_release_api_url_allowed(const char *url)
 {
-    const size_t host = strlen(GITHUB_RELEASE_HOST);
-    size_t length;
-    size_t i;
-    if (url == NULL || strncmp(url, GITHUB_RELEASE_HOST, host) != 0)
+    static const char start[] = GITHUB_RELEASE_HOST "repositories/";
+    static const char end[] = "/releases/latest";
+    size_t digits = 0;
+    if (url == NULL || strncmp(url, start, sizeof(start) - 1) != 0)
         return 0;
-    length = strlen(url);
-    if (length <= host || length >= 256)
+    url += sizeof(start) - 1;
+    /* GitHub's number for the repository: digits, no leading zero, at most a 64-bit number's. */
+    while (url[digits] >= '0' && url[digits] <= '9')
+        ++digits;
+    if (digits == 0 || digits > 19 || url[0] == '0')
         return 0;
-    for (i = 0; i < length; ++i)
-        if ((unsigned char)url[i] <= 0x20 || (unsigned char)url[i] >= 0x7f || url[i] == '\\' ||
-            url[i] == '@' || url[i] == '#')
-            return 0;
-    return 1;
+    return strcmp(url + digits, end) == 0;
 }
 
 /* ---- The release --------------------------------------------------------------------------- */
@@ -149,6 +149,17 @@ int github_release_api_url_allowed(const char *url)
 static int is_literal(const char *value, size_t length, const char *literal)
 {
     return length == strlen(literal) && memcmp(value, literal, length) == 0;
+}
+
+/* update_check_json_string, and -2 when `key` is there twice: an answer that says two things is
+ * read as neither (update_check_json_value refuses it so for the members it reads). */
+static int string_member(const char *json, size_t length, const char *key, char *out, size_t size)
+{
+    const char *value = NULL;
+    size_t value_length = 0;
+    if (update_check_json_value(json, length, key, &value, &value_length) < 0)
+        return -2;
+    return update_check_json_string(json, length, key, out, size);
 }
 
 /* GITHUB_RELEASE_NEWER when the boolean `key` is false, NOT_PUBLISHED when it is true. */
@@ -166,18 +177,16 @@ static github_release_reason published(const char *json, size_t length, const ch
 github_release_reason github_release_evaluate(const char *json, size_t length,
                                               const char *installed, github_release *release)
 {
-    /* The notes as GitHub has them, before they are made plain text: never longer than the
-     * answer they come in. One check at a time. */
-    static char body[GITHUB_RELEASE_MAX_ANSWER];
     const char *assets = NULL;
     const char *value = NULL;
     size_t assets_length = 0;
     size_t size = 0;
-    size_t index;
+    size_t cursor = 0;
     char suffix[48];
     size_t suffix_length;
     int sums = 0;
     int comparable = 0;
+    int found;
     github_release_reason state;
     if (release == NULL)
         return GITHUB_RELEASE_BAD_ARGUMENT;
@@ -192,9 +201,11 @@ github_release_reason github_release_evaluate(const char *json, size_t length,
     if ((state = published(json, length, "draft")) != GITHUB_RELEASE_NEWER ||
         (state = published(json, length, "prerelease")) != GITHUB_RELEASE_NEWER)
         return state;
-    if (update_check_json_string(json, length, "tag_name", release->tag, sizeof(release->tag)) != 1)
+    if ((found = string_member(json, length, "tag_name", release->tag, sizeof(release->tag))) != 1)
     {
         release->tag[0] = '\0';
+        if (found == -2)
+            return GITHUB_RELEASE_BAD_RESPONSE;
         /* A tag too long to be a version is still a tag. */
         return update_check_json_value(json, length, "tag_name", &value, &size) == 1 && size > 0 &&
                        value[0] == '"'
@@ -206,10 +217,11 @@ github_release_reason github_release_evaluate(const char *json, size_t length,
     if (update_check_version_compare(release->available, installed, &comparable) <= 0 || !comparable)
         return GITHUB_RELEASE_NOT_NEWER;
 
-    /* Its files, each uploaded in full: SHA256SUMS, and the ZIPs of this version, whatever the
-     * release line calls itself before "-<tag>.zip" (SHA256SUMS says which one is the release). */
+    /* Its files, each uploaded in full, read once from first to last (GitHub allows 1,000):
+     * SHA256SUMS, and the ZIPs of this version, whatever the release line calls itself before
+     * "-<tag>.zip" (SHA256SUMS says which one is the release). */
     suffix_length = (size_t)snprintf(suffix, sizeof(suffix), "-%s.zip", release->tag);
-    for (index = 0; index < 256; ++index)
+    for (;;)
     {
         const char *asset = NULL;
         size_t asset_length = 0;
@@ -218,22 +230,25 @@ github_release_reason github_release_evaluate(const char *json, size_t length,
         unsigned bytes = 0;
         size_t file_length;
         int is_zip;
-        const int found =
-            update_check_json_array_value(assets, assets_length, index, &asset, &asset_length);
+        int named;
+        found = update_check_json_array_next(assets, assets_length, &cursor, &asset, &asset_length);
         if (found == 0)
             break;
         if (found != 1)
             return GITHUB_RELEASE_BAD_RESPONSE;
         /* A name too long for `file` is neither. */
-        if (update_check_json_string(asset, asset_length, "name", file, sizeof(file)) != 1)
+        if ((named = string_member(asset, asset_length, "name", file, sizeof(file))) == -2)
+            return GITHUB_RELEASE_BAD_RESPONSE;
+        if (named != 1)
             continue;
         file_length = strlen(file);
         is_zip = file_length > suffix_length && strcmp(file + file_length - suffix_length, suffix) == 0 &&
                  is_file_name(file, sizeof(file));
         if (!is_zip && strcmp(file, "SHA256SUMS") != 0)
             continue;
-        if (update_check_json_string(asset, asset_length, "state", upload, sizeof(upload)) != 1 ||
-            strcmp(upload, "uploaded") != 0 ||
+        if ((named = string_member(asset, asset_length, "state", upload, sizeof(upload))) == -2)
+            return GITHUB_RELEASE_BAD_RESPONSE;
+        if (named != 1 || strcmp(upload, "uploaded") != 0 ||
             update_check_json_uint(asset, asset_length, "size", &bytes) != 1)
             continue;
         if (!is_zip)
@@ -241,8 +256,11 @@ github_release_reason github_release_evaluate(const char *json, size_t length,
             ++sums;
             release->sums_size = bytes;
         }
-        else if (bytes != 0 && bytes <= SELF_UPDATE_MAX_ARCHIVE && release->zip_count < GITHUB_RELEASE_MAX_ZIPS)
+        else if (bytes != 0 && bytes <= SELF_UPDATE_MAX_ARCHIVE)
         {
+            /* More ZIPs of the version than are told apart: none is dropped to make room. */
+            if (release->zip_count == GITHUB_RELEASE_MAX_ZIPS)
+                return GITHUB_RELEASE_TOO_MANY_ZIPS;
             memcpy(release->zips[release->zip_count], file, file_length + 1);
             release->zip_sizes[release->zip_count++] = bytes;
         }
@@ -252,10 +270,19 @@ github_release_reason github_release_evaluate(const char *json, size_t length,
     if (sums != 1 || release->sums_size == 0 || release->sums_size > GITHUB_RELEASE_MAX_SUMS)
         return GITHUB_RELEASE_NO_SUMS;
 
-    /* For the What's new view; none (null, or not text) is no notes. */
-    if (update_check_json_string(json, length, "body", body, sizeof(body)) == 1)
-        (void)github_release_notes(body, strlen(body), release->notes, sizeof(release->notes),
-                                   GITHUB_RELEASE_NOTES_CHARACTERS, &release->notes_truncated);
+    /* For the What's new view; none (null, or not text) is no notes. They are read as GitHub has
+     * them first, which is never longer than they are in the answer, into memory of that size
+     * for as long as they are made plain text (none: no notes). */
+    if ((found = update_check_json_value(json, length, "body", &value, &size)) < 0)
+        return GITHUB_RELEASE_BAD_RESPONSE;
+    if (found == 1 && size > 0 && value[0] == '"')
+    {
+        char *body = (char *)malloc(size);
+        if (body != NULL && update_check_json_string(json, length, "body", body, size) == 1)
+            (void)github_release_notes(body, strlen(body), release->notes, sizeof(release->notes),
+                                       GITHUB_RELEASE_NOTES_CHARACTERS, &release->notes_truncated);
+        free(body);
+    }
     return GITHUB_RELEASE_NEWER;
 }
 
@@ -755,6 +782,10 @@ const char *github_release_reason_text(github_release_reason reason)
         return "sha256sums-two-zips";
     case GITHUB_RELEASE_REDIRECT_REFUSED:
         return "redirect-refused";
+    case GITHUB_RELEASE_TOO_LARGE:
+        return "too-large";
+    case GITHUB_RELEASE_TOO_MANY_ZIPS:
+        return "too-many-zips";
     }
     return "unknown";
 }
@@ -776,6 +807,28 @@ static int on_sums(void *user, const void *data, size_t size)
     memcpy(sink->body + sink->used, data, size);
     sink->used += size;
     return 1;
+}
+
+/* Text from the answer as the log may show it: printable ASCII as it is, anything else as \xNN, so
+ * that it can't end the log's line or make one up; cut where an escape would not fit. */
+static void log_text(char *out, size_t size, const char *text)
+{
+    size_t used = 0;
+    for (; *text != '\0'; ++text)
+    {
+        const unsigned char c = (unsigned char)*text;
+        char piece[5];
+        size_t length = 1;
+        if (c > 0x20 && c < 0x7f && c != '\\')
+            piece[0] = (char)c;
+        else
+            length = (size_t)snprintf(piece, sizeof(piece), "\\x%02x", c);
+        if (used + length >= size)
+            break;
+        memcpy(out + used, piece, length);
+        used += length;
+    }
+    out[used] = '\0';
 }
 
 /* Ends the check without an offer: the reason for the log, and an empty offer as
@@ -820,6 +873,8 @@ self_update_check_result github_release_check(const self_update_platform *platfo
         const int code = platform->fetch(platform->user, url, answer, sizeof(answer), &length, &status);
         char next[256];
         report->http_status = status;
+        if (code == SELF_UPDATE_FETCH_TOO_LARGE || (code == 0 && length > sizeof(answer)))
+            return no_offer(offer, report, GITHUB_RELEASE_TOO_LARGE);
         if (code != 0)
         {
             report->platform_error = code;
@@ -828,10 +883,9 @@ self_update_check_result github_release_check(const self_update_platform *platfo
         if (status != 301 && status != 302 && status != 307 && status != 308)
             break;
         /* A renamed repository: GitHub's redirect names its new address in its body as well as in
-         * its Location header, and the kit's fetch gives the body. Followed on api.github.com
-         * only. */
-        if (hop >= GITHUB_RELEASE_REDIRECTS || length > sizeof(answer) ||
-            update_check_json_string(answer, length, "url", next, sizeof(next)) != 1 ||
+         * its Location header, and the kit's fetch gives the body. Followed to that address alone
+         * (github_release_api_url_allowed). */
+        if (hop >= GITHUB_RELEASE_REDIRECTS || string_member(answer, length, "url", next, sizeof(next)) != 1 ||
             !github_release_api_url_allowed(next))
             return no_offer(offer, report, GITHUB_RELEASE_REDIRECT_REFUSED);
         memcpy(url, next, sizeof(url));
@@ -844,12 +898,10 @@ self_update_check_result github_release_check(const self_update_platform *platfo
         return no_offer(offer, report, GITHUB_RELEASE_RATE_LIMITED);
     if (status != 200)
         return no_offer(offer, report, GITHUB_RELEASE_HTTP_STATUS);
-    if (length > sizeof(answer))
-        return no_offer(offer, report, GITHUB_RELEASE_BAD_RESPONSE);
     report->reason = github_release_evaluate(answer, length, installed, &release);
-    (void)snprintf(report->tag, sizeof(report->tag), "%s", release.tag);
+    log_text(report->tag, sizeof(report->tag), release.tag);
     if (release.zip_count == 1)
-        (void)snprintf(report->zip, sizeof(report->zip), "%s", release.zips[0]);
+        log_text(report->zip, sizeof(report->zip), release.zips[0]);
     if (report->reason != GITHUB_RELEASE_NEWER)
         return no_offer(offer, report, report->reason);
 
@@ -869,7 +921,7 @@ self_update_check_result github_release_check(const self_update_platform *platfo
     report->reason = github_release_choose(&release, sums, sink.used, offer->sha256);
     if (report->reason != GITHUB_RELEASE_NEWER)
         return no_offer(offer, report, report->reason);
-    (void)snprintf(report->zip, sizeof(report->zip), "%s", release.zip);
+    log_text(report->zip, sizeof(report->zip), release.zip);
     if (github_release_file_url(offer->artifact, sizeof(offer->artifact), repository, release.tag,
                                 release.zip) == 0 ||
         !self_update_url_allowed(offer->artifact, 0))

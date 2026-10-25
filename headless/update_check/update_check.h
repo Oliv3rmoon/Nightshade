@@ -117,9 +117,11 @@ extern "C"
     int update_check_json_uint(const char *json, size_t length, const char *key, unsigned *out);
     int update_check_json_array_string(const char *json, size_t length, size_t index,
                                        char *out, size_t size);
-    /* ProsperoEden: a view of an array element of any type (GitHub's list of a release's files). */
-    int update_check_json_array_value(const char *json, size_t length, size_t index,
-                                      const char **value, size_t *value_length);
+    /* ProsperoEden: the elements of an array, of any type, one after another (GitHub's list of a
+     * release's files): *at is 0 for the first and kept between calls, so the array is read once.
+     * 1: a view of the next element. 0: there are no more. -1: malformed. */
+    int update_check_json_array_next(const char *json, size_t length, size_t *at,
+                                     const char **value, size_t *value_length);
 
     /* Decides from an app's API file and the installed content version. Never fails: every
      * problem is a result with state UPDATE_CHECK_UNKNOWN and a reason. */

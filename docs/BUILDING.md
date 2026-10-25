@@ -62,8 +62,9 @@ when it is the repository's newest one that is neither a draft nor a pre-release
 named `<anything>-<tag>.zip` that `SHA256SUMS` lists (one). The ZIP is checked against that
 SHA-256, and the update helper still checks the title ID and version in what it unpacks. There is
 no signature as the catalog has: the check trusts TLS to api.github.com and github.com and the
-release's own `SHA256SUMS`. A renamed repository keeps working (GitHub's redirect to its new
-address on api.github.com is followed, there only). The update check's host test is
+release's own `SHA256SUMS`. A renamed repository keeps working: GitHub's redirect to its new
+address, `https://api.github.com/repositories/<number>/releases/latest`, is followed, to exactly
+that address and nowhere else. The update check's host test is
 `tools/check-update-check.py` (also run by every release build, and as `eden-update-check` by
 `make test`).
 

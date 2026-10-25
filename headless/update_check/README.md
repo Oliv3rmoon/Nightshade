@@ -30,7 +30,9 @@ newest release instead of the catalog and fills the same offer, so the
 download, the helper and the dialog are the kit's, unchanged. Its trust is
 TLS and the release's own `SHA256SUMS`, not the catalog's signature (see the
 header). For it, `update_check.c` has one more reader,
-`update_check_json_array_value` (an array element of any type), and
+`update_check_json_array_next` (an array's elements of any type, read once),
 `self_update_ps5.c` has `self_update_check_self_from`, which is
-`self_update_check_self` when no repository is named. The host test is
-`headless/update_check_check.cpp` (`tools/check-update-check.py`).
+`self_update_check_self` when no repository is named, and its `console_fetch`
+tells an answer too long for its buffer (`SELF_UPDATE_FETCH_TOO_LARGE`) from a
+failed transfer. The host test is `headless/update_check_check.cpp`
+(`tools/check-update-check.py`).
