@@ -11,8 +11,9 @@
  *   1. https://api.github.com/repos/<owner/name>/releases/latest: the newest release that is
  *      neither a draft nor a pre-release. Its tag must be a content version as tools/ci/
  *      make-dist.py names it ("v1.005.100" for contentVersion 01.005.100), higher than the
- *      running one. A repository that was renamed answers with a redirect to its new address on
- *      api.github.com, which is followed (there only);
+ *      running one. A repository that was renamed answers with a redirect to its new address,
+ *      https://api.github.com/repositories/<its number>/releases/latest, which is followed (to
+ *      that address alone);
  *   2. its files must include SHA256SUMS and a ZIP named "<anything>-<tag>.zip"
  *      ("Nightshade-v1.005.100.zip"), all uploaded;
  *   3. SHA256SUMS (small, downloaded like the ZIP) must list exactly one of those ZIPs, on one
@@ -46,7 +47,7 @@ extern "C"
 
 #define GITHUB_RELEASE_HOST "https://api.github.com/"
 #define GITHUB_RELEASE_API GITHUB_RELEASE_HOST "repos/"
-/* Redirects of the release's request followed, to api.github.com only. */
+/* Redirects of the release's request followed, to a renamed repository's address only. */
 #define GITHUB_RELEASE_REDIRECTS 3
 /* The release's files whose name ends in -<tag>.zip that are told apart by SHA256SUMS; a release
  * with more is not offered. */
@@ -124,8 +125,9 @@ extern "C"
     size_t github_release_file_url(char *out, size_t size, const char *repository, const char *tag,
                                    const char *file);
 
-    /* 1 when a redirect of the release's request may be followed to `url`: https, api.github.com,
-     * printable ASCII without a user name, shorter than 256. */
+    /* 1 when a redirect of the release's request may be followed to `url`: the address GitHub
+     * gives a renamed repository's newest release, exactly
+     * https://api.github.com/repositories/<its number>/releases/latest. */
     int github_release_api_url_allowed(const char *url);
 
     /* Reads releases/latest's answer: the tag, the files named *-<tag>.zip and SHA256SUMS, the

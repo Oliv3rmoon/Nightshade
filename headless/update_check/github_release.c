@@ -130,19 +130,18 @@ size_t github_release_file_url(char *out, size_t size, const char *repository, c
 
 int github_release_api_url_allowed(const char *url)
 {
-    const size_t host = strlen(GITHUB_RELEASE_HOST);
-    size_t length;
-    size_t i;
-    if (url == NULL || strncmp(url, GITHUB_RELEASE_HOST, host) != 0)
+    static const char start[] = GITHUB_RELEASE_HOST "repositories/";
+    static const char end[] = "/releases/latest";
+    size_t digits = 0;
+    if (url == NULL || strncmp(url, start, sizeof(start) - 1) != 0)
         return 0;
-    length = strlen(url);
-    if (length <= host || length >= 256)
+    url += sizeof(start) - 1;
+    /* GitHub's number for the repository: digits, no leading zero, at most a 64-bit number's. */
+    while (url[digits] >= '0' && url[digits] <= '9')
+        ++digits;
+    if (digits == 0 || digits > 19 || url[0] == '0')
         return 0;
-    for (i = 0; i < length; ++i)
-        if ((unsigned char)url[i] <= 0x20 || (unsigned char)url[i] >= 0x7f || url[i] == '\\' ||
-            url[i] == '@' || url[i] == '#')
-            return 0;
-    return 1;
+    return strcmp(url + digits, end) == 0;
 }
 
 /* ---- The release --------------------------------------------------------------------------- */
@@ -842,8 +841,8 @@ self_update_check_result github_release_check(const self_update_platform *platfo
         if (status != 301 && status != 302 && status != 307 && status != 308)
             break;
         /* A renamed repository: GitHub's redirect names its new address in its body as well as in
-         * its Location header, and the kit's fetch gives the body. Followed on api.github.com
-         * only. */
+         * its Location header, and the kit's fetch gives the body. Followed to that address alone
+         * (github_release_api_url_allowed). */
         if (hop >= GITHUB_RELEASE_REDIRECTS ||
             update_check_json_string(answer, length, "url", next, sizeof(next)) != 1 ||
             !github_release_api_url_allowed(next))

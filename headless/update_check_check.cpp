@@ -348,20 +348,77 @@ void Addresses() {
     assert(self_update_url_allowed("https://github.com/Oliv3rmoon/Nightshade/x y.zip", 0) == 0);
     assert(self_update_url_allowed((redirect + std::string(4096, 'a')).c_str(), 1) == 0);
 
-    // The release's own request follows GitHub's redirect for a renamed repository, to
-    // api.github.com and nowhere else.
+    // The release's own request follows GitHub's redirect for a renamed repository to the address
+    // GitHub gives it, exactly, and to nothing else: not another repository's path, another host,
+    // port, case or spelling of the same, nothing more after it.
     assert(github_release_api_url_allowed(kMoved) == 1);
-    assert(github_release_api_url_allowed(kApi) == 1);
-    for (const char* elsewhere : {"http://api.github.com/repositories/1/releases/latest",
-                                  "https://api.github.com.example.net/repositories/1/releases/latest",
-                                  "https://example.net/https://api.github.com/repositories/1",
-                                  "https://github.com/Oliv3rmoon/ProsperoEden/releases/latest",
-                                  "https://uploads.github.com/repos/Oliv3rmoon/Nightshade/releases",
-                                  "https://user@api.github.com/repositories/1/releases/latest",
-                                  "https://api.github.com/repositories/1/releases/latest#x",
-                                  "https://api.github.com/repositories/1 /releases/latest", "https://api.github.com/", ""})
+    assert(github_release_api_url_allowed("https://api.github.com/repositories/1/releases/latest") == 1);
+    assert(github_release_api_url_allowed("https://api.github.com/repositories/9223372036854775807/releases/latest") == 1);
+    for (const char* elsewhere : {
+             kApi, "https://api.github.com/repos/someone/else/releases/latest",
+             "https://api.github.com/repositories/1421452418/releases/1",
+             "https://api.github.com/repositories/1421452418/releases",
+             "https://api.github.com/repositories/1421452418/tags/latest",
+             "https://api.github.com/repositories/1421452418/../1/releases/latest",
+             "https://api.github.com/repositories//releases/latest",
+             "https://api.github.com/repositories/01421452418/releases/latest",
+             "https://api.github.com/repositories/12345678901234567890/releases/latest",
+             "https://api.github.com:443/repositories/1421452418/releases/latest",
+             "https://API.GITHUB.COM/repositories/1421452418/releases/latest",
+             "HTTPS://api.github.com/repositories/1421452418/releases/latest",
+             "https://api.github.com/Repositories/1421452418/releases/latest",
+             "https://api.github.com/repositories/1421452418/releases/LATEST",
+             "https://api.github.com/repositories\\1421452418/releases/latest",
+             "https://api.github.com/repositories/1421452418\\releases/latest",
+             "https://api.github.com/repositories/1421452418%40example.net/releases/latest",
+             "https://api.github.com%40example.net/repositories/1421452418/releases/latest",
+             "https://api.github.com/repositories/%31421452418/releases/latest",
+             "https://api.github.com./repositories/1421452418/releases/latest",
+             "https://api.github.com.example.net/repositories/1421452418/releases/latest",
+             "https://user@api.github.com/repositories/1421452418/releases/latest",
+             "http://api.github.com/repositories/1421452418/releases/latest",
+             "https://api.github.com/repositories/1421452418/releases/latest/",
+             "https://api.github.com/repositories/1421452418/releases/latest?per_page=1",
+             "https://api.github.com/repositories/1421452418/releases/latest#x",
+             "https://api.github.com/repositories/1421452418/releases/latest ",
+             " https://api.github.com/repositories/1421452418/releases/latest",
+             "https://api.github.com/repositories/1421452418/releases/latest\n", "https://api.github.com/", ""})
         assert(github_release_api_url_allowed(elsewhere) == 0);
-    assert(github_release_api_url_allowed(("https://api.github.com/" + std::string(240, 'a')).c_str()) == 0);
+    assert(github_release_api_url_allowed(nullptr) == 0);
+}
+
+// The address in the redirect as GitHub writes it, in JSON: what counts is what it reads as.
+void RedirectTargets() {
+    static self_update_offer offer;
+    github_release_report report{};
+    const std::string old_sums = "https://github.com/Oliv3rmoon/ProsperoEden/releases/download/v1.005.100/SHA256SUMS";
+    const auto moved_to = [&](const std::string& json_url) {
+        Serve(200, kRelease);
+        network.answers.clear();
+        network.answers[kOldApi] = {301, "{\"message\":\"Moved Permanently\",\"url\":\"" + json_url + "\"}"};
+        network.answers[kMoved] = {200, kRelease};
+        network.files[old_sums] = kSumsText;
+        return Check(kOldRepository, "01.005.000", &offer, &report);
+    };
+    // Escapes that read as the very address are followed to it.
+    for (const char* same : {"https:\\/\\/api.github.com\\/repositories\\/1421452418\\/releases\\/latest",
+                             "\\u0068ttps://api.github.com/repositories/1421452418/releases/latest"}) {
+        assert(moved_to(same) == SELF_UPDATE_AVAILABLE && report.redirects == 1);
+        assert((network.asked == std::vector<std::string>{kOldApi, kMoved, old_sums}));
+    }
+    // Ones that read as something else, or not as text, are not.
+    for (const char* other : {"https://api.github.com/repositories/1421452418/releases/latest\\u0000",
+                              "https://api.github.com/repositories/1421452418/releases/latest\\n",
+                              "https://api.github.com\\u002erepositories/1421452418/releases/latest",
+                              "https://api.github.com/repositories/1421452418\\u002f..\\u002f1/releases/latest",
+                              "https://api.github.com\\u0040example.net/repositories/1421452418/releases/latest",
+                              "https://api.github.com/repositories/1421452418\\\\releases/latest",
+                              "https://api.github.com/repositories/\\uff11421452418/releases/latest",
+                              "https://api.github.com/repositories/1421452418/releases/latest\\"}) {
+        assert(moved_to(other) == SELF_UPDATE_UNKNOWN && report.reason == GITHUB_RELEASE_REDIRECT_REFUSED &&
+               report.http_status == 301 && report.redirects == 0);
+        assert((network.asked == std::vector<std::string>{kOldApi}));
+    }
 }
 
 void SumsLines() {
@@ -628,9 +685,11 @@ void GitHubCheck() {
     assert(Check(kRepository, "01.005.000", &offer, &report) == SELF_UPDATE_UNKNOWN &&
            report.reason == GITHUB_RELEASE_REDIRECT_REFUSED);
     Serve(200, kRelease);
-    network.answers[kApi] = redirect(301, kApi); // to itself, again and again
+    network.answers[kApi] = redirect(301, kMoved);
+    network.answers[kMoved] = redirect(301, kMoved); // to itself, again and again
     assert(Check(kRepository, "01.005.000", &offer, &report) == SELF_UPDATE_UNKNOWN &&
-           report.reason == GITHUB_RELEASE_REDIRECT_REFUSED && network.asked.size() == 1 + GITHUB_RELEASE_REDIRECTS);
+           report.reason == GITHUB_RELEASE_REDIRECT_REFUSED && report.redirects == GITHUB_RELEASE_REDIRECTS &&
+           network.asked.size() == 1 + GITHUB_RELEASE_REDIRECTS);
 
     // A repository, title ID or installed version that can't be used asks nothing.
     Serve(200, kRelease);
@@ -797,6 +856,7 @@ int main() {
 
     TagVersions();
     Addresses();
+    RedirectTargets();
     SumsLines();
     ReleaseNotes();
     Releases();
