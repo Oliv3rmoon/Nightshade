@@ -2,6 +2,12 @@
 
 What changed in each release of ProsperoEden, newest first. A release's notes on GitHub are its section here.
 
+## v1.005.102
+
+**Update now works.** The in-app update said it had finished, but the old version opened again and the update was offered again. The update helper waits for the app to close before it replaces its files, and took the app's sandbox in `/mnt/sandbox` for the app itself; the system can leave that sandbox behind after the app has closed, until the console restarts (Swordpdf/ProsperoEden#232), so the helper gave up after two minutes. Now the app's connection to the helper ending is the app closing: a sandbox that stays 10 s longer is taken for the system's leftover, and the files are replaced. The helper also writes what it did to `/data/prosperoeden/logs/updater.log`.
+
+An update runs the helper of the version it updates from, so this one has to be copied by hand once from 1.005.100 or 1.005.101 (copy this ZIP's `PPSA99008` folder over yours). From 1.005.102 on, **Update now** applies the next one.
+
 ## v1.005.101
 
 **A game's update or DLC left in `roms/` beside it now applies.** A tester's Ori and the Will of the Wisps sat on "Starting the game" for minutes: it started as 1.0.0 without its 1.2.1 update, and 1.0.0 stopped there. Nightshade read updates from `updates/` and game folders only, so an update left in `roms/` beside its game was never applied. Now an update or DLC file directly in `roms/` whose name holds its title ID, as dumps are named (`[01008DD013200800][v196608]`), applies to its game, the Library no longer lists it as a game of its own but counts it for its game, and **Delete from console** deletes it with the game. `updates/` and game folders work as before. See [Install](https://github.com/Oliv3rmoon/Nightshade/blob/v1.005.101/docs/INSTALL.md).

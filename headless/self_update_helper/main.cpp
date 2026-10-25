@@ -60,8 +60,18 @@ int main()
     // The version an update replaces stays here until the next update.
     environment.previous = "/data/prosperoeden/previous-version";
     environment.launcher_data = "/data/prosperoeden";
+    // ProsperoEden: the kernel log, and /data/prosperoeden/logs/updater.log (the last update's
+    // lines, for a player to send: the kernel log is out of reach for most).
+    static std::FILE *file = std::fopen("/data/prosperoeden/logs/updater.log", "w");
     environment.log = [](const std::string &line)
-    { (void)klog_puts(("[self-update] " + line).c_str()); };
+    {
+        (void)klog_puts(("[self-update] " + line).c_str());
+        if (file)
+        {
+            std::fprintf(file, "%s\n", line.c_str());
+            std::fflush(file);
+        }
+    };
     const self_update::Io io{[](void *data, std::size_t size)
                              { return static_cast<long>(read(STDIN_FILENO, data, size)); },
                              [](const void *data, std::size_t size)

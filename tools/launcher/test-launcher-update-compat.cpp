@@ -3,6 +3,7 @@
 #include "update_check.h"
 #include <cassert>
 #include <filesystem>
+#include <functional>
 #include <fstream>
 #include <iostream>
 namespace fs=std::filesystem;
@@ -44,6 +45,39 @@ int main(int argc,char** argv) {
     need(update_check_json_array_string(json.data(),json.size(),2,text,sizeof(text))==0);
     for(const auto* malformed:{R"(["one",])",R"([true])",R"(["one"] trailing)",R"(["unterminated])",R"(["one\u0000hidden"])"}) {
         const std::string item=malformed;need(update_check_json_array_string(item.data(),item.size(),0,text,sizeof(text))==-1);
+    }
+    // The wait for the app to close before its files are replaced (wait_for_close): the sandbox
+    // going, the app's connection ending with the sandbox left behind (Swordpdf/ProsperoEden#232),
+    // a timeout with the connection open, a cancel, and an unreadable sandbox folder.
+    {
+        const fs::path sandboxes=root/"sandbox";
+        self_update::Environment environment;
+        environment.sandboxes=sandboxes.string();
+        unsigned now=0;std::function<void(unsigned)> at;
+        environment.sleep=[&](unsigned ms){now+=ms;if(at) at(now);};
+        const std::string title="PPSA99008";
+        bool gone=false,stop=false;
+        auto wait=[&]{return self_update::wait_for_close(environment,title,[&]{return gone;},[&]{return stop;});};
+        auto reset=[&]{now=0;at=nullptr;gone=stop=false;fs::remove_all(sandboxes);fs::create_directories(sandboxes);};
+        reset();need(wait()==self_update::CloseWait::closed && now==0);
+        reset();fs::create_directories(sandboxes/"PPSA99008_000");fs::create_directories(sandboxes/"PPSA99001_000");
+        at=[&](unsigned t){if(t>=3000) fs::remove_all(sandboxes/"PPSA99008_000");};
+        need(wait()==self_update::CloseWait::closed && now==3000);
+        reset();fs::create_directories(sandboxes/"PPSA99008_000");
+        need(wait()==self_update::CloseWait::timed_out && now>=environment.exit_wait_ms);
+        reset();fs::create_directories(sandboxes/"PPSA99008_000");
+        at=[&](unsigned t){if(t>=2000) gone=true;};
+        need(wait()==self_update::CloseWait::left_behind && now>=2000+environment.stale_sandbox_ms && now<2000+environment.stale_sandbox_ms+1000);
+        reset();fs::create_directories(sandboxes/"PPSA99008_000");
+        at=[&](unsigned t){if(t>=200000) gone=true;};  // the connection ends after the timeout: never seen
+        need(wait()==self_update::CloseWait::timed_out && now<200000);
+        reset();fs::create_directories(sandboxes/"PPSA99008_000");
+        at=[&](unsigned t){if(t>=1000) stop=true;};
+        need(wait()==self_update::CloseWait::cancelled);
+        reset();fs::remove_all(sandboxes);
+        need(wait()==self_update::CloseWait::timed_out);  // unknown counts as running...
+        reset();fs::remove_all(sandboxes);gone=true;
+        need(wait()==self_update::CloseWait::left_behind);  // ...until the app's connection ended
     }
     std::cout<<"PASS: "<<checks<<" application-update compatibility and bounded JSON checks\n";
 }

@@ -42,6 +42,9 @@ struct Environment
     unsigned exit_wait_ms = 120000;
     // Left alone for this long after the app is gone, before its files are touched.
     unsigned settle_ms = 1500;
+    // ProsperoEden: how long the title's sandbox may outlast the app's connection before it is
+    // taken for one the system left behind (wait_for_close).
+    unsigned stale_sandbox_ms = 10000;
     // Persistent launcher installation root, separate from the app being replaced.
     std::string launcher_data;
 };
@@ -65,6 +68,24 @@ std::vector<std::string> title_sandboxes(const std::string &sandboxes, const std
 bool launcher_update_compatible(const std::string& data_root, const std::string& staged, std::string& reason);
 
 bool swap_entries(const std::string &target, const std::string &staged, const std::string &backup);
+
+// ProsperoEden: the wait, after "applying", for the app to close before its files are replaced.
+// The app keeps its connection to the helper open until its process ends, so a connection that
+// ended is an app that is gone. Its sandbox can stay after that until the console restarts
+// (Swordpdf/ProsperoEden#232): one that outlasts the connection by stale_sandbox_ms is the
+// system's leftover, not the app. closed: the sandbox went; left_behind: the connection ended
+// and the sandbox stayed; timed_out: neither within exit_wait_ms (nothing may be touched);
+// cancelled: cancelled() said so.
+enum class CloseWait
+{
+    closed,
+    left_behind,
+    timed_out,
+    cancelled
+};
+CloseWait wait_for_close(const Environment &environment, const std::string &title,
+                         const std::function<bool()> &connection_closed,
+                         const std::function<bool()> &cancelled);
 
 // One whole conversation (kit/self_update_protocol.h). 0: the app was updated.
 int run(const Environment &environment, const Io &io);
