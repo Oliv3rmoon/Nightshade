@@ -789,6 +789,28 @@ static int on_sums(void *user, const void *data, size_t size)
     return 1;
 }
 
+/* Text from the answer as the log may show it: printable ASCII as it is, anything else as \xNN, so
+ * that it can't end the log's line or make one up; cut where an escape would not fit. */
+static void log_text(char *out, size_t size, const char *text)
+{
+    size_t used = 0;
+    for (; *text != '\0'; ++text)
+    {
+        const unsigned char c = (unsigned char)*text;
+        char piece[5];
+        size_t length = 1;
+        if (c > 0x20 && c < 0x7f && c != '\\')
+            piece[0] = (char)c;
+        else
+            length = (size_t)snprintf(piece, sizeof(piece), "\\x%02x", c);
+        if (used + length >= size)
+            break;
+        memcpy(out + used, piece, length);
+        used += length;
+    }
+    out[used] = '\0';
+}
+
 /* Ends the check without an offer: the reason for the log, and an empty offer as
  * self_update_check() leaves one. */
 static self_update_check_result no_offer(self_update_offer *offer, github_release_report *report,
@@ -858,9 +880,9 @@ self_update_check_result github_release_check(const self_update_platform *platfo
     if (status != 200)
         return no_offer(offer, report, GITHUB_RELEASE_HTTP_STATUS);
     report->reason = github_release_evaluate(answer, length, installed, &release);
-    (void)snprintf(report->tag, sizeof(report->tag), "%s", release.tag);
+    log_text(report->tag, sizeof(report->tag), release.tag);
     if (release.zip_count == 1)
-        (void)snprintf(report->zip, sizeof(report->zip), "%s", release.zips[0]);
+        log_text(report->zip, sizeof(report->zip), release.zips[0]);
     if (report->reason != GITHUB_RELEASE_NEWER)
         return no_offer(offer, report, report->reason);
 
@@ -880,7 +902,7 @@ self_update_check_result github_release_check(const self_update_platform *platfo
     report->reason = github_release_choose(&release, sums, sink.used, offer->sha256);
     if (report->reason != GITHUB_RELEASE_NEWER)
         return no_offer(offer, report, report->reason);
-    (void)snprintf(report->zip, sizeof(report->zip), "%s", release.zip);
+    log_text(report->zip, sizeof(report->zip), release.zip);
     if (github_release_file_url(offer->artifact, sizeof(offer->artifact), repository, release.tag,
                                 release.zip) == 0 ||
         !self_update_url_allowed(offer->artifact, 0))

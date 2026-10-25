@@ -90,7 +90,9 @@ extern "C"
         int http_status;    /* of the release query's last answer; 0 when none arrived */
         int platform_error; /* the failed request's code, or 0 */
         int redirects;      /* followed (a renamed repository) */
-        char tag[40];       /* the newest release's tag, once read */
+        /* As the log may show them, on one line: printable ASCII as it is, anything else (a line
+         * end, a space, a backslash, every byte of a non-ASCII character) as \xNN. */
+        char tag[160];      /* the newest release's tag, once read (at most 39 bytes, escaped) */
         char zip[128];      /* the ZIP's file name, once known */
     } github_release_report;
 

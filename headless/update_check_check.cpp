@@ -787,6 +787,38 @@ void AssetList() {
            report.reason == GITHUB_RELEASE_SUMS_NO_LINE);
 }
 
+// A release's tag goes into the log: whatever it holds, it stays on its line, and says what it is.
+void LoggedTag() {
+    static self_update_offer offer;
+    github_release_report report{};
+    const auto tagged = [&](const std::string& json_tag) {
+        Serve(200, With(kRelease, "\"tag_name\": \"v1.005.100\"", "\"tag_name\": \"" + json_tag + "\""));
+        return Check(kRepository, "01.005.000", &offer, &report);
+    };
+    const auto one_line = [](const char* text) {
+        for (const char* at = text; *at != '\0'; ++at)
+            if (*at <= ' ' || *at >= 0x7f) return false;
+        return true;
+    };
+    assert(tagged("v1\\n[ProsperoEden] update check: forged") == SELF_UPDATE_UNKNOWN &&
+           report.reason == GITHUB_RELEASE_NOT_A_VERSION);
+    assert(std::string(report.tag) == "v1\\x0a[ProsperoEden]\\x20update\\x20check:\\x20forged" && one_line(report.tag));
+    assert(tagged("a\\rb\\tc\\\\d\u00e9\\u2028e\\u001b[2J") == SELF_UPDATE_UNKNOWN);
+    assert(std::string(report.tag) == "a\\x0db\\x09c\\x5cd\\xc3\\xa9\\xe2\\x80\\xa8e\\x1b[2J" && one_line(report.tag));
+    // The longest tag read (39 bytes) is shown whole, escaped.
+    std::string ends;
+    for (int i = 0; i < 39; ++i) ends += "\\n";
+    assert(tagged(ends) == SELF_UPDATE_UNKNOWN && std::strlen(report.tag) == 39 * 4 && one_line(report.tag));
+    // And so the log line update_notice.cpp writes is one line.
+    char line[640];
+    std::snprintf(line, sizeof(line), "GitHub %s releases/latest: reason=%s http=%d redirects=%d error=%d tag=%s zip=%s",
+                  kRepository, github_release_reason_text(report.reason), report.http_status, report.redirects,
+                  report.platform_error, report.tag[0] ? report.tag : "-", report.zip[0] ? report.zip : "-");
+    assert(std::strchr(line, '\n') == nullptr && std::strchr(line, '\r') == nullptr);
+    // A tag that is a version is shown as it is.
+    assert(tagged("v1.005.100") == SELF_UPDATE_AVAILABLE && std::strcmp(report.tag, "v1.005.100") == 0);
+}
+
 void CatalogUnchanged() {
     static self_update_offer offer, direct;
     github_release_report report{};
@@ -870,6 +902,7 @@ int main(int argc, char** argv) {
     GitHubCheck();
     AnswerSize();
     AssetList();
+    LoggedTag();
     CatalogUnchanged();
     std::puts("update check: versions, request address, newer/same/older and silent answers PASS");
     std::puts("update check from GitHub: tag versions, addresses and redirects, SHA256SUMS lines, release notes, "
