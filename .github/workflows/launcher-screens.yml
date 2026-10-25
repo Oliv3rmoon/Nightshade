@@ -1,5 +1,5 @@
 {
- "name": "Launcher screens: official 1.005.000 and build 3",
+ "name": "Launcher screens: which change breaks the preview's checks",
  "on": {
   "push": {
    "branches": [
@@ -39,14 +39,14 @@
     },
     {
      "name": "Draw the launcher's screens",
-     "run": "set -o pipefail\nmkdir -p \"$RUNNER_TEMP/screens\"\nbash tools/launcher/preview.sh \"$RUNNER_TEMP/screens\" 2>&1 | grep -E 'error|warning|cues heard' || true\nbash tools/launcher/preview.sh \"$RUNNER_TEMP/screens2\" > /dev/null 2>&1; echo \"preview exit: $?\""
+     "run": "mkdir -p \"$RUNNER_TEMP/screens\"\nPE_THEME=\"${{ matrix.theme }}\" bash tools/launcher/preview.sh \"$RUNNER_TEMP/screens\" > \"$RUNNER_TEMP/preview.log\" 2>&1 && code=0 || code=$?\ngrep -E '^error|cues heard' \"$RUNNER_TEMP/preview.log\" || true\necho \"preview exit: $code\""
     },
     {
      "name": "Keep the screens",
      "if": "always()",
      "uses": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
      "with": {
-      "name": "launcher-screens-${{ matrix.ref }}",
+      "name": "launcher-screens-${{ strategy.job-index }}",
       "retention-days": 7,
       "path": "${{ runner.temp }}/screens"
      }
@@ -55,12 +55,31 @@
    "strategy": {
     "fail-fast": false,
     "matrix": {
-     "ref": [
-      "a26ba788222465ec7fb94dc813958fc749734e07",
-      "e0e5c45451552252d2f18b6fa81e3657b9213a34"
+     "include": [
+      {
+       "ref": "f0eeafcaf70416783748fa19f5e58dda3376edff",
+       "theme": "canopy",
+       "what": "release, Canopy theme"
+      },
+      {
+       "ref": "f0eeafcaf70416783748fa19f5e58dda3376edff",
+       "theme": "slate",
+       "what": "release, Slate theme"
+      },
+      {
+       "ref": "e0e5c45451552252d2f18b6fa81e3657b9213a34",
+       "theme": "slate",
+       "what": "build 3, Slate theme"
+      },
+      {
+       "ref": "56a6e35a813462205d62cc68eef5fbb5ce0f52dc",
+       "theme": "",
+       "what": "update feature alone, default theme"
+      }
      ]
     }
-   }
+   },
+   "name": "screens (${{ matrix.what }})"
   }
  }
 }
