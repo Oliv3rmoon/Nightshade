@@ -263,7 +263,10 @@ int Fetch(void*, const char* url, char* body, size_t capacity, size_t* length, i
         *status = 404;
         return 0;
     }
-    if (found->second.second.size() > capacity) return -10023;
+    if (found->second.second.size() > capacity) { // as console_fetch: told from a failed transfer
+        *status = found->second.first;
+        return SELF_UPDATE_FETCH_TOO_LARGE;
+    }
     std::memcpy(body, found->second.second.data(), found->second.second.size());
     *length = found->second.second.size();
     *status = found->second.first;
@@ -638,6 +641,34 @@ void GitHubCheck() {
                                   &report) == SELF_UPDATE_UNKNOWN);
 }
 
+// The release's notes in the answer, in place of the fixture's.
+std::string WithBody(const std::string& body) {
+    const std::size_t from = kRelease.find("\"body\": \""), to = kRelease.find("\"reactions\"");
+    return kRelease.substr(0, from) + "\"body\": \"" + body + "\",\n  " + kRelease.substr(to);
+}
+
+void AnswerSize() {
+    static self_update_offer offer;
+    github_release_report report{};
+    // As long as GitHub lets notes be (125,000 characters), in Chinese: some 380 KB of answer,
+    // offered, with its notes cut to what the dialog takes.
+    std::string notes;
+    for (int i = 0; i < 125000; ++i) notes += "\xe6\xbc\xa2"; // U+6F22
+    Serve(200, WithBody(notes));
+    assert(network.answers[kApi].second.size() > 375000);
+    assert(Check(kRepository, "01.005.000", &offer, &report) == SELF_UPDATE_AVAILABLE && report.reason == GITHUB_RELEASE_NEWER);
+    assert(offer.notes_truncated == 1 && std::string(offer.notes) == notes.substr(0, 3 * GITHUB_RELEASE_NOTES_CHARACTERS));
+    // Up to 1 MiB in all; a longer answer is too large, said as such (not as a network failure).
+    Serve(200, WithBody(std::string(GITHUB_RELEASE_MAX_ANSWER - 8000, 'x')));
+    assert(network.answers[kApi].second.size() <= GITHUB_RELEASE_MAX_ANSWER);
+    assert(Check(kRepository, "01.005.000", &offer, &report) == SELF_UPDATE_AVAILABLE);
+    Serve(200, WithBody(std::string(GITHUB_RELEASE_MAX_ANSWER, 'x')));
+    assert(Check(kRepository, "01.005.000", &offer, &report) == SELF_UPDATE_UNKNOWN);
+    assert(report.reason == GITHUB_RELEASE_TOO_LARGE && report.http_status == 200 && report.platform_error == 0 &&
+           std::strcmp(github_release_reason_text(report.reason), "too-large") == 0);
+    assert((network.asked == std::vector<std::string>{kApi}) && offer.artifact[0] == '\0');
+}
+
 void CatalogUnchanged() {
     static self_update_offer offer, direct;
     github_release_report report{};
@@ -712,6 +743,7 @@ int main() {
     Releases();
     ChooseZip();
     GitHubCheck();
+    AnswerSize();
     CatalogUnchanged();
     std::puts("update check: versions, request address, newer/same/older and silent answers PASS");
     std::puts("update check from GitHub: tag versions, addresses and redirects, SHA256SUMS lines, release notes, "

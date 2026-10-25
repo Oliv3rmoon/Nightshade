@@ -50,8 +50,9 @@ extern "C"
 #define GITHUB_RELEASE_REDIRECTS 3
 /* The release's files whose name ends in -<tag>.zip that are told apart by SHA256SUMS. */
 #define GITHUB_RELEASE_MAX_ZIPS 8
-/* The release's answer with its notes (GitHub allows 125,000 characters of them). */
-#define GITHUB_RELEASE_MAX_ANSWER (256u * 1024u)
+/* The release's answer with its notes: GitHub allows 125,000 characters of them, which in
+ * Chinese or Japanese is some 380 KB, and a release's files take about 1.4 KB each. */
+#define GITHUB_RELEASE_MAX_ANSWER (1024u * 1024u)
 /* SHA256SUMS: a line or a few. */
 #define GITHUB_RELEASE_MAX_SUMS 4096u
 /* As the catalog bounds release_notes (self_update_offer.notes). */
@@ -75,7 +76,8 @@ extern "C"
         GITHUB_RELEASE_SUMS_NO_LINE = 13,   /* SHA256SUMS lists none of the ZIPs */
         GITHUB_RELEASE_SUMS_MALFORMED = 14, /* its line for a ZIP is malformed or repeated */
         GITHUB_RELEASE_SUMS_TWO_ZIPS = 15,  /* it lists two of them: which one is meant? */
-        GITHUB_RELEASE_REDIRECT_REFUSED = 16 /* a redirect elsewhere than api.github.com, or too many */
+        GITHUB_RELEASE_REDIRECT_REFUSED = 16, /* a redirect elsewhere than api.github.com, or too many */
+        GITHUB_RELEASE_TOO_LARGE = 17        /* an answer over GITHUB_RELEASE_MAX_ANSWER */
     } github_release_reason;
 
     /* What the check found, for the log. */

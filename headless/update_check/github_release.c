@@ -16,6 +16,7 @@
 #include "update_check.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 /* ---- Names --------------------------------------------------------------------------------- */
@@ -166,9 +167,6 @@ static github_release_reason published(const char *json, size_t length, const ch
 github_release_reason github_release_evaluate(const char *json, size_t length,
                                               const char *installed, github_release *release)
 {
-    /* The notes as GitHub has them, before they are made plain text: never longer than the
-     * answer they come in. One check at a time. */
-    static char body[GITHUB_RELEASE_MAX_ANSWER];
     const char *assets = NULL;
     const char *value = NULL;
     size_t assets_length = 0;
@@ -252,10 +250,17 @@ github_release_reason github_release_evaluate(const char *json, size_t length,
     if (sums != 1 || release->sums_size == 0 || release->sums_size > GITHUB_RELEASE_MAX_SUMS)
         return GITHUB_RELEASE_NO_SUMS;
 
-    /* For the What's new view; none (null, or not text) is no notes. */
-    if (update_check_json_string(json, length, "body", body, sizeof(body)) == 1)
-        (void)github_release_notes(body, strlen(body), release->notes, sizeof(release->notes),
-                                   GITHUB_RELEASE_NOTES_CHARACTERS, &release->notes_truncated);
+    /* For the What's new view; none (null, or not text) is no notes. They are read as GitHub has
+     * them first, which is never longer than they are in the answer, into memory of that size
+     * for as long as they are made plain text (none: no notes). */
+    if (update_check_json_value(json, length, "body", &value, &size) == 1 && size > 0 && value[0] == '"')
+    {
+        char *body = (char *)malloc(size);
+        if (body != NULL && update_check_json_string(json, length, "body", body, size) == 1)
+            (void)github_release_notes(body, strlen(body), release->notes, sizeof(release->notes),
+                                       GITHUB_RELEASE_NOTES_CHARACTERS, &release->notes_truncated);
+        free(body);
+    }
     return GITHUB_RELEASE_NEWER;
 }
 
@@ -755,6 +760,8 @@ const char *github_release_reason_text(github_release_reason reason)
         return "sha256sums-two-zips";
     case GITHUB_RELEASE_REDIRECT_REFUSED:
         return "redirect-refused";
+    case GITHUB_RELEASE_TOO_LARGE:
+        return "too-large";
     }
     return "unknown";
 }
@@ -820,6 +827,8 @@ self_update_check_result github_release_check(const self_update_platform *platfo
         const int code = platform->fetch(platform->user, url, answer, sizeof(answer), &length, &status);
         char next[256];
         report->http_status = status;
+        if (code == SELF_UPDATE_FETCH_TOO_LARGE || (code == 0 && length > sizeof(answer)))
+            return no_offer(offer, report, GITHUB_RELEASE_TOO_LARGE);
         if (code != 0)
         {
             report->platform_error = code;
@@ -830,7 +839,7 @@ self_update_check_result github_release_check(const self_update_platform *platfo
         /* A renamed repository: GitHub's redirect names its new address in its body as well as in
          * its Location header, and the kit's fetch gives the body. Followed on api.github.com
          * only. */
-        if (hop >= GITHUB_RELEASE_REDIRECTS || length > sizeof(answer) ||
+        if (hop >= GITHUB_RELEASE_REDIRECTS ||
             update_check_json_string(answer, length, "url", next, sizeof(next)) != 1 ||
             !github_release_api_url_allowed(next))
             return no_offer(offer, report, GITHUB_RELEASE_REDIRECT_REFUSED);
@@ -844,8 +853,6 @@ self_update_check_result github_release_check(const self_update_platform *platfo
         return no_offer(offer, report, GITHUB_RELEASE_RATE_LIMITED);
     if (status != 200)
         return no_offer(offer, report, GITHUB_RELEASE_HTTP_STATUS);
-    if (length > sizeof(answer))
-        return no_offer(offer, report, GITHUB_RELEASE_BAD_RESPONSE);
     report->reason = github_release_evaluate(answer, length, installed, &release);
     (void)snprintf(report->tag, sizeof(report->tag), "%s", release.tag);
     if (release.zip_count == 1)
