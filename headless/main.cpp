@@ -44,6 +44,7 @@
 #include "multiplayer_logging.h"
 #include "mods.h"
 #include "loose_addons.h"
+#include "unmapped_log.h"
 #include "controller_applet.h"
 #include "error_applet.h"
 #include "keyboard_applet.h"
@@ -1878,6 +1879,7 @@ int main(int argc, char** argv) {
                     jit_list.Start(system.GetApplicationProcessProgramID(), build, code_start, code_end - code_start);
                 }
                 Eden::TakeGuestFault(); // Nothing from an earlier session belongs to this one.
+                Eden::UnmappedLog::Reset();
                 Eden::Loading::Set(Eden::Loading::Step::starting);
                 // From here a read of a game played where it lies that its source can no longer
                 // answer waits for the stop below, instead of handing the game what did not come, and
