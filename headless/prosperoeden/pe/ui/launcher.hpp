@@ -17,7 +17,7 @@
 namespace pe::ui
 {
 
-// Nightshade: Oliv3rmoon's own release of ProsperoEden (github.com/Oliv3rmoon/ProsperoEden), built
+// Nightshade: Oliv3rmoon's own release of ProsperoEden (github.com/Oliv3rmoon/Nightshade), built
 // on the official one with his fixes and features. The home screen names it beside the version, the About
 // screen says who made it and where to reach them. Plain text (not tr()): a name and two
 // addresses, the same in every language.

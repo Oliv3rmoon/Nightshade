@@ -13,7 +13,7 @@ What changed in each release of ProsperoEden, newest first. A release's notes on
 
 ### New
 
-- **Play a game from your server without downloading it (experimental).** A download source with `"stream": true` in `sources.json` plays its games where they lie: Cross starts one at once, Square still downloads it. Your network decides loading and stutter. See [Playing a game where it lies](https://github.com/Oliv3rmoon/ProsperoEden/blob/v1.005.100/docs/DOWNLOADS.md#playing-a-game-where-it-lies). (Swordpdf/ProsperoEden#111)
+- **Play a game from your server without downloading it (experimental).** A download source with `"stream": true` in `sources.json` plays its games where they lie: Cross starts one at once, Square still downloads it. Your network decides loading and stutter. See [Playing a game where it lies](https://github.com/Oliv3rmoon/Nightshade/blob/v1.005.100/docs/DOWNLOADS.md#playing-a-game-where-it-lies). (Swordpdf/ProsperoEden#111)
 - **Games on a USB drive, everything else on the console.** `"games_folder"` in the settings file names a folder of its own for `roms/` and `updates/`. (Swordpdf/ProsperoEden#50, Swordpdf/ProsperoEden#149)
 - **Fonts for translation mods.** A mod's replacement system font goes in `mods/0100000000000811/romfs/`. (Swordpdf/ProsperoEden#248)
 - **Pokémon Legends: Z-A:** a per-game `"vertex_input_dynamic": false` for the flashing colour after the train station. (Swordpdf/ProsperoEden#59, Swordpdf/ProsperoEden#112)

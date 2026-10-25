@@ -220,7 +220,7 @@ dependencies are reused instead of fetched) for a build on your own machine.
   for a tag, 7 days otherwise.
 - A tag's or a manual run's ZIP is attested (signed build provenance): a release ZIP built by
   the workflow can be checked with
-  `gh attestation verify Nightshade-vX.Y.Z.zip -R Oliv3rmoon/ProsperoEden` (GitHub
+  `gh attestation verify Nightshade-vX.Y.Z.zip -R Oliv3rmoon/Nightshade` (GitHub
   CLI). This covers releases built by GitHub Actions from now on (after v1.000.090), not
   earlier ones.
 
