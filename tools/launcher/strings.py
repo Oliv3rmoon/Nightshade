@@ -13,6 +13,8 @@ PS5 system language's tag (third_party/ps5_system_language.hpp): pt-BR.po, fr-FR
 check fails when a catalog
   - translates text the code no longer has, or leaves text untranslated,
   - changes the {0} {1} placeholders of a text,
+  - does not name homebrew.page once, as it is, where the text does (a build that asks GitHub's
+    releases instead puts GitHub there: pe/ui/launcher.cpp, update_text),
   - uses a character the launcher's font does not have.
 It warns when a translation is much longer than the English text (it may not fit its place).
 
@@ -416,6 +418,8 @@ def check():
                 continue
             if sorted(re.findall(r"\{\d\}", text)) != sorted(re.findall(r"\{\d\}", translation)) and translation:
                 problems.append(f"placeholders differ: {text!r} -> {translation!r}")
+            if "homebrew.page" in text and translation and translation.count("homebrew.page") != 1:
+                problems.append(f"homebrew.page not kept once as it is: {text!r} -> {translation!r}")
             missing = sorted({c for c in translation if ord(c) not in characters and c not in "\n"})
             if missing:
                 problems.append(f"characters the font lacks {''.join(missing)!r} in {translation!r}")
