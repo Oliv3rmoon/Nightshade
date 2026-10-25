@@ -10,7 +10,7 @@
   "conceptId": "99008",
   "contentBadgeType": 1,
   "contentId": "UP9000-PPSA99008_00-PROSPEROEDEN0001",
-  "contentVersion": "01.005.000",
+  "contentVersion": "01.005.100",
   "downloadDataSize": 256,
   "gameIntent": {
     "permittedIntents": [
@@ -25,7 +25,7 @@
   "localizedParameters": {
     "defaultLanguage": "en-US",
     "en-US": {
-      "titleName": "ProsperoEden"
+      "titleName": "ProsperoEden Oliv3rmoon"
     }
   },
   "masterVersion": "01.00",
