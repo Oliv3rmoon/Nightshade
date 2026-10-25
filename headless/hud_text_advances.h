@@ -15,14 +15,14 @@ inline constexpr float kHudPadUnits = 3.0f;
 inline constexpr float kHudBoxUnits = 20.0f;
 inline constexpr float kHudBaselineUnits = 17.0f;
 inline constexpr float kHudAdvance[95] = {
-    5.14f, 5.14f, 5.14f, 5.14f, 5.14f, 14.44f, 5.14f, 5.14f,
-    5.14f, 5.14f, 5.14f, 5.14f, 5.14f, 6.56f, 3.89f, 6.03f,
-    11.42f, 6.34f, 9.83f, 9.79f, 11.46f, 9.83f, 10.57f, 10.24f,
-    11.03f, 10.57f, 3.89f, 5.14f, 5.14f, 5.14f, 5.14f, 5.14f,
-    5.14f, 12.54f, 12.96f, 12.38f, 14.14f, 11.47f, 10.88f, 13.22f,
-    13.91f, 5.31f, 8.79f, 12.31f, 10.17f, 16.35f, 13.91f, 14.38f,
-    12.37f, 14.38f, 12.45f, 10.63f, 10.05f, 13.54f, 12.19f, 19.28f,
-    11.53f, 11.08f, 11.25f, 5.14f, 5.14f, 5.14f, 5.14f, 5.14f,
+    5.14f, 5.14f, 5.14f, 5.14f, 5.14f, 14.38f, 5.14f, 5.14f,
+    5.14f, 5.14f, 5.14f, 5.14f, 5.14f, 6.50f, 3.88f, 6.00f,
+    11.38f, 6.38f, 9.88f, 9.75f, 11.50f, 9.88f, 10.62f, 10.25f,
+    11.00f, 10.62f, 3.88f, 5.14f, 5.14f, 5.14f, 5.14f, 5.14f,
+    5.14f, 12.50f, 13.00f, 12.38f, 14.12f, 11.50f, 10.88f, 13.25f,
+    13.88f, 5.25f, 8.75f, 12.38f, 10.12f, 16.38f, 13.88f, 14.38f,
+    12.38f, 14.38f, 12.50f, 10.62f, 10.00f, 13.50f, 12.25f, 19.25f,
+    11.50f, 11.12f, 11.25f, 5.14f, 5.14f, 5.14f, 5.14f, 5.14f,
     5.14f, 5.14f, 5.14f, 5.14f, 5.14f, 5.14f, 5.14f, 5.14f,
     5.14f, 5.14f, 5.14f, 5.14f, 5.14f, 5.14f, 5.14f, 5.14f,
     5.14f, 5.14f, 5.14f, 5.14f, 5.14f, 5.14f, 5.14f, 5.14f,
@@ -31,7 +31,7 @@ inline constexpr float kHudAdvance[95] = {
 // The widest digit, which every figure in the overlay's line takes: a number that is
 // rewritten several times a second must not move what stands after it. hud_step in
 // loading_text.glsl lays the line out the same way.
-inline constexpr float kHudDigitAdvance = 11.46f;
+inline constexpr float kHudDigitAdvance = 11.50f;
 // One line's width, in whatever units its cap is given in.
 inline constexpr float HudTextWidth(std::string_view text, float cap) {
     float width = 0.0f;

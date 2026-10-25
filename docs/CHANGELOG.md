@@ -2,6 +2,19 @@
 
 What changed in each release of ProsperoEden, newest first. A release's notes on GitHub are its section here.
 
+## v1.005.101
+
+**A game's update or DLC left in `roms/` beside it now applies.** A tester's Ori and the Will of the Wisps sat on "Starting the game" for minutes: it started as 1.0.0 without its 1.2.1 update, and 1.0.0 stopped there. Nightshade read updates from `updates/` and game folders only, so an update left in `roms/` beside its game was never applied. Now an update or DLC file directly in `roms/` whose name holds its title ID, as dumps are named (`[01008DD013200800][v196608]`), applies to its game, the Library no longer lists it as a game of its own but counts it for its game, and **Delete from console** deletes it with the game. `updates/` and game folders work as before. See [Install](https://github.com/Oliv3rmoon/Nightshade/blob/v1.005.101/docs/INSTALL.md).
+
+### Also
+
+- **A start that shows no picture says why.** If "Starting the game" lasts 45 s, `stderr.log` gets an `EDEN_START_WAIT` line (whether the graphics were busy, and when the game last asked the system for something), and the game's last 64 service calls; again at 90 and 180 s. Send that log with a report.
+- The loading screen says Nightshade under the game's cover.
+
+### Install
+
+Nightshade v1.005.100 offers this update when it starts: choose **Update now**. Or copy this ZIP's `PPSA99008` folder over your current one, as before.
+
 ## v1.005.100
 
 **Nightshade: Oliv3rmoon's own release of ProsperoEden.** It's the official 1.005.000 with my fixes and features on top: everything from my test builds 2 and 3, every open community fix, a new name and a dark look of its own, and updates from this repository. It installs over the official app (same title ID, same `/data/prosperoeden`), so your games, settings, saves and covers stay. Built and checked by this repository's release workflow and test suite; not every change has been run on a console yet, so tell me how it goes.

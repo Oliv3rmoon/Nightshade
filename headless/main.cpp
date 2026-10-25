@@ -43,6 +43,7 @@
 #include "log_flusher.h"
 #include "multiplayer_logging.h"
 #include "mods.h"
+#include "loose_addons.h"
 #include "controller_applet.h"
 #include "error_applet.h"
 #include "keyboard_applet.h"
@@ -1605,6 +1606,14 @@ int main(int argc, char** argv) {
                 Settings::values.external_content_dirs = {Eden::GamesPath("updates")};
                 if (const std::string& folder = Eden::Mods::SessionGameFolder(); !folder.empty())
                     Settings::values.external_content_dirs.push_back(folder);
+                // And those left directly in roms/ beside a game there, by the title IDs in their
+                // names (loose_addons.h).
+                Eden::LooseAddOns::SessionFiles().clear();
+                if (game_title != 0 && Eden::Mods::SessionGameFolder().empty()) {
+                    Eden::LooseAddOns::SessionFiles() = Eden::LooseAddOns::FilesOf(Eden::GamesPath("roms"), game_title);
+                    for (const std::string& file : Eden::LooseAddOns::SessionFiles())
+                        std::fprintf(stderr, "[ProsperoEden] launch: Update or DLC beside the game in roms/: %s\n", file.c_str());
+                }
                 system.GetFileSystemController().CreateFactories(*system.GetFilesystem());
                 // The game's own contents, registered as Eden's desktop frontends do before booting a
                 // game (ConfigureFilesystemProvider). An update's data is a patch on the base game's:
