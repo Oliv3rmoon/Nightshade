@@ -4,7 +4,7 @@ What changed in each release of ProsperoEden, newest first. A release's notes on
 
 ## v1.005.101
 
-**A game's update or DLC left in `roms/` beside it now applies.** A tester's Ori and the Will of the Wisps sat on "Starting the game" for minutes: its 1.2.1 update was lying in `roms/` next to the game, Nightshade only read `updates/` and game folders, so the game started as 1.0.0, which stopped there. Now an update or DLC file directly in `roms/` whose name holds its title ID, as dumps are named (`[01008DD013200800][v196608]`), applies to its game, the Library no longer lists it as a game of its own but counts it for its game, and **Delete from console** deletes it with the game. `updates/` and game folders work as before. See [Install](https://github.com/Oliv3rmoon/Nightshade/blob/v1.005.101/docs/INSTALL.md).
+**A game's update or DLC left in `roms/` beside it now applies.** A tester's Ori and the Will of the Wisps sat on "Starting the game" for minutes: it started as 1.0.0 without its 1.2.1 update, and 1.0.0 stopped there. Nightshade read updates from `updates/` and game folders only, so an update left in `roms/` beside its game was never applied. Now an update or DLC file directly in `roms/` whose name holds its title ID, as dumps are named (`[01008DD013200800][v196608]`), applies to its game, the Library no longer lists it as a game of its own but counts it for its game, and **Delete from console** deletes it with the game. `updates/` and game folders work as before. See [Install](https://github.com/Oliv3rmoon/Nightshade/blob/v1.005.101/docs/INSTALL.md).
 
 ### Also
 

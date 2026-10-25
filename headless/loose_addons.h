@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 // An update or DLC file left directly in roms/ beside its game, where players put them: it applies
-// to its game and is not listed as a game of its own. A tester's Ori and the Will of the Wisps
-// started as 1.0.0 with its 1.2.1 update lying in roms/ (Eden reads updates/ and a game's own
-// folder only), and 1.0.0 stopped on its loading screen. In roms/ such a file is told by its name,
+// to its game and is not listed as a game of its own. Eden reads updates/ and a game's own folder
+// only, so such a file was never applied (a tester's Ori and the Will of the Wisps started as 1.0.0
+// without its 1.2.1 update and stopped on its loading screen). In roms/ such a file is told by its name,
 // which holds its title ID as dumps are named ("[01008DD013200800][v196608]"): a game's has its low
 // 13 bits clear, its update's and its DLC's do not, and both have the game's once those are cleared
 // (Eden's FileSys::GetBaseTitleID). A file named otherwise is a game, as before; updates/ and a
