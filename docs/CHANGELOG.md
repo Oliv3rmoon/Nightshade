@@ -8,6 +8,11 @@ What changed in each release of ProsperoEden, newest first. A release's notes on
 
 An update runs the helper of the version it updates from, so this one has to be copied by hand once from 1.005.100 or 1.005.101 (copy this ZIP's `PPSA99008` folder over yours). From 1.005.102 on, **Update now** applies the next one.
 
+### Also
+
+- The two frame generation texts that showed in English in every language (Frame gen method, and the message when MihawkGen's weights are missing) are translated in all 30.
+- A release build now stops on an untranslated text, and runs the update helper's own tests.
+
 ## v1.005.101
 
 **A game's update or DLC left in `roms/` beside it now applies.** A tester's Ori and the Will of the Wisps sat on "Starting the game" for minutes: it started as 1.0.0 without its 1.2.1 update, and 1.0.0 stopped there. Nightshade read updates from `updates/` and game folders only, so an update left in `roms/` beside its game was never applied. Now an update or DLC file directly in `roms/` whose name holds its title ID, as dumps are named (`[01008DD013200800][v196608]`), applies to its game, the Library no longer lists it as a game of its own but counts it for its game, and **Delete from console** deletes it with the game. `updates/` and game folders work as before. See [Install](https://github.com/Oliv3rmoon/Nightshade/blob/v1.005.101/docs/INSTALL.md).
