@@ -13,23 +13,23 @@ What changed in each release of ProsperoEden, newest first. A release's notes on
 
 ### New
 
-- **Play a game from your server without downloading it (experimental).** A download source with `"stream": true` in `sources.json` plays its games where they lie: Cross starts one at once, Square still downloads it. Your network decides loading and stutter. See [Playing a game where it lies](docs/DOWNLOADS.md#playing-a-game-where-it-lies). (Swordpdf/ProsperoEden#111)
-- **Games on a USB drive, everything else on the console.** `"games_folder"` in the settings file names a folder of its own for `roms/` and `updates/`. (Swordpdf/ProsperoEden#50, #149)
+- **Play a game from your server without downloading it (experimental).** A download source with `"stream": true` in `sources.json` plays its games where they lie: Cross starts one at once, Square still downloads it. Your network decides loading and stutter. See [Playing a game where it lies](https://github.com/Oliv3rmoon/ProsperoEden/blob/v1.005.100/docs/DOWNLOADS.md#playing-a-game-where-it-lies). (Swordpdf/ProsperoEden#111)
+- **Games on a USB drive, everything else on the console.** `"games_folder"` in the settings file names a folder of its own for `roms/` and `updates/`. (Swordpdf/ProsperoEden#50, Swordpdf/ProsperoEden#149)
 - **Fonts for translation mods.** A mod's replacement system font goes in `mods/0100000000000811/romfs/`. (Swordpdf/ProsperoEden#248)
-- **Pokémon Legends: Z-A:** a per-game `"vertex_input_dynamic": false` for the flashing colour after the train station. (Swordpdf/ProsperoEden#59, #112)
+- **Pokémon Legends: Z-A:** a per-game `"vertex_input_dynamic": false` for the flashing colour after the train station. (Swordpdf/ProsperoEden#59, Swordpdf/ProsperoEden#112)
 - **Compressed games:** NSZ and XCZ play as they are. (Swordpdf/ProsperoEden#285)
 - **Mihawk's newest PS5 graphics driver** (2026-10-13). Each game builds its shaders again the first time you play it.
 
 ### Fixes
 
-- **Long sessions crashing on a write to the game's own memory** (Dragon Quest VII and others): tested on a PS5 Pro, an hour where it crashed at 15 minutes. (Swordpdf/ProsperoEden#246, #296)
+- **Long sessions crashing on a write to the game's own memory** (Dragon Quest VII and others): tested on a PS5 Pro, an hour where it crashed at 15 minutes. (Swordpdf/ProsperoEden#246, Swordpdf/ProsperoEden#296)
 - **Big mods (UltraCam) stopping at the app's 3 GiB heap:** it can grow to 6 GiB. (Swordpdf/ProsperoEden#246)
-- **"Audio PCM queue capacity exceeded" crash:** the oldest audio is dropped instead. Tested: 30 minutes, no crash, no skips. (Swordpdf/ProsperoEden#270, #289)
+- **"Audio PCM queue capacity exceeded" crash:** the oldest audio is dropped instead. Tested: 30 minutes, no crash, no skips. (Swordpdf/ProsperoEden#270, Swordpdf/ProsperoEden#289)
 - **Metroid Prime 4 out of graphics memory:** staging buffers sized to their transfer. (Swordpdf/ProsperoEden#195)
-- **Controls dead after rest mode or the home menu:** the controller is opened again. (Swordpdf/ProsperoEden#97, #269)
-- **"Loader status 28":** now says which key your prod.keys is missing. (Swordpdf/ProsperoEden#206, #279, #295)
-- **Game folders:** a folder's mods no longer break its DLC (#288), forwarders find games moved into folders (#290), the home page shows them (#286), the newest of several updates is used whole (#287), and Settings counts them (#291).
-- **Idle cores no longer spin a CPU at 100%, and the overlay shows real load** (Kirby: tested, 30 FPS held). (Swordpdf/ProsperoEden#284, #275, #293)
+- **Controls dead after rest mode or the home menu:** the controller is opened again. (Swordpdf/ProsperoEden#97, Swordpdf/ProsperoEden#269)
+- **"Loader status 28":** now says which key your prod.keys is missing. (Swordpdf/ProsperoEden#206, Swordpdf/ProsperoEden#279, Swordpdf/ProsperoEden#295)
+- **Game folders:** a folder's mods no longer break its DLC (Swordpdf/ProsperoEden#288), forwarders find games moved into folders (Swordpdf/ProsperoEden#290), the home page shows them (Swordpdf/ProsperoEden#286), the newest of several updates is used whole (Swordpdf/ProsperoEden#287), and Settings counts them (Swordpdf/ProsperoEden#291).
+- **Idle cores no longer spin a CPU at 100%, and the overlay shows real load** (Kirby: tested, 30 FPS held). (Swordpdf/ProsperoEden#284, Swordpdf/ProsperoEden#275, Swordpdf/ProsperoEden#293)
 - **Smash 13.0.4 Skyline mods and post-processing paths.** (Swordpdf/ProsperoEden#276)
 
 ### For bug reports
