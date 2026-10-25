@@ -1331,11 +1331,12 @@ int main(int argc, char **argv)
         preferences.reduce_motion = names.find("calm") != std::string_view::npos;
         services.set_preferences(preferences);
     }
-    // PE_THEME=slate: the tour in another of the build's themes.
-    if (const char *theme = std::getenv("PE_THEME"); theme != nullptr && theme[0] != 0)
+    // PE_THEME=slate: the tour in another of the build's themes. Without it, Canopy: the tour's
+    // walks and checks follow Canopy's layout, whichever theme a new install starts with.
     {
+        const char *theme = std::getenv("PE_THEME");
         pe::ui::Preferences preferences = services.preferences();
-        preferences.theme = theme;
+        preferences.theme = theme != nullptr && theme[0] != 0 ? theme : "canopy";
         services.set_preferences(preferences);
     }
     pe::ui::Textures textures(batch, services);
