@@ -1,5 +1,5 @@
 {
- "name": "Launcher screens: Nightshade release",
+ "name": "Launcher screens: tour in every layout",
  "on": {
   "push": {
    "branches": [
@@ -57,14 +57,19 @@
     "matrix": {
      "include": [
       {
-       "ref": "7f4e10e81c774ab556da3670af79660a78b8ba21",
+       "ref": "98b986f1fdaa160b3a81811766dc1b576c910084",
        "theme": "",
-       "what": "release, default tour"
+       "what": "Canopy tour"
       },
       {
-       "ref": "7f4e10e81c774ab556da3670af79660a78b8ba21",
+       "ref": "98b986f1fdaa160b3a81811766dc1b576c910084",
        "theme": "nightly",
-       "what": "release, Nightshade theme"
+       "what": "Nightshade theme"
+      },
+      {
+       "ref": "98b986f1fdaa160b3a81811766dc1b576c910084",
+       "theme": "slate",
+       "what": "Slate theme"
       }
      ]
     }
