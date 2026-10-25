@@ -16,6 +16,7 @@
 #include <cstring>
 #include <time.h>
 #include "hud.h"
+#include "start_wait.h"
 #include "loading_art.h"
 #include "network/network.h"
 #include "loading_scene_glsl.h"
@@ -605,10 +606,27 @@ void ToggleHud() {
 HudSnapshot GetVulkanHud() {
     return vulkan_loading || hud_enabled.load(std::memory_order_relaxed) ? vulkan_hud : HudSnapshot{};
 }
+// A start that shows no picture for long says what the game was doing (start_wait.h). The GPU
+// counts as idle when it had no game commands waiting within the last second.
+void WatchStart(bool idle) {
+    static StartWait::Watch watch;
+    static std::int64_t idle_at = 0;
+    const std::int64_t now = Loading::Now();
+    if (idle) idle_at = now;
+    bool printed = false;
+    watch.Check(Loading::step.load(std::memory_order_relaxed) == static_cast<std::uint32_t>(Loading::Step::starting),
+                Loading::since.load(std::memory_order_relaxed), now, now - idle_at < 1000,
+                [&printed](const char* line) {
+                    std::fprintf(stderr, "%s\n", line);
+                    printed = true;
+                });
+    if (printed) std::fflush(stderr);
+}
 // idle: the GPU thread has no game commands waiting (hud.h, LoadingPace).
 bool LoadingTick(VideoCore::RendererBase& renderer, bool idle) {
 #ifdef EDEN_PS5_VULKAN
     if (vulkan_loading) {
+        WatchStart(idle);
         const double now = std::chrono::duration<double>(
             std::chrono::steady_clock::now().time_since_epoch()).count();
         const bool first = vulkan_loading_start < 0;
@@ -622,7 +640,9 @@ bool LoadingTick(VideoCore::RendererBase& renderer, bool idle) {
         return true;
     }
 #endif
-    return current_window_context && current_window_context->LoadingTick(idle);
+    const bool loading = current_window_context && current_window_context->LoadingTick(idle);
+    if (loading) WatchStart(idle);
+    return loading;
 }
 GraphicsWindow::GraphicsWindow(bool use_vulkan) : vulkan(use_vulkan) {
     vulkan_loading = vulkan;
