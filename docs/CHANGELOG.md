@@ -12,6 +12,7 @@ An update runs the helper of the version it updates from, so this one has to be 
 
 - The two frame generation texts that showed in English in every language (Frame gen method, and the message when MihawkGen's weights are missing) are translated in all 30.
 - A release build now stops on an untranslated text, and runs the update helper's own tests.
+- A game that keeps reading memory that isn't there no longer fills `eden_log.txt` in seconds: each session logs its first 64 such reads and writes, then one at each power of two with the count, so the log keeps what came before.
 
 ## v1.005.101
 
