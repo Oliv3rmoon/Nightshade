@@ -23,3 +23,14 @@ install, `mount_img.lnk`) before scanning the usual folders.
 In the kit itself, `self_update_check` also copies the catalog entry's
 `release_notes` and `release_notes_truncated` into the offer (`notes`,
 `notes_truncated`), for the update dialog's What's new view.
+
+`github_release.h` and `github_release.c` are ProsperoEden's own: a build that
+names a GitHub repository (`EDEN_UPDATE_REPOSITORY`) asks that repository's
+newest release instead of the catalog and fills the same offer, so the
+download, the helper and the dialog are the kit's, unchanged. Its trust is
+TLS and the release's own `SHA256SUMS`, not the catalog's signature (see the
+header). For it, `update_check.c` has one more reader,
+`update_check_json_array_value` (an array element of any type), and
+`self_update_ps5.c` has `self_update_check_self_from`, which is
+`self_update_check_self` when no repository is named. The host test is
+`headless/update_check_check.cpp` (`tools/check-update-check.py`).
