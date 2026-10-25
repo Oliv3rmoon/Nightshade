@@ -817,7 +817,13 @@ void CatalogUnchanged() {
 }
 } // namespace
 
-int main() {
+int main(int argc, char** argv) {
+    // tools/check-update-check.py: whether the update check takes a repository's name (1) or not
+    // (0), for headless/update_repository.cmake to be checked against.
+    if (argc == 3 && std::strcmp(argv[1], "--repository") == 0) {
+        std::printf("%d\n", github_release_repository_valid(argv[2]));
+        return 0;
+    }
     // The app's content version (sce_sys/param.json) is NN.NNN.NNN; a release's name is not one.
     unsigned parts[3];
     assert(update_check_version_parse("01.000.040", parts) == 1 && parts[0] == 1 && parts[1] == 0 && parts[2] == 40);

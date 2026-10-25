@@ -3378,11 +3378,7 @@ write_derived("${PORT_BUILD_DIR}/version/app_version.h"
 # Nightshade, this release line, asks its own repository (EDEN_UPDATE_REPOSITORY= for the catalog).
 set(EDEN_UPDATE_REPOSITORY "Oliv3rmoon/Nightshade" CACHE STRING
     "GitHub repository (owner/name) whose releases the update check asks; empty: the homebrew.page catalog")
-if(NOT EDEN_UPDATE_REPOSITORY STREQUAL "" AND
-   (NOT EDEN_UPDATE_REPOSITORY MATCHES "^[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9._-]+$" OR
-    EDEN_UPDATE_REPOSITORY MATCHES "/[.][.]?$"))
-    message(FATAL_ERROR "EDEN_UPDATE_REPOSITORY must be a GitHub repository as owner/name, not '${EDEN_UPDATE_REPOSITORY}'")
-endif()
+include("${EDEN_PORT_DIR}/update_repository.cmake") # refuses what the update check would refuse
 write_derived("${PORT_BUILD_DIR}/version/update_repository.h"
     "// Generated from EDEN_UPDATE_REPOSITORY (headless/CMakeLists.txt).\n#pragma once\n#define EDEN_UPDATE_REPOSITORY \"${EDEN_UPDATE_REPOSITORY}\"\n")
 target_include_directories(eden-headless PRIVATE "${PORT_BUILD_DIR}/version")
