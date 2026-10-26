@@ -248,6 +248,11 @@ msgstr "Batotas"
 msgid "Cheats folder"
 msgstr "Pasta de batotas"
 
+#. Names the mod made of the files put straight into a game's mods folder, without a folder of their own.
+#: pe/ui/library.cpp
+msgid "Unnamed mod"
+msgstr "Mod sem nome"
+
 #: pe/ui/pairing.cpp
 msgid "Check that the code there is this one, and approve."
 msgstr "Confirma que o código lá é este e aprova."

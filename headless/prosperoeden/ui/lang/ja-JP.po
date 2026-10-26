@@ -248,6 +248,11 @@ msgstr "チート"
 msgid "Cheats folder"
 msgstr "チートフォルダー"
 
+#. Names the mod made of the files put straight into a game's mods folder, without a folder of their own.
+#: pe/ui/library.cpp
+msgid "Unnamed mod"
+msgstr "名前のないMOD"
+
 #: pe/ui/pairing.cpp
 msgid "Check that the code there is this one, and approve."
 msgstr "表示されたコードがこのコードと同じことを確認し、承認してください。"

@@ -248,6 +248,11 @@ msgstr "สูตรโกง"
 msgid "Cheats folder"
 msgstr "โฟลเดอร์​สูตรโกง"
 
+#. Names the mod made of the files put straight into a game's mods folder, without a folder of their own.
+#: pe/ui/library.cpp
+msgid "Unnamed mod"
+msgstr "ม็อด​ไม่มี​ชื่อ"
+
 #: pe/ui/pairing.cpp
 msgid "Check that the code there is this one, and approve."
 msgstr "ตรวจสอบ​ว่า​รหัส​ที่​นั่น​ตรง​กับ​รหัส​นี้ แล้ว​อนุมัติ"

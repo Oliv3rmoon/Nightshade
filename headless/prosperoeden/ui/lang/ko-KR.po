@@ -248,6 +248,11 @@ msgstr "치트"
 msgid "Cheats folder"
 msgstr "치트 폴더"
 
+#. Names the mod made of the files put straight into a game's mods folder, without a folder of their own.
+#: pe/ui/library.cpp
+msgid "Unnamed mod"
+msgstr "이름 없는 모드"
+
 #: pe/ui/pairing.cpp
 msgid "Check that the code there is this one, and approve."
 msgstr "그곳의 코드가 이 코드와 같은지 확인하고 승인하세요."
