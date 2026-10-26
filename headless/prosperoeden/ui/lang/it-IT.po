@@ -248,6 +248,11 @@ msgstr "Trucchi"
 msgid "Cheats folder"
 msgstr "Cartella dei trucchi"
 
+#. Names the mod made of the files put straight into a game's mods folder, without a folder of their own.
+#: pe/ui/library.cpp
+msgid "Unnamed mod"
+msgstr "Mod senza nome"
+
 #: pe/ui/pairing.cpp
 msgid "Check that the code there is this one, and approve."
 msgstr "Controlla che il codice lì sia questo, poi approva."

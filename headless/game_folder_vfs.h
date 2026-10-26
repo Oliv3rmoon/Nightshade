@@ -4,6 +4,7 @@
 // mod (mods.h has the layout and the rules; the launcher lists the same with Mods::List). The
 // derived bis_factory.cpp returns this for the game's mod folder (headless/CMakeLists.txt).
 #pragma once
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <vector>
@@ -15,6 +16,29 @@
 #include "mods.h"
 
 namespace Eden::GameFolderMods {
+
+// The romfs/ and exefs/ put straight into the mods folders (Mods::kUnnamedMod), as one more
+// layer: <name>/<kUnnamedMod>/romfs/... Each part is the same part of every folder, the first
+// folder's files first, whatever the case of its name in each (RomFS/ and romfs/ are one).
+inline void AddUnnamed(std::vector<FileSys::VirtualDir>& layers, const std::string& name) {
+    std::vector<std::pair<std::string, std::vector<FileSys::VirtualDir>>> parts;
+    for (const auto& layer : layers)
+        for (auto& part : layer->GetSubdirectories()) {
+            if (!Mods::IsModPart(part->GetName())) continue;
+            const std::string key = Mods::Lower(part->GetName());
+            auto it = std::find_if(parts.begin(), parts.end(), [&](const auto& known) { return known.first == key; });
+            if (it == parts.end()) it = parts.insert(parts.end(), {key, {}});
+            it->second.push_back(std::move(part));
+        }
+    if (parts.empty()) return;
+    std::vector<FileSys::VirtualDir> merged;
+    for (auto& [key, folders] : parts)
+        merged.push_back(FileSys::LayeredVfsDirectory::MakeLayeredDirectory(std::move(folders), key));
+    auto mod = std::make_shared<FileSys::VectorVfsDirectory>(std::vector<FileSys::VirtualFile>{}, std::move(merged),
+                                                             std::string{Mods::kUnnamedMod});
+    layers.push_back(std::make_shared<FileSys::VectorVfsDirectory>(
+        std::vector<FileSys::VirtualFile>{}, std::vector<FileSys::VirtualDir>{std::move(mod)}, name));
+}
 
 // shared: the game's folder in mods/, or null.
 inline FileSys::VirtualDir Root(FileSys::VirtualDir shared, std::uint64_t title_id, std::string name) {
@@ -28,6 +52,7 @@ inline FileSys::VirtualDir Root(FileSys::VirtualDir shared, std::uint64_t title_
             if (Mods::IsFolder(entry) && Mods::Lower(entry.path().filename().string()) == "mods")
                 if (auto mods = vfs.OpenDirectory(entry.path().string(), FileSys::OpenMode::Read)) layers.push_back(mods);
     if (shared) layers.push_back(std::move(shared));
+    AddUnnamed(layers, name);
     std::vector<FileSys::VirtualFile> files;
     for (const auto& path : Mods::CheatFolderFiles(places, title_id))
         if (auto file = vfs.OpenFile(path.string(), FileSys::OpenMode::Read)) files.push_back(std::move(file));

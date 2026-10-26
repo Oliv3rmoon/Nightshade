@@ -54,6 +54,11 @@ namespace fs = std::filesystem;
 // The mod the cheats/ folders make (roms/<game>/cheats/ and cheats/<title ID>/).
 inline constexpr std::string_view kCheatsFolder = "Cheats folder";
 
+// The mod a mods folder's own romfs/ and exefs/ make, put there without a folder of their own
+// (mods/<title ID>/romfs/...). Eden reads a mod's parts one folder down, so such files applied
+// nothing; game_folder_vfs.h shows Eden them in a folder of this name.
+inline constexpr std::string_view kUnnamedMod = "Unnamed mod";
+
 // Where a game's mods are: the game files folder's mods/ and cheats/, and the game's own folder in
 // roms/ (empty for a game directly in roms/).
 struct Places {
@@ -106,6 +111,12 @@ inline std::string Lower(std::string_view text) {
     std::string result(text);
     for (char& c : result) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
     return result;
+}
+
+// A folder Eden reads inside a mod (patch_manager.cpp): not a mod itself.
+inline bool IsModPart(std::string_view name) {
+    const std::string lower = Lower(name);
+    return lower == "exefs" || lower == "romfs" || lower == "romfslite" || lower == "romfs_ext";
 }
 
 inline std::string TitleName(uint64_t title_id) {
@@ -240,14 +251,18 @@ inline Mod WithCheats(std::string name, unsigned kinds, std::vector<Patches::Ent
 }
 
 // The game's mods, in the order Eden applies them: those of its own folder, then those of mods/
-// that it has none of the same name of, and the cheats/ folders' cheats as one more.
+// that it has none of the same name of, the files put straight into either as kUnnamedMod, and
+// the cheats/ folders' cheats as one more.
 inline std::vector<Mod> List(const Places& places, uint64_t title_id) {
     std::vector<Mod> mods;
     std::set<std::string> names;
+    unsigned unnamed = 0;
     const auto add_folder = [&](const std::string& folder) {
+        unnamed |= Kinds(folder) & (kCode | kFiles);
         for (const auto& entry : ListFolder(folder)) {
             const std::string name = entry.path().filename().string();
             if (name == kCheatsFolder || names.contains(name)) continue;
+            if (IsFolder(entry) && IsModPart(name)) continue;
             if (IsFolder(entry)) {
                 if (const unsigned kinds = Kinds(entry.path())) {
                     mods.push_back(WithCheats(name, kinds, kinds & kCheats ? CheatList(entry) : std::vector<Patches::Entry>{}));
@@ -263,6 +278,7 @@ inline std::vector<Mod> List(const Places& places, uint64_t title_id) {
         for (const auto& entry : ListFolder(places.game_folder))
             if (IsFolder(entry) && Lower(entry.path().filename().string()) == "mods") add_folder(entry.path().string());
     if (const std::string folder = TitleFolder(places.mods, title_id); !folder.empty()) add_folder(folder);
+    if (const std::string name{kUnnamedMod}; unnamed && !names.contains(name)) mods.push_back({name, unnamed, {}, {}});
     if (auto files = CheatFolderFiles(places, title_id); !files.empty()) {
         const std::string name{kCheatsFolder};
         mods.push_back(WithCheats(name, kCheats, CheatList(std::move(files), name)));

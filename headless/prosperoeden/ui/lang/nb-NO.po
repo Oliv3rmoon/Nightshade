@@ -248,6 +248,11 @@ msgstr "Juksekoder"
 msgid "Cheats folder"
 msgstr "Mappe for juksekoder"
 
+#. Names the mod made of the files put straight into a game's mods folder, without a folder of their own.
+#: pe/ui/library.cpp
+msgid "Unnamed mod"
+msgstr "Mod uten navn"
+
 #: pe/ui/pairing.cpp
 msgid "Check that the code there is this one, and approve."
 msgstr "Kontroller at koden der er denne, og godkjenn."

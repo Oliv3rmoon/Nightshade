@@ -3,8 +3,12 @@
 // the pinned source could not apply: headless/CMakeLists.txt), what the launcher lists from a
 // game's mods folder (mods.h), the names it switches off (settings_store.h), and the cheats chosen
 // one by one (cheats.h) as Eden's own parser reads them.
+#include "game_folder_vfs.h"
 #include "mods.h"
 #include "settings_store.h"
+
+#include <algorithm>
+#include <cstring>
 
 #include <cstdint>
 #include <cstdio>
@@ -190,6 +194,83 @@ void check_game_folder(const fs::path& base) {
     require(mods[0].cheats.size() == 4, "game folder: the cheats of both files");
     require(List(Places{(base / "mods").string(), (base / "cheats").string(), {}}, game).size() == 3,
             "a game directly in roms/: mods/ and cheats/ only");
+}
+
+FileSys::VirtualDir folder(const char* name, std::vector<FileSys::VirtualFile> files,
+                           std::vector<FileSys::VirtualDir> dirs = {}) {
+    return std::make_shared<FileSys::VectorVfsDirectory>(std::move(files), std::move(dirs), name);
+}
+
+std::string text(const FileSys::VirtualFile& file) {
+    require(file != nullptr, "unnamed mod: a file Eden reads");
+    const auto bytes = file->ReadAllBytes();
+    return {bytes.begin(), bytes.end()};
+}
+
+// The mods Eden takes a part from (patch_manager.cpp: each subfolder of the mods folder, and its
+// part found whatever its case): mod name, then that part.
+std::vector<std::pair<std::string, FileSys::VirtualDir>> eden_parts(const FileSys::VirtualDir& load, std::string_view part) {
+    std::vector<std::pair<std::string, FileSys::VirtualDir>> out;
+    for (const auto& mod : load->GetSubdirectories())
+        for (const auto& sub : mod->GetSubdirectories())
+            if (Eden::Mods::Lower(sub->GetName()) == part && (!sub->GetFiles().empty() || !sub->GetSubdirectories().empty()))
+                out.emplace_back(mod->GetName(), sub);
+    return out;
+}
+
+// romfs/ and exefs/ put straight into a mods folder, without a folder of their own: one mod,
+// kUnnamedMod, in the launcher's list and in what Eden reads (game_folder_vfs.h).
+void check_unnamed(const fs::path& base) {
+    using namespace Eden::Mods;
+    using FileSys::VirtualDir;
+    const std::uint64_t game = 0x01008DD013200000ULL;
+    const fs::path game_folder = base / "roms" / "Ori";
+    write_text(base / "mods" / "01008DD013200000" / "romfs" / "Data" / "data_0.unity3d", "x");
+    write_text(base / "mods" / "01008DD013200000" / "Texture pack" / "romfs" / "a.bin", "x");
+    const Places shared_only{(base / "mods").string(), {}, {}};
+    auto mods = List(shared_only, game);
+    require(mods.size() == 2 && mods[0].name == "Texture pack" && mods[1].name == std::string(kUnnamedMod) &&
+                mods[1].kinds == kFiles,
+            "unnamed mod: listed beside the named one, romfs/ itself no mod");
+    write_text(game_folder / "mods" / "ExeFS" / "0123456789ABCDEF.pchtxt", "@enabled\n");
+    mods = List(Places{(base / "mods").string(), {}, game_folder.string()}, game);
+    require(mods.size() == 2 && mods[1].name == std::string(kUnnamedMod) && mods[1].kinds == (kCode | kFiles),
+            "unnamed mod: one, from the game's folder and mods/ together");
+
+    const std::string name = "01008DD013200000";
+    const auto file = [](const char* file_name, const char* bytes) -> FileSys::VirtualFile {
+        return std::make_shared<FileSys::VectorVfsFile>(std::vector<u8>(bytes, bytes + std::strlen(bytes)), file_name);
+    };
+    const auto load = [&](std::vector<VirtualDir> layers) {
+        Eden::GameFolderMods::AddUnnamed(layers, name);
+        return layers.size() == 1 ? layers.front()
+                                  : FileSys::LayeredVfsDirectory::MakeLayeredDirectory(std::move(layers), name);
+    };
+    // As a player put it: mods/<title ID>/romfs/Data/...
+    const auto alone = folder(name.c_str(), {}, {folder("romfs", {}, {folder("Data", {file("data_0.unity3d", "mod")})})});
+    require(eden_parts(alone, "romfs").empty(), "unnamed mod: Eden alone finds nothing in it");
+    const auto romfs = eden_parts(load({alone}), "romfs");
+    require(romfs.size() == 1 && romfs[0].first == kUnnamedMod &&
+                text(romfs[0].second->GetSubdirectory("Data")->GetFile("data_0.unity3d")) == "mod",
+            "unnamed mod: Eden reads its files");
+    // Both places, either case: one part each, the game folder's files first.
+    const auto own = folder("mods", {}, {folder("RomFS", {}, {folder("Data", {file("data_0.unity3d", "game")})}),
+                                         folder("exefs", {file("0123456789ABCDEF.pchtxt", "@enabled\n")})});
+    const auto shared = folder(name.c_str(), {}, {folder("romfs", {}, {folder("Data", {file("data_0.unity3d", "shared"),
+                                                                                       file("other.bin", "s")})}),
+                                                  folder("Texture pack", {}, {folder("romfs", {file("a.bin", "a")})})});
+    const auto both = load({own, shared});
+    const auto files = eden_parts(both, "romfs");
+    const auto unnamed = std::find_if(files.begin(), files.end(), [](const auto& m) { return m.first == kUnnamedMod; });
+    require(files.size() == 2 && unnamed != files.end(), "unnamed mod: with the named one, romfs/ itself no mod");
+    const auto data = unnamed->second->GetSubdirectory("Data");
+    require(text(data->GetFile("data_0.unity3d")) == "game" && text(data->GetFile("other.bin")) == "s",
+            "unnamed mod: the game folder's file first, the other folder's too");
+    const auto code = eden_parts(both, "exefs");
+    require(code.size() == 1 && code[0].first == kUnnamedMod, "unnamed mod: its exefs patch");
+    std::vector<VirtualDir> named{folder(name.c_str(), {}, {folder("Texture pack", {}, {folder("romfs", {file("a.bin", "a")})})})};
+    Eden::GameFolderMods::AddUnnamed(named, name);
+    require(named.size() == 1, "unnamed mod: none without loose parts");
 }
 
 void check_cheats(const fs::path& base) {
@@ -420,10 +501,11 @@ int main() {
     check_listing(base);
     check_cheats(base);
     check_game_folder(base);
+    check_unnamed(base);
     check_cheats_list(base);
     check_settings(base);
     fs::remove_all(base);
     std::puts("Mods: IPS and IPS32 patches, .pchtxt hex, text and long values, the folder listing, a game's own folder, "
-              "switching off per game, the game's Mods and Cheats switches, cheats chosen one by one, the Cheats "
-              "list PASS");
+              "files put straight into a mods folder (unnamed mod), switching off per game, the game's Mods and "
+              "Cheats switches, cheats chosen one by one, the Cheats list PASS");
 }

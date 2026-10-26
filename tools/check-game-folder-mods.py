@@ -8,7 +8,8 @@ folder's mods were given for all of them, and the game's disabled list (its titl
 cover its DLC: a mod switched off for the game still applied to its DLC's data. This compiles
 headless/mods.h, makes a game folder with a mod and a cheat file, and checks which titles get
 them; and that the patch manager's mod folder (game_folder_vfs.h) and the frontend (main.cpp)
-go by it.
+go by it. Also that romfs/ put straight into mods/<title ID>/ is listed as one mod (Mods::kUnnamedMod),
+which game_folder_vfs.h shows Eden.
 """
 from pathlib import Path
 import os, subprocess, tempfile
@@ -17,6 +18,8 @@ root = Path(__file__).resolve().parents[1]
 vfs = (root / 'headless/game_folder_vfs.h').read_text()
 assert 'Mods::GameFolderFor(title_id)}' in vfs and 'Mods::SessionGameFolder()}' not in vfs, \
     'game_folder_vfs.h must take the game folder for the asked title only'
+assert '    AddUnnamed(layers, name);\n' in vfs, \
+    'game_folder_vfs.h must show Eden the files put straight into a mods folder (Mods::kUnnamedMod)'
 main = (root / 'headless/main.cpp').read_text()
 assert main.count('Eden::Mods::SessionTitle() = 0;') == 1 and main.count('Eden::Mods::SessionTitle() = game_title;') == 1
 
@@ -56,6 +59,12 @@ int main(int, char** argv) {
     SessionGameFolder().clear();
     SessionTitle() = base;
     assert(GameFolderFor(base).empty());
+    // Files put straight into a mods folder, without a folder of their own: one mod, kUnnamedMod.
+    const fs::path shared = fs::path(argv[1]) / "mods" / "0100152000022000";
+    fs::create_directories(shared / "romfs" / "Data");
+    std::ofstream(shared / "romfs" / "Data" / "data_0.unity3d") << "x";
+    const auto loose = List(Places{(fs::path(argv[1]) / "mods").string(), "", ""}, base);
+    assert(loose.size() == 1 && loose[0].name == kUnnamedMod && loose[0].kinds == kFiles);
     std::puts("game folder mods: PASS");
 }
 '''
@@ -64,4 +73,5 @@ with tempfile.TemporaryDirectory() as tmp:
     subprocess.run([os.environ.get('CXX', 'c++'), '-std=c++20', '-Wall', '-Wextra', '-Werror',
                     '-I' + str(root / 'headless'), '-x', 'c++', '-', '-o', str(exe)], input=code, text=True, check=True)
     subprocess.run([str(exe), tmp], check=True)
-print("Game folder mods: PASS a game folder's mods and cheats apply to its own title, not its DLC or update")
+print("Game folder mods: PASS a game folder's mods and cheats apply to its own title, not its DLC or update; "
+      "files put straight into a mods folder are one mod")

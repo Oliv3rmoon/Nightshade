@@ -248,6 +248,11 @@ msgstr "Cheats"
 msgid "Cheats folder"
 msgstr "Cheat-Ordner"
 
+#. Names the mod made of the files put straight into a game's mods folder, without a folder of their own.
+#: pe/ui/library.cpp
+msgid "Unnamed mod"
+msgstr "Unbenannter Mod"
+
 #: pe/ui/pairing.cpp
 msgid "Check that the code there is this one, and approve."
 msgstr "Prüfen, dass dort dieser Code steht, und bestätigen."

@@ -248,6 +248,11 @@ msgstr "Csalások"
 msgid "Cheats folder"
 msgstr "Csalások mappája"
 
+#. Names the mod made of the files put straight into a game's mods folder, without a folder of their own.
+#: pe/ui/library.cpp
+msgid "Unnamed mod"
+msgstr "Névtelen mod"
+
 #: pe/ui/pairing.cpp
 msgid "Check that the code there is this one, and approve."
 msgstr "Ellenőrizd, hogy ott ugyanez a kód látható, és hagyd jóvá."

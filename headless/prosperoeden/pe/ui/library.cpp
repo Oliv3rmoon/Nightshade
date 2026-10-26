@@ -63,6 +63,8 @@ constexpr const char *kKindNames[] = {TR("Console mode"), TR("Video"),    TR("Pe
 
 // The mod Eden makes of a game's cheats folder (headless/mods.h), named in the player's language.
 constexpr const char *kCheatsFolder = TR("Cheats folder");
+// The mod of the files put straight into a game's mods folder (headless/mods.h), named so too.
+constexpr const char *kUnnamedMod = TR("Unnamed mod");
 
 // How many settings a game has of its own.
 int changes_of(const GameSettings &game)
@@ -1271,8 +1273,9 @@ void Launcher::draw_mods_pane(Canvas &c, const Rect &pane, bool active)
         const Mod &mod = mods_[static_cast<std::size_t>(row)];
         const float top = row_top(row);
         list.push_opacity(active ? mod_rows_.row_alpha(row, height) : 1.0f);
-        // Its name as the player's folder has it, what it changes under it, its switch.
-        text_fit(c, mod.name, pane.x + 28.0f, baseline(top + 10.0f, 36.0f, t.size_text), t.size_text,
+        // Its name as the player's folder has it (the unnamed mod's in their language), what it
+        // changes under it, its switch.
+        text_fit(c, mod.name == "Unnamed mod" ? std::string{tr(kUnnamedMod)} : mod.name, pane.x + 28.0f, baseline(top + 10.0f, 36.0f, t.size_text), t.size_text,
                  mod.enabled && live ? t.value : t.meta, pane.w - 28.0f - 120.0f);
         text_shrink(c, mod.kind, pane.x + 28.0f, baseline(top + 46.0f, 26.0f, 18.0f), 18.0f, t.meta,
                     pane.w - 28.0f - 120.0f);

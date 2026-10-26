@@ -2072,6 +2072,10 @@ msgstr ""
 msgid "Unlinked. Its save data is no longer synced."
 msgstr ""
 
+#: pe/ui/library.cpp
+msgid "Unnamed mod"
+msgstr ""
+
 #. Update dialog headline while the downloaded release is extracted.
 #: pe/ui/update.cpp
 msgid "Unpacking"

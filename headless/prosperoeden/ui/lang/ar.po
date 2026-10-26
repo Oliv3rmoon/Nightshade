@@ -248,6 +248,11 @@ msgstr "شفرات غش"
 msgid "Cheats folder"
 msgstr "مجلد شفرات الغش"
 
+#. Names the mod made of the files put straight into a game's mods folder, without a folder of their own.
+#: pe/ui/library.cpp
+msgid "Unnamed mod"
+msgstr "تعديل بلا اسم"
+
 #: pe/ui/pairing.cpp
 msgid "Check that the code there is this one, and approve."
 msgstr "تأكد أن الرمز هناك هو هذا الرمز، ثم وافق."
