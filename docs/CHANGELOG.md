@@ -2,6 +2,14 @@
 
 What changed in each release of ProsperoEden, newest first. A release's notes on GitHub are its section here.
 
+## v1.005.104
+
+**A mod copied straight into the mods folder works.** A mod's `romfs` or `exefs` folder put directly in `mods/<title ID>/` (or a game folder's `mods/`), without a folder of its own, applied nothing: Eden reads a mod's files one folder down, so it took `romfs` for the mod's name and found nothing in it. A tester's Ori mod at `mods/01008DD013200000/romfs/Data/` did not load. Such files are now one mod, **Unnamed mod**, with its own switch in the game's Mods list (in all 30 languages). Mods in folders of their own work as before. See [Mods and cheats](https://github.com/Oliv3rmoon/Nightshade/blob/v1.005.104/docs/MODS.md).
+
+### Install
+
+From 1.005.102 or 1.005.103, **Update now** applies it. If it doesn't, send `/data/prosperoeden/logs/updater.log`. From an older version, copy this ZIP's `PPSA99008` folder over yours.
+
 ## v1.005.103
 
 **Cross on a game from your server plays it, on the home screen too.** In the Nightshade theme (and Slate) the home screen's grid is the Library, but Cross on a game that is only on a download source put it in the download queue, and on one already downloading cancelled it. Now it downloads the game and starts it, as Cross does in the Library (Square still only queues it), and so does Play on the game panel. Game settings on such a game says why it has none yet.
