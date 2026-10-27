@@ -100,8 +100,9 @@ Inside this repository, in `.deps/`:
   `headless/` replaces and derives sources at configure time (`headless/inject.cmake`). This
   fork also patches a few of Eden's files when `make prepare` extracts them
   (`tools/eden-patches/*.diff`, in name order, each applied once): faster reads of game files,
-  per-game cache storage, bounds-checked shader local memory, and CPU reads of GPU-cached
-  pages without reactive flushing.
+  per-game cache storage, bounds-checked shader local memory, CPU reads of GPU-cached pages
+  without reactive flushing, and the shader instruction `ATOM.CAS` (compare and swap in global
+  memory).
 - **FFmpeg** at the commit Eden pins, built with only the decoders games use.
 - **PS5 OpenGL 4.6 SDK 1.0.2** (release archive), for the launcher and the OpenGL renderer.
 - **OpenSSL, zlib, libcurl and libpsl** from pacbrew v0.40.2.
