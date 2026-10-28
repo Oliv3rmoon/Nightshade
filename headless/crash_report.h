@@ -72,7 +72,8 @@ void Install(const std::string& logs_folder, const char* version, bool restarted
 void SetSession(const std::string& text, bool game) noexcept;
 
 // The app found an error it cannot continue from (an exception nothing caught): the report says
-// why, then the same course as for a signal. Does not return.
+// why, then the same course as for a signal, except that VK_ERROR_DEVICE_LOST closes the app: the
+// GPU it stopped on is still stuck for an app started again. Does not return.
 [[noreturn]] void Fail(const char* reason) noexcept;
 
 // For the checks (tools/check-crash-report.py).

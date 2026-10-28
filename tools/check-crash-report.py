@@ -195,6 +195,8 @@ int main(int argc, char** argv) {
             Eden::Crash::NameThread("Thrower");
             throw std::runtime_error("test exception: nothing caught it");
         }).join();
+    if (mode == "lost")  // what Vulkan throws when the GPU stops responding
+        std::thread([] { throw std::runtime_error("VK_ERROR_DEVICE_LOST"); }).join();
     const auto crash = [] {
         Eden::Crash::NameThread("CPUCore_1");
         Outer(reinterpret_cast<volatile int*>(bad));
@@ -328,6 +330,13 @@ def check(binary, console):
     assert status == 42 and 'what: the app stopped itself\nreason: test exception: nothing caught it\n' in report, \
         (status, report[:400], err[-400:])
     assert '\nthread: Thrower (0x' in report and note.endswith(' 1\n')
+
+    # The GPU stopped: the app closes, since an app started again would find it still stuck.
+    status, out, err, reports, note = run(binary, 'lost', console)
+    report = reports[0].read_text() if reports else ''
+    assert status == 43 and out == 'EXIT\n' and note.endswith(' 0\n'), (status, out, note, err[-400:])
+    assert 'reason: VK_ERROR_DEVICE_LOST\n' in report and report.endswith(
+        'then: the app closes (the GPU stopped responding, and an app started again would find it stuck)\n'), report[-300:]
 
     # Four threads at once: one report, one restart.
     status, out, err, reports, note = run(binary, 'many', console)

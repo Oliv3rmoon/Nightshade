@@ -176,7 +176,8 @@ sudo apt install --no-install-recommends $(grep -v '^#' tools/ci/ubuntu-packages
 
 When the app crashes it writes `crash-YYYYMMDD-HHMMSS.txt` to its logs folder
 (`/data/prosperoeden/logs`), starts again and says on the home screen where the report is
-(`headless/crash_report.h`). At the next start that run's logs are moved beside the report
+(`headless/crash_report.h`). When the GPU stopped responding (`VK_ERROR_DEVICE_LOST`) it closes
+instead: an app started again would find the GPU still stuck. At the next start that run's logs are moved beside the report
 (`-stderr.log`, `-heap.log`, `-eden_log.txt`); the five newest reports are kept.
 
 The report lists addresses as `eboot+0x...`. To get function names, files and lines:
