@@ -101,8 +101,9 @@ Inside this repository, in `.deps/`:
   fork also patches a few of Eden's files when `make prepare` extracts them
   (`tools/eden-patches/*.diff`, in name order, each applied once): faster reads of game files,
   per-game cache storage, bounds-checked shader local memory, CPU reads of GPU-cached pages
-  without reactive flushing, and the shader instruction `ATOM.CAS` (compare and swap in global
-  memory).
+  without reactive flushing, the shader instruction `ATOM.CAS` (compare and swap in global
+  memory), and coherent storage buffers in shaders that use atomics, so a wait on another
+  workgroup's write or an emulated atomic's retry reads memory instead of a stale cached copy.
 - **FFmpeg** at the commit Eden pins, built with only the decoders games use.
 - **PS5 OpenGL 4.6 SDK 1.0.2** (release archive), for the launcher and the OpenGL renderer.
 - **OpenSSL, zlib, libcurl and libpsl** from pacbrew v0.40.2.
