@@ -172,6 +172,28 @@ def git(*args, cwd=None):
     subprocess.run(['git', *args], cwd=cwd, check=True)
 
 
+def seed(item, path):
+    """Files a checkout's own setup downloads, put where it looks first, from the first of their
+    addresses that answers with the pinned hash: the setup then skips its own download. zlib.net
+    answered a release build with something other than zlib (the boilerplate's sha256 check
+    stopped it); GitHub's copy of the same archive is asked first."""
+    for entry in item.get('seed', []):
+        algorithm, expected = pinned_hash(entry)
+        target = path / entry['to']
+        if target.exists() and digest(target, algorithm) == expected:
+            continue
+        for url in entry['urls']:
+            try:
+                cached = download(url, algorithm, expected, target.name)
+            except SystemExit:  # download() has said why; the next address may answer
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(cached, target)
+            break
+        else:
+            fail(f'{item["name"]}: no address gave {entry["to"]} with its pinned {algorithm}')
+
+
 def fetch_git(item):
     path = location(item)
     if not path.exists():
@@ -187,6 +209,7 @@ def fetch_git(item):
             fail(f'{item["name"]}: fetched {head}, pinned {item["commit"]}')
         staging.rename(path)
     if 'setup' in item and not (path / item['setup_creates']).exists():
+        seed(item, path)
         print(f'deps: setting up {item["name"]}: {" ".join(item["setup"])}', flush=True)
         subprocess.run(item['setup'], cwd=path, check=True)
 
