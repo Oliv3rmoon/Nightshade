@@ -17,8 +17,6 @@ CXXFLAGS := -std=c++20 -O2 -Wall -Wextra -Werror -fno-exceptions -fno-rtti -I$(R
 CFLAGS := -std=c11 -I../update_check -O2 -Wall -Wextra -Werror -DUPDATE_CHECK_NO_NETWORK
 MINIZ_CFLAGS := -std=c11 -O2 -w
 LDFLAGS := -Wl,--build-id=none
-# ProsperoEden: sceLncUtil, for the app the console runs (an install of another app, main.cpp).
-LIBS := -lSceSystemService
 
 CXX_SOURCES := main.cpp updater.cpp archive.cpp files.cpp
 C_SOURCES := ../update_check/self_update_sha256.c ../update_check/update_check.c
@@ -43,7 +41,7 @@ $(WORK)%.o: %.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(OUTPUT): $(OBJECTS)
-	$(CXX) $(LDFLAGS) -o $@ $^ $(LIBS)
+	$(CXX) $(LDFLAGS) -o $@ $^
 
 clean:
 	rm -rf -- $(WORK)
