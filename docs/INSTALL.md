@@ -135,6 +135,61 @@ When ProsperoEden updates itself, the files of the version it replaces are kept 
 
 The update will be offered again the next time ProsperoEden opens; choose **Skip** to stay on the version you put back. Settings, saves and game files are not part of this: they stay as they are. An update done by hand, by copying a release over the app's folder, keeps no previous version.
 
+## Nightshade's apps
+
+**Settings > Apps** gets, updates and opens Nightshade TV (`PPSA99003`), Nightshade Stream
+(`PPSA99002`) and Nightshade Station (`PPSA98510`), Nightshade's own release lines of
+[ProsperoTV](https://github.com/blackbearreloaded/ProsperoTV),
+[ProsperoLight](https://github.com/blackbearreloaded/ProsperoLight) and
+[SwanStationPS5](https://github.com/darkxex/SwanStationPS5). The list is
+`headless/prosperoeden/pe/ui/apps_list.hpp`.
+
+**What is installed.** When Settings opens, Nightshade looks for each app: where ShadowMountPlus
+recorded it mounted the app from (`/user/app/<title ID>/mount.lnk`), then the folders beside
+Nightshade's own and in `/data/homebrew`, whatever their name, by the title ID in their
+`sce_sys/param.json`; the version shown is that file's `contentVersion`. An app ShadowMountPlus
+mounts from an image is shown, and opens, but is not updated here: replace the image. This needs
+the filesystem access Nightshade asks for when it starts; without it the dialog says it can't tell
+what is installed, offers **Get** for every app with a release and **Open** on Square.
+
+**What is offered.** The first time the dialog opens in a session (and on Triangle), Nightshade asks
+GitHub for the newest release of each app's Nightshade repository (`releases/latest`, one or two of
+the 60 requests an hour GitHub allows an address without an account). While that repository has no
+release, the newest release of the project the app is based on is offered instead, and the row says
+"of the original project". The release must have the file `<title ID>.zip`, whose top folder
+`<title ID>/` holds `eboot.bin` and `sce_sys/param.json`. Its SHA-256 is the one the release's
+`SHA256SUMS` lists for it; a release without `SHA256SUMS` is checked against the SHA-256 GitHub
+keeps of each file it holds. A release with neither, or whose two differ, is not offered, and the
+row says why. A release is an update when its tag names a higher version than the one installed: a
+tag such as `01.000.090` or `v1.005.100` is the version, and the ZIP must hold that version; `1.5.9`
+is compared as `01.005.009`, and then the ZIP's own version is installed. A tag that names no
+version is always offered.
+
+**Get and Update.** The ZIP is downloaded from GitHub, checked against its SHA-256 as it arrives,
+and streamed to the update helper (`self-updater.elf`, sent to the payload loader on port 9021, as
+for [Nightshade's own updates](#updating)), which checks it again and unpacks it. Circle cancels
+until the files are put in place; nothing changes before. A new app goes in a folder named after its
+title ID beside Nightshade's (`/data/homebrew/PPSA99003` when Nightshade is in
+`/data/homebrew/PPSA99008`); the helper refuses when a folder of that name is there already, or the
+app is installed somewhere else. An update replaces the entries the release has in the app's folder
+and keeps the rest, and the files it replaced are kept in
+`/data/prosperoeden/previous-version/<title ID>-backup`, as for Nightshade. Nightshade stays open,
+and the console shows a notification too. A new app appears on the home screen after the homebrew
+loader's (ShadowMountPlus's) next scan, or after a restart. The helper writes what it did to
+`/data/prosperoeden/logs/updater.log`, which keeps the last update or install. To install an app by
+hand instead, copy the `<title ID>` folder from its release ZIP to `/data/homebrew`.
+
+**Open.** A PS5 app cannot start another one itself. Nightshade sends `app-launch.elf`, from its own
+folder, to the payload loader on port 9021 and tells it which app to open; once it has answered,
+Nightshade closes, and the payload waits for it to be gone (up to 30 seconds) and starts the app as
+the PS5's foreground user. It refuses an app the console doesn't list yet (a new one before the
+homebrew loader's scan), and Nightshade then stays open and says so. With no payload loader
+listening, Nightshade says that too: start the app from the home screen. The payload writes each
+step to `/data/prosperoeden/logs/app-launch.log`. It is based on the Game Forwarder's launch payload
+of Mihawk's [PS5 RetroArch](https://github.com/mihawk-99/PS5_RetroArch) (`forwarder/launch.c`).
+
+Nightshade writes what it found and did under "apps" in its log.
+
 ## Upgrading from an earlier alpha
 
 Earlier versions read everything from `/data/homebrew/PPSA99008/assets/`. That folder keeps working until you choose a game files folder, and settings are migrated automatically on first launch. To move to the new layout, move `assets/keys`, `assets/firmware` and `assets/roms` into any folder, then select it in **Settings > Game files**. The release ZIP contains no user files, so copy its app files over your installation without deleting your own data.

@@ -70,6 +70,7 @@ Local-wireless multiplayer through Eden rooms is new in v1.000.110 and experimen
 - **Settings in one place** - a single JSON file under `/data/prosperoeden`, with game volume, mute, and detailed logging options. Logs keep the previous session.
 - **Speed limit** - **Settings > Performance > Speed limit** (and each game's own) lets a game run at 150%, 200%, 300% or without a limit: a game locked to 30 FPS can reach 60 at 200% when the console has time to spare, and a game timed by its frames plays faster with it; see [Speed limit](docs/SETTINGS.md#speed-limit).
 - **Updates from the menu** - when a newer release is listed on [homebrew.page](https://homebrew.page/ps5), ProsperoEden offers to install it each time it opens; **Skip** keeps the current version, and **Settings > Diagnostics > Update notices** off stops the offer (About still names the newer version); see [Updating](docs/INSTALL.md#updating). A build made with a GitHub repository set (`EDEN_UPDATE_REPOSITORY`, [docs/BUILDING.md](docs/BUILDING.md#make-targets)) checks that repository's releases instead.
+- **Apps** - Nightshade TV, Nightshade Stream and Nightshade Station, got, updated and opened from **Settings > Apps**; see [Apps](#apps).
 - **Crash reports** - if ProsperoEden stops because of an error, it saves a report with that session's logs, starts again and shows where the report is. **Settings > Diagnostics** also keeps the FTP log-folder path visible; attach the dated `crash-*.txt` report and its matching logs.
 - **Controllers, audio, and saves** - up to four DualSense controllers (one per signed-in PS5 user) with rumble and motion controls, game audio, and save data work out of the box. A game that gives a player a single Joy-Con is played with the whole DualSense: the shapes are that Joy-Con's four buttons, the D-pad and either stick are its stick, and L1/R1 and L2/R2 are its shoulder buttons. When the game has the Joy-Con held sideways, the DualSense is still held as usual: the stick, the buttons and the motion sensors are turned to match.
 - **Controller type per game** - some games take a Pro Controller and then only work with another controller. In **Library > Game settings > Controls**, **Controller type** gives the game a Pro Controller, the Handheld controller, Dual Joy-Cons, a Left Joy-Con or a Right Joy-Con. Left on **Automatic**, the game gets what it takes, a Pro Controller first.
@@ -87,13 +88,50 @@ Local-wireless multiplayer through Eden rooms is new in v1.000.110 and experimen
 5. Launch **ProsperoEden**, open **Settings > Game files**, browse to that folder and select it. The default is `/data/prosperoeden`.
 6. Close and reopen ProsperoEden, then open **Library**. Setup is checked when the app opens, so reopen it after changing the folder or adding keys or firmware.
 
+## Apps
+
+**Settings > Apps** lists Nightshade's three companion apps. Each is Nightshade's own release line of
+another project, with that project's title ID:
+
+| App | Title ID | Released in | Based on |
+|---|---|---|---|
+| Nightshade TV | `PPSA99003` | [Oliv3rmoon/Nightshade-TV](https://github.com/Oliv3rmoon/Nightshade-TV) | [ProsperoTV](https://github.com/blackbearreloaded/ProsperoTV), an IPTV client |
+| Nightshade Stream | `PPSA99002` | [Oliv3rmoon/Nightshade-Stream](https://github.com/Oliv3rmoon/Nightshade-Stream) | [ProsperoLight](https://github.com/blackbearreloaded/ProsperoLight), game streaming with Moonlight |
+| Nightshade Station | `PPSA98510` | [Oliv3rmoon/Nightshade-Station](https://github.com/Oliv3rmoon/Nightshade-Station) | darkxex's [SwanStationPS5](https://github.com/darkxex/SwanStationPS5), a PS1 emulator |
+
+Each row says whether the app is installed and at which version, and which release is offered and
+from where.
+
+- **Open** (Cross on an installed app) closes Nightshade and starts the app. An app cannot start
+  another one itself, so Nightshade sends a small launch payload (`app-launch.elf`) to the
+  console's payload loader on port 9021; it waits for Nightshade to close and then opens the app.
+  With no payload loader listening, Nightshade says so and stays open: start the app from the PS5's
+  home screen instead.
+- **Get** (Cross on an app that isn't installed) and **Update** (Square, when a newer release is
+  out) download the app's release and install it with the same update helper as Nightshade's own
+  updates. A new app goes in a folder beside Nightshade's (`/data/homebrew/PPSA99003` next to
+  `/data/homebrew/PPSA99008`); an update replaces the app's files and keeps yours. The homebrew
+  loader puts a new app on the home screen after its next scan or a restart.
+- **Where the files come from:** the newest release of the app's Nightshade repository, its
+  `<title ID>.zip`. Until that repository has a release, the newest release of the project the app
+  is based on is offered, and the row says so. The ZIP is checked against the release's
+  `SHA256SUMS`, or against GitHub's own SHA-256 of the file when the release has none; a release
+  with neither is not offered. Triangle asks GitHub again.
+
+The details are in [Nightshade's apps](docs/INSTALL.md#nightshades-apps). Thanks to the projects
+the apps are based on, ProsperoTV and ProsperoLight (their repositories are now
+[ThatGuyKalvin/ProsperoTV](https://github.com/ThatGuyKalvin/ProsperoTV) and
+[LedyBacer/ProsperoLight](https://github.com/LedyBacer/ProsperoLight)) and darkxex's SwanStationPS5,
+and to **Mihawk**, whose [PS5 RetroArch](https://github.com/mihawk-99/PS5_RetroArch) Game Forwarder
+the launch payload is based on (`forwarder/launch.c`).
+
 ## Guides
 
 <a name="game-files-folder"></a><a name="app-data"></a><a name="updating"></a><a name="going-back-to-the-previous-version"></a><a name="moving-save-data"></a><a name="mods"></a><a name="quick-start-with-romm"></a><a name="download-sources"></a><a name="romm"></a><a name="save-sync"></a><a name="romm-1"></a><a name="performance-settings"></a><a name="frame-generation"></a><a name="post-processing"></a><a name="profiles"></a><a name="settings-per-game"></a><a name="button-mapping"></a><a name="language-and-accessibility"></a><a name="upgrading-from-an-earlier-alpha"></a><a name="roadmap"></a>
 
 | Guide | What is in it |
 |---|---|
-| [Game files, app data and updates](docs/INSTALL.md) | The layout of the game files folder, where settings, saves and logs are kept, updating from the menu or by hand, going back to the previous version |
+| [Game files, app data and updates](docs/INSTALL.md) | The layout of the game files folder, where settings, saves and logs are kept, updating from the menu or by hand, going back to the previous version, Nightshade's apps |
 | [Settings](docs/SETTINGS.md) | The Performance switches, post-processing (ReShade FX presets), frame generation, profiles, settings per game, button mapping, language and accessibility |
 | [Save data](docs/SAVES.md) | Moving save data in and out, and save sync with a server |
 | [Download sources and RomM](docs/DOWNLOADS.md) | Games from a RomM server or another source in your network, and the download queue |
