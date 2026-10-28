@@ -170,6 +170,21 @@ msgstr "Automaattinen"
 msgid "Back"
 msgstr "Takaisin"
 
+#. Button hint in Back up to USB: start a backup to the highlighted USB drive. Keep it short.
+#: pe/ui/backup.cpp
+msgid "Back up"
+msgstr "Varmuuskopioi"
+
+#. Settings > Diagnostics: copies the app's data (settings, profiles, save data) to a USB drive. USB stays.
+#: pe/ui/backup.cpp, pe/ui/settings.cpp
+msgid "Back up to USB"
+msgstr "Varmuuskopio USB:lle"
+
+#. {0} is the backup's folder on the USB drive.
+#: pe/ui/backup.cpp
+msgid "Backed up to {0}."
+msgstr "Varmuuskopioitu: {0}."
+
 #: pe/ui/settings.cpp
 msgid "Backend"
 msgstr "Renderöijä"
@@ -177,6 +192,11 @@ msgstr "Renderöijä"
 #: pe/ui/save_sync.cpp
 msgid "Backing up save data"
 msgstr "Varmuuskopioidaan tallennuksia"
+
+#. A sentence saying what was left on the drive follows it.
+#: pe/ui/backup.cpp
+msgid "Backup cancelled."
+msgstr "Varmuuskopiointi peruttu."
 
 #. An upscaling filter.
 #: settings_store.h
@@ -386,6 +406,16 @@ msgstr "OHJAIMET"
 #: pe/ui/library.cpp, pe/ui/settings.cpp
 msgid "Controls"
 msgstr "Ohjaus"
+
+#. What Back up to USB does; nothing is restored from there.
+#: pe/ui/backup.cpp, pe/ui/settings.cpp
+msgid "Copies settings, profiles and save data to a USB drive."
+msgstr "Kopioi asetukset, profiilit ja tallennetut tiedot USB-asemalle."
+
+#. A backup's files are being copied to the USB drive. Keep it short.
+#: pe/ui/backup.cpp
+msgid "Copying"
+msgstr "Kopioidaan"
 
 #: pe/ui/settings.cpp
 msgid "Corner"
@@ -739,6 +769,11 @@ msgstr "Kuvien generointi tarvitsee MihawkGenin painot (network.fgw)."
 msgid "Frame time"
 msgstr "Kuva-aika"
 
+#. The console does not say how much room a USB drive has. Keep it short.
+#: pe/ui/backup.cpp
+msgid "Free space unknown"
+msgstr "Vapaa tila tuntematon"
+
 #: settings_store.h
 msgid "French"
 msgstr "Ranska"
@@ -848,6 +883,11 @@ msgstr "Palauttaa muistin, jonka peli jätti tyhjäksi, 16 KiB kerrallaan. Enemm
 #: pe/ui/multiplayer.cpp
 msgid "Go offline"
 msgstr "Siirry offline-tilaan"
+
+#. {0} is a folder such as /mnt/usb0/nightshade-backup: where a backup is put.
+#: pe/ui/backup.cpp
+msgid "Goes to {0}"
+msgstr "Kohde: {0}"
 
 #: pe/ui/settings.cpp
 msgid "GPU"
@@ -1176,6 +1216,11 @@ msgstr "Nimimerkki"
 msgid "Nickname: {0}"
 msgstr "Nimimerkki: {0}"
 
+#. {0} is why (English, technical).
+#: pe/ui/backup.cpp
+msgid "Nightshade's data could not be read: {0}"
+msgstr "Nightshaden tietoja ei voitu lukea: {0}"
+
 #: pe/ui/library.cpp
 msgid "No cheats"
 msgstr "Ei huijauksia"
@@ -1249,6 +1294,11 @@ msgstr "Ei roms-kansiota"
 msgid "No server to pair with: add a RomM server to sources.json, or set save-sync.json up over FTP."
 msgstr "Ei palvelinta, johon parittaa: lisää RomM-palvelin tiedostoon sources.json tai määritä save-sync.json FTP:llä."
 
+#. exFAT and FAT32 are names of disk formats (unchanged).
+#: pe/ui/backup.cpp
+msgid "No USB drive is connected. Connect one formatted as exFAT or FAT32."
+msgstr "USB-asemaa ei ole liitetty. Liitä asema, joka on alustettu exFAT- tai FAT32-muotoon."
+
 #: pe/ui/pairing.cpp
 msgid "Nobody approved the code in time."
 msgstr "Kukaan ei hyväksynyt koodia ajoissa."
@@ -1261,6 +1311,11 @@ msgstr "Ei ole"
 #: pe/ui/remote.cpp
 msgid "Not connected yet"
 msgstr "Ei vielä yhdistetty"
+
+#. {0} and {1} are sizes such as 1.2 GB.
+#: pe/ui/backup.cpp
+msgid "Not enough room on the drive: the backup needs {0}, {1} is free."
+msgstr "Asemalla ei ole tarpeeksi tilaa: varmuuskopio tarvitsee {0}, vapaana on {1}."
 
 #. Settings > Apps: the app is not on the console.
 #: pe/ui/apps.cpp
@@ -1295,6 +1350,11 @@ msgstr "Ei määritetty"
 #: pe/ui/library.cpp
 msgid "Nothing to import"
 msgstr "Ei tuotavaa"
+
+#. After a backup that was cancelled or failed: what it had written was removed.
+#: pe/ui/backup.cpp
+msgid "Nothing was left on the drive."
+msgstr "Asemalle ei jäänyt mitään."
 
 #. A setting that is switched off.
 #: pe/ui/game_options.cpp, pe/ui/library.cpp, pe/ui/settings.cpp
@@ -1842,9 +1902,10 @@ msgstr "Määritys vaaditaan"
 msgid "Setup required: {0} Open Settings, Game files to choose the folder that holds your keys, firmware and roms folders (or add the files to {1}), then reopen Nightshade."
 msgstr "Määritys vaaditaan: {0} Valitse kohdasta Asetukset, Pelitiedostot kansio, jossa keys-, firmware- ja roms-kansiot ovat (tai lisää tiedostot kansioon {1}), ja avaa sitten Nightshade uudelleen."
 
+#. What the Diagnostics item of Settings has.
 #: pe/ui/settings.cpp
-msgid "Setup status and detailed logs."
-msgstr "Määrityksen tila ja tarkat lokit."
+msgid "Setup status, detailed logs and a backup to USB."
+msgstr "Määrityksen tila, tarkat lokit ja varmuuskopio USB:lle."
 
 #: eden_services.cpp
 msgid "Setup validation failed. Check that firmware and key files are readable and valid."
@@ -1986,9 +2047,19 @@ msgstr "Kiitos koko PS5:n homebrew-yhteisölle ja kaikille kehittäjille, joiden
 msgid "The accent colour of the current theme."
 msgstr "Nykyisen teeman korostusväri."
 
+#. {0} is why (English, technical). A sentence saying what was left on the drive follows it.
+#: pe/ui/backup.cpp
+msgid "The backup failed: {0}"
+msgstr "Varmuuskopiointi epäonnistui: {0}"
+
 #: pe/ui/remote.cpp
 msgid "The download stopped"
 msgstr "Lataus keskeytyi"
+
+#. The USB drive ran out of room during a backup. A sentence saying what was left on it follows.
+#: pe/ui/backup.cpp
+msgid "The drive is full."
+msgstr "Asema on täynnä."
 
 #: pe/ui/settings.cpp
 msgid "The folder that holds your keys, firmware and games."
@@ -2131,6 +2202,16 @@ msgstr "Tämän pelin asetuksia ei voi tallentaa (nimiketunnus puuttuu)."
 msgid "This room uses a different protocol version."
 msgstr "Tämä huone käyttää eri protokollaversiota."
 
+#. Exactly one file; {0} is a size such as 1.2 GB. See '{0} game'.
+#: pe/ui/backup.cpp
+msgid "To back up: {0} in {1} file"
+msgstr "Varmuuskopioitavaa: {0}, {1} tiedosto"
+
+#. {0} is a size such as 1.2 GB, {1} how many files (any number but one). See '{0} game'.
+#: pe/ui/backup.cpp
+msgid "To back up: {0} in {1} files"
+msgstr "Varmuuskopioitavaa: {0}, {1} tiedostoa"
+
 #. ryujinx/, save-import/ and roms/ are folder names (unchanged); {0} is the game's ID.
 #: eden_services.cpp
 msgid "To import, copy a Ryujinx folder to ryujinx/ or a save to save-import/{0}/, next to roms/."
@@ -2248,6 +2329,11 @@ msgstr "Skaalaussuodatin"
 msgid "USA"
 msgstr "USA"
 
+#. {0} is a number from 1 to 8: which of the USB drives connected.
+#: pe/ui/backup.cpp
+msgid "USB drive {0}"
+msgstr "USB-asema {0}"
+
 #: pe/ui/settings.cpp
 msgid "Use another home screen, library and menu layout."
 msgstr "Käytä toista aloitusnäkymän, kirjaston ja valikon asettelua."
@@ -2362,6 +2448,11 @@ msgstr "palvelimeen {0}"
 msgid "Without filesystem access Nightshade can't tell which apps are installed."
 msgstr "Ilman tiedostojärjestelmän käyttöoikeutta Nightshade ei tiedä, mitkä sovellukset on asennettu."
 
+#. Filesystem access is what the app asks the console for when it starts (as in 'Without filesystem access Nightshade can't tell which apps are installed.').
+#: pe/ui/backup.cpp
+msgid "Without filesystem access there is nothing to back up."
+msgstr "Ilman tiedostojärjestelmän käyttöoikeutta ei ole mitään varmuuskopioitavaa."
+
 #: pe/ui/settings.cpp
 msgid "Write logs at once"
 msgstr "Kirjoita lokit heti"
@@ -2408,6 +2499,11 @@ msgstr "Sovellusta {0} ei voitu avata: {1}"
 msgid "{0} DLC"
 msgstr "{0} DLC"
 
+#. {0} is a size such as 61.0 GB: the room left on a USB drive. Keep it short.
+#: pe/ui/backup.cpp
+msgid "{0} free"
+msgstr "{0} vapaana"
+
 #. Exactly one game. In a language with more than two plural forms, word it so that it reads well with any number (Games: {0}).
 #: pe/ui/browse.cpp, pe/ui/remote.cpp
 msgid "{0} game"
@@ -2446,6 +2542,11 @@ msgstr "{0} Hz"
 #: pe/ui/apps.cpp
 msgid "{0} is installed. The homebrew loader lists it after its next scan or a restart."
 msgstr "{0} on asennettu. Homebrew-lataaja näyttää sen seuraavan haun tai uudelleenkäynnistyksen jälkeen."
+
+#. {0} is a folder whose name ends in .incomplete: the part of a backup that could not be removed.
+#: pe/ui/backup.cpp
+msgid "{0} is left on the drive, marked incomplete: delete it."
+msgstr "{0} jäi asemalle keskeneräiseksi merkittynä: poista se."
 
 #. {0} is an app's name, {1} its new version, such as 01.000.110.
 #: pe/ui/apps.cpp

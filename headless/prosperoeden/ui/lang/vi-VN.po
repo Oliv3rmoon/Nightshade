@@ -170,6 +170,21 @@ msgstr "Tự động"
 msgid "Back"
 msgstr "Quay lại"
 
+#. Button hint in Back up to USB: start a backup to the highlighted USB drive. Keep it short.
+#: pe/ui/backup.cpp
+msgid "Back up"
+msgstr "Sao lưu"
+
+#. Settings > Diagnostics: copies the app's data (settings, profiles, save data) to a USB drive. USB stays.
+#: pe/ui/backup.cpp, pe/ui/settings.cpp
+msgid "Back up to USB"
+msgstr "Sao lưu vào USB"
+
+#. {0} is the backup's folder on the USB drive.
+#: pe/ui/backup.cpp
+msgid "Backed up to {0}."
+msgstr "Đã sao lưu vào {0}."
+
 #: pe/ui/settings.cpp
 msgid "Backend"
 msgstr "Trình kết xuất"
@@ -177,6 +192,11 @@ msgstr "Trình kết xuất"
 #: pe/ui/save_sync.cpp
 msgid "Backing up save data"
 msgstr "Đang sao lưu dữ liệu lưu"
+
+#. A sentence saying what was left on the drive follows it.
+#: pe/ui/backup.cpp
+msgid "Backup cancelled."
+msgstr "Đã hủy sao lưu."
 
 #. An upscaling filter.
 #: settings_store.h
@@ -386,6 +406,16 @@ msgstr "BỘ ĐIỀU KHIỂN"
 #: pe/ui/library.cpp, pe/ui/settings.cpp
 msgid "Controls"
 msgstr "Điều khiển"
+
+#. What Back up to USB does; nothing is restored from there.
+#: pe/ui/backup.cpp, pe/ui/settings.cpp
+msgid "Copies settings, profiles and save data to a USB drive."
+msgstr "Sao chép cài đặt, hồ sơ và dữ liệu đã lưu sang ổ USB."
+
+#. A backup's files are being copied to the USB drive. Keep it short.
+#: pe/ui/backup.cpp
+msgid "Copying"
+msgstr "Đang sao chép"
 
 #: pe/ui/settings.cpp
 msgid "Corner"
@@ -739,6 +769,11 @@ msgstr "Tạo khung hình cần trọng số MihawkGen (network.fgw)."
 msgid "Frame time"
 msgstr "Thời gian khung hình"
 
+#. The console does not say how much room a USB drive has. Keep it short.
+#: pe/ui/backup.cpp
+msgid "Free space unknown"
+msgstr "Không rõ dung lượng trống"
+
 #: settings_store.h
 msgid "French"
 msgstr "Tiếng Pháp"
@@ -848,6 +883,11 @@ msgstr "Trả lại bộ nhớ mà trò chơi để trống, mỗi lần 16 KiB.
 #: pe/ui/multiplayer.cpp
 msgid "Go offline"
 msgstr "Ngoại tuyến"
+
+#. {0} is a folder such as /mnt/usb0/nightshade-backup: where a backup is put.
+#: pe/ui/backup.cpp
+msgid "Goes to {0}"
+msgstr "Lưu vào {0}"
 
 #: pe/ui/settings.cpp
 msgid "GPU"
@@ -1176,6 +1216,11 @@ msgstr "Biệt danh"
 msgid "Nickname: {0}"
 msgstr "Biệt danh: {0}"
 
+#. {0} is why (English, technical).
+#: pe/ui/backup.cpp
+msgid "Nightshade's data could not be read: {0}"
+msgstr "Không thể đọc dữ liệu của Nightshade: {0}"
+
 #: pe/ui/library.cpp
 msgid "No cheats"
 msgstr "Không có mã gian lận"
@@ -1249,6 +1294,11 @@ msgstr "Không có thư mục roms"
 msgid "No server to pair with: add a RomM server to sources.json, or set save-sync.json up over FTP."
 msgstr "Không có máy chủ để ghép đôi: thêm máy chủ RomM vào sources.json hoặc thiết lập save-sync.json qua FTP."
 
+#. exFAT and FAT32 are names of disk formats (unchanged).
+#: pe/ui/backup.cpp
+msgid "No USB drive is connected. Connect one formatted as exFAT or FAT32."
+msgstr "Chưa kết nối ổ USB nào. Hãy kết nối một ổ được định dạng exFAT hoặc FAT32."
+
 #: pe/ui/pairing.cpp
 msgid "Nobody approved the code in time."
 msgstr "Không ai chấp thuận mã kịp thời."
@@ -1261,6 +1311,11 @@ msgstr "Không có"
 #: pe/ui/remote.cpp
 msgid "Not connected yet"
 msgstr "Chưa kết nối"
+
+#. {0} and {1} are sizes such as 1.2 GB.
+#: pe/ui/backup.cpp
+msgid "Not enough room on the drive: the backup needs {0}, {1} is free."
+msgstr "Ổ không đủ dung lượng: bản sao lưu cần {0}, còn trống {1}."
 
 #. Settings > Apps: the app is not on the console.
 #: pe/ui/apps.cpp
@@ -1295,6 +1350,11 @@ msgstr "Chưa thiết lập"
 #: pe/ui/library.cpp
 msgid "Nothing to import"
 msgstr "Không có gì để nhập"
+
+#. After a backup that was cancelled or failed: what it had written was removed.
+#: pe/ui/backup.cpp
+msgid "Nothing was left on the drive."
+msgstr "Không còn gì sót lại trên ổ."
 
 #. A setting that is switched off.
 #: pe/ui/game_options.cpp, pe/ui/library.cpp, pe/ui/settings.cpp
@@ -1842,9 +1902,10 @@ msgstr "Cần thiết lập"
 msgid "Setup required: {0} Open Settings, Game files to choose the folder that holds your keys, firmware and roms folders (or add the files to {1}), then reopen Nightshade."
 msgstr "Cần thiết lập: {0} Hãy mở Cài đặt, Tệp trò chơi để chọn thư mục chứa các thư mục keys, firmware và roms của bạn (hoặc thêm các tệp vào {1}), rồi mở lại Nightshade."
 
+#. What the Diagnostics item of Settings has.
 #: pe/ui/settings.cpp
-msgid "Setup status and detailed logs."
-msgstr "Trạng thái thiết lập và nhật ký chi tiết."
+msgid "Setup status, detailed logs and a backup to USB."
+msgstr "Trạng thái thiết lập, nhật ký chi tiết và sao lưu vào USB."
 
 #: eden_services.cpp
 msgid "Setup validation failed. Check that firmware and key files are readable and valid."
@@ -1986,9 +2047,19 @@ msgstr "Cảm ơn toàn thể cộng đồng homebrew PS5 và mọi nhà phát t
 msgid "The accent colour of the current theme."
 msgstr "Màu nhấn của chủ đề hiện tại."
 
+#. {0} is why (English, technical). A sentence saying what was left on the drive follows it.
+#: pe/ui/backup.cpp
+msgid "The backup failed: {0}"
+msgstr "Sao lưu thất bại: {0}"
+
 #: pe/ui/remote.cpp
 msgid "The download stopped"
 msgstr "Quá trình tải xuống đã dừng"
+
+#. The USB drive ran out of room during a backup. A sentence saying what was left on it follows.
+#: pe/ui/backup.cpp
+msgid "The drive is full."
+msgstr "Ổ đã đầy."
 
 #: pe/ui/settings.cpp
 msgid "The folder that holds your keys, firmware and games."
@@ -2131,6 +2202,16 @@ msgstr "Không thể lưu cài đặt cho trò chơi này (thiếu ID trò chơi
 msgid "This room uses a different protocol version."
 msgstr "Phòng này dùng phiên bản giao thức khác."
 
+#. Exactly one file; {0} is a size such as 1.2 GB. See '{0} game'.
+#: pe/ui/backup.cpp
+msgid "To back up: {0} in {1} file"
+msgstr "Cần sao lưu: {0} trong {1} tệp"
+
+#. {0} is a size such as 1.2 GB, {1} how many files (any number but one). See '{0} game'.
+#: pe/ui/backup.cpp
+msgid "To back up: {0} in {1} files"
+msgstr "Cần sao lưu: {0} trong {1} tệp"
+
 #. ryujinx/, save-import/ and roms/ are folder names (unchanged); {0} is the game's ID.
 #: eden_services.cpp
 msgid "To import, copy a Ryujinx folder to ryujinx/ or a save to save-import/{0}/, next to roms/."
@@ -2248,6 +2329,11 @@ msgstr "Bộ lọc phóng to"
 msgid "USA"
 msgstr "Mỹ"
 
+#. {0} is a number from 1 to 8: which of the USB drives connected.
+#: pe/ui/backup.cpp
+msgid "USB drive {0}"
+msgstr "Ổ USB {0}"
+
 #: pe/ui/settings.cpp
 msgid "Use another home screen, library and menu layout."
 msgstr "Dùng bố cục khác cho màn hình chính, thư viện và menu."
@@ -2362,6 +2448,11 @@ msgstr "với {0}"
 msgid "Without filesystem access Nightshade can't tell which apps are installed."
 msgstr "Không có quyền truy cập hệ thống tệp, Nightshade không biết ứng dụng nào đã được cài."
 
+#. Filesystem access is what the app asks the console for when it starts (as in 'Without filesystem access Nightshade can't tell which apps are installed.').
+#: pe/ui/backup.cpp
+msgid "Without filesystem access there is nothing to back up."
+msgstr "Không có quyền truy cập hệ thống tệp nên không có gì để sao lưu."
+
 #: pe/ui/settings.cpp
 msgid "Write logs at once"
 msgstr "Ghi nhật ký ngay"
@@ -2408,6 +2499,11 @@ msgstr "Không thể mở {0}: {1}"
 msgid "{0} DLC"
 msgstr "{0} DLC"
 
+#. {0} is a size such as 61.0 GB: the room left on a USB drive. Keep it short.
+#: pe/ui/backup.cpp
+msgid "{0} free"
+msgstr "Trống {0}"
+
 #. Exactly one game. In a language with more than two plural forms, word it so that it reads well with any number (Games: {0}).
 #: pe/ui/browse.cpp, pe/ui/remote.cpp
 msgid "{0} game"
@@ -2446,6 +2542,11 @@ msgstr "{0} Hz"
 #: pe/ui/apps.cpp
 msgid "{0} is installed. The homebrew loader lists it after its next scan or a restart."
 msgstr "Đã cài {0}. Trình nạp homebrew sẽ hiển thị sau lần quét tiếp theo hoặc sau khi khởi động lại."
+
+#. {0} is a folder whose name ends in .incomplete: the part of a backup that could not be removed.
+#: pe/ui/backup.cpp
+msgid "{0} is left on the drive, marked incomplete: delete it."
+msgstr "{0} còn lại trên ổ, được đánh dấu chưa hoàn tất: hãy xóa nó."
 
 #. {0} is an app's name, {1} its new version, such as 01.000.110.
 #: pe/ui/apps.cpp

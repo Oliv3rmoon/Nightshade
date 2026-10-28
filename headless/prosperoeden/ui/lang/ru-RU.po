@@ -170,6 +170,21 @@ msgstr "Автоматически"
 msgid "Back"
 msgstr "Назад"
 
+#. Button hint in Back up to USB: start a backup to the highlighted USB drive. Keep it short.
+#: pe/ui/backup.cpp
+msgid "Back up"
+msgstr "Копировать"
+
+#. Settings > Diagnostics: copies the app's data (settings, profiles, save data) to a USB drive. USB stays.
+#: pe/ui/backup.cpp, pe/ui/settings.cpp
+msgid "Back up to USB"
+msgstr "Резервная копия на USB"
+
+#. {0} is the backup's folder on the USB drive.
+#: pe/ui/backup.cpp
+msgid "Backed up to {0}."
+msgstr "Копия сохранена в {0}."
+
 #: pe/ui/settings.cpp
 msgid "Backend"
 msgstr "Рендерер"
@@ -177,6 +192,11 @@ msgstr "Рендерер"
 #: pe/ui/save_sync.cpp
 msgid "Backing up save data"
 msgstr "Резервное копирование сохранений"
+
+#. A sentence saying what was left on the drive follows it.
+#: pe/ui/backup.cpp
+msgid "Backup cancelled."
+msgstr "Копирование отменено."
 
 #. An upscaling filter.
 #: settings_store.h
@@ -386,6 +406,16 @@ msgstr "КОНТРОЛЛЕРЫ"
 #: pe/ui/library.cpp, pe/ui/settings.cpp
 msgid "Controls"
 msgstr "Управление"
+
+#. What Back up to USB does; nothing is restored from there.
+#: pe/ui/backup.cpp, pe/ui/settings.cpp
+msgid "Copies settings, profiles and save data to a USB drive."
+msgstr "Копирует настройки, профили и сохраненные данные на USB-накопитель."
+
+#. A backup's files are being copied to the USB drive. Keep it short.
+#: pe/ui/backup.cpp
+msgid "Copying"
+msgstr "Копирование"
 
 #: pe/ui/settings.cpp
 msgid "Corner"
@@ -739,6 +769,11 @@ msgstr "Для генерации кадров нужны веса MihawkGen (ne
 msgid "Frame time"
 msgstr "Время кадра"
 
+#. The console does not say how much room a USB drive has. Keep it short.
+#: pe/ui/backup.cpp
+msgid "Free space unknown"
+msgstr "Свободное место неизвестно"
+
 #: settings_store.h
 msgid "French"
 msgstr "Французский"
@@ -848,6 +883,11 @@ msgstr "Возвращает память, которую игра остави�
 #: pe/ui/multiplayer.cpp
 msgid "Go offline"
 msgstr "Отключиться"
+
+#. {0} is a folder such as /mnt/usb0/nightshade-backup: where a backup is put.
+#: pe/ui/backup.cpp
+msgid "Goes to {0}"
+msgstr "Будет в {0}"
 
 #: pe/ui/settings.cpp
 msgid "GPU"
@@ -1176,6 +1216,11 @@ msgstr "Никнейм"
 msgid "Nickname: {0}"
 msgstr "Никнейм: {0}"
 
+#. {0} is why (English, technical).
+#: pe/ui/backup.cpp
+msgid "Nightshade's data could not be read: {0}"
+msgstr "Не удалось прочитать данные Nightshade: {0}"
+
 #: pe/ui/library.cpp
 msgid "No cheats"
 msgstr "Нет читов"
@@ -1249,6 +1294,11 @@ msgstr "Нет папки roms"
 msgid "No server to pair with: add a RomM server to sources.json, or set save-sync.json up over FTP."
 msgstr "Нет сервера для привязки: добавьте сервер RomM в sources.json или настройте save-sync.json по FTP."
 
+#. exFAT and FAT32 are names of disk formats (unchanged).
+#: pe/ui/backup.cpp
+msgid "No USB drive is connected. Connect one formatted as exFAT or FAT32."
+msgstr "USB-накопитель не подключен. Подключите накопитель в формате exFAT или FAT32."
+
 #: pe/ui/pairing.cpp
 msgid "Nobody approved the code in time."
 msgstr "Код не подтвердили вовремя."
@@ -1261,6 +1311,11 @@ msgstr "Нет"
 #: pe/ui/remote.cpp
 msgid "Not connected yet"
 msgstr "Ещё не подключён"
+
+#. {0} and {1} are sizes such as 1.2 GB.
+#: pe/ui/backup.cpp
+msgid "Not enough room on the drive: the backup needs {0}, {1} is free."
+msgstr "На накопителе мало места: для копии нужно {0}, свободно {1}."
 
 #. Settings > Apps: the app is not on the console.
 #: pe/ui/apps.cpp
@@ -1295,6 +1350,11 @@ msgstr "Не настроено"
 #: pe/ui/library.cpp
 msgid "Nothing to import"
 msgstr "Нечего импортировать"
+
+#. After a backup that was cancelled or failed: what it had written was removed.
+#: pe/ui/backup.cpp
+msgid "Nothing was left on the drive."
+msgstr "На накопителе ничего не осталось."
 
 #. A setting that is switched off.
 #: pe/ui/game_options.cpp, pe/ui/library.cpp, pe/ui/settings.cpp
@@ -1842,9 +1902,10 @@ msgstr "Требуется настройка"
 msgid "Setup required: {0} Open Settings, Game files to choose the folder that holds your keys, firmware and roms folders (or add the files to {1}), then reopen Nightshade."
 msgstr "Требуется настройка: {0} Откройте «Настройки» > «Файлы игр» и выберите папку, где лежат папки keys, firmware и roms (или добавьте файлы в {1}), затем перезапустите Nightshade."
 
+#. What the Diagnostics item of Settings has.
 #: pe/ui/settings.cpp
-msgid "Setup status and detailed logs."
-msgstr "Состояние настройки и подробный журнал."
+msgid "Setup status, detailed logs and a backup to USB."
+msgstr "Состояние настройки, подробный журнал и резервная копия на USB."
 
 #: eden_services.cpp
 msgid "Setup validation failed. Check that firmware and key files are readable and valid."
@@ -1986,9 +2047,19 @@ msgstr "Спасибо всему homebrew-сообществу PS5 и кажд�
 msgid "The accent colour of the current theme."
 msgstr "Акцентный цвет текущей темы."
 
+#. {0} is why (English, technical). A sentence saying what was left on the drive follows it.
+#: pe/ui/backup.cpp
+msgid "The backup failed: {0}"
+msgstr "Сбой резервного копирования: {0}"
+
 #: pe/ui/remote.cpp
 msgid "The download stopped"
 msgstr "Загрузка остановилась"
+
+#. The USB drive ran out of room during a backup. A sentence saying what was left on it follows.
+#: pe/ui/backup.cpp
+msgid "The drive is full."
+msgstr "Накопитель заполнен."
 
 #: pe/ui/settings.cpp
 msgid "The folder that holds your keys, firmware and games."
@@ -2131,6 +2202,16 @@ msgstr "Настройки этой игры нельзя сохранить (н
 msgid "This room uses a different protocol version."
 msgstr "Эта комната использует другую версию протокола."
 
+#. Exactly one file; {0} is a size such as 1.2 GB. See '{0} game'.
+#: pe/ui/backup.cpp
+msgid "To back up: {0} in {1} file"
+msgstr "К копированию: {0} в {1} файле"
+
+#. {0} is a size such as 1.2 GB, {1} how many files (any number but one). See '{0} game'.
+#: pe/ui/backup.cpp
+msgid "To back up: {0} in {1} files"
+msgstr "К копированию: {0}, файлов: {1}"
+
 #. ryujinx/, save-import/ and roms/ are folder names (unchanged); {0} is the game's ID.
 #: eden_services.cpp
 msgid "To import, copy a Ryujinx folder to ryujinx/ or a save to save-import/{0}/, next to roms/."
@@ -2248,6 +2329,11 @@ msgstr "Фильтр"
 msgid "USA"
 msgstr "США"
 
+#. {0} is a number from 1 to 8: which of the USB drives connected.
+#: pe/ui/backup.cpp
+msgid "USB drive {0}"
+msgstr "USB-накопитель {0}"
+
 #: pe/ui/settings.cpp
 msgid "Use another home screen, library and menu layout."
 msgstr "Использовать другой макет главного экрана, библиотеки и меню."
@@ -2362,6 +2448,11 @@ msgstr "к {0}"
 msgid "Without filesystem access Nightshade can't tell which apps are installed."
 msgstr "Без доступа к файловой системе Nightshade не может определить, какие приложения установлены."
 
+#. Filesystem access is what the app asks the console for when it starts (as in 'Without filesystem access Nightshade can't tell which apps are installed.').
+#: pe/ui/backup.cpp
+msgid "Without filesystem access there is nothing to back up."
+msgstr "Без доступа к файловой системе копировать нечего."
+
 #: pe/ui/settings.cpp
 msgid "Write logs at once"
 msgstr "Сразу записывать журнал"
@@ -2408,6 +2499,11 @@ msgstr "Не удалось открыть {0}: {1}"
 msgid "{0} DLC"
 msgstr "{0} DLC"
 
+#. {0} is a size such as 61.0 GB: the room left on a USB drive. Keep it short.
+#: pe/ui/backup.cpp
+msgid "{0} free"
+msgstr "Свободно {0}"
+
 #. Exactly one game. In a language with more than two plural forms, word it so that it reads well with any number (Games: {0}).
 #: pe/ui/browse.cpp, pe/ui/remote.cpp
 msgid "{0} game"
@@ -2446,6 +2542,11 @@ msgstr "{0} Гц"
 #: pe/ui/apps.cpp
 msgid "{0} is installed. The homebrew loader lists it after its next scan or a restart."
 msgstr "{0} установлено. Загрузчик homebrew покажет его после следующего сканирования или перезапуска."
+
+#. {0} is a folder whose name ends in .incomplete: the part of a backup that could not be removed.
+#: pe/ui/backup.cpp
+msgid "{0} is left on the drive, marked incomplete: delete it."
+msgstr "На накопителе осталась папка {0}, помеченная как неполная: удалите ее."
 
 #. {0} is an app's name, {1} its new version, such as 01.000.110.
 #: pe/ui/apps.cpp

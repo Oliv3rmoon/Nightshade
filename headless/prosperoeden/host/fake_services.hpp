@@ -310,6 +310,75 @@ class FakeServices : public ui::Services
         return app_open;
     }
 
+    // Settings > Diagnostics > Back up to USB: two USB drives, the second with its room known (on the
+    // console it never is). A backup goes through its phases a step per look (the launcher looks four
+    // times a second); backup_full ends it on a drive that fills up, a cancel removes what it wrote.
+    ui::BackupStatus backup_state = [] {
+        ui::BackupStatus status;
+        status.drives = {{"/mnt/usb0", 0, false}, {"/mnt/usb1", 61ull << 30, true}};
+        return status;
+    }();
+    int backups_refreshed = 0;
+    int backups_made = 0;
+    int backup_steps = -1; // looks since start_backup; -1: none
+    bool backup_full = false;
+    bool backup_cancelled = false;
+    void refresh_backup() override
+    {
+        ++backups_refreshed;
+        backup_state.measured = true;
+        backup_state.files = 4182;
+        backup_state.bytes = 1288490189; // 1.2 GB
+    }
+    ui::BackupStatus backup_status() override
+    {
+        if (backup_steps < 0)
+            return backup_state;
+        const int step = backup_steps++;
+        ui::BackupStatus status = backup_state;
+        if (backup_cancelled)
+            status.phase = ui::BackupPhase::cancelled;
+        else if (step < 2)
+            status.phase = ui::BackupPhase::measuring;
+        else if (step < 30 && !(backup_full && step >= 14))
+        {
+            status.phase = ui::BackupPhase::copying;
+            status.done_bytes = status.bytes * static_cast<std::uint64_t>(step - 2) / 28;
+            status.done_files = status.files * static_cast<std::uint64_t>(step - 2) / 28;
+        }
+        else if (backup_full)
+            status.phase = ui::BackupPhase::no_room;
+        else
+        {
+            status.phase = ui::BackupPhase::done;
+            status.folder = status.drives[static_cast<std::size_t>(std::max(0, status.drive))].path +
+                            "/nightshade-backup/20261028-153000";
+        }
+        return status;
+    }
+    bool start_backup(int drive, std::string *reason) override
+    {
+        if (backup_steps >= 0 || drive < 0 || drive >= static_cast<int>(backup_state.drives.size()))
+        {
+            *reason = "a backup runs";
+            return false;
+        }
+        backup_state.drive = drive;
+        backup_steps = 0;
+        backup_cancelled = false;
+        return true;
+    }
+    void cancel_backup() override
+    {
+        backup_cancelled = true;
+    }
+    void finish_backup() override
+    {
+        backups_made += backup_steps >= 30 && !backup_full && !backup_cancelled ? 1 : 0;
+        backup_steps = -1;
+        backup_state.drive = -1;
+    }
+
     // Game files the preview takes away from the folder, as a player would by deleting them.
     std::vector<std::string> removed;
     bool game_exists(const std::string &file) override

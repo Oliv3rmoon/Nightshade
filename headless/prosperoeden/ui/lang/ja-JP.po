@@ -170,6 +170,21 @@ msgstr "自動"
 msgid "Back"
 msgstr "戻る"
 
+#. Button hint in Back up to USB: start a backup to the highlighted USB drive. Keep it short.
+#: pe/ui/backup.cpp
+msgid "Back up"
+msgstr "バックアップ"
+
+#. Settings > Diagnostics: copies the app's data (settings, profiles, save data) to a USB drive. USB stays.
+#: pe/ui/backup.cpp, pe/ui/settings.cpp
+msgid "Back up to USB"
+msgstr "USBにバックアップ"
+
+#. {0} is the backup's folder on the USB drive.
+#: pe/ui/backup.cpp
+msgid "Backed up to {0}."
+msgstr "{0} にバックアップしました。"
+
 #: pe/ui/settings.cpp
 msgid "Backend"
 msgstr "レンダラー"
@@ -177,6 +192,11 @@ msgstr "レンダラー"
 #: pe/ui/save_sync.cpp
 msgid "Backing up save data"
 msgstr "セーブデータをバックアップ中"
+
+#. A sentence saying what was left on the drive follows it.
+#: pe/ui/backup.cpp
+msgid "Backup cancelled."
+msgstr "バックアップをキャンセルしました。"
 
 #. An upscaling filter.
 #: settings_store.h
@@ -386,6 +406,16 @@ msgstr "コントローラー"
 #: pe/ui/library.cpp, pe/ui/settings.cpp
 msgid "Controls"
 msgstr "操作"
+
+#. What Back up to USB does; nothing is restored from there.
+#: pe/ui/backup.cpp, pe/ui/settings.cpp
+msgid "Copies settings, profiles and save data to a USB drive."
+msgstr "設定、プロフィール、セーブデータをUSBドライブにコピーします。"
+
+#. A backup's files are being copied to the USB drive. Keep it short.
+#: pe/ui/backup.cpp
+msgid "Copying"
+msgstr "コピー中"
 
 #: pe/ui/settings.cpp
 msgid "Corner"
@@ -739,6 +769,11 @@ msgstr "フレーム生成には MihawkGen の重み (network.fgw) が必要で�
 msgid "Frame time"
 msgstr "フレーム時間"
 
+#. The console does not say how much room a USB drive has. Keep it short.
+#: pe/ui/backup.cpp
+msgid "Free space unknown"
+msgstr "空き容量は不明"
+
 #: settings_store.h
 msgid "French"
 msgstr "フランス語"
@@ -848,6 +883,11 @@ msgstr "ゲームが空のまま残したメモリを16 KiB単位で返します
 #: pe/ui/multiplayer.cpp
 msgid "Go offline"
 msgstr "オフラインにする"
+
+#. {0} is a folder such as /mnt/usb0/nightshade-backup: where a backup is put.
+#: pe/ui/backup.cpp
+msgid "Goes to {0}"
+msgstr "保存先：{0}"
 
 #: pe/ui/settings.cpp
 msgid "GPU"
@@ -1176,6 +1216,11 @@ msgstr "ニックネーム"
 msgid "Nickname: {0}"
 msgstr "ニックネーム: {0}"
 
+#. {0} is why (English, technical).
+#: pe/ui/backup.cpp
+msgid "Nightshade's data could not be read: {0}"
+msgstr "Nightshadeのデータを読み込めませんでした：{0}"
+
 #: pe/ui/library.cpp
 msgid "No cheats"
 msgstr "チートなし"
@@ -1249,6 +1294,11 @@ msgstr "roms フォルダーなし"
 msgid "No server to pair with: add a RomM server to sources.json, or set save-sync.json up over FTP."
 msgstr "ペアリングできるサーバーがありません。sources.jsonにRomMサーバーを追加するか、FTPでsave-sync.jsonを設定してください。"
 
+#. exFAT and FAT32 are names of disk formats (unchanged).
+#: pe/ui/backup.cpp
+msgid "No USB drive is connected. Connect one formatted as exFAT or FAT32."
+msgstr "USBドライブが接続されていません。exFATまたはFAT32でフォーマットしたドライブを接続してください。"
+
 #: pe/ui/pairing.cpp
 msgid "Nobody approved the code in time."
 msgstr "時間内にコードが承認されませんでした。"
@@ -1261,6 +1311,11 @@ msgstr "なし"
 #: pe/ui/remote.cpp
 msgid "Not connected yet"
 msgstr "未接続"
+
+#. {0} and {1} are sizes such as 1.2 GB.
+#: pe/ui/backup.cpp
+msgid "Not enough room on the drive: the backup needs {0}, {1} is free."
+msgstr "ドライブの空き容量が足りません：バックアップには {0} 必要ですが、空きは {1} です。"
 
 #. Settings > Apps: the app is not on the console.
 #: pe/ui/apps.cpp
@@ -1295,6 +1350,11 @@ msgstr "未設定"
 #: pe/ui/library.cpp
 msgid "Nothing to import"
 msgstr "インポートするものがありません"
+
+#. After a backup that was cancelled or failed: what it had written was removed.
+#: pe/ui/backup.cpp
+msgid "Nothing was left on the drive."
+msgstr "ドライブには何も残っていません。"
 
 #. A setting that is switched off.
 #: pe/ui/game_options.cpp, pe/ui/library.cpp, pe/ui/settings.cpp
@@ -1842,9 +1902,10 @@ msgstr "セットアップが必要です"
 msgid "Setup required: {0} Open Settings, Game files to choose the folder that holds your keys, firmware and roms folders (or add the files to {1}), then reopen Nightshade."
 msgstr "セットアップが必要です：{0} 設定の「ゲームファイル」で、keys、firmware、roms の各フォルダーが入ったフォルダーを選び（またはファイルを {1} に入れ）、Nightshadeを開き直してください。"
 
+#. What the Diagnostics item of Settings has.
 #: pe/ui/settings.cpp
-msgid "Setup status and detailed logs."
-msgstr "セットアップの状態と詳細ログ。"
+msgid "Setup status, detailed logs and a backup to USB."
+msgstr "セットアップの状態、詳細ログ、USBへのバックアップ。"
 
 #: eden_services.cpp
 msgid "Setup validation failed. Check that firmware and key files are readable and valid."
@@ -1986,9 +2047,19 @@ msgstr "PS5ホームブリューコミュニティのみなさんと、Nightshad
 msgid "The accent colour of the current theme."
 msgstr "現在のテーマのアクセントカラー。"
 
+#. {0} is why (English, technical). A sentence saying what was left on the drive follows it.
+#: pe/ui/backup.cpp
+msgid "The backup failed: {0}"
+msgstr "バックアップに失敗しました：{0}"
+
 #: pe/ui/remote.cpp
 msgid "The download stopped"
 msgstr "ダウンロードが停止しました"
+
+#. The USB drive ran out of room during a backup. A sentence saying what was left on it follows.
+#: pe/ui/backup.cpp
+msgid "The drive is full."
+msgstr "ドライブがいっぱいです。"
 
 #: pe/ui/settings.cpp
 msgid "The folder that holds your keys, firmware and games."
@@ -2131,6 +2202,16 @@ msgstr "このゲームの設定は保存できません（タイトルIDなし�
 msgid "This room uses a different protocol version."
 msgstr "このルームは異なるプロトコルバージョンを使用しています。"
 
+#. Exactly one file; {0} is a size such as 1.2 GB. See '{0} game'.
+#: pe/ui/backup.cpp
+msgid "To back up: {0} in {1} file"
+msgstr "バックアップ対象：{0}（ファイル {1}個）"
+
+#. {0} is a size such as 1.2 GB, {1} how many files (any number but one). See '{0} game'.
+#: pe/ui/backup.cpp
+msgid "To back up: {0} in {1} files"
+msgstr "バックアップ対象：{0}（ファイル {1}個）"
+
 #. ryujinx/, save-import/ and roms/ are folder names (unchanged); {0} is the game's ID.
 #: eden_services.cpp
 msgid "To import, copy a Ryujinx folder to ryujinx/ or a save to save-import/{0}/, next to roms/."
@@ -2248,6 +2329,11 @@ msgstr "拡大フィルター"
 msgid "USA"
 msgstr "アメリカ"
 
+#. {0} is a number from 1 to 8: which of the USB drives connected.
+#: pe/ui/backup.cpp
+msgid "USB drive {0}"
+msgstr "USBドライブ {0}"
+
 #: pe/ui/settings.cpp
 msgid "Use another home screen, library and menu layout."
 msgstr "別のホーム画面、ライブラリー、メニューのレイアウトを使います。"
@@ -2362,6 +2448,11 @@ msgstr "{0}と"
 msgid "Without filesystem access Nightshade can't tell which apps are installed."
 msgstr "ファイルシステムへのアクセスがないため、Nightshadeはどのアプリがインストールされているか判別できません。"
 
+#. Filesystem access is what the app asks the console for when it starts (as in 'Without filesystem access Nightshade can't tell which apps are installed.').
+#: pe/ui/backup.cpp
+msgid "Without filesystem access there is nothing to back up."
+msgstr "ファイルシステムへのアクセスがないため、バックアップするものがありません。"
+
 #: pe/ui/settings.cpp
 msgid "Write logs at once"
 msgstr "ログをすぐに書き込む"
@@ -2408,6 +2499,11 @@ msgstr "{0}を開けませんでした：{1}"
 msgid "{0} DLC"
 msgstr "DLC {0}個"
 
+#. {0} is a size such as 61.0 GB: the room left on a USB drive. Keep it short.
+#: pe/ui/backup.cpp
+msgid "{0} free"
+msgstr "空き {0}"
+
 #. Exactly one game. In a language with more than two plural forms, word it so that it reads well with any number (Games: {0}).
 #: pe/ui/browse.cpp, pe/ui/remote.cpp
 msgid "{0} game"
@@ -2446,6 +2542,11 @@ msgstr "{0} Hz"
 #: pe/ui/apps.cpp
 msgid "{0} is installed. The homebrew loader lists it after its next scan or a restart."
 msgstr "{0}をインストールしました。homebrewローダーの次回のスキャン後か再起動後に表示されます。"
+
+#. {0} is a folder whose name ends in .incomplete: the part of a backup that could not be removed.
+#: pe/ui/backup.cpp
+msgid "{0} is left on the drive, marked incomplete: delete it."
+msgstr "{0} が未完了の印を付けたままドライブに残っています。削除してください。"
 
 #. {0} is an app's name, {1} its new version, such as 01.000.110.
 #: pe/ui/apps.cpp

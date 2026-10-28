@@ -753,6 +753,54 @@ void pictures(Stage &s)
         std::fprintf(stderr, "error: the Update notices switch did not reach the settings\n");
         s.ok = false;
     }
+    // Back up to USB, Diagnostics' fourth row: the drives and the size, a backup copying and done,
+    // one on a drive that fills up, a cancel; then back to Diagnostics on its row.
+    s.press({Key::down});
+    s.wait(0.6f);
+    s.shoot("18e-diagnostics-backup");
+    s.press({Key::cross});
+    s.wait(0.8f);
+    s.shoot("18f-backup");
+    if (s.services.backups_refreshed < 1)
+    {
+        std::fprintf(stderr, "error: Back up to USB did not look for the drives\n");
+        s.ok = false;
+    }
+    s.press({Key::cross});
+    s.wait(2.5f);
+    s.shoot("18g-backup-copying");
+    for (int frame = 0; frame < 1200 && s.services.backup_steps >= 0; ++frame)
+        s.frame();
+    s.wait(0.5f);
+    s.shoot("18h-backup-done");
+    if (s.services.backups_made != 1)
+    {
+        std::fprintf(stderr, "error: the backup did not finish\n");
+        s.ok = false;
+    }
+    s.press({Key::down});
+    s.services.backup_full = true;
+    s.press({Key::cross});
+    for (int frame = 0; frame < 1200 && s.services.backup_steps >= 0; ++frame)
+        s.frame();
+    s.wait(0.5f);
+    s.shoot("18i-backup-drive-full");
+    s.press({Key::left}); // closes the card
+    s.services.backup_full = false;
+    s.press({Key::cross});
+    s.wait(1.5f);
+    s.press({Key::circle});
+    for (int frame = 0; frame < 1200 && s.services.backup_steps >= 0; ++frame)
+        s.frame();
+    s.wait(0.3f);
+    s.shoot("18j-backup-cancelled");
+    if (s.services.backups_made != 1 || !s.services.backup_cancelled)
+    {
+        std::fprintf(stderr, "error: the backup was not cancelled\n");
+        s.ok = false;
+    }
+    s.press({Key::circle});
+    s.wait(0.4f);
     s.press({Key::circle});
     s.walk_settings(6, 7);
     s.press({Key::cross});

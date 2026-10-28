@@ -170,6 +170,21 @@ msgstr "Automático"
 msgid "Back"
 msgstr "Voltar"
 
+#. Button hint in Back up to USB: start a backup to the highlighted USB drive. Keep it short.
+#: pe/ui/backup.cpp
+msgid "Back up"
+msgstr "Fazer backup"
+
+#. Settings > Diagnostics: copies the app's data (settings, profiles, save data) to a USB drive. USB stays.
+#: pe/ui/backup.cpp, pe/ui/settings.cpp
+msgid "Back up to USB"
+msgstr "Backup em USB"
+
+#. {0} is the backup's folder on the USB drive.
+#: pe/ui/backup.cpp
+msgid "Backed up to {0}."
+msgstr "Backup salvo em {0}."
+
 #: pe/ui/settings.cpp
 msgid "Backend"
 msgstr "Renderizador"
@@ -177,6 +192,11 @@ msgstr "Renderizador"
 #: pe/ui/save_sync.cpp
 msgid "Backing up save data"
 msgstr "Fazendo backup dos dados salvos"
+
+#. A sentence saying what was left on the drive follows it.
+#: pe/ui/backup.cpp
+msgid "Backup cancelled."
+msgstr "Backup cancelado."
 
 #. An upscaling filter.
 #: settings_store.h
@@ -386,6 +406,16 @@ msgstr "CONTROLES"
 #: pe/ui/library.cpp, pe/ui/settings.cpp
 msgid "Controls"
 msgstr "Controles"
+
+#. What Back up to USB does; nothing is restored from there.
+#: pe/ui/backup.cpp, pe/ui/settings.cpp
+msgid "Copies settings, profiles and save data to a USB drive."
+msgstr "Copia configurações, perfis e dados salvos para uma unidade USB."
+
+#. A backup's files are being copied to the USB drive. Keep it short.
+#: pe/ui/backup.cpp
+msgid "Copying"
+msgstr "Copiando"
 
 #: pe/ui/settings.cpp
 msgid "Corner"
@@ -739,6 +769,11 @@ msgstr "A geração de quadros precisa dos pesos do MihawkGen (network.fgw)."
 msgid "Frame time"
 msgstr "Tempo de quadro"
 
+#. The console does not say how much room a USB drive has. Keep it short.
+#: pe/ui/backup.cpp
+msgid "Free space unknown"
+msgstr "Espaço livre desconhecido"
+
 #: settings_store.h
 msgid "French"
 msgstr "Francês"
@@ -848,6 +883,11 @@ msgstr "Devolve a memória que um jogo deixou vazia, 16 KiB por vez. Mais memór
 #: pe/ui/multiplayer.cpp
 msgid "Go offline"
 msgstr "Ficar offline"
+
+#. {0} is a folder such as /mnt/usb0/nightshade-backup: where a backup is put.
+#: pe/ui/backup.cpp
+msgid "Goes to {0}"
+msgstr "Vai para {0}"
 
 #: pe/ui/settings.cpp
 msgid "GPU"
@@ -1176,6 +1216,11 @@ msgstr "Apelido"
 msgid "Nickname: {0}"
 msgstr "Apelido: {0}"
 
+#. {0} is why (English, technical).
+#: pe/ui/backup.cpp
+msgid "Nightshade's data could not be read: {0}"
+msgstr "Não foi possível ler os dados do Nightshade: {0}"
+
 #: pe/ui/library.cpp
 msgid "No cheats"
 msgstr "Sem trapaças"
@@ -1249,6 +1294,11 @@ msgstr "Sem pasta roms"
 msgid "No server to pair with: add a RomM server to sources.json, or set save-sync.json up over FTP."
 msgstr "Nenhum servidor para parear: adicione um servidor RomM a sources.json ou configure save-sync.json por FTP."
 
+#. exFAT and FAT32 are names of disk formats (unchanged).
+#: pe/ui/backup.cpp
+msgid "No USB drive is connected. Connect one formatted as exFAT or FAT32."
+msgstr "Nenhuma unidade USB conectada. Conecte uma formatada em exFAT ou FAT32."
+
 #: pe/ui/pairing.cpp
 msgid "Nobody approved the code in time."
 msgstr "Ninguém aprovou o código a tempo."
@@ -1261,6 +1311,11 @@ msgstr "Nenhum"
 #: pe/ui/remote.cpp
 msgid "Not connected yet"
 msgstr "Ainda não conectado"
+
+#. {0} and {1} are sizes such as 1.2 GB.
+#: pe/ui/backup.cpp
+msgid "Not enough room on the drive: the backup needs {0}, {1} is free."
+msgstr "Não há espaço suficiente na unidade: o backup precisa de {0} e há {1} livres."
 
 #. Settings > Apps: the app is not on the console.
 #: pe/ui/apps.cpp
@@ -1295,6 +1350,11 @@ msgstr "Não configurado"
 #: pe/ui/library.cpp
 msgid "Nothing to import"
 msgstr "Nada para importar"
+
+#. After a backup that was cancelled or failed: what it had written was removed.
+#: pe/ui/backup.cpp
+msgid "Nothing was left on the drive."
+msgstr "Nada ficou na unidade."
 
 #. A setting that is switched off.
 #: pe/ui/game_options.cpp, pe/ui/library.cpp, pe/ui/settings.cpp
@@ -1842,9 +1902,10 @@ msgstr "Preparação necessária"
 msgid "Setup required: {0} Open Settings, Game files to choose the folder that holds your keys, firmware and roms folders (or add the files to {1}), then reopen Nightshade."
 msgstr "Preparação necessária: {0} Abra Configurações, Arquivos de jogo para escolher a pasta com as pastas keys, firmware e roms (ou adicione os arquivos a {1}) e reabra o Nightshade."
 
+#. What the Diagnostics item of Settings has.
 #: pe/ui/settings.cpp
-msgid "Setup status and detailed logs."
-msgstr "Estado da preparação e registros detalhados."
+msgid "Setup status, detailed logs and a backup to USB."
+msgstr "Estado da preparação, registros detalhados e backup em USB."
 
 #: eden_services.cpp
 msgid "Setup validation failed. Check that firmware and key files are readable and valid."
@@ -1986,9 +2047,19 @@ msgstr "Obrigado a toda a comunidade homebrew do PS5 e a cada desenvolvedor cujo
 msgid "The accent colour of the current theme."
 msgstr "A cor de destaque do tema atual."
 
+#. {0} is why (English, technical). A sentence saying what was left on the drive follows it.
+#: pe/ui/backup.cpp
+msgid "The backup failed: {0}"
+msgstr "O backup falhou: {0}"
+
 #: pe/ui/remote.cpp
 msgid "The download stopped"
 msgstr "O download parou"
+
+#. The USB drive ran out of room during a backup. A sentence saying what was left on it follows.
+#: pe/ui/backup.cpp
+msgid "The drive is full."
+msgstr "A unidade está cheia."
 
 #: pe/ui/settings.cpp
 msgid "The folder that holds your keys, firmware and games."
@@ -2131,6 +2202,16 @@ msgstr "Não é possível salvar as configurações deste jogo (sem ID de títul
 msgid "This room uses a different protocol version."
 msgstr "Esta sala usa uma versão de protocolo diferente."
 
+#. Exactly one file; {0} is a size such as 1.2 GB. See '{0} game'.
+#: pe/ui/backup.cpp
+msgid "To back up: {0} in {1} file"
+msgstr "Para o backup: {0} em {1} arquivo"
+
+#. {0} is a size such as 1.2 GB, {1} how many files (any number but one). See '{0} game'.
+#: pe/ui/backup.cpp
+msgid "To back up: {0} in {1} files"
+msgstr "Para o backup: {0} em {1} arquivos"
+
 #. ryujinx/, save-import/ and roms/ are folder names (unchanged); {0} is the game's ID.
 #: eden_services.cpp
 msgid "To import, copy a Ryujinx folder to ryujinx/ or a save to save-import/{0}/, next to roms/."
@@ -2248,6 +2329,11 @@ msgstr "Filtro de ampliação"
 msgid "USA"
 msgstr "EUA"
 
+#. {0} is a number from 1 to 8: which of the USB drives connected.
+#: pe/ui/backup.cpp
+msgid "USB drive {0}"
+msgstr "Unidade USB {0}"
+
 #: pe/ui/settings.cpp
 msgid "Use another home screen, library and menu layout."
 msgstr "Use outro layout de início, biblioteca e menu."
@@ -2362,6 +2448,11 @@ msgstr "com {0}"
 msgid "Without filesystem access Nightshade can't tell which apps are installed."
 msgstr "Sem acesso ao sistema de arquivos, o Nightshade não consegue saber quais apps estão instalados."
 
+#. Filesystem access is what the app asks the console for when it starts (as in 'Without filesystem access Nightshade can't tell which apps are installed.').
+#: pe/ui/backup.cpp
+msgid "Without filesystem access there is nothing to back up."
+msgstr "Sem acesso ao sistema de arquivos, não há nada para fazer backup."
+
 #: pe/ui/settings.cpp
 msgid "Write logs at once"
 msgstr "Gravar registros na hora"
@@ -2408,6 +2499,11 @@ msgstr "Não foi possível abrir {0}: {1}"
 msgid "{0} DLC"
 msgstr "{0} DLC"
 
+#. {0} is a size such as 61.0 GB: the room left on a USB drive. Keep it short.
+#: pe/ui/backup.cpp
+msgid "{0} free"
+msgstr "{0} livres"
+
 #. Exactly one game. In a language with more than two plural forms, word it so that it reads well with any number (Games: {0}).
 #: pe/ui/browse.cpp, pe/ui/remote.cpp
 msgid "{0} game"
@@ -2446,6 +2542,11 @@ msgstr "{0} Hz"
 #: pe/ui/apps.cpp
 msgid "{0} is installed. The homebrew loader lists it after its next scan or a restart."
 msgstr "{0} está instalado. O carregador de homebrew o lista após a próxima varredura ou uma reinicialização."
+
+#. {0} is a folder whose name ends in .incomplete: the part of a backup that could not be removed.
+#: pe/ui/backup.cpp
+msgid "{0} is left on the drive, marked incomplete: delete it."
+msgstr "{0} ficou na unidade, marcada como incompleta: exclua-a."
 
 #. {0} is an app's name, {1} its new version, such as 01.000.110.
 #: pe/ui/apps.cpp
