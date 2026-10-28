@@ -413,6 +413,29 @@ void other_apps()
                    !fs::exists(console.homebrew / "PPSA98510") && console.no_work_left(),
                "a cancelled install leaves nothing behind");
 
+        // A ZIP whose param.json names no content version, from a release that names none.
+        fs::remove_all(console.homebrew / "PPSA98510");
+        App &oddly = new_app();
+        oddly.install = true;
+        oddly.archive = release_zip("PPSA98510", "1.5.9", "station program");
+        expect(console.talk(oddly, install_request("PPSA98510", "none", "any", oddly.archive, sha256(oddly.archive),
+                                                   "Nightshade Station")) == 1 &&
+                   oddly.last() == "fail The download isn't the app and version the release names" &&
+                   !fs::exists(console.homebrew / "PPSA98510"),
+               "a ZIP whose version isn't a content version is not installed");
+
+        // A title the console may be running: its sandbox is there (also one the system kept).
+        fs::create_directories(console.base / "sandbox/PPSA98510_000");
+        App &running = new_app();
+        running.install = true;
+        running.archive = app.archive;
+        expect(console.talk(running, install_request("PPSA98510", "none", "any", running.archive,
+                                                     sha256(running.archive), "Nightshade Station")) == 1 &&
+                   running.last().rfind("fail The app may be running", 0) == 0 &&
+                   !fs::exists(console.homebrew / "PPSA98510") && console.no_work_left(),
+               "a title the console may be running is not installed");
+        fs::remove_all(console.base / "sandbox/PPSA98510_000");
+
         // Nightshade's own title is never installed this way (its own update checks more).
         App &own = new_app();
         own.install = true;

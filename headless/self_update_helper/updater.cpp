@@ -726,6 +726,19 @@ int install(const std::shared_ptr<Session> &shared, const std::string &title, co
         session.say("fail " + reason + "\n");
         return 1;
     };
+    // Never a title the console may be running: unknown counts as running, as for the app's own
+    // update, and so does a sandbox the system kept after the app closed (it stays until a restart,
+    // Swordpdf/ProsperoEden#232); the asking app is open, so nothing can tell those apart here.
+    if (title_running(environment.sandboxes, title) != 0)
+    {
+        std::string left;
+        for (const auto &entry : title_sandboxes(environment.sandboxes, title))
+            left += (left.empty() ? "" : ", ") + entry;
+        session.log("install " + title + " refused: in " + environment.sandboxes + ": " +
+                    (left.empty() ? std::string{"(could not be listed)"} : left));
+        return refuse("The app may be running: the console has its sandbox, which stays until a restart. "
+                      "Restart the console and try again");
+    }
 
     // Where it goes: its one folder, at the version that was asked about; a new one beside the
     // asking app's when it has none, where nothing may be yet.
@@ -800,7 +813,8 @@ int install(const std::shared_ptr<Session> &shared, const std::string &title, co
         return 1;
     };
     std::string staged_title, version;
-    if (!read_param(staged, staged_title, version) || staged_title != title || (!any && version != available))
+    if (!read_param(staged, staged_title, version) || staged_title != title || !content_version(version) ||
+        (!any && version != available))
         return fail("The download isn't the app and version the release names");
     session.say("p " + std::to_string(info.unpacked) + " " + std::to_string(info.unpacked) + "\n");
     if (!session.say("staged\n"))
@@ -830,24 +844,26 @@ int install(const std::shared_ptr<Session> &shared, const std::string &title, co
         if (!swap_entries(target, staged, work + "/backup"))
             return fail("The app's files couldn't be replaced; it is as it was");
         refresh_registered(environment, title, target);
-        if (!environment.previous.empty())
-        {
-            const std::string kept = environment.previous + "/" + title + "-backup";
-            if (make_directory(environment.previous) && remove_tree(kept) && move_tree(work + "/backup", kept))
-                session.log("version " + installed + " is kept in " + kept);
-            else
-                session.log("version " + installed + " could not be kept in " + kept);
-        }
     }
-    clean();
     session.log("installed " + title + " " + version + " in " + target);
+    // Said as soon as the files are in place, with where they are when the line has room for it:
+    // keeping the replaced version below can be a copy to another drive that outlasts the app's
+    // wait for this line.
+    const std::string done = "installed " + version + " " + target;
+    session.say((done.size() < SELF_UPDATE_LINE ? done : "installed " + version) + "\n");
     if (environment.notify)
         environment.notify(fresh ? name + " " + label +
                                        " was installed. The homebrew loader lists it after its next scan or a restart."
                                  : name + " was updated to " + label + ".");
-    // Where it is, when the line has room for it.
-    const std::string done = "installed " + version + " " + target;
-    session.say((done.size() < SELF_UPDATE_LINE ? done : "installed " + version) + "\n");
+    if (!fresh && !environment.previous.empty())
+    {
+        const std::string kept = environment.previous + "/" + title + "-backup";
+        if (make_directory(environment.previous) && remove_tree(kept) && move_tree(work + "/backup", kept))
+            session.log("version " + installed + " is kept in " + kept);
+        else
+            session.log("version " + installed + " could not be kept in " + kept);
+    }
+    clean();
     return 0;
 }
 } // namespace
