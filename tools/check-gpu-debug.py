@@ -26,6 +26,7 @@ applied = [
     'Eden::DevVulkan::hcr_mode = gpu_debug.hcr;',
     'Eden::DevVulkan::compute_barriers = gpu_debug.compute_barriers != 0;',
     'Eden::DevVulkan::disable_conditional_rendering = gpu_debug.conditional_rendering == 0;',
+    'Eden::DevVulkan::robustness2 = gpu_debug.robustness2 != 0;',
     'std::fprintf(stderr, "%s renderer=%s\\n", Eden::GpuDebugLine(gpu_debug).c_str(),',
 ]
 # Every session sets them again (they outlive one), before the emulator and its renderer are built.
@@ -34,20 +35,20 @@ for statement in applied:
     assert statement in release, statement
     assert release.index(read) < release.index(statement) < system, statement
 # dev-settings names the same five and goes first.
-for name in ('coherent_storage', 'submit_sync', 'hcr', 'compute_barriers', 'conditional_rendering'):
+for name in ('coherent_storage', 'submit_sync', 'hcr', 'compute_barriers', 'conditional_rendering', 'robustness2'):
     assert f'dev_gpu_debug.{name} = ' in dev, name
 
 # The defaults are what the renderer has without them (headless/dev_vulkan.h).
 store = (root / 'headless/settings_store.h').read_text()
 vulkan = (root / 'headless/dev_vulkan.h').read_text()
-assert 'inline constexpr GpuDebugSettings kGpuDebugDefaults{0, 0, 1, 1, 1};' in store
+assert 'inline constexpr GpuDebugSettings kGpuDebugDefaults{0, 0, 1, 1, 1, 0};' in store
 for declaration in ('inline int coherent_storage = 0;', 'inline bool sync_submissions = false;',
                     'inline int hcr_mode = 1;', 'inline bool compute_barriers = true;',
-                    'inline bool disable_conditional_rendering = false;'):
+                    'inline bool disable_conditional_rendering = false;', 'inline bool robustness2 = false;'):
     assert declaration in vulkan, declaration
 fields = re.search(r'struct GpuDebugSettings \{(.*?)\};', store, re.S).group(1)
 assert re.findall(r'int (\w+) = -1;', fields) == ['coherent_storage', 'submit_sync', 'hcr', 'compute_barriers',
-                                                   'conditional_rendering']
+                                                   'conditional_rendering', 'robustness2']
 
 # The mode's names are Shader::CoherentStorage's values, in order (Eden patch 10).
 assert 'inline constexpr const char* kCoherentStorageKeys[] = {"atomics", "compute", "all"};' in store
@@ -75,7 +76,7 @@ assert 'gpu_debug' not in services and 'GpuDebug' not in services
 # Documented, each switch, with the game's title ID as the file has it (capitals).
 docs = (root / 'docs/SETTINGS.md').read_text()
 section = docs.split('## For testing a game that stops the GPU', 1)[1].split('\n## ', 1)[0]
-for name in ('coherent_storage', 'submit_sync', 'hcr', 'compute_barriers', 'conditional_rendering',
+for name in ('coherent_storage', 'submit_sync', 'hcr', 'compute_barriers', 'conditional_rendering', 'robustness2',
              '"0100606026F12000": { "gpu_debug": {', 'EDEN_GPU_DEBUG coherent='):
     assert name in section, name
 print('GPU debug switches: a game\'s "gpu_debug" reaches the renderer and the shader compiler before the '

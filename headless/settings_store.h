@@ -828,7 +828,7 @@ inline bool LoadAdaptiveClock(uint64_t title_id, const std::string& file = Setti
 // while absent, and the session then takes its default (kGpuDebugDefaults); in a development
 // build dev-settings.txt names them too and goes first. The Library neither shows nor writes them.
 //   "gpu_debug": { "coherent_storage": "compute", "submit_sync": true, "hcr": 2,
-//                  "compute_barriers": true, "conditional_rendering": false }
+//                  "compute_barriers": true, "conditional_rendering": false, "robustness2": true }
 inline constexpr const char* kCoherentStorageKeys[] = {"atomics", "compute", "all"};
 struct GpuDebugSettings {
     int coherent_storage = -1;       // index into kCoherentStorageKeys (Shader::CoherentStorage)
@@ -836,9 +836,11 @@ struct GpuDebugSettings {
     int hcr = -1;                    // host conditional rendering: 0 Eden's, 1 exact, 2 on the CPU
     int compute_barriers = -1;       // barriers after compute dispatches
     int conditional_rendering = -1;  // VK_EXT_conditional_rendering
+    int robustness2 = -1;            // robust buffer and image access: a read out of range gives zeroes
 };
-// What a session has without them: patch 07's coherent storage, the barriers and the extension on.
-inline constexpr GpuDebugSettings kGpuDebugDefaults{0, 0, 1, 1, 1};
+// What a session has without them: patch 07's coherent storage, the barriers and the extension on,
+// no robust access (Eden's own choice: it costs some speed).
+inline constexpr GpuDebugSettings kGpuDebugDefaults{0, 0, 1, 1, 1, 0};
 
 inline GpuDebugSettings LoadGpuDebug(uint64_t title_id, const std::string& file = SettingsFile()) {
     GpuDebugSettings result;
@@ -855,6 +857,7 @@ inline GpuDebugSettings LoadGpuDebug(uint64_t title_id, const std::string& file 
     result.submit_sync = flag("submit_sync");
     result.compute_barriers = flag("compute_barriers");
     result.conditional_rendering = flag("conditional_rendering");
+    result.robustness2 = flag("robustness2");
     const int hcr = Settings::Int(document, Json::json_pointer(base + "hcr"), -1);
     result.hcr = hcr >= 0 && hcr <= 2 ? hcr : -1;
     return result;
@@ -868,7 +871,8 @@ inline GpuDebugSettings ResolveGpuDebug(const GpuDebugSettings& game, const GpuD
             pick(first.submit_sync, game.submit_sync, base.submit_sync),
             pick(first.hcr, game.hcr, base.hcr),
             pick(first.compute_barriers, game.compute_barriers, base.compute_barriers),
-            pick(first.conditional_rendering, game.conditional_rendering, base.conditional_rendering)};
+            pick(first.conditional_rendering, game.conditional_rendering, base.conditional_rendering),
+            pick(first.robustness2, game.robustness2, base.robustness2)};
 }
 
 // The line a session's start writes to stderr.log with the values it uses (ResolveGpuDebug's).
@@ -878,7 +882,8 @@ inline std::string GpuDebugLine(const GpuDebugSettings& value) {
     return std::string("EDEN_GPU_DEBUG coherent=") + kCoherentStorageKeys[mode] +
            " submit_sync=" + std::to_string(value.submit_sync) + " hcr=" + std::to_string(value.hcr) +
            " compute_barriers=" + std::to_string(value.compute_barriers) +
-           " conditional_rendering=" + std::to_string(value.conditional_rendering);
+           " conditional_rendering=" + std::to_string(value.conditional_rendering) +
+           " robustness2=" + std::to_string(value.robustness2);
 }
 
 // Speed against accuracy, for every game ("performance") and for one ("games/<title>/performance",

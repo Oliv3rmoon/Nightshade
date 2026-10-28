@@ -1028,6 +1028,7 @@ int main(int argc, char** argv) {
                 } else if (entry == "descriptor_buffer=off") {
                     Eden::DevVulkan::disable_descriptor_buffer = true;
                 } else if (entry == "robustness2=on") {
+                    dev_gpu_debug.robustness2 = 1;
                     Eden::DevVulkan::robustness2 = true;
                 } else if (entry == "vertex_input_dynamic=off" || entry == "vertex_input_dynamic=on") {
                     dev_vertex_input = entry.ends_with("on") ? 1 : 0;
@@ -1387,6 +1388,7 @@ int main(int argc, char** argv) {
             Eden::DevVulkan::hcr_mode = gpu_debug.hcr;
             Eden::DevVulkan::compute_barriers = gpu_debug.compute_barriers != 0;
             Eden::DevVulkan::disable_conditional_rendering = gpu_debug.conditional_rendering == 0;
+            Eden::DevVulkan::robustness2 = gpu_debug.robustness2 != 0;
             // Which ones the session has, in stderr.log: the Vulkan renderer's alone.
             std::fprintf(stderr, "%s renderer=%s\n", Eden::GpuDebugLine(gpu_debug).c_str(),
                          Eden::BackendName(backend));

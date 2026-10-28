@@ -664,30 +664,30 @@ int main() {
         {
             const Eden::GpuDebugSettings none = Eden::LoadGpuDebug(quest, file);
             assert(none.coherent_storage == -1 && none.submit_sync == -1 && none.hcr == -1 &&
-                   none.compute_barriers == -1 && none.conditional_rendering == -1);
+                   none.compute_barriers == -1 && none.conditional_rendering == -1 && none.robustness2 == -1);
             const Eden::GpuDebugSettings session = Eden::ResolveGpuDebug(none);
             assert(session.coherent_storage == 0 && session.submit_sync == 0 && session.hcr == 1 &&
-                   session.compute_barriers == 1 && session.conditional_rendering == 1);
+                   session.compute_barriers == 1 && session.conditional_rendering == 1 && session.robustness2 == 0);
             assert(Eden::GpuDebugLine(session) ==
-                   "EDEN_GPU_DEBUG coherent=atomics submit_sync=0 hcr=1 compute_barriers=1 conditional_rendering=1");
+                   "EDEN_GPU_DEBUG coherent=atomics submit_sync=0 hcr=1 compute_barriers=1 conditional_rendering=1 robustness2=0");
             assert(Eden::LoadGpuDebug(0, file).coherent_storage == -1);
             auto document = Eden::Settings::Load(file);
             document["games"][Eden::Settings::TitleKey(quest)]["gpu_debug"] = {
                 {"coherent_storage", "compute"}, {"submit_sync", true}, {"hcr", 2},
-                {"compute_barriers", false}, {"conditional_rendering", false}};
+                {"compute_barriers", false}, {"conditional_rendering", false}, {"robustness2", true}};
             assert(Eden::Settings::Write(document, file));
         }
         {
             // The game's own values, for that game only.
             const Eden::GpuDebugSettings own = Eden::LoadGpuDebug(quest, file);
             assert(own.coherent_storage == 1 && own.submit_sync == 1 && own.hcr == 2 &&
-                   own.compute_barriers == 0 && own.conditional_rendering == 0);
+                   own.compute_barriers == 0 && own.conditional_rendering == 0 && own.robustness2 == 1);
             const Eden::GpuDebugSettings other = Eden::LoadGpuDebug(racer, file);
             assert(other.coherent_storage == -1 && other.submit_sync == -1 && other.hcr == -1);
             assert(Eden::GpuDebugLine(Eden::ResolveGpuDebug(own)) ==
-                   "EDEN_GPU_DEBUG coherent=compute submit_sync=1 hcr=2 compute_barriers=0 conditional_rendering=0");
+                   "EDEN_GPU_DEBUG coherent=compute submit_sync=1 hcr=2 compute_barriers=0 conditional_rendering=0 robustness2=1");
             assert(Eden::GpuDebugLine(Eden::ResolveGpuDebug(other)) ==
-                   "EDEN_GPU_DEBUG coherent=atomics submit_sync=0 hcr=1 compute_barriers=1 conditional_rendering=1");
+                   "EDEN_GPU_DEBUG coherent=atomics submit_sync=0 hcr=1 compute_barriers=1 conditional_rendering=1 robustness2=0");
             // dev-settings go first, one value at a time.
             Eden::GpuDebugSettings dev;
             dev.coherent_storage = 2;
