@@ -2,15 +2,32 @@
 
 What changed in each release of ProsperoEden, newest first. A release's notes on GitHub are its section here.
 
+## v1.010.001
+
+**Closer to the GPU stop in Final Fantasy Resonance: shaders read memory the way the game asks, switches to test a game that stops the GPU, and a stall report that names the shader.** Final Fantasy Resonance still stops in its opening scene on v1.010.000 (Oliv3rmoon/Nightshade#1); this release gives the next test runs what they need to find where, and one more fix that may be it. Not confirmed on a console yet.
+
+### Fixes
+
+- **Loads and stores that the game marks "don't cache" reach memory.** A Switch shader can ask that a read come from memory rather than a cache (`LDG.CG`, `LDG.CV`) or that a write go straight through (`STG.CG`, `STG.WT`); Eden dropped that request, so on the PS5's GPU such a read could keep answering from a stale cached copy. Nightshade now keeps it. Shaders that don't ask compile as before.
+
+### For testing a game that stops the GPU
+
+- **When the GPU stops, `stderr.log` says where.** Besides what the stuck submission carried, it now names the first GPU wait that reads as unmet, the last draws and dispatches before it with how much work each asked for and the address of each shader, and the pipeline each address belongs to; Eden logs every pipeline it builds (`EDEN_PIPELINE`), so a report links the stop to the game's own shader.
+- **Switches per game in the settings file** (`"gpu_debug"` in the game's entry): `coherent_storage` (`"compute"`: every compute shader, `"all"`: every shader reads memory, not a cached copy, not only those with atomics), `robustness2` (reads outside a buffer or image give zeroes, writes there are dropped), `submit_sync`, `hcr`, `compute_barriers` and `conditional_rendering`. `stderr.log` says which are in effect (`EDEN_GPU_DEBUG`). See [For testing a game that stops the GPU](https://github.com/Oliv3rmoon/Nightshade/blob/v1.010.001/docs/SETTINGS.md#for-testing-a-game-that-stops-the-gpu).
+
+### Install
+
+From 1.005.102 or later, **Update now** applies it. If it doesn't, send `/data/prosperoeden/logs/updater.log`. From an older version, copy this ZIP's `PPSA99008` folder over yours.
+
 ## v1.010.000
 
 **Nightshade's biggest release: a likely fix for games that stop the GPU, three Nightshade apps beside it, and backups to USB.** Built and checked by this repository's release workflow and test suite (the Linux host tests and the launcher's screens in all three layouts), and the new shader code was checked with Eden's shader compiler on a PC; the GPU fixes have not been confirmed on a console yet, so tell me how your games do.
 
 ### Fixes
 
-- **Games that stop the GPU while they wait on another part of the picture.** On the PS5's GPU an ordinary read of a game's memory can be answered from a cache that another part of the GPU's writes never reach, so a shader that waits for that write waits forever, the GPU stops and the console with it; the Switch's GPU doesn't keep those reads, so games wait that way. In shaders that use atomics, Nightshade now reads that memory from where the writes go. The same applies to how Eden adds floating-point numbers atomically (a retry that read a stale copy could retry forever), which any game with float atomics uses. Final Fantasy Resonance, which stops right after New Game, very probably stops this way (Oliv3rmoon/Nightshade#1); other games that freeze the console may be helped too (Swordpdf/ProsperoEden#277, Swordpdf/ProsperoEden#52, Swordpdf/ProsperoEden#233). None of these is confirmed on a console yet.
+- **Games that stop the GPU while they wait on another part of the picture.** On the PS5's GPU an ordinary read of a game's memory can be answered from a cache that another part of the GPU's writes never reach, so a shader that waits for that write waits forever, the GPU stops and the console with it; the Switch's GPU doesn't keep those reads, so games wait that way. In shaders that use atomics, Nightshade now reads that memory from where the writes go. The same applies to how Eden adds floating-point numbers atomically (a retry that read a stale copy could retry forever), which any game with float atomics uses. Final Fantasy Resonance still stops in its opening scene on a tester's console (some runs right after New Game, some a few seconds into the scene); that is still being worked on in Oliv3rmoon/Nightshade#1. Other games that freeze the console may be helped too (Swordpdf/ProsperoEden#277, Swordpdf/ProsperoEden#52, Swordpdf/ProsperoEden#233), not confirmed yet.
 - **Compare-and-swap in a shader's shared memory (`ATOMS.CAS`)** is translated: a game whose log says `Instruction ATOMS (cas) is not implemented` had that shader skipped, as Final Fantasy Resonance's `ATOM (cas)` was before v1.005.105.
-- **When the GPU stops, Nightshade closes** instead of starting again: an app started again found the GPU still stuck and didn't respond either. The next start says where the crash report is, as before.
+- **When the GPU stops, Nightshade closes** instead of starting again: an app started again found the GPU still stuck and didn't respond either. Confirmed on a console: the console stays responsive, with no need to pull the power cord. The next start says where the crash report is, as before.
 
 ### New
 

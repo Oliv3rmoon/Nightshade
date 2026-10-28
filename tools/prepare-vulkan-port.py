@@ -1399,10 +1399,18 @@ configure_phases = [
      '    return configured;'),
 ]
 for name in ('vk_graphics_pipeline', 'vk_compute_pipeline'):
+    # Once the pipeline exists, Eden's hashes beside its VkPipeline on stderr
+    # (headless/pipeline_identity.h): the driver's stall dump names the handle whose shader the
+    # GPU stopped in.
+    identity = ('::Eden::PipelineIdentity::Graphics(*pipeline, key.Hash(), key.unique_hashes);'
+                if name == 'vk_graphics_pipeline' else
+                '::Eden::PipelineIdentity::Compute(*pipeline, shader_hash);')
     anchors = [
-        ('#include <algorithm>', '#include <algorithm>\n#include "performance.h"'),
+        ('#include <algorithm>', '#include <algorithm>\n#include "performance.h"\n#include "pipeline_identity.h"'),
         ('            std::unique_lock lock{build_mutex};',
          '            auto timer = Eden::Performance::VulkanTimer(16);\n            std::unique_lock lock{build_mutex};'),
+        ('            pipeline_statistics->Collect(device, *pipeline);\n        }\n',
+         '            pipeline_statistics->Collect(device, *pipeline);\n        }\n        ' + identity + '\n'),
     ]
     if name == 'vk_graphics_pipeline':
         anchors += configure_phases
@@ -1410,6 +1418,14 @@ for name in ('vk_graphics_pipeline', 'vk_compute_pipeline'):
 shader_costs = [
     ('#include <algorithm>', '#include <algorithm>\n#include <cstdio>\n#include <set>\n#include <unordered_set>\n'
      '#include "performance.h"\n#include "dev_vulkan.h"\n#include "diagnostics.h"'),
+    # For testing a game that stops the GPU (dev_vulkan.h coherent_storage, from a game's
+    # "gpu_debug" or dev-settings): more of its storage buffers device-coherent (Eden patch 10). The
+    # profile is made with the renderer, after the session has set the switch. Eden builds every
+    # shader's SPIR-V again from the guest code at each start, so no cache holds another mode's.
+    ('        .max_user_clip_distances = device.GetMaxUserClipDistances()\n    };\n',
+     '        .max_user_clip_distances = device.GetMaxUserClipDistances()\n    };\n'
+     '    profile.coherent_storage = static_cast<Shader::CoherentStorage>(\n'
+     '        std::clamp(::Eden::DevVulkan::coherent_storage, 0, 2));\n'),
     # Development crash probes: report each pipeline's first use (stage hashes) to klog,
     # which survives a GPU fault that kills the title.
     ('    current_pipeline = pipeline.get();\n    return BuiltPipeline(current_pipeline);\n}',

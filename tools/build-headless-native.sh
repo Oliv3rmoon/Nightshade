@@ -102,6 +102,7 @@ python3 -B "$root/tools/launcher/strings.py" check
 python3 -B "$root/tools/check-nso-memory.py"
 python3 -B "$root/tools/check-performance.py"
 python3 -B "$root/tools/check-performance-settings.py"
+python3 -B "$root/tools/check-gpu-debug.py"
 python3 -B "$root/tools/check-startup-performance.py"
 python3 -B "$root/tools/check-worker-affinity.py"
 python3 -B "$root/tools/check-tsc-fallback.py"

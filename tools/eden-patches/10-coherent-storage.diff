@@ -1,0 +1,106 @@
+--- a/src/shader_recompiler/backend/spirv/emit_spirv_memory.cpp
++++ b/src/shader_recompiler/backend/spirv/emit_spirv_memory.cpp
+@@ -49,12 +49,17 @@
+     return inst->Flags<IR::MemoryInstInfo>().coherent;
+ }
+ 
++// Profile::coherent_storage: in such a shader every storage buffer load is Volatile as well.
++bool IsCoherentLoad(EmitContext& ctx, IR::Inst* inst) {
++    return ctx.coherent_storage || IsCoherent(inst);
++}
++
+ Id LoadStorage(EmitContext& ctx, IR::Inst* inst, const IR::Value& binding,
+                const IR::Value& offset, Id result_type, const StorageTypeDefinition& type_def,
+                size_t element_size, Id StorageDefinitions::*member_ptr, u32 index_offset = 0) {
+     const Id pointer{
+         StoragePointer(ctx, binding, offset, type_def, element_size, member_ptr, index_offset)};
+-    if (IsCoherent(inst)) {
++    if (IsCoherentLoad(ctx, inst)) {
+         return ctx.OpLoad(result_type, pointer, spv::MemoryAccessMask::Volatile);
+     }
+     return ctx.OpLoad(result_type, pointer);
+--- a/src/shader_recompiler/backend/spirv/spirv_emit_context.cpp
++++ b/src/shader_recompiler/backend/spirv/spirv_emit_context.cpp
+@@ -317,9 +317,10 @@
+         const Id id{ctx.AddGlobalVariable(struct_pointer, spv::StorageClass::StorageBuffer)};
+         ctx.Decorate(id, spv::Decoration::Binding, binding);
+         ctx.Decorate(id, spv::Decoration::DescriptorSet, 0U);
+-        if (info.uses_storage_atomics) {
++        if (info.uses_storage_atomics || ctx.coherent_storage) {
+             // Atomics act at device scope; the shader's plain loads must see what other
+-            // workgroups wrote, not a stale copy in a per-CU cache.
++            // workgroups wrote, not a stale copy in a per-CU cache. Profile::coherent_storage
++            // asks the same of every storage buffer of more shaders.
+             ctx.Decorate(id, spv::Decoration::Coherent);
+         }
+         ctx.Name(id, fmt::format("ssbo{}", index));
+@@ -476,7 +477,11 @@
+ EmitContext::EmitContext(const Profile& profile_, const RuntimeInfo& runtime_info_,
+                          IR::Program& program, Bindings& bindings)
+     : Sirit::Module(profile_.supported_spirv), profile{profile_}, runtime_info{runtime_info_},
+-      stage{program.stage}, texture_rescaling_index{bindings.texture_scaling_index},
++      stage{program.stage},
++      coherent_storage{profile_.coherent_storage == CoherentStorage::All ||
++                       (profile_.coherent_storage == CoherentStorage::Compute &&
++                        program.stage == Stage::Compute)},
++      texture_rescaling_index{bindings.texture_scaling_index},
+       image_rescaling_index{bindings.image_scaling_index} {
+     const bool is_unified{profile.unified_descriptor_binding};
+     u32& uniform_binding{is_unified ? bindings.unified : bindings.uniform_buffer};
+@@ -996,13 +1001,15 @@
+     // A global access the guest marked device-coherent (LDG .CG and the like) shares these
+     // functions with every other one: all of their accesses are then Volatile.
+     const bool coherent{info.uses_coherent_global_memory};
++    const bool coherent_load{coherent || coherent_storage};
+     const auto define_load{[&](DefPtr ssbo_member, Id element_pointer, Id type, u32 shift) {
+         const Id function_type{TypeFunction(type, U64)};
+         const Id func_id{OpFunction(type, spv::FunctionControlMask::MaskNone, function_type)};
+         const Id addr{OpFunctionParameter(U64)};
+         define_body(ssbo_member, addr, element_pointer, shift, [&](Id ssbo_pointer) {
+-            OpReturnValue(coherent ? OpLoad(type, ssbo_pointer, spv::MemoryAccessMask::Volatile)
+-                                   : OpLoad(type, ssbo_pointer));
++            OpReturnValue(coherent_load
++                              ? OpLoad(type, ssbo_pointer, spv::MemoryAccessMask::Volatile)
++                              : OpLoad(type, ssbo_pointer));
+         });
+         OpReturnValue(ConstantNull(type));
+         OpFunctionEnd();
+--- a/src/shader_recompiler/backend/spirv/spirv_emit_context.h
++++ b/src/shader_recompiler/backend/spirv/spirv_emit_context.h
+@@ -214,6 +214,9 @@
+     const Profile& profile;
+     const RuntimeInfo& runtime_info;
+     Stage stage{};
++    /// Every storage buffer of this shader is Coherent and read with Volatile loads
++    /// (Profile::coherent_storage).
++    bool coherent_storage{};
+ 
+     Id void_id{};
+     Id U1{};
+--- a/src/shader_recompiler/profile.h
++++ b/src/shader_recompiler/profile.h
+@@ -12,6 +12,13 @@
+ 
+ enum class Stage : u32;
+ 
++/// Which storage buffers a shader reads device-coherently, past the per-CU caches.
++enum class CoherentStorage : u32 {
++    Atomics, ///< Those of a shader with storage atomics (Coherent), and loads the guest marked
++    Compute, ///< Also every one of a compute shader: Coherent, and its loads Volatile
++    All,     ///< Also every one of every shader
++};
++
+ struct Profile {
+     u32 supported_spirv{0x00010000};
+     bool unified_descriptor_binding{};
+@@ -111,6 +118,10 @@
+     u64 min_ssbo_alignment{};
+     u32 max_user_clip_distances{};
+ 
++    /// For testing a game whose GPU work stops (a loop that waits for another workgroup's
++    /// write and is served a stale cached copy): more of its storage buffers device-coherent.
++    CoherentStorage coherent_storage{CoherentStorage::Atomics};
++
+     bool SupportsSubgroupStage(Stage stage) const {
+         return (supported_subgroup_stages & (1u << static_cast<u32>(stage))) != 0;
+     }

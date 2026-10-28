@@ -658,6 +658,67 @@ int main() {
             document["games"][Eden::Settings::TitleKey(quest)].erase("vertex_input_dynamic");
             assert(Eden::Settings::Write(document, file));
         }
+        // For testing a game that stops the GPU: "gpu_debug" in the game's entry, the file's alone.
+        // Absent, every value is -1 and the session has the defaults: patch 07's coherent storage,
+        // no wait after submissions, the exact host conditions, the barriers and the extension on.
+        {
+            const Eden::GpuDebugSettings none = Eden::LoadGpuDebug(quest, file);
+            assert(none.coherent_storage == -1 && none.submit_sync == -1 && none.hcr == -1 &&
+                   none.compute_barriers == -1 && none.conditional_rendering == -1 && none.robustness2 == -1);
+            const Eden::GpuDebugSettings session = Eden::ResolveGpuDebug(none);
+            assert(session.coherent_storage == 0 && session.submit_sync == 0 && session.hcr == 1 &&
+                   session.compute_barriers == 1 && session.conditional_rendering == 1 && session.robustness2 == 0);
+            assert(Eden::GpuDebugLine(session) ==
+                   "EDEN_GPU_DEBUG coherent=atomics submit_sync=0 hcr=1 compute_barriers=1 conditional_rendering=1 robustness2=0");
+            assert(Eden::LoadGpuDebug(0, file).coherent_storage == -1);
+            auto document = Eden::Settings::Load(file);
+            document["games"][Eden::Settings::TitleKey(quest)]["gpu_debug"] = {
+                {"coherent_storage", "compute"}, {"submit_sync", true}, {"hcr", 2},
+                {"compute_barriers", false}, {"conditional_rendering", false}, {"robustness2", true}};
+            assert(Eden::Settings::Write(document, file));
+        }
+        {
+            // The game's own values, for that game only.
+            const Eden::GpuDebugSettings own = Eden::LoadGpuDebug(quest, file);
+            assert(own.coherent_storage == 1 && own.submit_sync == 1 && own.hcr == 2 &&
+                   own.compute_barriers == 0 && own.conditional_rendering == 0 && own.robustness2 == 1);
+            const Eden::GpuDebugSettings other = Eden::LoadGpuDebug(racer, file);
+            assert(other.coherent_storage == -1 && other.submit_sync == -1 && other.hcr == -1);
+            assert(Eden::GpuDebugLine(Eden::ResolveGpuDebug(own)) ==
+                   "EDEN_GPU_DEBUG coherent=compute submit_sync=1 hcr=2 compute_barriers=0 conditional_rendering=0 robustness2=1");
+            assert(Eden::GpuDebugLine(Eden::ResolveGpuDebug(other)) ==
+                   "EDEN_GPU_DEBUG coherent=atomics submit_sync=0 hcr=1 compute_barriers=1 conditional_rendering=1 robustness2=0");
+            // dev-settings go first, one value at a time.
+            Eden::GpuDebugSettings dev;
+            dev.coherent_storage = 2;
+            dev.hcr = 0;
+            const Eden::GpuDebugSettings both = Eden::ResolveGpuDebug(own, dev);
+            assert(both.coherent_storage == 2 && both.hcr == 0 && both.submit_sync == 1 &&
+                   both.compute_barriers == 0 && both.conditional_rendering == 0);
+            // A save from the Library keeps them, as it keeps "vertex_input_dynamic".
+            assert(Eden::SaveGameSettings(quest, Eden::GameSettings{}, file));
+            assert(Eden::LoadGpuDebug(quest, file).coherent_storage == 1 && Eden::LoadGpuDebug(quest, file).hcr == 2);
+        }
+        {
+            // A value of the wrong kind reads as absent: an unknown mode, hcr past 2, a number or a
+            // word for a switch, and "gpu_debug" that is not an object.
+            auto document = Eden::Settings::Load(file);
+            auto& entry = document["games"][Eden::Settings::TitleKey(quest)];
+            entry["gpu_debug"] = {{"coherent_storage", "everything"}, {"submit_sync", 1}, {"hcr", 3},
+                                  {"compute_barriers", "off"}, {"conditional_rendering", nullptr}};
+            assert(Eden::Settings::Write(document, file));
+            const Eden::GpuDebugSettings mistyped = Eden::LoadGpuDebug(quest, file);
+            assert(mistyped.coherent_storage == -1 && mistyped.submit_sync == -1 && mistyped.hcr == -1 &&
+                   mistyped.compute_barriers == -1 && mistyped.conditional_rendering == -1);
+            entry["gpu_debug"] = {{"hcr", -1}, {"coherent_storage", "all"}};
+            assert(Eden::Settings::Write(document, file));
+            assert(Eden::LoadGpuDebug(quest, file).hcr == -1 && Eden::LoadGpuDebug(quest, file).coherent_storage == 2);
+            entry["gpu_debug"] = true;
+            assert(Eden::Settings::Write(document, file));
+            assert(Eden::LoadGpuDebug(quest, file).hcr == -1 && Eden::LoadGpuDebug(quest, file).coherent_storage == -1);
+            entry.erase("gpu_debug");
+            assert(Eden::Settings::Write(document, file));
+        }
         wrong = game;
         wrong.mapping[Eden::game_b] = wrong.mapping[Eden::game_a];
         assert(!Eden::SaveGameSettings(quest, wrong, file));

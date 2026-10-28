@@ -1,6 +1,6 @@
 # Settings
 
-The settings that take more than a line to explain: the Performance switches and speed limit, frame generation, profiles, settings per game, button mapping, language, accessibility and update notices.
+The settings that take more than a line to explain: the Performance switches and speed limit, frame generation, profiles, settings per game, the switches for testing a game that stops the GPU, button mapping, language, accessibility and update notices.
 
 ## Performance settings
 
@@ -213,6 +213,40 @@ One more is in the settings file only, for a game whose graphics break with it: 
 ```json
 { "games": { "<the game's title ID>": { "vertex_input_dynamic": false } } }
 ```
+
+## For testing a game that stops the GPU
+
+A game that stops the GPU freezes the picture, and Nightshade closes. These switches change how the Vulkan renderer runs that game, to find out what makes it go on: they are for testing, not for playing, and most make the game slower. They are in the settings file only, `/data/prosperoeden/config/prosperoeden.json`, as `"gpu_debug"` in the game's entry under `"games"`; there is no menu for them. Leave the game before editing the file; they apply the next time it starts. A switch left out keeps its default, and the OpenGL renderer ignores them all.
+
+| In the file | Default | What it does |
+|---|---|---|
+| `coherent_storage` | `"atomics"` | Which of a shader's storage buffers it reads from where every part of the GPU writes, instead of from a cache near the part that runs it. A shader that waits for another part's write can be answered from a stale copy in that cache forever, and the GPU stops at whatever moment that happens. `"atomics"`: in shaders that use atomics, and the reads a game itself marks to skip the cache. `"compute"`: also every storage buffer of every compute shader. `"all"`: also every storage buffer of every shader. The more it covers, the slower. |
+| `submit_sync` | `false` | `true`: the renderer waits for the GPU to finish each submission before it goes on, so no two run at once. Much slower. |
+| `hcr` | `1` | How a draw the game makes conditional on a GPU result is decided: `0` Eden's way, `1` Eden's way except that the cases it approximates are worked out exactly, `2` every condition worked out on the CPU. |
+| `compute_barriers` | `true` | `false`: Eden's own synchronization of compute work, without the barriers Nightshade adds around each dispatch. |
+| `conditional_rendering` | `true` | `false`: the driver's conditional rendering (`VK_EXT_conditional_rendering`) is not used; the conditions are resolved the way Eden does on a driver without it. |
+| `robustness2` | `false` | `true`: robust buffer and image access (`VK_EXT_robustness2`): a shader's read outside a buffer or image gives zeroes and its write there is dropped, stricter than the bounds check every session already has. Some speed. |
+
+The title ID is written as the file has it, with capital letters. Final Fantasy Resonance (title ID `0100606026F12000`, [Oliv3rmoon/Nightshade#1](https://github.com/Oliv3rmoon/Nightshade/issues/1)), with every storage buffer of its compute shaders read past the cache:
+
+```json
+{ "games": { "0100606026F12000": { "gpu_debug": { "coherent_storage": "compute" } } } }
+```
+
+and with every switch named:
+
+```json
+{ "games": { "0100606026F12000": { "gpu_debug": { "coherent_storage": "all", "submit_sync": true, "hcr": 2,
+                                                  "compute_barriers": true, "conditional_rendering": false } } } }
+```
+
+When the game starts, `stderr.log` has a line with the values it got, for example:
+
+```
+EDEN_GPU_DEBUG coherent=compute submit_sync=0 hcr=1 compute_barriers=1 conditional_rendering=1 robustness2=0 renderer=Vulkan
+```
+
+Changing the game's settings in the Library keeps them; take `"gpu_debug"` out of the file to go back to the defaults. A development build's `dev-settings.txt` has the same switches (`coherent_storage=compute`, `submit_sync=on`, `hcr=cpu`, `compute_barriers=off`, `conditional_rendering=off`, `robustness2=on`), and they go before the game's.
 
 ## Button mapping
 
