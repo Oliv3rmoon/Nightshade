@@ -2,6 +2,35 @@
 
 What changed in each release of ProsperoEden, newest first. A release's notes on GitHub are its section here.
 
+## v1.010.000
+
+**Nightshade's biggest release: a fix for games that stop the GPU, three Nightshade apps beside it, and backups to USB.** Built and checked by this repository's release workflow and test suite (the Linux host tests, the launcher's screens in all three layouts, and the shader compiler run on the host); the GPU fixes have not been confirmed on a console yet, so tell me how your games do.
+
+### Fixes
+
+- **Games that stop the GPU while they wait on another part of the picture.** On the PS5's GPU an ordinary read of a game's memory can be answered from a cache that another part of the GPU's writes never reach, so a shader that waits for that write waits forever, the GPU stops and the console with it; the Switch's GPU doesn't keep those reads, so games wait that way. In shaders that use atomics, Nightshade now reads that memory from where the writes go. The same applies to how Eden adds floating-point numbers atomically (a retry that read a stale copy could retry forever), which any game with float atomics uses. Final Fantasy Resonance stopped right after New Game this way (Oliv3rmoon/Nightshade#1); other games that freeze the console may be helped too (Swordpdf/ProsperoEden#277, Swordpdf/ProsperoEden#52, Swordpdf/ProsperoEden#233). None of these is confirmed on a console yet.
+- **Compare-and-swap in a shader's shared memory (`ATOMS.CAS`)** is translated: a game whose log says `Instruction ATOMS (cas) is not implemented` had that shader skipped, as Final Fantasy Resonance's `ATOM (cas)` was before v1.005.105.
+- **When the GPU stops, Nightshade closes** instead of starting again: an app started again found the GPU still stuck and didn't respond either. The next start says where the crash report is, as before.
+
+### New
+
+- **Settings > Apps: Nightshade TV, Nightshade Stream and Nightshade Station.** Three apps in Nightshade's black and red, each its own release on GitHub, installed over the app it comes from (same title ID and data, so your channels, paired PCs and memory cards stay):
+  - [Nightshade TV](https://github.com/Oliv3rmoon/Nightshade-TV): ProsperoTV's IPTV client, now with **Plex** (sign in on the TV with a code, your servers and the ones shared with you, movies and shows, resume).
+  - [Nightshade Stream](https://github.com/Oliv3rmoon/Nightshade-Stream): ProsperoLight, the Moonlight client, for playing your PC's games on the PS5.
+  - [Nightshade Station](https://github.com/Oliv3rmoon/Nightshade-Station): SwanStationPS5, the PS1 emulator.
+
+  **Settings > Apps** shows which are installed and their version. **Get** and **Update** download the newest release, check it against its `SHA256SUMS`, and install it with the update helper; **Open** closes Nightshade and starts the app (with a payload loader running, as for updates). See [Apps](https://github.com/Oliv3rmoon/Nightshade/blob/v1.010.000/README.md#apps).
+- **Back up to USB.** **Settings > Diagnostics > Back up to USB** copies the settings, profiles and every save to `nightshade-backup/<date-time>/` on a USB drive, with a `SHA256SUMS` to check them on a PC; caches, logs and games stay out. To restore, copy the folder back with the app closed. See [Backing up to a USB drive](https://github.com/Oliv3rmoon/Nightshade/blob/v1.010.000/docs/INSTALL.md#backing-up-to-a-usb-drive). (Swordpdf/ProsperoEden#157)
+- **Wallpapers from the game files folder.** Images in `wallpapers/` of the game files folder you copy from a PC are listed in **Settings > Appearance > Wallpaper** too, so a new wallpaper needs no FTP. (Swordpdf/ProsperoEden#263)
+
+### Also
+
+- The release build waits out GitHub's rate limit when it downloads its dependencies, and the update helper builds cleanly with GCC.
+
+### Install
+
+From 1.005.102 or later, **Update now** applies it. If it doesn't, send `/data/prosperoeden/logs/updater.log`. From an older version, copy this ZIP's `PPSA99008` folder over yours.
+
 ## v1.005.105
 
 **A shader Final Fantasy Resonance needs in its opening cinematic now runs.** A few seconds into the opening cinematic after New Game, the game hung the GPU and took the console with it: controller and power button stopped responding (Oliv3rmoon/Nightshade#1). One of its compute shaders uses a compare-and-swap instruction (`ATOM.CAS`) that Eden did not translate, so that shader never ran, and the GPU waited for its work forever. The instruction is now translated. It is not yet confirmed on a console that the game plays on past that point: if it still stops, send the new crash log. Any other game whose log says `Instruction ATOM (cas) is not implemented` gets the same fix.
