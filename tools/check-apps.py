@@ -35,7 +35,10 @@ with tempfile.TemporaryDirectory() as tmp:
         subprocess.run([os.environ.get('CC', 'cc'), '-O1', '-w', '-I' + str(root / 'third_party/miniz'), '-c',
                         str(root / 'third_party/miniz' / (name + '.c')), '-o', objects[-1]], check=True)
     exe = Path(tmp) / 'eden-apps-check'
-    subprocess.run([os.environ.get('CXX', 'c++'), '-std=c++20', '-pthread', *flags, '-I' + str(headless),
+    # GCC with the sanitizers reads the helper's unique_ptr<DIR, decltype(&closedir)> as dropping
+    # glibc's attributes on closedir: harmless, and the helper's own check builds it without them.
+    subprocess.run([os.environ.get('CXX', 'c++'), '-std=c++20', '-pthread', *flags, '-Wno-ignored-attributes',
+                    '-I' + str(headless),
                     '-I' + str(headless / 'prosperoeden'), '-I' + str(headless / 'self_update_helper'),
                     '-I' + str(headless / 'update_check'), '-I' + str(root / 'third_party'),
                     str(headless / 'apps_check.cpp'), str(headless / 'apps_release.cpp'),
