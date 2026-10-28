@@ -3539,6 +3539,7 @@ endif()
                 "${launcher_dir}/pe/platform/audio_out.cpp"
                 "${launcher_dir}/pe/platform/display_egl.cpp"
                 "${launcher_dir}/pe/ui/apps.cpp"
+                "${launcher_dir}/pe/ui/backup.cpp"
                 "${launcher_dir}/pe/ui/browse.cpp"
                 "${launcher_dir}/pe/ui/game_options.cpp"
                 "${launcher_dir}/pe/ui/profiles.cpp"
