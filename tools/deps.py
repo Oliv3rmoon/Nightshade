@@ -22,6 +22,8 @@ import sys
 import tarfile
 import tempfile
 import time
+import urllib.error
+import urllib.parse
 import urllib.request
 import zipfile
 
@@ -77,18 +79,33 @@ def download(url, algorithm, expected, name):
     if target.exists() and digest(target, algorithm) == expected:
         return target
     partial = target.with_name(target.name + f'.partial-{os.getpid()}')
-    for attempt in range(1, 4):
+    # On CI, raw.githubusercontent.com answers a runner that names its token with a far higher rate
+    # limit than an anonymous one (it refused several files a run with 429). Only hosts that answer
+    # themselves get it, and never through a redirect: release files redirect to signed addresses.
+    token = os.environ.get('GITHUB_TOKEN') or os.environ.get('GH_TOKEN')
+    host = urllib.parse.urlsplit(url).hostname or ''
+    authorize = bool(token) and host in ('raw.githubusercontent.com', 'codeload.github.com')
+    attempts = 6
+    for attempt in range(1, attempts + 1):
         try:
             print(f'deps: downloading {url}', flush=True)
             request = urllib.request.Request(url, headers={'User-Agent': 'prosperoeden-deps'})
+            if authorize:
+                request.add_unredirected_header('Authorization', f'Bearer {token}')
             with urllib.request.urlopen(request, timeout=120) as response, open(partial, 'wb') as out:
                 shutil.copyfileobj(response, out, 1 << 20)
             break
         except OSError as error:
             partial.unlink(missing_ok=True)
-            if attempt == 3:
+            if attempt == attempts:
                 fail(f'cannot download {url}: {error}')
-            time.sleep(5 * attempt)
+            # Too many requests: wait as long as the server asks, else back off longer each time.
+            wait = 5 * attempt
+            if isinstance(error, urllib.error.HTTPError) and error.code in (429, 503):
+                after = error.headers.get('Retry-After', '') if error.headers else ''
+                wait = int(after) if after.isdigit() else 15 * 2 ** (attempt - 1)
+                print(f'deps: {url} answered {error.code}; trying again in {min(wait, 300)} s', flush=True)
+            time.sleep(min(wait, 300))
     actual = digest(partial, algorithm)
     if actual != expected:
         partial.unlink(missing_ok=True)
