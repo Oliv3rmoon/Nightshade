@@ -16,8 +16,9 @@
  *   app      PSL1, <title ID to open>, <title ID of the app asking>      (three lines)
  *   payload  waiting                              or  fail <reason>
  *
- * Nightshade then closes. The payload waits for it to stop being the app that runs (up to 30 s:
- * Nightshade gives its graphics and sound back first), then opens the title as the foreground
+ * Nightshade then closes. The payload waits for it to stop being the app that runs (three looks
+ * in a row a quarter of a second apart that find another, within 30 s: Nightshade gives its
+ * graphics and sound back first), then opens the title as the foreground
  * user with sceLncUtilLaunchApp and, when that refuses, sceSystemServiceLaunchApp. Each step is
  * written to /data/prosperoeden/logs/app-launch.log.
  */
@@ -32,6 +33,8 @@
 #define LAUNCH_LOG "/data/prosperoeden/logs/app-launch.log"
 #define LAUNCH_WAIT_STEP_US 250000
 #define LAUNCH_WAIT_STEPS 120
+/* Looks in a row that must find another app than the asking one before the title is opened. */
+#define LAUNCH_CLEAR_LOOKS 3
 
 typedef struct
 {
@@ -124,6 +127,7 @@ int main(void)
     char magic[16];
     char target[16];
     char asking[16];
+    char first[16];
     char title[16];
     const char *arguments[] = {NULL};
     FILE *log;
@@ -131,6 +135,7 @@ int main(void)
     int foreground;
     int user = -1;
     int waited = 0;
+    int clear = 0;
     int result;
     lnc_app_param_t param;
     /* The app closes its end once it has the answer. */
@@ -156,17 +161,23 @@ int main(void)
     say("waiting\n");
     init = sceUserServiceInitialize(NULL);
     foreground = sceUserServiceGetForegroundUser(&user);
-    for (running_title(title); strcmp(title, asking) == 0 && waited < LAUNCH_WAIT_STEPS; waited++)
+    /* What runs as it starts, for the log; then one look caught between two states is not taken
+     * for the asking app having gone. */
+    running_title(first);
+    for (; clear < LAUNCH_CLEAR_LOOKS && waited < LAUNCH_WAIT_STEPS; waited++)
     {
-        usleep(LAUNCH_WAIT_STEP_US);
         running_title(title);
+        clear = strcmp(title, asking) == 0 ? 0 : clear + 1;
+        if (clear < LAUNCH_CLEAR_LOOKS)
+            usleep(LAUNCH_WAIT_STEP_US);
     }
     if (log)
     {
         fprintf(log,
-                "launch %s for %s: user service %08x, foreground user %d (%08x); waited %d step(s) for %s, "
-                "running now: '%s'\n",
-                target, asking, (unsigned)init, user, (unsigned)foreground, waited, asking, title);
+                "launch %s for %s: user service %08x, foreground user %d (%08x); running at the start: '%s'; "
+                "waited %d step(s) for %s to go%s, running now: '%s'\n",
+                target, asking, (unsigned)init, user, (unsigned)foreground, first, waited, asking,
+                clear < LAUNCH_CLEAR_LOOKS ? " (it did not)" : "", title);
         fflush(log);
     }
     param.size = sizeof(param);
