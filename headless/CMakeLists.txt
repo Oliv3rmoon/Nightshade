@@ -3663,6 +3663,9 @@ endif()
             # Settings > Apps (apps.h): the update kit's job and the helper install other apps, the
             # launch payload opens them; it uses the same object.
             target_sources(eden-headless PRIVATE "${EDEN_PORT_DIR}/apps.cpp" "${EDEN_PORT_DIR}/apps_release.cpp")
+            # Settings > Diagnostics > Back up to USB (backup.h): its SHA256SUMS hashes with the update
+            # kit's SHA-256, in the same object.
+            target_sources(eden-headless PRIVATE "${EDEN_PORT_DIR}/backup.cpp")
             target_link_libraries(eden-headless PRIVATE
                 "${OPENSSL_SSL_LIBRARY}" "${OPENSSL_CRYPTO_LIBRARY}" "${ZLIB_LIBRARY}")
             # The launcher calls OpenGL by name (the SDK's headers), not through glad.

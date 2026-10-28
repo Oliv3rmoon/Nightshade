@@ -129,6 +129,46 @@ enum class AppOpen : std::uint8_t
     refused,    // anything else (the reason says what)
 };
 
+// Settings > Diagnostics > Back up to USB (headless/backup.h): the app's data folder copied to a
+// USB drive. A drive it can go to.
+struct BackupDrive
+{
+    std::string path;        // /mnt/usb0
+    std::uint64_t free = 0;  // bytes it can still take, when known
+    bool free_known = false; // a PS5 title can't ask: false there
+};
+enum class BackupPhase : std::uint8_t
+{
+    idle,      // nothing runs: the drives and the size as last looked at
+    looking,   // looking for the drives and measuring what a backup copies
+    measuring, // a backup reads what it copies
+    copying,   // done_files and done_bytes of files and bytes
+    done,      // until finish_backup, as each of the three below
+    cancelled,
+    failed,
+    no_room,   // the drive lacks room: before anything was written (room_known), or it filled up
+};
+struct BackupStatus
+{
+    BackupPhase phase = BackupPhase::idle;
+    bool access = true;      // false: without filesystem access there is nothing to back up
+    bool measured = false;   // files and bytes are known
+    std::uint64_t files = 0; // what a backup copies
+    std::uint64_t bytes = 0;
+    std::string problem;     // the data folder could not be read: why (English)
+    std::vector<BackupDrive> drives;
+    int drive = -1;          // the one a backup goes to
+    std::uint64_t done_files = 0;
+    std::uint64_t done_bytes = 0;
+    // done: the backup's folder. Otherwise what is left on the drive, its name ending in
+    // .incomplete (empty: nothing was left).
+    std::string folder;
+    std::string error;       // failed: why (English)
+    bool room_known = false; // no_room before anything was written: what it needs and has
+    std::uint64_t needed = 0;
+    std::uint64_t free = 0;
+};
+
 // A game file in the games folder.
 struct Game
 {
@@ -932,6 +972,29 @@ class Services
     virtual AppOpen open_app(int, std::string *)
     {
         return AppOpen::no_loader;
+    }
+
+    // ---- Settings > Diagnostics > Back up to USB (headless/backup.h) ----
+    // Looks for the USB drives and measures what a backup copies, on a thread of its own; backs
+    // up to one of backup_status().drives (false: it could not begin, and reason says why, in
+    // English); how that goes; stops it (what it wrote is removed); and once it has ended, before
+    // the next.
+    virtual void refresh_backup()
+    {
+    }
+    virtual BackupStatus backup_status()
+    {
+        return {};
+    }
+    virtual bool start_backup(int, std::string *)
+    {
+        return false;
+    }
+    virtual void cancel_backup()
+    {
+    }
+    virtual void finish_backup()
+    {
     }
 
     // ---- images ----

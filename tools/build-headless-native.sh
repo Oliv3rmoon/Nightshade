@@ -96,6 +96,7 @@ python3 -B "$root/tools/check-loose-addons.py"
 python3 -B "$root/tools/check-update-helper.py"
 python3 -B "$root/tools/check-apps.py"
 python3 -B "$root/tools/check-wallpapers.py"
+python3 -B "$root/tools/check-backup.py"
 python3 -B "$root/tools/check-unmapped-log.py"
 python3 -B "$root/tools/launcher/strings.py" check
 python3 -B "$root/tools/check-nso-memory.py"
