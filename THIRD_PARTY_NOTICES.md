@@ -64,6 +64,10 @@ builds on the following projects, each under its own license.
 - **[ps5log](https://github.com/mpereiraesaa/ps5-agc-gears/tree/1ae1f9182abd2770c131b97419034fb85173c2dc/native/ps5log)**,
   GPL-3.0-or-later. The pinned single-header logging client used as an upstream
   Lapy helper build input.
+- **[PS5 RetroArch](https://github.com/mihawk-99/PS5_RetroArch)** by Mihawk,
+  GPL-3.0-or-later. Nightshade's launch payload (`headless/app_launch/main.c`, which opens an app
+  from Settings > Apps once Nightshade has closed) is based on its Game Forwarder's launch payload
+  (`forwarder/launch.c`): the wait for the calling app to close and the two launch calls are his.
 - **[ProsperoPuzzles](https://github.com/blackbearreloaded/ProsperoPuzzles)**,
   GPL-3.0-or-later. The launcher's drawing, text, animation and sound code
   (`headless/prosperoeden/pe`) started there.

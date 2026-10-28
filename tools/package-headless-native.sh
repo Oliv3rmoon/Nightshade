@@ -57,6 +57,12 @@ make -s -C "$root/headless/self_update_helper" PS5_PAYLOAD_SDK="$template/.deps/
     OUTPUT="$root/build/self-update/self-updater.elf"
 python3 "$root/tools/validate-loader-elf.py" "$root/build/self-update/self-updater.elf"
 cp "$root/build/self-update/self-updater.elf" "$app/self-updater.elf"
+# The launch payload (headless/app_launch, after Mihawk's): Settings > Apps sends it to the same
+# loader to open another app once Nightshade has closed.
+make -s -C "$root/headless/app_launch" PS5_PAYLOAD_SDK="$template/.deps/native/ps5-payload-sdk" \
+    OUTPUT="$root/build/app-launch/app-launch.elf"
+python3 "$root/tools/validate-loader-elf.py" "$root/build/app-launch/app-launch.elf"
+cp "$root/build/app-launch/app-launch.elf" "$app/app-launch.elf"
 cp "$root/sce_sys/"{param.json,icon0.png,pic0.dds,pic1.dds,snd0.at9} "$app/sce_sys/"
 rm -rf "$app/ui"
 cp -a "$root/headless/prosperoeden/ui" "$app/ui"
