@@ -1399,10 +1399,18 @@ configure_phases = [
      '    return configured;'),
 ]
 for name in ('vk_graphics_pipeline', 'vk_compute_pipeline'):
+    # Once the pipeline exists, Eden's hashes beside its VkPipeline on stderr
+    # (headless/pipeline_identity.h): the driver's stall dump names the handle whose shader the
+    # GPU stopped in.
+    identity = ('::Eden::PipelineIdentity::Graphics(*pipeline, key.Hash(), key.unique_hashes);'
+                if name == 'vk_graphics_pipeline' else
+                '::Eden::PipelineIdentity::Compute(*pipeline, shader_hash);')
     anchors = [
-        ('#include <algorithm>', '#include <algorithm>\n#include "performance.h"'),
+        ('#include <algorithm>', '#include <algorithm>\n#include "performance.h"\n#include "pipeline_identity.h"'),
         ('            std::unique_lock lock{build_mutex};',
          '            auto timer = Eden::Performance::VulkanTimer(16);\n            std::unique_lock lock{build_mutex};'),
+        ('            pipeline_statistics->Collect(device, *pipeline);\n        }\n',
+         '            pipeline_statistics->Collect(device, *pipeline);\n        }\n        ' + identity + '\n'),
     ]
     if name == 'vk_graphics_pipeline':
         anchors += configure_phases
