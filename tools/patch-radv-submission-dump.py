@@ -164,6 +164,7 @@ radv_ps5_stall_read(uint64_t address, uint32_t *value)
    void *start = NULL, *end = NULL;
    uint32_t protection = 0;
    if (sceKernelQueryMemoryProtection((void *)(uintptr_t)address, &start, &end, &protection) != 0 ||
+       (uintptr_t)start > address || (uintptr_t)end < address + sizeof(uint32_t) ||
        !(protection & PS5_KERNEL_PROT_CPU_READ))
       return false;
    radv_ps5_cpu_flush((const void *)(uintptr_t)address, sizeof(uint32_t));
@@ -358,7 +359,7 @@ radv_ps5_dump_in_flight(const struct radv_ps5_queue *queue, const struct radv_ps
 /* Every shader pipeline creation made and every vertex-input prolog, newest last, in a ring that
  * overwrites its oldest entries once full. Writers claim a slot with one atomic increment; the
  * reader is the stall dump, ten seconds after anything was written. */
-#define RADV_PS5_SHADER_NOTES 8192
+#define RADV_PS5_SHADER_NOTES 65536
 
 struct radv_ps5_shader_note {
    uint64_t va;
@@ -392,6 +393,8 @@ radv_ps5_note_shader(uint64_t va, uint32_t bytes, const char *stage, uint32_t ki
 /* Whose code is at address, newest first. Up to four are named: pipelines share a shader (RADV's
  * shader cache), and code freed with its pipeline leaves its entry behind for the next code put
  * at that address, so the newest entry is the likeliest. */
+void eden_gpu_stalled(void) __attribute__((weak));
+
 static void
 radv_ps5_dump_shader_owner(const char *reg, uint64_t address)
 {
@@ -836,6 +839,11 @@ radv_ps5_dump_stall(struct radv_ps5_queue *queue, uint64_t seq, uint64_t complet
    static uint32_t dumped;
    if (p_atomic_cmpxchg(&dumped, 0u, 1u) != 0u)
       return;
+   /* Before anything here can fault: the app learns its GPU stopped, so a crash in this dump
+    * closes it as VK_ERROR_DEVICE_LOST does instead of starting it again on the stuck GPU
+    * (headless/crash_report.cpp). Weak: a build without the app has no such hook. */
+   if (eden_gpu_stalled)
+      eden_gpu_stalled();
    /* A lock-free, best-effort snapshot: taking the submit lock could deadlock when the stall
     * trips inside radv_ps5_queue_claim, which already holds it, and at a ten-second hang the
     * submitting thread is quiescent anyway. Indices are masked, and radv_ps5_record_words

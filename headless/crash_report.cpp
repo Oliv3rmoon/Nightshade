@@ -68,6 +68,7 @@ enum : int { kIdle, kReporting, kGivingUp };
 std::atomic<int> state{kIdle};
 std::atomic<std::uintptr_t> reporter{0};  // the thread writing the report
 std::atomic<bool> helper_failed{false};   // the system refused both the restart and the exit
+std::atomic<bool> gpu_stalled{false};     // the driver found its GPU stopped (eden_gpu_stalled)
 std::atomic<bool> leave{false};           // close the app instead of starting it again
 std::atomic<bool> game_started{false};
 
@@ -293,7 +294,8 @@ void PutRegister(const char* before, const char* name, std::uint64_t value) noex
 // The GPU stopped responding (VK_ERROR_DEVICE_LOST): an app started again finds it still stuck and
 // does not respond either (Oliv3rmoon/Nightshade#1), so the app closes and the system has it back.
 bool GpuLost(const char* reason) noexcept {
-    return reason && std::strcmp(reason, "VK_ERROR_DEVICE_LOST") == 0;
+    return gpu_stalled.load(std::memory_order_acquire) ||
+           (reason && std::strcmp(reason, "VK_ERROR_DEVICE_LOST") == 0);
 }
 
 // The report, complete in its buffer.
@@ -677,4 +679,15 @@ Last TakeLast(const std::string& logs_folder, const std::string& eden_log) {
     return last;
 }
 
+void NoteGpuStalled() noexcept {
+    gpu_stalled.store(true, std::memory_order_release);
+}
+
 } // namespace Eden::Crash
+
+// The driver's stall dump (tools/patch-radv-submission-dump.py) calls this first, before anything
+// there could fault: from here on a crash closes the app as VK_ERROR_DEVICE_LOST does, instead
+// of starting it again on the GPU that stopped.
+extern "C" void eden_gpu_stalled(void) {
+    Eden::Crash::NoteGpuStalled();
+}

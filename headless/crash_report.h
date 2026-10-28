@@ -76,6 +76,10 @@ void SetSession(const std::string& text, bool game) noexcept;
 // GPU it stopped on is still stuck for an app started again. Does not return.
 [[noreturn]] void Fail(const char* reason) noexcept;
 
+// The GPU stopped: the driver's stall dump says so before it reads anything (eden_gpu_stalled, in
+// crash_report.cpp), and a crash after it closes the app like VK_ERROR_DEVICE_LOST.
+void NoteGpuStalled() noexcept;
+
 // For the checks (tools/check-crash-report.py).
 bool Readable(const void* address, std::size_t bytes) noexcept;
 } // namespace Eden::Crash

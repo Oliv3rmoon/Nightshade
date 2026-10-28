@@ -48,6 +48,7 @@ PROGRAM = r'''
 
 // The app's two ways out (src/lifecycle.c on the console).
 static bool refuse;
+extern "C" void eden_gpu_stalled(void);  // headless/crash_report.cpp, called by the driver
 extern "C" int eden_restart_app(void) {
     if (refuse) return -1;
     (void)!write(1, "RESTART\n", 8);
@@ -197,6 +198,8 @@ int main(int argc, char** argv) {
         }).join();
     if (mode == "lost")  // what Vulkan throws when the GPU stops responding
         std::thread([] { throw std::runtime_error("VK_ERROR_DEVICE_LOST"); }).join();
+    if (mode == "stalled")  // the driver's stall dump has begun, and something in it faults
+        eden_gpu_stalled();
     const auto crash = [] {
         Eden::Crash::NameThread("CPUCore_1");
         Outer(reinterpret_cast<volatile int*>(bad));
@@ -330,6 +333,13 @@ def check(binary, console):
     assert status == 42 and 'what: the app stopped itself\nreason: test exception: nothing caught it\n' in report, \
         (status, report[:400], err[-400:])
     assert '\nthread: Thrower (0x' in report and note.endswith(' 1\n')
+
+    # The driver noted a stopped GPU and a fault follows (in its stall dump): closed as well.
+    status, out, err, reports, note = run(binary, 'stalled', console)
+    report = reports[0].read_text() if reports else ''
+    assert status == 43 and out == 'EXIT\n' and note.endswith(' 0\n'), (status, out, note, err[-400:])
+    assert 'what: SIGSEGV' in report and report.endswith(
+        'then: the app closes (the GPU stopped responding, and an app started again would find it stuck)\n'), report[-300:]
 
     # The GPU stopped: the app closes, since an app started again would find it still stuck.
     status, out, err, reports, note = run(binary, 'lost', console)

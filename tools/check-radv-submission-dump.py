@@ -345,6 +345,9 @@ static struct radv_pipeline pipe_e = {{RADV_PIPELINE_COMPUTE, true, {{[MESA_SHAD
                                   0xe5e5e5e5e5e5e5e5ull}};
 static struct radv_pipeline pipe_rt = {{RADV_PIPELINE_RAY_TRACING, false, {{&a_vs}}, NULL, NULL, 0x1ull}};
 static struct radv_queue_holder {{ struct radv_ps5_queue queue; }} holder;
+/* The app's hook (headless/crash_report.cpp): the dump calls it before anything else, once. */
+static unsigned stalled_calls;
+void eden_gpu_stalled(void) {{ stalled_calls++; }}
 
 int main(void)
 {{
@@ -373,6 +376,7 @@ int main(void)
    queue->submitted_seq = 6;
    radv_ps5_dump_stall(queue, 5, 4);
    radv_ps5_dump_stall(queue, 5, 4); /* once per process */
+   printf("stalled hook %u\\n", stalled_calls);
    return 0;
 }}
 '''
@@ -397,7 +401,10 @@ else:
         program = compile_c(folder, 'submission_dump', prologue + struct_in_flight + struct_queue + header_decl_new + public_decl_new +
                             test_memory + dump_block + pipeline_shim + pipeline_note_block + test_main, link=True)
         run = subprocess.run([str(program)], capture_output=True, text=True, check=True)
-    handles = dict(item.split('=') for item in run.stdout.split()[1:])
+    first, *after = run.stdout.splitlines()
+    handles = dict(item.split('=') for item in first.split()[1:])
+    # The app's hook ran once, before the dump: a fault in the dump then closes the app.
+    assert after == ['stalled hook 1'], after
     lines = run.stderr.splitlines()
     sys.stdout.write(run.stderr)
 

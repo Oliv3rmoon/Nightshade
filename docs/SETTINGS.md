@@ -225,7 +225,7 @@ A game that stops the GPU freezes the picture, and Nightshade closes. These swit
 | `hcr` | `1` | How a draw the game makes conditional on a GPU result is decided: `0` Eden's way, `1` Eden's way except that the cases it approximates are worked out exactly, `2` every condition worked out on the CPU. |
 | `compute_barriers` | `true` | `false`: Eden's own synchronization of compute work, without the barriers Nightshade adds around each dispatch. |
 | `conditional_rendering` | `true` | `false`: the driver's conditional rendering (`VK_EXT_conditional_rendering`) is not used; the conditions are resolved the way Eden does on a driver without it. |
-| `robustness2` | `false` | `true`: robust buffer and image access (`VK_EXT_robustness2`): a shader's read outside a buffer or image gives zeroes and its write there is dropped, where without it the GPU can fault on it. Some speed. |
+| `robustness2` | `false` | `true`: robust buffer and image access (`VK_EXT_robustness2`): a shader's read outside a buffer or image gives zeroes and its write there is dropped, stricter than the bounds check every session already has. Some speed. |
 
 The title ID is written as the file has it, with capital letters. Final Fantasy Resonance (title ID `0100606026F12000`, [Oliv3rmoon/Nightshade#1](https://github.com/Oliv3rmoon/Nightshade/issues/1)), with every storage buffer of its compute shaders read past the cache:
 

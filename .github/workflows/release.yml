@@ -136,7 +136,8 @@ jobs:
       # After `make deps`: a restored RADV folder would otherwise stand in for the git checkout
       # it lives in, and deps.py would not fetch that checkout. With the driver go the Payload
       # SDK and zlib its build sets up beside it: the final link takes libraries from that SDK.
-      # The key holds every script that changes the driver's source (tools/patch-radv-*.py): a driver
+      # The key holds every script that changes the driver's source (tools/patch-radv-*.py, and the
+      # tools/radv-*.inc they put into it): a driver
       # built before one of them changed would be restored without its checkout, and its patch would
       # find no source to change.
       - name: Restore the RADV driver
@@ -148,7 +149,7 @@ jobs:
             ${{ env.RADV_NATIVE }}/ps5-payload-sdk
             ${{ env.RADV_NATIVE }}/zlib
             build/radv-isolated
-          key: radv-4-${{ hashFiles('tools/deps.json', 'tools/patch-radv-*.py', 'tools/build-radv-dependencies.sh', 'tools/isolate-radv.py', 'tools/ci/ubuntu-24.04-packages.txt', 'tools/ci/setup-ubuntu-24.04.sh') }}
+          key: radv-4-${{ hashFiles('tools/deps.json', 'tools/patch-radv-*.py', 'tools/radv-*.inc', 'tools/build-radv-dependencies.sh', 'tools/isolate-radv.py', 'tools/ci/ubuntu-24.04-packages.txt', 'tools/ci/setup-ubuntu-24.04.sh') }}
 
       - name: Restore ccache
         id: ccache
@@ -218,7 +219,7 @@ jobs:
             ${{ env.RADV_NATIVE }}/ps5-payload-sdk
             ${{ env.RADV_NATIVE }}/zlib
             build/radv-isolated
-          key: radv-4-${{ hashFiles('tools/deps.json', 'tools/patch-radv-*.py', 'tools/build-radv-dependencies.sh', 'tools/isolate-radv.py', 'tools/ci/ubuntu-24.04-packages.txt', 'tools/ci/setup-ubuntu-24.04.sh') }}
+          key: radv-4-${{ hashFiles('tools/deps.json', 'tools/patch-radv-*.py', 'tools/radv-*.inc', 'tools/build-radv-dependencies.sh', 'tools/isolate-radv.py', 'tools/ci/ubuntu-24.04-packages.txt', 'tools/ci/setup-ubuntu-24.04.sh') }}
 
       - name: Match the tag to the package version
         if: startsWith(github.ref, 'refs/tags/')
