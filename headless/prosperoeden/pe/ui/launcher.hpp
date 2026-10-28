@@ -539,8 +539,13 @@ class Launcher
     ListView controls_rows_;    // the Controls dialog's rows (more than it shows)
     ListView accent_rows_;      // the Colour dialog's rows (more than it shows)
     ListView wallpaper_rows_;   // the Wallpaper dialog's rows (more than it shows)
-    // The images in the wallpapers folder, as the Wallpaper dialog lists them (settings.cpp).
+    // The images in the wallpapers folders, as the Wallpaper dialog lists them (settings.cpp).
     std::vector<std::string> wallpaper_files_;
+    // The file the chosen wallpaper is read from (Services::wallpaper_file), looked for again when
+    // the choice changes or the Wallpaper dialog reads the folders, not every frame.
+    std::string wallpaper_name_;
+    std::string wallpaper_path_;
+    bool wallpaper_looked_ = false;
     GameSettings game_settings_;
     bool game_docked_ = true;
     SaveSource import_source_ = SaveSource::none; // what Save data could import for the game

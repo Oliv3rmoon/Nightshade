@@ -377,9 +377,9 @@ class FakeServices : public ui::Services
     std::string setup_details() override;
     std::string crash_reports_folder() override { return "/data/prosperoeden/logs"; }
     std::vector<std::string> wallpapers() override;
-    std::string wallpapers_folder() override
+    std::vector<std::string> wallpaper_folders() override
     {
-        return wallpapers_directory_;
+        return {wallpapers_directory_};
     }
     bool folders(const std::string &directory, std::vector<std::string> *names) override;
     ui::FolderInfo folder_info(const std::string &directory) override;

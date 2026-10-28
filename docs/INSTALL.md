@@ -31,6 +31,7 @@ Only these subfolders matter; the folder itself can have any name and location.
 ├── save-import/                        # optional: saves to import, one folder per title ID
 ├── ryujinx/                            # optional: a Ryujinx data folder to import saves from
 ├── save-export/                        # written by "Export a copy"
+├── wallpapers/                         # optional: images for Settings > Appearance > Wallpaper (WALLPAPERS.md)
 └── .remote-downloads/                  # downloads that are not finished yet (see Download sources)
 ```
 

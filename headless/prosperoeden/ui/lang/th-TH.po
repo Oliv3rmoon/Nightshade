@@ -884,6 +884,11 @@ msgstr "วิธี​วาด​ภาพ​เกม​และ​ปรั
 msgid "Images in this folder: {0}"
 msgstr "รูปภาพในโฟลเดอร์นี้: {0}"
 
+#. Under the Wallpaper list: {0} and {1} are the two folders the images are read from (the game files folder's wallpapers folder, then /data/prosperoeden/wallpapers).
+#: pe/ui/settings.cpp
+msgid "Images in {0} and in {1}"
+msgstr "รูปภาพใน {0} และ​ใน {1}"
+
 #. Button hint: copy a save in.
 #: pe/ui/library.cpp
 msgid "Import"

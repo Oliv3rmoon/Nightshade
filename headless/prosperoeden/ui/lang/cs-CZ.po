@@ -884,6 +884,11 @@ msgstr "Jak se hry vykreslují a škálují na televizi."
 msgid "Images in this folder: {0}"
 msgstr "Obrázky v této složce: {0}"
 
+#. Under the Wallpaper list: {0} and {1} are the two folders the images are read from (the game files folder's wallpapers folder, then /data/prosperoeden/wallpapers).
+#: pe/ui/settings.cpp
+msgid "Images in {0} and in {1}"
+msgstr "Obrázky ve složkách {0} a {1}"
+
 #. Button hint: copy a save in.
 #: pe/ui/library.cpp
 msgid "Import"

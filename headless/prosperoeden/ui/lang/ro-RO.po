@@ -884,6 +884,11 @@ msgstr "Cum sunt redate și scalate jocurile pe televizorul tău."
 msgid "Images in this folder: {0}"
 msgstr "Imagini în acest dosar: {0}"
 
+#. Under the Wallpaper list: {0} and {1} are the two folders the images are read from (the game files folder's wallpapers folder, then /data/prosperoeden/wallpapers).
+#: pe/ui/settings.cpp
+msgid "Images in {0} and in {1}"
+msgstr "Imagini în {0} și în {1}"
+
 #. Button hint: copy a save in.
 #: pe/ui/library.cpp
 msgid "Import"

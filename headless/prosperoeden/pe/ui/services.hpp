@@ -635,15 +635,22 @@ class Services
     virtual std::string crash_reports_folder() { return {}; }
 
     // ---- wallpaper: an image behind the launcher's screens (Settings > Appearance) ----
-    // The image file names in the wallpapers folder, sorted; and the folder itself (empty when
-    // this build has no folder to put wallpapers in).
+    // The image file names in the wallpapers folders, each once, sorted; the folders, in the order
+    // a name is looked for (headless/wallpapers.h: the game files folder's wallpapers/, then the
+    // data folder's; empty when this build has no folder to put wallpapers in); and the file a
+    // name is read from (empty when no folder has it).
     virtual std::vector<std::string> wallpapers()
     {
         return {};
     }
-    virtual std::string wallpapers_folder()
+    virtual std::vector<std::string> wallpaper_folders()
     {
         return {};
+    }
+    virtual std::string wallpaper_file(const std::string &name)
+    {
+        const std::vector<std::string> folders = wallpaper_folders();
+        return folders.empty() || name.empty() ? std::string{} : folders.front() + "/" + name;
     }
 
     // ---- game files ----

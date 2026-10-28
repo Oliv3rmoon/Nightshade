@@ -317,12 +317,15 @@ void Launcher::update(float dt)
     message_age_ += dt;
     backdrop_.update(dt);
     // The wallpaper (Settings > Appearance > Wallpaper): the same call with the same file does
-    // nothing, so the choice is only read when it changed.
+    // nothing, so the choice is only read when it changed. Which folder has it (the game files
+    // folder's or the data folder's) is looked up when the choice changes.
+    if (!wallpaper_looked_ || wallpaper_name_ != prefs_.wallpaper)
     {
-        const std::string folder = services_.wallpapers_folder();
-        textures_.load_wallpaper(
-            prefs_.wallpaper.empty() || folder.empty() ? std::string{} : folder + "/" + prefs_.wallpaper);
+        wallpaper_name_ = prefs_.wallpaper;
+        wallpaper_path_ = prefs_.wallpaper.empty() ? std::string{} : services_.wallpaper_file(prefs_.wallpaper);
+        wallpaper_looked_ = true;
     }
+    textures_.load_wallpaper(wallpaper_path_);
     if (th().game_backdrop)
     {
         if (screen_ == Screen::home && !home_.last_cover.empty())

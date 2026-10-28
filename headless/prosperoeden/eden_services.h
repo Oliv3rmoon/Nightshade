@@ -69,7 +69,8 @@ public:
     std::string crash_reports_folder() override;
 
     std::vector<std::string> wallpapers() override;
-    std::string wallpapers_folder() override;
+    std::vector<std::string> wallpaper_folders() override;
+    std::string wallpaper_file(const std::string& name) override;
 
     bool folders(const std::string& directory, std::vector<std::string>* names) override;
     pe::ui::FolderInfo folder_info(const std::string& directory) override;

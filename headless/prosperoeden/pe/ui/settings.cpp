@@ -695,14 +695,16 @@ void Launcher::press_dialog(Key key)
         }
         else
         {
-            // The wallpaper's own dialog (docs/WALLPAPERS.md): the folder's images, each on its
-            // own row, with "None" above them.
+            // The wallpaper's own dialog (docs/WALLPAPERS.md): the folders' images, each on its
+            // own row, with "None" above them. The one in use is looked for again too: it may have
+            // been put in the other folder since.
             std::vector<std::string> files = services_.wallpapers();
             std::vector<std::string> images;
             for (std::string &name : files)
                 if (WallpaperImage(name))
                     images.push_back(std::move(name));
             wallpaper_files_ = std::move(images);
+            wallpaper_looked_ = false;
             open_modal(Modal::wallpaper);
             wallpaper_rows_.visible = kWallpaperRowsShown;
             wallpaper_rows_.pitch = kVideoRowPitch;
@@ -1428,11 +1430,14 @@ void Launcher::draw_dialog(Canvas &c, Modal modal, float open)
     }
     if (modal == Modal::wallpaper)
     {
-        // The folder the images are put in (as Performance says what its switches do).
-        const std::string folder = services_.wallpapers_folder();
-        text_block(c, folder.empty() ?
+        // The folders the images are put in (as Performance says what its switches do): the game
+        // files folder's wallpapers/ and the data folder's, or the one when they are the same.
+        const std::vector<std::string> folders = services_.wallpaper_folders();
+        text_block(c, folders.empty() ?
                           std::string{tr("Put images in the wallpapers folder to show them here.")} :
-                          fill(tr("Images in this folder: {0}"), {short_path(folder, 64)}),
+                      folders.size() == 1 ?
+                          fill(tr("Images in this folder: {0}"), {short_path(folders[0], 64)}) :
+                          fill(tr("Images in {0} and in {1}"), {short_path(folders[0], 44), short_path(folders[1], 44)}),
                    592.0f, baseline(window.y + window.h + 22.0f, 30.0f, th().size_small), th().size_small,
                    30.0f, th().meta, 736.0f, 2, kShrink);
     }
