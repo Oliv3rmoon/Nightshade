@@ -37,7 +37,7 @@ bool collect(const std::string &path, unsigned depth, std::vector<std::string> &
         return false;
     std::vector<std::string> names;
     {
-        std::unique_ptr<DIR, decltype(&closedir)> directory(opendir(path.c_str()), closedir);
+        std::unique_ptr<DIR, CloseDirectory> directory(opendir(path.c_str()));
         if (!directory)
             return false;
         for (;;)
@@ -197,7 +197,7 @@ bool copy_file(const std::string &from, const std::string &to)
 
 bool list_files(const std::string &folder, std::size_t limit, std::vector<std::string> &names)
 {
-    std::unique_ptr<DIR, decltype(&closedir)> directory(opendir(folder.c_str()), closedir);
+    std::unique_ptr<DIR, CloseDirectory> directory(opendir(folder.c_str()));
     if (!directory)
         return false;
     for (;;)

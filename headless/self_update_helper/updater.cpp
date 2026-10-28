@@ -86,7 +86,7 @@ std::string shown(const std::string &text, std::size_t limit, const std::string 
 
 bool list_entries(const std::string &folder, std::size_t limit, std::vector<std::string> &names)
 {
-    std::unique_ptr<DIR, decltype(&closedir)> directory(opendir(folder.c_str()), closedir);
+    std::unique_ptr<DIR, CloseDirectory> directory(opendir(folder.c_str()));
     if (!directory)
         return false;
     for (;;)
@@ -195,7 +195,10 @@ bool open_permissions(const std::string &path, unsigned depth = 0)
         return false;
     if (chmod(path.c_str(), 0777) != 0)
         return false;
-    (void)chown(path.c_str(), 0, 0); // best effort: the mode is what decides
+    if (chown(path.c_str(), 0, 0) != 0)
+    {
+        // best effort: the mode is what decides
+    }
     if (what == Kind::file)
         return true;
     std::vector<std::string> names;
@@ -646,7 +649,8 @@ bool launcher_update_compatible(const std::string& data_root, const std::string&
     for(std::size_t at=0;at<=supported.size();) {
         const auto end=supported.find(',',at);
         if(supported.substr(at,end==supported.npos?supported.size()-at:end-at)==contract) return true;
-        if(end==supported.npos) break;at=end+1;
+        if(end==supported.npos) break;
+        at=end+1;
     }
     reason="The selected launcher needs a different runtime contract. Select the built-in launcher before updating.";return false;
 }

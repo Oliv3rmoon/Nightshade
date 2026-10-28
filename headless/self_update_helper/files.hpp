@@ -2,12 +2,23 @@
 // Copyright (C) 2026 BlackBearReloaded
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
+#include <dirent.h>
+
 #include <cstddef>
 #include <string>
 #include <vector>
 
 namespace self_update
 {
+// unique_ptr's deleter for opendir's answer. A function pointer type (decltype(&closedir))
+// drops closedir's attributes, which GCC reports and -Werror stops on.
+struct CloseDirectory
+{
+    void operator()(DIR *directory) const
+    {
+        closedir(directory);
+    }
+};
 enum class Kind
 {
     absent,
