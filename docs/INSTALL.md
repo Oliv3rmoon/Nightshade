@@ -108,6 +108,53 @@ This is the only place it keeps them. If ProsperoEden cannot get access to the c
 
 Keys, firmware and games that an early version kept inside the app's folder (`/data/homebrew/PPSA99008/assets`) are moved to `/data/prosperoeden` the first time this version starts, so that replacing the app cannot remove them.
 
+## Backing up to a USB drive
+
+**Settings > Diagnostics > Back up to USB** copies ProsperoEden's data to a USB drive in one go: the
+settings, the profiles and every profile's save data, with the rest of `/data/prosperoeden` that the
+app can't make again by itself. A PC reads the drive when it is formatted as exFAT or FAT32.
+
+- **Before it starts** the dialog shows how much there is to copy, and a row for each USB drive
+  connected (`/mnt/usb0` to `/mnt/usb7`). The PS5 doesn't tell an app how much room a drive has, so
+  on the console a drive shows "Free space unknown": use one with more free space than the size
+  shown. When the drive fills up, the backup stops and removes what it wrote. (Where the room is
+  known, a backup that doesn't fit is refused before anything is written.)
+- **Where it goes:** `<drive>/nightshade-backup/<YYYYMMDD-HHMMSS>/`, named after the console's date
+  and time, with the same folders as `/data/prosperoeden` and two files of its own:
+  `backup.json` (the app's version, the date, how many files and bytes, and what was left out) and
+  `SHA256SUMS` (every file's SHA-256, as `sha256sum` writes them). In the backup's folder on a PC,
+  `sha256sum -c SHA256SUMS` (Linux) or `shasum -a 256 -c SHA256SUMS` (macOS) checks the copy.
+- **What is left out** is what the app makes again by itself, and the games: `cache/` (the
+  driver's shader cache), `covers/`, `logs/`, `previous-version/`, and Eden's `user/cache/` (which
+  also holds the unpacked NSZ games), `user/shader/`, `user/log/`, `user/crash_dumps/` and
+  `user/dump/`; and `roms/`, `updates/` and `.remote-downloads/` (the downloads not finished yet)
+  when the game files folder is `/data/prosperoeden`, with what the game folders in `roms/` hold
+  (their mods, cheats and presets). Its `keys/`, `firmware/` and `mods/` are copied then. A game
+  files folder elsewhere is not part of the backup.
+- **A backup is whole, or its name says it isn't.** The files are copied one at a time into
+  `<YYYYMMDD-HHMMSS>.incomplete`, which takes its name only once every file, `SHA256SUMS` and
+  `backup.json` are on the drive. Circle cancels, and what was written is removed; so is a backup
+  that fails. If it can't be removed (the drive was pulled out), the folder keeps `.incomplete` in
+  its name: delete it. Nothing on the drive is written over, and a second backup in the same
+  second is named `-2`. Leave the drive in until the dialog says the backup is done.
+
+Nightshade writes what it found and did under "backup" in its log.
+
+### Restoring a backup
+
+Nightshade doesn't restore a backup itself, so nothing can replace your saves by accident. To put
+one back by hand:
+
+1. Close Nightshade.
+2. Copy everything in the backup's folder except `backup.json` and `SHA256SUMS` into
+   `/data/prosperoeden`, replacing the files there: over FTP from a PC, or from the USB drive with
+   a file manager on the console. A folder whose name ends in `.incomplete` is not a whole backup.
+3. Start Nightshade. What was left out (the shader caches, the covers) is made again as needed.
+
+Files in `/data/prosperoeden` that the backup doesn't have stay as they are. To bring back one
+game's save data only, copy just its folder,
+`user/nand/user/save/0000000000000000/<profile ID>/<title ID>/`.
+
 ## Updating
 
 Close ProsperoEden first. Your settings, saves, covers and logs are in `/data/prosperoeden`, outside the app, so an update keeps them. Afterwards the About screen shows the version that is running.

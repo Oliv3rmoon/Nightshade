@@ -52,13 +52,14 @@ Local-wireless multiplayer through Eden rooms is new in v1.000.110 and experimen
 - **Library** - your games as covers, with the selected game's details beside them. The home screen has **Continue Playing** and **Recently Played**, which keep working after you move your files.
 - **Launcher** - an animated interface drawn with OpenGL, with sound effects (their level is in **Settings > Audio**) and a loading screen that shows the game's cover while it starts. It opens from the console's own launch picture without a cut: the mark appears over the picture and goes to its place as the menu arrives (any button skips it). Its five sections (Home, Library, Multiplayer, Settings, About) are on a rail at the left: L1 and R1 go from one to the next, and Left from a screen's edge opens the rail. The home screen shows which controllers are connected.
 - **Themes** - the launcher's look is a theme, chosen in **Settings > Theme**. It comes with one, Canopy; [docs/THEMES.md](docs/THEMES.md) says what a theme is made of.
-- **Wallpapers** - an image of your own behind the menu instead of the theme's artwork: PNG or JPEG files (also BMP, GIF, TGA and DDS) in `/data/prosperoeden/wallpapers`, chosen in **Settings > Appearance > Wallpaper**; see [docs/WALLPAPERS.md](docs/WALLPAPERS.md).
+- **Wallpapers** - an image of your own behind the menu instead of the theme's artwork: PNG or JPEG files (also BMP, GIF, TGA and DDS) in `/data/prosperoeden/wallpapers`, or in `wallpapers/` of the game files folder you copy from a PC, chosen in **Settings > Appearance > Wallpaper**; see [docs/WALLPAPERS.md](docs/WALLPAPERS.md).
 - **Profiles** - everyone who plays has their own save data, settings and recently played games: **Settings > Profiles**; see [Profiles](docs/SETTINGS.md#profiles).
 - **Settings per game** - a game can differ from Settings in its video, performance, audio, controls and language, and has its own Handheld / Docked mode (Triangle in the Library); see [Settings per game](docs/SETTINGS.md#settings-per-game).
 - **Button mapping** - choose which DualSense button presses each of the game's buttons, for every controller, in **Settings > Controls**, or for one game in its settings; see [Button mapping](docs/SETTINGS.md#button-mapping).
 - **Your language** - the launcher follows the language the PS5 is set to (29 languages; English otherwise).
 - **Accessibility** - larger text, high contrast and reduced motion, in **Settings > Accessibility**.
 - **Save data in and out** - import a game's save from a folder or from a Ryujinx data folder, and export a copy (Triangle in the Library, then **Save data**).
+- **Back up to USB** - the settings, profiles and every save copied to a USB drive at once, with a `SHA256SUMS` to check them on a PC: **Settings > Diagnostics > Back up to USB**; see [Backing up to a USB drive](docs/INSTALL.md#backing-up-to-a-usb-drive).
 - **Compressed games** - NSZ and XCZ files (NSPs and XCIs compressed with [nsz](https://github.com/nicoboss/nsz)) play as they are; see [Compressed games](docs/INSTALL.md#compressed-games-nsz-and-xcz).
 - **Game updates and DLC** - keep each game in a folder of its own in `roms`, with its update and DLC files (NSP, XCI, NSZ or XCZ) beside it; see [Game files folder](docs/INSTALL.md#game-files-folder). They apply when the game starts, and each game's details show the update version and DLC count.
 - **Download sources** - the games on servers in your network, such as a [RomM](https://github.com/rommapp/romm) server, appear in the Library next to the ones on the console. A game is downloaded when you play it, or ahead of time through a download queue, and then runs from the console like any other. A source can also be set to stream its games, which then play straight from it without being downloaded first ([Playing a game where it lies](docs/DOWNLOADS.md#playing-a-game-where-it-lies)). Downloads need an FTP server running on the console; see [Download sources](docs/DOWNLOADS.md#download-sources).
@@ -131,7 +132,7 @@ based on (`forwarder/launch.c`).
 
 | Guide | What is in it |
 |---|---|
-| [Game files, app data and updates](docs/INSTALL.md) | The layout of the game files folder, where settings, saves and logs are kept, updating from the menu or by hand, going back to the previous version, Nightshade's apps |
+| [Game files, app data and updates](docs/INSTALL.md) | The layout of the game files folder, where settings, saves and logs are kept, backing them up to USB and restoring them, updating from the menu or by hand, going back to the previous version, Nightshade's apps |
 | [Settings](docs/SETTINGS.md) | The Performance switches, post-processing (ReShade FX presets), frame generation, profiles, settings per game, button mapping, language and accessibility |
 | [Save data](docs/SAVES.md) | Moving save data in and out, and save sync with a server |
 | [Download sources and RomM](docs/DOWNLOADS.md) | Games from a RomM server or another source in your network, and the download queue |
@@ -140,7 +141,7 @@ based on (`forwarder/launch.c`).
 | [Multiplayer](docs/MULTIPLAYER.md) | Local wireless play through Eden rooms: setup and current limits |
 | [Forwarders](docs/FORWARDER.md) | Starting a game from its own tile on the PS5's home screen |
 | [Themes](docs/THEMES.md) | What a launcher theme is made of |
-| [Wallpapers](docs/WALLPAPERS.md) | Your own image behind the launcher's screens, the folder it reads and the formats it supports |
+| [Wallpapers](docs/WALLPAPERS.md) | Your own image behind the launcher's screens, the folders it reads and the formats it supports |
 | [Building](docs/BUILDING.md) | Building from source, and how releases are made |
 | [Changelog](docs/CHANGELOG.md) | What changed in each release |
 | [Roadmap](docs/ROADMAP.md) | What is planned |

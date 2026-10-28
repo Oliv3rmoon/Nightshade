@@ -12,6 +12,8 @@ Emulators like Eden keep a save as the files the game wrote, so nothing is conve
 
 Cross imports, and asks before it replaces a save. The save it replaces is first moved to `/data/prosperoeden/backup/save-import`, so nothing is lost.
 
+Every profile's save data at once, with the settings, goes to a USB drive from **Settings > Diagnostics > Back up to USB**; see [Backing up to a USB drive](INSTALL.md#backing-up-to-a-usb-drive).
+
 ## Save sync
 
 Each profile can keep its save data on a server, such as a [RomM](https://github.com/rommapp/romm) server (5.0.0 or newer), the way Steam keeps it in the cloud: before a game starts, its save data is put in step with the server's, and after the game ended the new save data goes to the server. Played on another device in between (Eden on Android with [Argosy](https://github.com/rommapp/argosy-launcher), or another console), the newer save data comes to the console; changed on both sides, ProsperoEden asks which one stays. Save sync is set up for each profile and does not depend on the download sources: games copied to the console by hand sync too, as long as the server has the game.
