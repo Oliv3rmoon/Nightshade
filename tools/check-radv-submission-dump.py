@@ -100,7 +100,7 @@ PKT3 = {
     'PKT3_WAIT_REG_MEM': 0x3C, 'PKT3_INDIRECT_BUFFER': 0x3F, 'PKT3_PFP_SYNC_ME': 0x42, 'PKT3_COND_WRITE': 0x45,
     'PKT3_EVENT_WRITE': 0x46, 'PKT3_RELEASE_MEM': 0x49, 'PKT3_DMA_DATA': 0x50, 'PKT3_ACQUIRE_MEM': 0x58,
     'PKT3_SET_CONTEXT_REG': 0x69, 'PKT3_SET_SH_REG': 0x76, 'PKT3_WAIT_ON_CE_COUNTER': 0x86,
-    'PKT3_SET_SH_REG_INDEX': 0x9B,
+    'PKT3_SET_SH_REG_INDEX': 0x9B, 'PKT3_NUM_INSTANCES': 0x2F,
 }
 OFFSETS = {'SI_SH_REG_OFFSET': 0x0000B000, 'SI_CONTEXT_REG_OFFSET': 0x00028000}
 REGS = {
@@ -269,6 +269,7 @@ s1.set_context(0x28A00, 0)
 s1.wait_mem(UNREADABLE, 1, function=5, label='wait3')
 s1.set_sh(REGS['R_00B320_SPI_SHADER_PGM_LO_ES'], PROLOG >> 8)  # a vertex-input prolog, as RADV sets one
 s1.program('R_00B020_SPI_SHADER_PGM_LO_PS', D_FS)
+s1.pkt('PKT3_NUM_INSTANCES', [7])
 s1.pkt('PKT3_DRAW_INDEX_AUTO', [3, 2], 'draw2')
 s1.nop_pad()
 s1.pkt('PKT3_DRAW_INDIRECT', [0, 4, 5, 2], 'draw3')
@@ -406,9 +407,9 @@ else:
         # Stream 2: no wait unmet, so its last work; no VGT_SHADER_STAGES_EN, so the stale HS shows.
         'radv/ps5 stall: seq 9: none of its 1 waits reads as unmet (0 the CPU cannot tell)',
         f'radv/ps5 stall: the last draws and dispatches before dword {len(s2.words)} (1 draws, 2 dispatches before it):',
-        f'radv/ps5 stall:   draw 1 at dword {w1["draw1"]} DRAW_INDEX_OFFSET_2: HS 0x{STALE_HS:x} PS 0x{A_FS:x}',
-        f'radv/ps5 stall:   dispatch 1 at dword {w1["dispatch1"]} DISPATCH_DIRECT: CS 0x{E_CS:x}',
-        f'radv/ps5 stall:   dispatch 2 at dword {w1["dispatch2"]} DISPATCH_DIRECT: CS 0x{GS_MAIN:x}',
+        f'radv/ps5 stall:   draw 1 at dword {w1["draw1"]} DRAW_INDEX_OFFSET_2 count 3: HS 0x{STALE_HS:x} PS 0x{A_FS:x}',
+        f'radv/ps5 stall:   dispatch 1 at dword {w1["dispatch1"]} DISPATCH_DIRECT 2x2x2 groups: CS 0x{E_CS:x}',
+        f'radv/ps5 stall:   dispatch 2 at dword {w1["dispatch2"]} DISPATCH_DIRECT 4x1x1 groups: CS 0x{GS_MAIN:x}',
         f'radv/ps5 stall: HS 0x{STALE_HS:x} = no recorded shader (10 recorded, the newest 10 kept)',
         f'radv/ps5 stall: PS 0x{A_FS:x} = pipeline a1a1a1a1a1a1a1a1 vk={handles["a"]} (graphics FS)',
         f'radv/ps5 stall: CS 0x{E_CS:x} = pipeline e5e5e5e5e5e5e5e5 vk=', None,
@@ -427,9 +428,9 @@ else:
         f'radv/ps5 stall: seq 5 stops at wait 4 of 7, dword {a1["wait4"]}: WAIT_REG_MEM mem 0x{FENCE:x} & 0xffffffff'
         ' == 0x00000003, now 0x00000002',
         f'radv/ps5 stall: the last draws and dispatches before dword {a1["wait4"]} (3 draws, 2 dispatches before it):',
-        f'radv/ps5 stall:   draw 1 at dword {a1["draw1"]} DRAW_INDEX_2: GS 0x{A_VS:x} PS 0x{A_FS:x}',
-        f'radv/ps5 stall:   dispatch 1 at dword {a1["dispatch1"]} DISPATCH_DIRECT: CS 0x{B_CS:x}',
-        f'radv/ps5 stall:   draw 2 at dword {a1["draw2"]} DRAW_INDEX_AUTO: GS 0x{PROLOG:x} PS 0x{D_FS:x}',
+        f'radv/ps5 stall:   draw 1 at dword {a1["draw1"]} DRAW_INDEX_2 count 36: GS 0x{A_VS:x} PS 0x{A_FS:x}',
+        f'radv/ps5 stall:   dispatch 1 at dword {a1["dispatch1"]} DISPATCH_DIRECT 8x8x1 groups: CS 0x{B_CS:x}',
+        f'radv/ps5 stall:   draw 2 at dword {a1["draw2"]} DRAW_INDEX_AUTO count 3 x7 instances: GS 0x{PROLOG:x} PS 0x{D_FS:x}',
         f'radv/ps5 stall:   draw 3 at dword {a1["draw3"]} DRAW_INDIRECT: GS 0x{PROLOG:x} PS 0x{D_FS:x}',
         f'radv/ps5 stall:   dispatch 2 at dword {a1["dispatch2"]} DISPATCH_INDIRECT: CS 0x{LOOSE_CS:x}',
         f'radv/ps5 stall: GS 0x{A_VS:x} = pipeline a1a1a1a1a1a1a1a1 vk={handles["a"]} (graphics VS)',

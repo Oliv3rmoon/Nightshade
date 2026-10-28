@@ -427,7 +427,7 @@ radv_ps5_dump_shader_owner(const char *reg, uint64_t address)
 
 #define RADV_PS5_STALL_WAITS 256
 #define RADV_PS5_STALL_WRITES 1024
-#define RADV_PS5_STALL_WORK 4
+#define RADV_PS5_STALL_WORK 16
 #define RADV_PS5_STALL_WAIT_LINES 64
 
 /* The program address registers the walk follows (GFX10.3: the ES registers hold the NGG or the
@@ -475,6 +475,11 @@ struct radv_ps5_stall_work {
    uint32_t op;
    uint32_t ordinal;
    uint64_t address[RADV_PS5_STAGES];
+   /* How much work it asked for: a direct dispatch's groups in x, y and z; a direct draw's vertex or
+    * index count, and its instances when a NUM_INSTANCES before it in this submission set them (0:
+    * not known here). An indirect one's are in memory, so none. */
+   uint32_t size[3];
+   uint32_t instances;
 };
 
 /* The packet at words[i] (i < count): its opcode and its length in dwords (a type-2 filler is one
@@ -689,7 +694,7 @@ radv_ps5_dump_stuck(const uint32_t *words, uint32_t count, uint64_t seq)
    /* 3. The draws and dispatches before that point, with the program each runs as the SET_SH_REG
     *    packets before it left the program address registers. */
    uint32_t lo[RADV_PS5_STAGES] = {0}, hi[RADV_PS5_STAGES] = {0};
-   uint32_t stages = 0, draw_total = 0, dispatch_total = 0;
+   uint32_t stages = 0, draw_total = 0, dispatch_total = 0, instances = 0;
    bool stages_known = false;
    for (at = 0; at < stop && radv_ps5_stall_packet(words, count, at, &op, &n); at += n) {
       const uint32_t *const body = words + at + 1;
@@ -708,6 +713,8 @@ radv_ps5_dump_stuck(const uint32_t *words, uint32_t count, uint64_t seq)
             stages = body[1 + (R_028B54_VGT_SHADER_STAGES_EN - reg) / 4];
             stages_known = true;
          }
+      } else if (op == PKT3_NUM_INSTANCES && body_dw >= 1) {
+         instances = body[0];
       } else if (radv_ps5_pkt3_is_draw(op) || op == PKT3_DISPATCH_DIRECT || op == PKT3_DISPATCH_INDIRECT) {
          const bool draw = radv_ps5_pkt3_is_draw(op);
          const uint32_t ordinal = draw ? ++draw_total : ++dispatch_total;
@@ -716,6 +723,21 @@ radv_ps5_dump_stuck(const uint32_t *words, uint32_t count, uint64_t seq)
          slot->at = at;
          slot->op = op;
          slot->ordinal = ordinal;
+         if (op == PKT3_DISPATCH_DIRECT && body_dw >= 3) {
+            slot->size[0] = body[0];
+            slot->size[1] = body[1];
+            slot->size[2] = body[2];
+         } else if (draw) {
+            /* DRAW_INDEX_AUTO: count, initiator. DRAW_INDEX_2: max, base lo, base hi, count, initiator.
+             * DRAW_INDEX_OFFSET_2: max, offset, count, initiator. */
+            if (op == PKT3_DRAW_INDEX_AUTO && body_dw >= 1)
+               slot->size[0] = body[0];
+            else if (op == PKT3_DRAW_INDEX_2 && body_dw >= 4)
+               slot->size[0] = body[3];
+            else if (op == PKT3_DRAW_INDEX_OFFSET_2 && body_dw >= 3)
+               slot->size[0] = body[2];
+            slot->instances = instances;
+         }
          for (unsigned s = 0; s < RADV_PS5_STAGES; s++) {
             const bool runs = draw ? s != RADV_PS5_STAGE_CS && radv_ps5_stall_stage_runs(s, stages_known, stages)
                                    : s == RADV_PS5_STAGE_CS;
@@ -760,8 +782,15 @@ radv_ps5_dump_stuck(const uint32_t *words, uint32_t count, uint64_t seq)
    for (uint32_t k = 0; k < work_count; k++) {
       const struct radv_ps5_stall_work *const item = work[k];
       const bool draw = radv_ps5_pkt3_is_draw(item->op);
-      fprintf(stderr, "radv/ps5 stall:   %s %u at dword %u %s:", draw ? "draw" : "dispatch", item->ordinal, item->at,
+      fprintf(stderr, "radv/ps5 stall:   %s %u at dword %u %s", draw ? "draw" : "dispatch", item->ordinal, item->at,
               radv_ps5_pkt3_name(item->op));
+      if (!draw && item->op == PKT3_DISPATCH_DIRECT)
+         fprintf(stderr, " %ux%ux%u groups", item->size[0], item->size[1], item->size[2]);
+      else if (draw && item->size[0])
+         fprintf(stderr, " count %u", item->size[0]);
+      if (draw && item->size[0] && item->instances)
+         fprintf(stderr, " x%u instances", item->instances);
+      fprintf(stderr, ":");
       bool any = false;
       for (unsigned s = 0; s < RADV_PS5_STAGES; s++) {
          if (!item->address[s])
