@@ -81,6 +81,7 @@ enum class AppProblem : std::uint8_t
     no_file,      // the release has no <title ID>.zip
     no_hash,      // no SHA256SUMS line for it and no digest: it can't be checked
     bad_hash,     // its SHA256SUMS line is malformed, or differs from GitHub's digest
+    moved,        // the repository moved to another account: nothing is taken from one not named
     unreadable,   // anything else in GitHub's answer
 };
 struct AppState
@@ -902,9 +903,9 @@ class Services
         (void)releases;
     }
     // Installs an app's offered release, new or over the one installed (false: it could not
-    // begin); how that goes; stop it (nothing changes until its files are put in place); and once
-    // it has ended, before the next one.
-    virtual bool install_app(int)
+    // begin, and reason says why, in English); how that goes; stop it (nothing changes until its
+    // files are put in place); and once it has ended, before the next one.
+    virtual bool install_app(int, std::string *)
     {
         return false;
     }

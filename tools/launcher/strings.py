@@ -259,6 +259,8 @@ NOTES = {
     "{0} is installed. The homebrew loader lists it after its next scan or a restart.": "{0} is an app's name. See 'The PS5 doesn't list {0} yet...' for the homebrew loader.",
     "{0} is updated to {1}.": "{0} is an app's name, {1} its new version, such as 01.000.110.",
     "{0} of {1} installed": "Settings > Apps: how many of Nightshade's apps are on the console: 2 of 3 installed.",
+    "{0} has moved to another account, so its release is not offered.": "{0} is a GitHub repository, such as blackbearreloaded/ProsperoTV (unchanged): GitHub now sends requests for it to another account's repository, which Nightshade does not install from.",
+    "Opening {0}...": "{0} is an app's name: Nightshade asks for it to be opened, and closes once that is under way.",
 }
 
 

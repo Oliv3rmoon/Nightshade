@@ -42,8 +42,11 @@ GitHub releases, the kit has three more things. `github_release_asset_check` fin
 file by its name (`PPSA99003.zip`), whatever the tag, with its SHA-256 from the release's
 `SHA256SUMS` or else from GitHub's digest of the file, refusing it with neither or when the two
 differ; it asks `releases/latest` the way the app's own check does (`fetch_latest`, taken out of
-`github_release_check` as it was). `self_update.c` sends an offer with `beside` set as an
+`github_release_check` as it was), but follows a renamed repository's redirect only to the same
+owner (`GITHUB_RELEASE_OWNER_CHANGED` otherwise). `self_update.c` sends an offer with `beside` set as an
 `install` request (`self_update_protocol.h`), goes on to the helper's go-ahead by itself once it
 is staged and ends in `SELF_UPDATE_INSTALLED`; an offer without it is the kit's update, as
 before. And `self_update_ps5.c` sends any payload from the app's folder
-(`self_update_open_payload`), the launch payload as well as the helper.
+(`self_update_open_payload`), the launch payload as well as the helper, with a shorter wait for its
+answer when asked (`self_update_channel_timeout`), and `console_download` keeps the address it
+follows per call instead of in one static buffer, since downloads can now run at once.

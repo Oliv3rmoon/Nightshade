@@ -87,6 +87,8 @@ std::string problem_text(const AppState &app, const AppListing &listing)
         return fill(tr("The release gives no SHA-256 for {0}, so it is not offered."), {listing.asset});
     case AppProblem::bad_hash:
         return fill(tr("The release's SHA-256 for {0} can't be trusted, so it is not offered."), {listing.asset});
+    case AppProblem::moved:
+        return fill(tr("{0} has moved to another account, so its release is not offered."), {app.repository});
     case AppProblem::unreadable:
         return tr("GitHub's answer could not be read.");
     }
@@ -258,15 +260,16 @@ void Launcher::press_apps(Key key)
                                    const AppOpen result = services_.open_app(row, &reason);
                                    return std::make_pair(result, reason);
                                });
-        say(fill(tr("Opening {0}. Nightshade closes now."), {kApps[row].name}));
+        say(fill(tr("Opening {0}..."), {kApps[row].name}));
         cue(Cue::select);
         return;
     }
     if (!get)
         return;
-    if (!services_.install_app(row))
+    std::string reason;
+    if (!services_.install_app(row, &reason))
     {
-        say(fill(tr("{0} could not be installed: {1}"), {kApps[row].name, "the install could not begin"}), true);
+        say(fill(tr("{0} could not be installed: {1}"), {kApps[row].name, reason}), true);
         cue(Cue::error);
         return;
     }

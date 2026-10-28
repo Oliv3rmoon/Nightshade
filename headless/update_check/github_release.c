@@ -792,6 +792,8 @@ const char *github_release_reason_text(github_release_reason reason)
         return "sha256-differ";
     case GITHUB_RELEASE_BAD_TAG:
         return "bad-tag";
+    case GITHUB_RELEASE_OWNER_CHANGED:
+        return "owner-changed";
     }
     return "unknown";
 }
@@ -984,6 +986,35 @@ static github_release_reason asset_reason(github_release_report *report, github_
     return reason;
 }
 
+/* Whether a release's answer is of a repository of `repository`'s owner: its "url" is
+ * https://api.github.com/repos/<owner>/<name>/releases/<id>, with GitHub's own spelling of the
+ * owner (an account's name is the same whatever its letters' case). */
+static int same_owner(const char *json, size_t length, const char *repository)
+{
+    static const char start[] = GITHUB_RELEASE_API;
+    char url[256];
+    const char *owner;
+    const size_t wanted = (size_t)(strchr(repository, '/') - repository);
+    size_t i;
+    if (string_member(json, length, "url", url, sizeof(url)) != 1 || strncmp(url, start, sizeof(start) - 1) != 0)
+        return 0;
+    owner = url + sizeof(start) - 1;
+    if (strlen(owner) <= wanted || owner[wanted] != '/')
+        return 0;
+    for (i = 0; i < wanted; ++i)
+    {
+        char a = owner[i];
+        char b = repository[i];
+        if (a >= 'A' && a <= 'Z')
+            a = (char)(a - 'A' + 'a');
+        if (b >= 'A' && b <= 'Z')
+            b = (char)(b - 'A' + 'a');
+        if (a != b)
+            return 0;
+    }
+    return 1;
+}
+
 /* "sha256:<64 hex>", GitHub's digest of a file, as 64 lowercase characters. 1: it is one. */
 static int sha256_digest(const char *text, char out[65])
 {
@@ -1034,6 +1065,9 @@ github_release_reason github_release_asset_check(const self_update_platform *pla
     if (answer == NULL)
         return asset_reason(report, GITHUB_RELEASE_NETWORK);
     reason = fetch_latest(platform, repository, answer, GITHUB_RELEASE_MAX_ANSWER, &length, report);
+    /* A renamed repository is followed to its number; where that is now must be the same owner's. */
+    if (reason == GITHUB_RELEASE_NEWER && report->redirects > 0 && !same_owner(answer, length, repository))
+        reason = GITHUB_RELEASE_OWNER_CHANGED;
     /* As github_release_evaluate reads it: one whole object, of a release that is published. */
     if (reason == GITHUB_RELEASE_NEWER &&
         update_check_json_value(answer, length, "assets", &assets, &assets_length) != 1)
@@ -1109,7 +1143,7 @@ github_release_reason github_release_asset_check(const self_update_platform *pla
     {
         /* From github.com, as the file will be: its address made, not taken from the answer. */
         if (sums_size == 0 || sums_size > GITHUB_RELEASE_MAX_SUMS)
-            return asset_reason(report, GITHUB_RELEASE_SUMS_UNREADABLE);
+            return asset_reason(report, GITHUB_RELEASE_SUMS_MALFORMED);
         found = snprintf(sums_url, sizeof(sums_url), "https://github.com/%s/releases/download/%s/SHA256SUMS",
                          repository, asset->tag);
         if (found <= 0 || (size_t)found >= sizeof(sums_url) || !self_update_url_allowed(sums_url, 0))

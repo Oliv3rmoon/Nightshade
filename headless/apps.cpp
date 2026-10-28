@@ -7,6 +7,7 @@
 #include <cstring>
 #include <mutex>
 #include <pthread.h>
+#include <utility>
 
 #include "apps_release.h"
 #include "diagnostics.h"
@@ -20,6 +21,8 @@ constexpr std::size_t kStackSize = 1024 * 1024;
 // usual folder of homebrew apps.
 constexpr const char* kRegistered = "/user";
 constexpr const char* kHomebrew = "/data/homebrew";
+// How long the launch payload may take to answer.
+constexpr int kLaunchAnswerMs = 5000;
 
 struct Known {
     bool looked = false;
@@ -31,7 +34,8 @@ struct Known {
 std::mutex lock;
 std::array<Known, pe::ui::kAppCount> known;
 bool asking = false;  // a thread looks (and maybe asks GitHub)
-bool wanted = false;  // ... and GitHub is to be asked once it has looked
+bool looking = false; // ... and is to look (again) for the apps
+bool wanted = false;  // ... and to ask GitHub once it has looked
 self_update_job job{};  // zero until the first Install, as the kit asks
 bool begun = false;
 int job_app = -1;
@@ -81,19 +85,23 @@ void AskGitHub() {
     }
 }
 
-// The thread of Refresh: looks, then asks GitHub as long as that is wanted.
+// The thread of Refresh: looks and asks GitHub for as long as either is wanted, so a Refresh while
+// it runs is not lost.
 void* Ask(void*) {
-    Look(-1);
     for (;;) {
+        bool look = false;
+        bool github = false;
         {
             const std::lock_guard guard(lock);
-            if (!wanted) {
+            look = std::exchange(looking, false);
+            github = std::exchange(wanted, false);
+            if (!look && !github) {
                 asking = false;
                 return nullptr;
             }
-            wanted = false;
         }
-        AskGitHub();
+        if (look) Look(-1);
+        if (github) AskGitHub();
     }
 }
 
@@ -102,14 +110,15 @@ pe::ui::AppProblem ProblemOf(github_release_reason reason) {
     case GITHUB_RELEASE_NEWER: return pe::ui::AppProblem::none;
     case GITHUB_RELEASE_NONE: return pe::ui::AppProblem::no_release;
     case GITHUB_RELEASE_NETWORK:
-    case GITHUB_RELEASE_HTTP_STATUS: return pe::ui::AppProblem::offline;
+    case GITHUB_RELEASE_HTTP_STATUS:
+    case GITHUB_RELEASE_SUMS_UNREADABLE: return pe::ui::AppProblem::offline;  // its download failed
     case GITHUB_RELEASE_RATE_LIMITED: return pe::ui::AppProblem::rate_limited;
     case GITHUB_RELEASE_NO_ZIP: return pe::ui::AppProblem::no_file;
     case GITHUB_RELEASE_NO_HASH:
     case GITHUB_RELEASE_SUMS_NO_LINE: return pe::ui::AppProblem::no_hash;
     case GITHUB_RELEASE_HASHES_DIFFER:
-    case GITHUB_RELEASE_SUMS_MALFORMED:
-    case GITHUB_RELEASE_SUMS_UNREADABLE: return pe::ui::AppProblem::bad_hash;
+    case GITHUB_RELEASE_SUMS_MALFORMED: return pe::ui::AppProblem::bad_hash;
+    case GITHUB_RELEASE_OWNER_CHANGED: return pe::ui::AppProblem::moved;
     default: return pe::ui::AppProblem::unreadable;
     }
 }
@@ -127,11 +136,12 @@ pe::ui::AppOffer OfferOf(Offer offer) {
 void Refresh(bool releases) {
     {
         const std::lock_guard guard(lock);
+        looking = true;
         if (releases) {
             wanted = true;
             for (Known& app : known) app.checked = false;
         }
-        // One that runs asks GitHub once it has looked, when that is wanted now.
+        // One that runs does it once it has done what it does now.
         if (asking) return;
         asking = true;
     }
@@ -147,6 +157,7 @@ void Refresh(bool releases) {
     Report("apps", "The thread could not start");
     const std::lock_guard guard(lock);
     asking = false;
+    looking = false;
     wanted = false;
 }
 
@@ -173,23 +184,34 @@ std::vector<pe::ui::AppState> List() {
     return list;
 }
 
-bool Install(int app) {
+bool Install(int app, std::string* reason) {
     const std::lock_guard guard(lock);
     if (app < 0 || app >= pe::ui::kAppCount) return false;
+    // Without it the kit would say no payload loader took it.
+    if (!FileExists(AppFile("self-updater.elf"))) {
+        *reason = "self-updater.elf is not in Nightshade's folder";
+        Report("apps", ("Install " + std::string{pe::ui::kApps[app].title} + ": " + *reason).c_str());
+        return false;
+    }
     if (begun) {
         self_update_status status{};
         self_update_poll(&job, &status);
         if (status.phase != SELF_UPDATE_INSTALLED && status.phase != SELF_UPDATE_FAILED &&
-            status.phase != SELF_UPDATE_CANCELLED)
+            status.phase != SELF_UPDATE_CANCELLED) {
+            *reason = "another app is being installed";
             return false;  // one at a time
+        }
         self_update_finish(&job);
         begun = false;
     }
     const Known& found = known[static_cast<std::size_t>(app)];
     self_update_offer offer{};
-    if (!found.checked || !MakeOffer(pe::ui::kApps[app], found.release, found.installed, OwnTitle().c_str(), &offer))
+    if (!found.checked || !MakeOffer(pe::ui::kApps[app], found.release, found.installed, OwnTitle().c_str(), &offer)) {
+        *reason = "its release is not one that can be installed";
         return false;
+    }
     begun = self_update_start(&job, self_update_console(), &offer) == 1;
+    if (!begun) *reason = "the install could not begin";
     job_app = app;
     job_fresh = std::strcmp(offer.installed, "none") == 0;
     job_told = false;
@@ -242,8 +264,8 @@ pe::ui::AppJob Poll() {
             if (out.phase == pe::ui::AppPhase::installed) look = job_app;
         }
     }
-    // The list says what is there now.
-    if (look >= 0) Look(look);
+    // The list says what is there now, once the thread of Refresh has looked again.
+    if (look >= 0) Refresh(false);
     return out;
 }
 
@@ -272,6 +294,8 @@ pe::ui::AppOpen Open(int app, std::string* reason) {
         Report("apps", ("Open " + std::string{pe::ui::kApps[app].title} + ": no payload loader took app-launch.elf").c_str());
         return pe::ui::AppOpen::no_loader;
     }
+    // It answers at once; the helper's minute would hold the menu that long.
+    (void)self_update_channel_timeout(&channel, kLaunchAnswerMs);
     const std::string answer = AskLaunch(channel, pe::ui::kApps[app].title, OwnTitle());
     channel.close(channel.user);
     Report("apps", ("Open " + std::string{pe::ui::kApps[app].title} + ": " +

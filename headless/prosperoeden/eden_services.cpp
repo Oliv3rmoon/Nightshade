@@ -920,7 +920,7 @@ std::vector<pe::ui::AppState> EdenServices::apps() { return Eden::Apps::List(); 
 
 void EdenServices::refresh_apps(bool releases) { Eden::Apps::Refresh(releases); }
 
-bool EdenServices::install_app(int app) { return Eden::Apps::Install(app); }
+bool EdenServices::install_app(int app, std::string* reason) { return Eden::Apps::Install(app, reason); }
 
 pe::ui::AppJob EdenServices::app_job() { return Eden::Apps::Poll(); }
 

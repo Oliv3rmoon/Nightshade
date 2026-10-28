@@ -98,7 +98,8 @@ struct File
     std::size_t size;
     std::string digest;
 };
-std::string latest(const std::string &tag, const std::vector<File> &files)
+// `repository`: where GitHub says the release is ("url"), as after a renamed repository's redirect.
+std::string latest(const std::string &tag, const std::vector<File> &files, const std::string &repository = "")
 {
     std::string assets;
     for (const File &file : files)
@@ -106,7 +107,9 @@ std::string latest(const std::string &tag, const std::vector<File> &files)
                   file.name + "\",\"label\":null,\"uploader\":{\"login\":\"someone\",\"name\":\"not this\"}," +
                   "\"state\":\"uploaded\",\"size\":" + std::to_string(file.size) + ",\"digest\":" +
                   (file.digest.empty() ? std::string{"null"} : "\"sha256:" + file.digest + "\"") + "}";
-    return "{\"tag_name\":\"" + tag + "\",\"name\":\"" + tag + "\",\"draft\":false,\"prerelease\":false,"
+    const std::string url =
+        repository.empty() ? "" : "\"url\":\"https://api.github.com/repos/" + repository + "/releases/1\",";
+    return "{" + url + "\"tag_name\":\"" + tag + "\",\"name\":\"" + tag + "\",\"draft\":false,\"prerelease\":false,"
            "\"assets\":[" + assets + "],\"body\":\"Notes\"}";
 }
 
@@ -302,12 +305,10 @@ void good_zip()
     network.console = &console;
     const pe::ui::AppListing &tv = app("PPSA99003");
     const std::string zip = release_zip("PPSA99003", "01.000.090", "tv");
-    // Nightshade TV has no repository yet (404); ProsperoTV was renamed (301), and its release
-    // lists PPSA99003.zip with SHA256SUMS and a digest that agree.
+    // Nightshade TV has no release yet (404); ProsperoTV's lists PPSA99003.zip with SHA256SUMS and
+    // a digest that agree.
     network.api[latest_of(tv.repository)] = {404, "{\"message\":\"Not Found\"}"};
-    network.api[latest_of(tv.fallback)] = {301, "{\"message\":\"Moved Permanently\",\"url\":"
-                                                "\"https://api.github.com/repositories/1351488589/releases/latest\"}"};
-    network.api["https://api.github.com/repositories/1351488589/releases/latest"] = {
+    network.api[latest_of(tv.fallback)] = {
         200, latest("01.000.090", {{"PPSA99003.zip", zip.size(), sha256(zip)}, {"SHA256SUMS", 80, ""}})};
     network.files[file_of(tv.fallback, "01.000.090", "SHA256SUMS")] = sha256(zip) + "  PPSA99003.zip\n";
     network.files[file_of(tv.fallback, "01.000.090", "PPSA99003.zip")] = zip;
@@ -316,9 +317,9 @@ void good_zip()
     const Eden::Apps::Release release = Eden::Apps::Check(&platform, tv);
     expect(release.reason == GITHUB_RELEASE_NEWER && release.fallback && release.repository == tv.fallback,
            "with no release of its own, the project it is based on is offered");
-    expect(release.report.redirects == 1 && std::string{release.asset.tag} == "01.000.090" &&
+    expect(release.report.redirects == 0 && std::string{release.asset.tag} == "01.000.090" &&
                release.asset.from_sums == 1 && release.asset.sha256 == sha256(zip) && release.asset.size == zip.size(),
-           "a renamed repository's release, with its SHA256SUMS");
+           "the original project's release, with its SHA256SUMS");
     expect(std::string{release.asset.url} == file_of(tv.fallback, "01.000.090", "PPSA99003.zip"),
            "the download's address is made from the repository, the tag and the file");
 
@@ -349,7 +350,7 @@ void good_zip()
 
     // Its update: a newer release, installed over its folder.
     const std::string newer = release_zip("PPSA99003", "01.000.100", "tv 2");
-    network.api["https://api.github.com/repositories/1351488589/releases/latest"] = {
+    network.api[latest_of(tv.fallback)] = {
         200, latest("01.000.100", {{"PPSA99003.zip", newer.size(), sha256(newer)}, {"SHA256SUMS", 80, ""}})};
     network.files[file_of(tv.fallback, "01.000.100", "SHA256SUMS")] = sha256(newer) + " *PPSA99003.zip\n";
     network.files[file_of(tv.fallback, "01.000.100", "PPSA99003.zip")] = newer;
@@ -466,6 +467,74 @@ void missing_release()
            "a tag that can't be in an address is refused");
 }
 
+// A renamed repository: followed to its new name, never to another account; and SHA256SUMS that
+// can't be downloaded, or can't be one.
+void redirects(const fs::path &fixtures)
+{
+    Network network;
+    const pe::ui::AppListing &tv = app("PPSA99003");
+    const std::string moved = "https://api.github.com/repositories/42/releases/latest";
+    const std::string zip = release_zip("PPSA99003", "01.001.000", "tv");
+    network.api[latest_of(tv.repository)] = {301, "{\"message\":\"Moved Permanently\",\"url\":\"" + moved + "\"}"};
+    network.api[moved] = {200, latest("01.001.000", {{"PPSA99003.zip", zip.size(), sha256(zip)}},
+                                      "oliv3rmoon/Nightshade-Television")};
+    const self_update_platform platform = platform_of(network);
+    const Eden::Apps::Release renamed = Eden::Apps::Check(&platform, tv);
+    expect(renamed.reason == GITHUB_RELEASE_NEWER && !renamed.fallback && renamed.report.redirects == 1,
+           "a repository renamed by its owner is followed");
+    network.api[moved] = {200, latest("01.001.000", {{"PPSA99003.zip", zip.size(), sha256(zip)}},
+                                      "someone-else/Nightshade-TV")};
+    network.asked.clear();
+    const Eden::Apps::Release elsewhere = Eden::Apps::Check(&platform, tv);
+    self_update_offer offer{};
+    expect(elsewhere.reason == GITHUB_RELEASE_OWNER_CHANGED && !elsewhere.fallback &&
+               !Eden::Apps::MakeOffer(tv, elsewhere, {}, "PPSA99008", &offer) &&
+               network.asked == std::vector<std::string>{latest_of(tv.repository), moved},
+           "a redirect to another account is refused, and nothing more is asked");
+    network.api[moved] = {200, latest("01.001.000", {{"PPSA99003.zip", zip.size(), sha256(zip)}})};
+    expect(Eden::Apps::Check(&platform, tv).reason == GITHUB_RELEASE_OWNER_CHANGED,
+           "a redirect whose answer doesn't say where the release is is refused");
+
+    // As GitHub answers today for a list that names blackbearreloaded/ProsperoTV, which moved to
+    // ThatGuyKalvin's account.
+    const pe::ui::AppListing old{"Nightshade TV", "PPSA99003", "Oliv3rmoon/Nightshade-TV", "blackbearreloaded/ProsperoTV",
+                                 "PPSA99003.zip", "", pe::ui::AppIcon::tv};
+    Network github;
+    github.api[latest_of(old.repository)] = {404, "{\"message\":\"Not Found\"}"};
+    github.api[latest_of(old.fallback)] = {301, read(fixtures / "ProsperoTV-moved.json")};
+    github.api["https://api.github.com/repositories/1351488589/releases/latest"] = {200,
+                                                                                    read(fixtures / "ProsperoTV-latest.json")};
+    const self_update_platform real = platform_of(github);
+    const Eden::Apps::Release moved_away = Eden::Apps::Check(&real, old);
+    expect(moved_away.reason == GITHUB_RELEASE_OWNER_CHANGED && moved_away.fallback &&
+               moved_away.repository == "blackbearreloaded/ProsperoTV",
+           "blackbearreloaded/ProsperoTV, now ThatGuyKalvin's, is not installed from");
+
+    // SHA256SUMS listed but not downloaded (told as GitHub not answering), or of no size.
+    Network sums;
+    sums.api[latest_of(tv.repository)] = {
+        200, latest("01.001.000", {{"PPSA99003.zip", zip.size(), sha256(zip)}, {"SHA256SUMS", 80, ""}})};
+    const self_update_platform none = platform_of(sums);
+    expect(Eden::Apps::Check(&none, tv).reason == GITHUB_RELEASE_SUMS_UNREADABLE,
+           "SHA256SUMS that can't be downloaded: nothing is offered");
+    sums.api[latest_of(tv.repository)] = {
+        200, latest("01.001.000", {{"PPSA99003.zip", zip.size(), sha256(zip)}, {"SHA256SUMS", 0, ""}})};
+    expect(Eden::Apps::Check(&none, tv).reason == GITHUB_RELEASE_SUMS_MALFORMED,
+           "SHA256SUMS of no size: nothing is offered");
+
+    // Nightshade TV's own first release, as GitHub gave it.
+    Network own;
+    own.api[latest_of(tv.repository)] = {200, read(fixtures / "Nightshade-TV-latest.json")};
+    own.files[file_of(tv.repository, "01.001.000", "SHA256SUMS")] = read(fixtures / "Nightshade-TV-SHA256SUMS");
+    const self_update_platform ours = platform_of(own);
+    const Eden::Apps::Release first = Eden::Apps::Check(&ours, tv);
+    expect(first.reason == GITHUB_RELEASE_NEWER && !first.fallback && std::string{first.asset.tag} == "01.001.000" &&
+               first.asset.from_sums == 1 &&
+               std::string{first.asset.sha256} == "dd810b47475d604faf01917f0631712c04607ebeffc0adfc539c2f905f00acd9" &&
+               std::string{first.asset.url} == file_of(tv.repository, "01.001.000", "PPSA99003.zip"),
+           "Nightshade TV's own release 01.001.000 is offered from its repository");
+}
+
 // ---- the originals' releases, as GitHub answered for them ---------------------------------------
 
 void originals(const fs::path &fixtures, const fs::path &zips)
@@ -473,16 +542,13 @@ void originals(const fs::path &fixtures, const fs::path &zips)
     struct Original
     {
         const char *title, *project, *tag, *sha256;
-        int number; // GitHub's for a renamed repository; 0: not renamed
         bool sums;
     };
     const Original all[] = {
-        {"PPSA99003", "ProsperoTV", "01.000.090", "efbe68d8723bd2cbab3225e5945ea86aa7c28dab827412848f285cc7d9ef40b3",
-         1351488589, true},
-        {"PPSA99002", "ProsperoLight", "01.000.110",
-         "f29935f3bd9d61926c1ea63f8d34019fff19ee993e8d030ee373c004efd974ba", 1350039488, true},
-        {"PPSA98510", "SwanStationPS5", "1.5.9", "4def0fd289a935cb37b5df04bf19dbc3523c8a2de8c7b1f92020ea0d63c77bca", 0,
-         false},
+        {"PPSA99003", "ProsperoTV", "01.000.090", "efbe68d8723bd2cbab3225e5945ea86aa7c28dab827412848f285cc7d9ef40b3", true},
+        {"PPSA99002", "ProsperoLight", "01.000.110", "f29935f3bd9d61926c1ea63f8d34019fff19ee993e8d030ee373c004efd974ba",
+         true},
+        {"PPSA98510", "SwanStationPS5", "1.5.9", "4def0fd289a935cb37b5df04bf19dbc3523c8a2de8c7b1f92020ea0d63c77bca", false},
     };
     for (const Original &original : all)
     {
@@ -490,16 +556,8 @@ void originals(const fs::path &fixtures, const fs::path &zips)
         const std::string name = original.project;
         Network network;
         network.api[latest_of(listing.repository)] = {404, "{\"message\":\"Not Found\"}"};
-        const std::string answer = read(fixtures / (name + "-latest.json"));
-        if (original.number != 0)
-        {
-            const std::string moved = "https://api.github.com/repositories/" + std::to_string(original.number) +
-                                      "/releases/latest";
-            network.api[latest_of(listing.fallback)] = {301, read(fixtures / (name + "-moved.json"))};
-            network.api[moved] = {200, answer};
-        }
-        else
-            network.api[latest_of(listing.fallback)] = {200, answer};
+        // The list names each project where it is now: GitHub answers it at once.
+        network.api[latest_of(listing.fallback)] = {200, read(fixtures / (name + "-latest.json"))};
         if (original.sums)
             network.files[file_of(listing.fallback, original.tag, "SHA256SUMS")] =
                 read(fixtures / (name + "-SHA256SUMS"));
@@ -651,6 +709,7 @@ int main(int argc, char **argv)
     wrong_hash();
     missing_hash();
     missing_release();
+    redirects(argv[1]);
     originals(argv[1], argc == 3 ? fs::path{argv[2]} : fs::path{});
     finding();
     tags();

@@ -94,6 +94,9 @@ extern "C"
     /* ProsperoEden: sends another payload from the app's folder to the loader as the helper is
      * sent (app-launch.elf, Nightshade's Apps). 1: channel is open. On the console only. */
     int self_update_open_payload(const char *path, self_update_channel *channel);
+    /* ProsperoEden: how long such a connection waits for an answer, instead of the helper's
+     * minute. 1: set. On the console only. */
+    int self_update_channel_timeout(const self_update_channel *channel, int milliseconds);
 
     /* ---- 1. Is there an update? ------------------------------------------------------------ */
 

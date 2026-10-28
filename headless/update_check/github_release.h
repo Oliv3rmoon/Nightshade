@@ -84,7 +84,8 @@ extern "C"
         /* ProsperoEden, for another app's release (github_release_asset_check): */
         GITHUB_RELEASE_NO_HASH = 19,         /* neither SHA256SUMS nor a digest of the file */
         GITHUB_RELEASE_HASHES_DIFFER = 20,   /* SHA256SUMS and GitHub's digest of the file differ */
-        GITHUB_RELEASE_BAD_TAG = 21          /* a tag that can't be in a download's address */
+        GITHUB_RELEASE_BAD_TAG = 21,         /* a tag that can't be in a download's address */
+        GITHUB_RELEASE_OWNER_CHANGED = 22    /* a renamed repository's redirect led to another owner */
     } github_release_reason;
 
     /* What the check found, for the log. */
@@ -203,7 +204,9 @@ extern "C"
     } github_release_asset;
 
     /* releases/latest of `repository` (a renamed one's redirect followed, as for the app's own
-     * update), and its uploaded file named `file` ("PPSA99003.zip"). Its SHA-256 is the line
+     * update, but only to a repository of the same owner: the answer names where it is now, and
+     * another owner's is GITHUB_RELEASE_OWNER_CHANGED, so nothing is installed from an account the
+     * caller did not name), and its uploaded file named `file` ("PPSA99003.zip"). Its SHA-256 is the line
      * SHA256SUMS has for it when the release has a SHA256SUMS, otherwise the digest GitHub keeps of
      * every file it holds (the file's "digest", "sha256:<64 hex>"); when both are there they must
      * be the same, and with neither nothing is offered (GITHUB_RELEASE_NO_HASH). The download's

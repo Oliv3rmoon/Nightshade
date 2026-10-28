@@ -336,6 +336,14 @@ static int console_open_helper(void *user, self_update_channel *channel)
     return self_update_open_payload(SELF_UPDATE_HELPER_PATH, channel);
 }
 
+/* ProsperoEden: a shorter wait for an answer on a payload's connection than the helper's minute
+ * (the launch payload answers at once). */
+int self_update_channel_timeout(const self_update_channel *channel, int milliseconds)
+{
+    const int timeout_us = milliseconds * 1000;
+    return sceNetSetsockopt((int)(intptr_t)channel->user, 0xffff, 0x1106, &timeout_us, sizeof(timeout_us)) >= 0;
+}
+
 /* ---- Kept between launches ----------------------------------------------------------------- */
 
 static int console_load_sequence(void *user, uint64_t *sequence)

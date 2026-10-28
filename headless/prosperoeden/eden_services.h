@@ -43,7 +43,7 @@ public:
     void finish_update() override;
     std::vector<pe::ui::AppState> apps() override;
     void refresh_apps(bool releases) override;
-    bool install_app(int app) override;
+    bool install_app(int app, std::string* reason) override;
     pe::ui::AppJob app_job() override;
     void cancel_app() override;
     void finish_app() override;

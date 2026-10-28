@@ -25,8 +25,9 @@ namespace Eden::Apps {
 void Refresh(bool releases);
 // Every app of kApps, in its order, as far as Refresh has come.
 std::vector<pe::ui::AppState> List();
-// Installs the offered release of an app (true: begun), where that is, stop it, and after it ended.
-bool Install(int app);
+// Installs the offered release of an app (true: begun; otherwise *reason says why, in English),
+// where that is, stop it, and after it ended.
+bool Install(int app, std::string* reason);
 pe::ui::AppJob Poll();
 void Cancel();
 void Finish();

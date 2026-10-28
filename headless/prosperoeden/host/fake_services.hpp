@@ -245,10 +245,13 @@ class FakeServices : public ui::Services
     {
         apps_refreshed += releases ? 1 : 0;
     }
-    bool install_app(int app) override
+    bool install_app(int app, std::string *reason) override
     {
         if (app < 0 || app >= static_cast<int>(app_list.size()) || app_steps >= 0)
+        {
+            *reason = "another app is being installed";
             return false;
+        }
         app_installing = app;
         app_steps = 0;
         app_cancelled = false;

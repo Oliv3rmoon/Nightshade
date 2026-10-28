@@ -95,8 +95,8 @@ another project, with that project's title ID:
 
 | App | Title ID | Released in | Based on |
 |---|---|---|---|
-| Nightshade TV | `PPSA99003` | [Oliv3rmoon/Nightshade-TV](https://github.com/Oliv3rmoon/Nightshade-TV) | [ProsperoTV](https://github.com/blackbearreloaded/ProsperoTV), an IPTV client |
-| Nightshade Stream | `PPSA99002` | [Oliv3rmoon/Nightshade-Stream](https://github.com/Oliv3rmoon/Nightshade-Stream) | [ProsperoLight](https://github.com/blackbearreloaded/ProsperoLight), game streaming with Moonlight |
+| Nightshade TV | `PPSA99003` | [Oliv3rmoon/Nightshade-TV](https://github.com/Oliv3rmoon/Nightshade-TV) | [ProsperoTV](https://github.com/ThatGuyKalvin/ProsperoTV), an IPTV client |
+| Nightshade Stream | `PPSA99002` | [Oliv3rmoon/Nightshade-Stream](https://github.com/Oliv3rmoon/Nightshade-Stream) | [ProsperoLight](https://github.com/LedyBacer/ProsperoLight), game streaming with Moonlight |
 | Nightshade Station | `PPSA98510` | [Oliv3rmoon/Nightshade-Station](https://github.com/Oliv3rmoon/Nightshade-Station) | darkxex's [SwanStationPS5](https://github.com/darkxex/SwanStationPS5), a PS1 emulator |
 
 Each row says whether the app is installed and at which version, and which release is offered and
@@ -116,14 +116,14 @@ from where.
   `<title ID>.zip`. Until that repository has a release, the newest release of the project the app
   is based on is offered, and the row says so. The ZIP is checked against the release's
   `SHA256SUMS`, or against GitHub's own SHA-256 of the file when the release has none; a release
-  with neither is not offered. Triangle asks GitHub again.
+  with neither is not offered. Nothing is installed from an account other than the one listed: a
+  repository GitHub says moved to another account is not offered. Triangle asks GitHub again.
 
 The details are in [Nightshade's apps](docs/INSTALL.md#nightshades-apps). Thanks to the projects
-the apps are based on, ProsperoTV and ProsperoLight (their repositories are now
-[ThatGuyKalvin/ProsperoTV](https://github.com/ThatGuyKalvin/ProsperoTV) and
-[LedyBacer/ProsperoLight](https://github.com/LedyBacer/ProsperoLight)) and darkxex's SwanStationPS5,
-and to **Mihawk**, whose [PS5 RetroArch](https://github.com/mihawk-99/PS5_RetroArch) Game Forwarder
-the launch payload is based on (`forwarder/launch.c`).
+the apps are based on, ProsperoTV and ProsperoLight (first published as blackbearreloaded/ProsperoTV
+and blackbearreloaded/ProsperoLight) and darkxex's SwanStationPS5, and to **Mihawk**, whose
+[PS5 RetroArch](https://github.com/mihawk-99/PS5_RetroArch) Game Forwarder the launch payload is
+based on (`forwarder/launch.c`).
 
 ## Guides
 

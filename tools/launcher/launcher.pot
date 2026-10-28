@@ -1347,6 +1347,11 @@ msgstr ""
 msgid "Opening {0}. Nightshade closes now."
 msgstr ""
 
+#. {0} is an app's name: Nightshade asks for it to be opened, and closes once that is under way.
+#: pe/ui/apps.cpp
+msgid "Opening {0}..."
+msgstr ""
+
 #. The DualSense button labelled OPTIONS: keep the label if the language's players do.
 #: pe/ui/game_options.cpp
 msgid "Options"
@@ -2422,6 +2427,11 @@ msgstr ""
 #. Any number of games other than one. See '{0} game'.
 #: eden_services.cpp, host/fake_services.cpp
 msgid "{0} games installed"
+msgstr ""
+
+#. {0} is a GitHub repository, such as blackbearreloaded/ProsperoTV (unchanged): GitHub now sends requests for it to another account's repository, which Nightshade does not install from.
+#: pe/ui/apps.cpp
+msgid "{0} has moved to another account, so its release is not offered."
 msgstr ""
 
 #. {0} is 60 or 120 (hertz).

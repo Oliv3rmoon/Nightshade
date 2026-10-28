@@ -1328,6 +1328,11 @@ msgstr "라이브러리 열기"
 msgid "Opening {0}. Nightshade closes now."
 msgstr "{0}을(를) 엽니다. Nightshade이 지금 종료됩니다."
 
+#. {0} is an app's name: Nightshade asks for it to be opened, and closes once that is under way.
+#: pe/ui/apps.cpp
+msgid "Opening {0}..."
+msgstr "{0}을(를) 여는 중..."
+
 #. The DualSense button labelled OPTIONS: keep the label if the language's players do.
 #: pe/ui/game_options.cpp
 msgid "Options"
@@ -2421,6 +2426,11 @@ msgstr "게임 {0}개"
 #: eden_services.cpp, host/fake_services.cpp
 msgid "{0} games installed"
 msgstr "게임 {0}개 설치됨"
+
+#. {0} is a GitHub repository, such as blackbearreloaded/ProsperoTV (unchanged): GitHub now sends requests for it to another account's repository, which Nightshade does not install from.
+#: pe/ui/apps.cpp
+msgid "{0} has moved to another account, so its release is not offered."
+msgstr "{0}이(가) 다른 계정으로 옮겨져 릴리스가 제공되지 않습니다."
 
 #. {0} is 60 or 120 (hertz).
 #: pe/ui/game_options.cpp, pe/ui/library.cpp, pe/ui/settings.cpp
