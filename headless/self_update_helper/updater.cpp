@@ -726,19 +726,16 @@ int install(const std::shared_ptr<Session> &shared, const std::string &title, co
         session.say("fail " + reason + "\n");
         return 1;
     };
-    // Never a title the console may be running: unknown counts as running, as for the app's own
-    // update, and so does a sandbox the system kept after the app closed (it stays until a restart,
-    // Swordpdf/ProsperoEden#232); the asking app is open, so nothing can tell those apart here.
-    if (title_running(environment.sandboxes, title) != 0)
-    {
-        std::string left;
-        for (const auto &entry : title_sandboxes(environment.sandboxes, title))
-            left += (left.empty() ? "" : ", ") + entry;
-        session.log("install " + title + " refused: in " + environment.sandboxes + ": " +
-                    (left.empty() ? std::string{"(could not be listed)"} : left));
-        return refuse("The app may be running: the console has its sandbox, which stays until a restart. "
-                      "Restart the console and try again");
-    }
+    // Never the files of the app the console runs: the asking one (refused above, it is the one
+    // that runs while it asks) or any other. Asked of the console, not read from /mnt/sandbox, which
+    // keeps a closed app's sandbox until a restart (Swordpdf/ProsperoEden#232). When the console
+    // can't say, nothing is installed.
+    std::string running;
+    if (!environment.running_app || !environment.running_app(running) || running.empty())
+        return refuse("The app the console runs couldn't be told, so nothing was installed");
+    session.log("install " + title + " while " + running + " runs");
+    if (running == title)
+        return refuse("The app is running; close it and try again");
 
     // Where it goes: its one folder, at the version that was asked about; a new one beside the
     // asking app's when it has none, where nothing may be yet.

@@ -47,6 +47,10 @@ struct Environment
     unsigned stale_sandbox_ms = 10000;
     // Persistent launcher installation root, separate from the app being replaced.
     std::string launcher_data;
+    // ProsperoEden: the title ID of the big app the console runs now, which an install of another
+    // app never replaces (main.cpp asks the console). False, or unset: it can't be told, and nothing
+    // is installed.
+    std::function<bool(std::string &title)> running_app;
 };
 
 // The console's drives ("/data", "/mnt/ext0", "/mnt/ext1", "/mnt/usb0" to "/mnt/usb7") and

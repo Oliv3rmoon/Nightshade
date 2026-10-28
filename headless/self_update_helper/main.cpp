@@ -19,6 +19,9 @@ extern "C"
 {
     int sceKernelSendNotificationRequest(int device, void *request, std::size_t size, int blocking);
     int klog_puts(const char *text);
+    // ProsperoEden: the big app the console runs (as Mihawk's PS5 RetroArch forwarder reads it).
+    std::uint32_t sceLncUtilGetAppIdOfRunningBigApp(void);
+    int sceLncUtilGetAppTitleId(std::uint32_t app_id, char *title_id);
 }
 
 namespace
@@ -60,6 +63,17 @@ int main()
     // The version an update replaces stays here until the next update.
     environment.previous = "/data/prosperoeden/previous-version";
     environment.launcher_data = "/data/prosperoeden";
+    // ProsperoEden: for an install of another app (Nightshade's Apps): which app runs now.
+    environment.running_app = [](std::string &title)
+    {
+        const std::uint32_t app = sceLncUtilGetAppIdOfRunningBigApp();
+        char id[16] = {};
+        if (app == 0 || app == 0xffffffffu || sceLncUtilGetAppTitleId(app, id) != 0)
+            return false;
+        id[15] = '\0';
+        title = id;
+        return true;
+    };
     // ProsperoEden: the kernel log, and /data/prosperoeden/logs/updater.log (the last update's
     // lines, for a player to send: the kernel log is out of reach for most).
     static std::FILE *file = std::fopen("/data/prosperoeden/logs/updater.log", "w");

@@ -175,9 +175,10 @@ for [Nightshade's own updates](#updating)), which checks it again and unpacks it
 until the files are put in place; nothing changes before. A new app goes in a folder named after its
 title ID beside Nightshade's (`/data/homebrew/PPSA99003` when Nightshade is in
 `/data/homebrew/PPSA99008`); the helper refuses when a folder of that name is there already, or the
-app is installed somewhere else. It also refuses while the console has the app's sandbox in
-`/mnt/sandbox`: the app may be running, and after an app has run the system can keep its sandbox
-until a restart, so restart the console and try again. An update replaces the entries the release has in the app's folder
+app is installed somewhere else. It never installs over the app the console is running, which it
+asks the console (not `/mnt/sandbox`, where the system can keep a closed app's sandbox until a
+restart, so an app you used before needs no restart to be updated), and when the console can't say,
+it installs nothing. An update replaces the entries the release has in the app's folder
 and keeps the rest, and the files it replaced are kept in
 `/data/prosperoeden/previous-version/<title ID>-backup`, as for Nightshade, once the helper has told
 Nightshade the update is in place. Nightshade stays open, and the console shows a notification too. A new app appears on the home screen after the homebrew

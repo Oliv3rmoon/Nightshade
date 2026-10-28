@@ -141,6 +141,12 @@ struct Console
         environment.previous = (data / "prosperoeden/previous-version").string();
         environment.launcher_data = (data / "prosperoeden").string();
         environment.settle_ms = 0;
+        // Nightshade is the app the console runs while it asks.
+        environment.running_app = [](std::string &title)
+        {
+            title = "PPSA99008";
+            return true;
+        };
     }
     ~Console()
     {

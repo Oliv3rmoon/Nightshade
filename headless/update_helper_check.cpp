@@ -17,6 +17,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -215,6 +216,12 @@ struct Console
         environment.previous = (data / "prosperoeden/previous-version").string();
         environment.launcher_data = (data / "prosperoeden").string();
         environment.settle_ms = 0;
+        // Nightshade is the app the console runs while it asks.
+        environment.running_app = [](std::string &title)
+        {
+            title = "PPSA99008";
+            return true;
+        };
     }
     ~Console()
     {
@@ -424,17 +431,45 @@ void other_apps()
                    !fs::exists(console.homebrew / "PPSA98510"),
                "a ZIP whose version isn't a content version is not installed");
 
-        // A title the console may be running: its sandbox is there (also one the system kept).
+        // The app the console runs is never installed over; nor anything when the console can't
+        // say which runs.
+        const auto refused = [&](const std::function<bool(std::string &)> &answer, const std::string &why,
+                                 const std::string &what)
+        {
+            console.environment.running_app = answer;
+            App &asked = new_app();
+            asked.install = true;
+            asked.archive = app.archive;
+            expect(console.talk(asked, install_request("PPSA98510", "none", "any", asked.archive,
+                                                       sha256(asked.archive), "Nightshade Station")) == 1 &&
+                       asked.last() == "fail " + why && !fs::exists(console.homebrew / "PPSA98510") &&
+                       console.no_work_left(),
+                   what);
+        };
+        refused([](std::string &title) { title = "PPSA98510"; return true; },
+                "The app is running; close it and try again", "the app the console runs is not installed over");
+        refused([](std::string &) { return false; },
+                "The app the console runs couldn't be told, so nothing was installed",
+                "nothing is installed when the console can't say which app runs");
+        refused(nullptr, "The app the console runs couldn't be told, so nothing was installed",
+                "nothing is installed with no way to ask which app runs");
+        console.environment.running_app = [](std::string &title)
+        {
+            title = "PPSA99008";
+            return true;
+        };
+        // A closed app's sandbox the system kept until a restart (Swordpdf/ProsperoEden#232) is no
+        // reason to refuse.
         fs::create_directories(console.base / "sandbox/PPSA98510_000");
-        App &running = new_app();
-        running.install = true;
-        running.archive = app.archive;
-        expect(console.talk(running, install_request("PPSA98510", "none", "any", running.archive,
-                                                     sha256(running.archive), "Nightshade Station")) == 1 &&
-                   running.last().rfind("fail The app may be running", 0) == 0 &&
-                   !fs::exists(console.homebrew / "PPSA98510") && console.no_work_left(),
-               "a title the console may be running is not installed");
+        App &leftover = new_app();
+        leftover.install = true;
+        leftover.archive = app.archive;
+        expect(console.talk(leftover, install_request("PPSA98510", "none", "any", leftover.archive,
+                                                      sha256(leftover.archive), "Nightshade Station")) == 0 &&
+                   read(console.homebrew / "PPSA98510/eboot.bin") == "station program",
+               "an app closed with its sandbox left behind is installed");
         fs::remove_all(console.base / "sandbox/PPSA98510_000");
+        fs::remove_all(console.homebrew / "PPSA98510");
 
         // Nightshade's own title is never installed this way (its own update checks more).
         App &own = new_app();
