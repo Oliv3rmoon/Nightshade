@@ -103,7 +103,9 @@ Inside this repository, in `.deps/`:
   per-game cache storage, bounds-checked shader local memory, CPU reads of GPU-cached pages
   without reactive flushing, the shader instructions `ATOM.CAS` and `ATOMS.CAS` (compare and swap in global and
   shared memory), and coherent storage buffers in shaders that use atomics, so a wait on another
-  workgroup's write or an emulated atomic's retry reads memory instead of a stale cached copy.
+  workgroup's write or an emulated atomic's retry reads memory instead of a stale cached copy. The
+  cache operation of a global load or store (`LDG`/`STG` `.CG`, `.CV`, `.WT`) is kept, so a read the
+  game marks to skip the cache reads memory too.
 - **FFmpeg** at the commit Eden pins, built with only the decoders games use.
 - **PS5 OpenGL 4.6 SDK 1.0.2** (release archive), for the launcher and the OpenGL renderer.
 - **OpenSSL, zlib, libcurl and libpsl** from pacbrew v0.40.2.
