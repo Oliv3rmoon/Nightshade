@@ -10,6 +10,7 @@
 #include "mods.h"
 #include "profiles.h"
 #include "update_notice.h"
+#include "apps.h"
 #include "game_name.h"
 #include "loose_addons.h"
 #include "game_files.h"
@@ -913,6 +914,21 @@ void EdenServices::cancel_update() { Eden::UpdateNotice::Cancel(); }
 bool EdenServices::apply_update() { return Eden::UpdateNotice::Apply(); }
 
 void EdenServices::finish_update() { Eden::UpdateNotice::Finish(); }
+
+// Settings > Apps (apps.h).
+std::vector<pe::ui::AppState> EdenServices::apps() { return Eden::Apps::List(); }
+
+void EdenServices::refresh_apps(bool releases) { Eden::Apps::Refresh(releases); }
+
+bool EdenServices::install_app(int app) { return Eden::Apps::Install(app); }
+
+pe::ui::AppJob EdenServices::app_job() { return Eden::Apps::Poll(); }
+
+void EdenServices::cancel_app() { Eden::Apps::Cancel(); }
+
+void EdenServices::finish_app() { Eden::Apps::Finish(); }
+
+pe::ui::AppOpen EdenServices::open_app(int app, std::string* reason) { return Eden::Apps::Open(app, reason); }
 
 std::vector<pe::ui::Profile> EdenServices::profiles() {
     const auto who = Eden::Profiles::Resolve(user_);

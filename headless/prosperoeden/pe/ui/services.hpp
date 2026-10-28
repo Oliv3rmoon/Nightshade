@@ -63,6 +63,71 @@ struct UpdateStatus
     std::string error;       // why it failed (English, technical)
 };
 
+// An app of Settings > Apps (pe/ui/apps_list.hpp) as the console has it, and its newest release.
+enum class AppOffer : std::uint8_t
+{
+    none,    // nothing to install: no release found, or it is installed as an image
+    get,     // not installed: its release can be
+    update,  // a newer release than the one installed
+    current, // installed, and the release is not newer
+};
+// Why no release is offered.
+enum class AppProblem : std::uint8_t
+{
+    none,
+    no_release,   // neither its own repository nor the original project has one
+    offline,      // GitHub could not be reached
+    rate_limited, // GitHub's limit for requests without an account
+    no_file,      // the release has no <title ID>.zip
+    no_hash,      // no SHA256SUMS line for it and no digest: it can't be checked
+    bad_hash,     // its SHA256SUMS line is malformed, or differs from GitHub's digest
+    unreadable,   // anything else in GitHub's answer
+};
+struct AppState
+{
+    bool looked = false;    // where it is was looked at (needs the filesystem access)
+    std::string installed;  // its content version; empty: not installed (or not known)
+    bool image = false;     // installed as an image: it opens, it isn't updated here
+    bool checked = false;   // GitHub has answered, or failed to
+    AppOffer offer = AppOffer::none;
+    AppProblem problem = AppProblem::none;
+    std::string release;    // the newest release's tag
+    std::string repository; // where that release is
+    bool fallback = false;  // it is the original project's: the app's own repository has none yet
+    std::uint64_t size = 0; // its ZIP's size in bytes
+};
+// Installing one.
+enum class AppPhase : std::uint8_t
+{
+    idle,
+    starting,    // sending the self-update helper
+    downloading, // done/total are bytes of the ZIP
+    unpacking,
+    installing,  // the helper puts the files in place
+    installed,
+    cancelled,
+    failed,
+};
+struct AppJob
+{
+    AppPhase phase = AppPhase::idle;
+    int app = -1;           // its place in kApps
+    bool fresh = false;     // a new install (otherwise an update)
+    std::uint64_t done = 0;
+    std::uint64_t total = 0;
+    std::string version;    // installed: the version put in place
+    std::string error;      // failed: why (English, technical)
+    bool no_loader = false; // failed: no payload loader took the helper
+};
+// Opening one.
+enum class AppOpen : std::uint8_t
+{
+    closing,    // the launch payload waits for this app to close: close it now
+    no_loader,  // no payload loader is listening
+    not_listed, // the console doesn't list the app yet: the homebrew loader has not scanned it
+    refused,    // anything else (the reason says what)
+};
+
 // A game file in the games folder.
 struct Game
 {
@@ -824,6 +889,42 @@ class Services
     virtual std::optional<std::int64_t> ask_seed(std::int64_t /*current*/, const std::atomic<bool>& /*stop*/)
     { return std::nullopt; }
     virtual bool can_launch_game() { return true; }
+
+    // ---- Settings > Apps: Nightshade's own apps (pe/ui/apps_list.hpp, headless/apps.h) ----
+    // Each app of kApps in its order, as last looked at: where it is, and its newest release once
+    // GitHub has answered. refresh_apps looks again, and with `releases` asks GitHub again too.
+    virtual std::vector<AppState> apps()
+    {
+        return {};
+    }
+    virtual void refresh_apps(bool releases)
+    {
+        (void)releases;
+    }
+    // Installs an app's offered release, new or over the one installed (false: it could not
+    // begin); how that goes; stop it (nothing changes until its files are put in place); and once
+    // it has ended, before the next one.
+    virtual bool install_app(int)
+    {
+        return false;
+    }
+    virtual AppJob app_job()
+    {
+        return {};
+    }
+    virtual void cancel_app()
+    {
+    }
+    virtual void finish_app()
+    {
+    }
+    // Opens an installed app: the launch payload waits for this app to close, then opens it.
+    // AppOpen::closing: close now. Otherwise nothing happened, and reason says why (English).
+    // It takes a moment: the launcher calls it from a thread of its own.
+    virtual AppOpen open_app(int, std::string *)
+    {
+        return AppOpen::no_loader;
+    }
 
     // ---- images ----
     virtual bool load_image(const std::string &path, gfx::Image *image) = 0;

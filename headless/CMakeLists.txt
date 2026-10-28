@@ -3538,6 +3538,7 @@ endif()
                 "${launcher_dir}/pe/gfx/system_fonts.cpp"
                 "${launcher_dir}/pe/platform/audio_out.cpp"
                 "${launcher_dir}/pe/platform/display_egl.cpp"
+                "${launcher_dir}/pe/ui/apps.cpp"
                 "${launcher_dir}/pe/ui/browse.cpp"
                 "${launcher_dir}/pe/ui/game_options.cpp"
                 "${launcher_dir}/pe/ui/profiles.cpp"
@@ -3659,6 +3660,9 @@ endif()
                 COMMAND_EXPAND_LISTS VERBATIM)
             set_source_files_properties("${update_object}" PROPERTIES EXTERNAL_OBJECT TRUE GENERATED TRUE)
             target_sources(eden-headless PRIVATE "${EDEN_PORT_DIR}/update_notice.cpp" "${update_object}")
+            # Settings > Apps (apps.h): the update kit's job and the helper install other apps, the
+            # launch payload opens them; it uses the same object.
+            target_sources(eden-headless PRIVATE "${EDEN_PORT_DIR}/apps.cpp" "${EDEN_PORT_DIR}/apps_release.cpp")
             target_link_libraries(eden-headless PRIVATE
                 "${OPENSSL_SSL_LIBRARY}" "${OPENSSL_CRYPTO_LIBRARY}" "${ZLIB_LIBRARY}")
             # The launcher calls OpenGL by name (the SDK's headers), not through glad.

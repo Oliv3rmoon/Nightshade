@@ -34,16 +34,17 @@ enum Category
     kLanguage,
     kAppearance,
     kColour,
+    kApps, // Nightshade's own apps (apps.cpp): the same tile or row in every layout
     kCategoryCount,
 };
 constexpr const char *kCategories[kCategoryCount] = {
     TR("Profiles"), TR("Video"), TR("Performance"), TR("Audio"), TR("Controls"), TR("Accessibility"),
     TR("Diagnostics"), TR("Game files"), TR("Downloads"), TR("Save sync"), TR("Language"), TR("Appearance"),
-    TR("Colour")};
+    TR("Colour"), TR("Apps")};
 constexpr Icon kIcons[kCategoryCount] = {
     Icon::profile, Icon::video, Icon::performance, Icon::audio, Icon::controls, Icon::accessibility,
     Icon::diagnostics, Icon::files, Icon::downloads, Icon::sync, Icon::language, Icon::theme,
-    Icon::theme};
+    Icon::theme, Icon::apps};
 constexpr int kTileColumns = 4;
 constexpr int kTileRows = 4;
 constexpr float kTileGap = 20.0f;
@@ -250,7 +251,7 @@ void Launcher::press_settings(Key key)
     case Key::down:
         if (th().list_settings)
             settings_.move(1);
-        else if (at < kTileColumns * (kTileRows - 1))
+        else if (at < kTileColumns * (kTileRows - 1) && at + kTileColumns < kCategoryCount)
             at += kTileColumns;
         break;
     case Key::left:
@@ -259,7 +260,7 @@ void Launcher::press_settings(Key key)
         at -= 1;
         break;
     case Key::right:
-        if (!th().list_settings && at % kTileColumns != kTileColumns - 1)
+        if (!th().list_settings && at % kTileColumns != kTileColumns - 1 && at + 1 < kCategoryCount)
             at += 1;
         break;
     case Key::cross:
@@ -279,6 +280,9 @@ void Launcher::press_settings(Key key)
             break;
         case kDownloads:
             open_sources();
+            break;
+        case kApps:
+            open_apps();
             break;
         case kSaveSync:
             open_sync_setup();
@@ -368,6 +372,18 @@ void Launcher::draw_settings(Canvas &c)
         t.name,
         accent_index() < 0 ? std::string{tr("Default")} :
             std::string{accent_presets()[static_cast<std::size_t>(accent_index())].name},
+        // How many are installed once that has been looked at; their names until then.
+        [&] {
+            int installed = 0;
+            bool looked = !apps_.empty();
+            for (const AppState &app : apps_)
+            {
+                installed += !app.installed.empty() || app.image ? 1 : 0;
+                looked = looked && app.looked;
+            }
+            return looked ? fill(tr("{0} of {1} installed"), {std::to_string(installed), std::to_string(apps_.size())})
+                          : std::string{"TV, Stream, Station"};
+        }(),
     };
     if (t.list_settings)
     {
@@ -486,6 +502,9 @@ void Launcher::draw_settings(Canvas &c)
             break;
         case kAppearance:
             about = tr("Choose a theme or change the launcher layout.");
+            break;
+        case kApps:
+            about = tr("Get, update and open Nightshade TV, Stream and Station.");
             break;
         default:
             break;

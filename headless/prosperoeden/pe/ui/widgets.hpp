@@ -204,6 +204,10 @@ enum class Icon : std::uint8_t
     handheld,
     check,
     lock,
+    apps,   // Settings > Apps: three tiles and a fourth being added
+    tv,     // the apps of Settings > Apps (pe/ui/apps_list.hpp): a screen with its aerial,
+    stream, // a screen with a play mark and the waves it comes over,
+    disc,   // a disc
 };
 // The icon in a square `size` wide centred on (cx, cy).
 void icon(Canvas &c, Icon which, float cx, float cy, float size, Color ink);
