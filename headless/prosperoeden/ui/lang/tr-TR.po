@@ -104,6 +104,11 @@ msgstr "Eden emülatöründeki tüm emek, geliştiricilerine ve katkıda bulunan
 msgid "AMD FSR"
 msgstr "AMD FSR"
 
+#. Settings > Apps: each app is Nightshade's own release of another project; until it has one, that project's release is offered.
+#: pe/ui/apps.cpp
+msgid "An app without a Nightshade release yet is offered from the project it is based on."
+msgstr "Henüz Nightshade sürümü olmayan bir uygulama, dayandığı projeden sunulur."
+
 #: pe/ui/settings.cpp
 msgid "An image of your own behind this menu."
 msgstr "Bu menünün arkasında kendi resminiz."
@@ -119,6 +124,11 @@ msgstr "Görünüm"
 #: pe/ui/settings.cpp
 msgid "Apply"
 msgstr "Uygula"
+
+#. Settings > Apps: Nightshade's own companion apps (an IPTV client, game streaming, a PS1 emulator), not games.
+#: pe/ui/apps.cpp, pe/ui/settings.cpp
+msgid "Apps"
+msgstr "Uygulamalar"
 
 #. The button mapping has not been changed.
 #: pe/ui/game_options.cpp, pe/ui/settings.cpp
@@ -804,9 +814,32 @@ msgstr "Başlattığınız oyunlar burada görünür."
 msgid "German"
 msgstr "Almanca"
 
+#. Button hint in Settings > Apps: download and install an app that is not on the console yet. Keep it short.
+#: pe/ui/apps.cpp
+msgid "Get"
+msgstr "Edin"
+
+#. Settings > Apps: what it is for. Nightshade TV, Stream and Station are the apps' names (unchanged).
+#: pe/ui/apps.cpp, pe/ui/settings.cpp
+msgid "Get, update and open Nightshade TV, Stream and Station."
+msgstr "Nightshade TV, Stream ve Station'ı edinin, güncelleyin ve açın."
+
 #: pe/ui/browse.cpp
 msgid "GETTING STARTED"
 msgstr "BAŞLARKEN"
+
+#: pe/ui/apps.cpp
+msgid "GitHub could not be reached."
+msgstr "GitHub'a ulaşılamadı."
+
+#. GitHub allows an address a number of requests an hour; that number was reached.
+#: pe/ui/apps.cpp
+msgid "GitHub is limiting requests. Try again in an hour."
+msgstr "GitHub istekleri sınırlıyor. Bir saat sonra yeniden deneyin."
+
+#: pe/ui/apps.cpp
+msgid "GitHub's answer could not be read."
+msgstr "GitHub'ın yanıtı okunamadı."
 
 #: pe/ui/settings.cpp
 msgid "Gives back memory a game left empty, 16 KiB at a time. More free memory; a game that writes there again can stutter for a moment."
@@ -876,6 +909,16 @@ msgstr "KULLANIMDA"
 #: pe/ui/multiplayer.cpp
 msgid "Incompatible"
 msgstr "Uyumsuz"
+
+#. Settings > Apps: the app is installed as a disk image file, which this menu can't update.
+#: pe/ui/apps.cpp
+msgid "Installed as an image: replace the image to update it."
+msgstr "Kalıp olarak kurulu: güncellemek için kalıbı değiştirin."
+
+#. Settings > Apps: the new release's files are being put in the app's folder.
+#: pe/ui/apps.cpp
+msgid "Installing"
+msgstr "Kuruluyor"
 
 #: pe/ui/save_sync.cpp
 msgid "It goes to the server."
@@ -1166,9 +1209,24 @@ msgstr "Mod yok"
 msgid "No mods for this game yet. Copy each mod's folder to {0}."
 msgstr "Bu oyun için henüz mod yok. Her modun klasörünü {0} konumuna kopyalayın."
 
+#. {0} is a port number, {1} an app's name. The payload loader is the program on the console that starts the homebrew programs sent to it.
+#: pe/ui/apps.cpp
+msgid "No payload loader is listening on port {0}, so {1} can't be installed."
+msgstr "{0} numaralı bağlantı noktasını dinleyen bir payload yükleyici yok, bu yüzden {1} kurulamıyor."
+
+#. See 'No payload loader is listening on port {0}, so {1} can't be installed.' The PS5's home screen is the console's own, not this menu's.
+#: pe/ui/apps.cpp
+msgid "No payload loader is listening on port {0}, so {1} can't be opened from here. Open it from the PS5's home screen."
+msgstr "{0} numaralı bağlantı noktasını dinleyen bir payload yükleyici yok, bu yüzden {1} buradan açılamıyor. PS5 ana ekranından açın."
+
 #: pe/ui/multiplayer.cpp
 msgid "No public rooms are available."
 msgstr "Kullanılabilir herkese açık oda yok."
+
+#. Settings > Apps: neither the app's own GitHub repository nor the project it is based on has published a release.
+#: pe/ui/apps.cpp
+msgid "No release yet."
+msgstr "Henüz sürüm yok."
 
 #: pe/ui/library.cpp
 msgid "No ROM files found."
@@ -1198,6 +1256,11 @@ msgstr "Yok"
 #: pe/ui/remote.cpp
 msgid "Not connected yet"
 msgstr "Henüz bağlanılmadı"
+
+#. Settings > Apps: the app is not on the console.
+#: pe/ui/apps.cpp
+msgid "Not installed"
+msgstr "Kurulu değil"
 
 #: pe/ui/pairing.cpp
 msgid "Not linked"
@@ -1259,6 +1322,11 @@ msgstr "{0} sürümünü kullanmak için yeniden aç."
 #: pe/ui/home.cpp
 msgid "Open library"
 msgstr "Kütüphaneyi aç"
+
+#. {0} is an app's name.
+#: pe/ui/apps.cpp
+msgid "Opening {0}. Nightshade closes now."
+msgstr "{0} açılıyor. Nightshade şimdi kapanıyor."
 
 #. The DualSense button labelled OPTIONS: keep the label if the language's players do.
 #: pe/ui/game_options.cpp
@@ -1552,6 +1620,16 @@ msgstr "BÖLGE"
 #: pe/ui/game_options.cpp
 msgid "Regular"
 msgstr "Normal"
+
+#. See 'Release {0}, from {1}': here the release is the one of the project the app is based on, because the app has no Nightshade release yet.
+#: pe/ui/apps.cpp
+msgid "Release {0} of the original project, {1}"
+msgstr "Özgün projenin {0} sürümü, {1}"
+
+#. {0} is a release's name, such as v1.000.090 or 01.000.110; {1} a GitHub repository, such as Oliv3rmoon/Nightshade-TV (both unchanged).
+#: pe/ui/apps.cpp
+msgid "Release {0}, from {1}"
+msgstr "{0} sürümü, {1} kaynağından"
 
 #: pe/ui/profiles.cpp
 msgid "Remove"
@@ -1964,6 +2042,26 @@ msgstr "Profilin kaydedilen verileri bundan sonra {0} olarak eşitlenir."
 msgid "The profile's save data syncs with the server from now on."
 msgstr "Profilin kaydedilen verileri bundan sonra sunucuyla eşitlenir."
 
+#. {0} is an app's name. The homebrew loader is the tool that puts homebrew apps on the PS5's home screen (ShadowMountPlus, for example).
+#: pe/ui/apps.cpp
+msgid "The PS5 doesn't list {0} yet. The homebrew loader lists it after its next scan or a restart."
+msgstr "PS5 {0} uygulamasını henüz listelemiyor. Homebrew yükleyici bir sonraki taramasından ya da yeniden başlatmadan sonra listeler."
+
+#. {0} is a file name such as PPSA99003.zip; SHA-256 is the name of a checksum (unchanged).
+#: pe/ui/apps.cpp
+msgid "The release gives no SHA-256 for {0}, so it is not offered."
+msgstr "Sürüm {0} için SHA-256 vermiyor, bu yüzden sunulmuyor."
+
+#. {0} is a file name such as PPSA99003.zip.
+#: pe/ui/apps.cpp
+msgid "The release has no {0}."
+msgstr "Sürümde {0} yok."
+
+#. See 'The release gives no SHA-256 for {0}, so it is not offered.' Its SHA-256 values disagree or are malformed.
+#: pe/ui/apps.cpp
+msgid "The release's SHA-256 for {0} can't be trusted, so it is not offered."
+msgstr "Sürümün {0} için verdiği SHA-256 değerine güvenilemiyor, bu yüzden sunulmuyor."
+
 #. Shown at the end of release notes that were cut short; homebrew.page is a site's name and stays as it is.
 #: pe/ui/update.cpp
 msgid "The rest is on the app's page on homebrew.page."
@@ -2098,6 +2196,11 @@ msgstr "Açılıyor"
 #: pe/ui/browse.cpp
 msgid "UP"
 msgstr "YUKARI"
+
+#. Button hint in Settings > Apps: install an app's newer release over the one installed. Keep it short.
+#: pe/ui/apps.cpp
+msgid "Update"
+msgstr "Güncelle"
 
 #. Notification title: a newer release of this app is listed (not a game update).
 #: pe/ui/launcher.cpp, pe/ui/update.cpp
@@ -2245,6 +2348,10 @@ msgstr "Bu konsolun kaydedilen verileriyle; oyundan sonra eşitlenir."
 msgid "with {0}"
 msgstr "{0} ile"
 
+#: pe/ui/apps.cpp
+msgid "Without filesystem access Nightshade can't tell which apps are installed."
+msgstr "Dosya sistemi erişimi olmadan Nightshade hangi uygulamaların kurulu olduğunu bilemez."
+
 #: pe/ui/settings.cpp
 msgid "Write logs at once"
 msgstr "Günlükleri hemen yaz"
@@ -2275,6 +2382,16 @@ msgstr "Kaydedilen verileriniz sunucudakilerle karşılaştırılıyor."
 #: pe/ui/library.cpp
 msgid "{0} changed"
 msgstr "{0} değiştirildi"
+
+#. {0} is an app's name, {1} why (English, from the installer).
+#: pe/ui/apps.cpp
+msgid "{0} could not be installed: {1}"
+msgstr "{0} kurulamadı: {1}"
+
+#. {0} is an app's name, {1} why (English, from the launch payload).
+#: pe/ui/apps.cpp
+msgid "{0} could not be opened: {1}"
+msgstr "{0} açılamadı: {1}"
 
 #. {0} is how many DLC (add-on content) a game has installed.
 #: eden_services.cpp, host/fake_services.cpp
@@ -2310,6 +2427,16 @@ msgstr "{0} oyun yüklü"
 msgid "{0} Hz"
 msgstr "{0} Hz"
 
+#. {0} is an app's name. See 'The PS5 doesn't list {0} yet...' for the homebrew loader.
+#: pe/ui/apps.cpp
+msgid "{0} is installed. The homebrew loader lists it after its next scan or a restart."
+msgstr "{0} kuruldu. Homebrew yükleyici bir sonraki taramasından ya da yeniden başlatmadan sonra listeler."
+
+#. {0} is an app's name, {1} its new version, such as 01.000.110.
+#: pe/ui/apps.cpp
+msgid "{0} is updated to {1}."
+msgstr "{0}, {1} sürümüne güncellendi."
+
 #. Exactly one mod, in the list of what a game comes with (Update 1.2.0, 2 DLC, 1 mod). See '{0} game'.
 #: pe/ui/library.cpp
 msgid "{0} mod"
@@ -2339,6 +2466,11 @@ msgstr "{0} mevcut değil"
 #: pe/ui/widgets.cpp
 msgid "{0} OF {1}"
 msgstr "{0} / {1}"
+
+#. Settings > Apps: how many of Nightshade's apps are on the console: 2 of 3 installed.
+#: pe/ui/settings.cpp
+msgid "{0} of {1} installed"
+msgstr "{0}/{1} kurulu"
 
 #. In the same list, when some of the game's mods are switched off: 1 of 2 mods on. Keep it short.
 #: pe/ui/library.cpp

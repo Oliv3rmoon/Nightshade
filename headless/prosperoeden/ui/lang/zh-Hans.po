@@ -104,6 +104,11 @@ msgstr "Eden 模拟器的全部功劳归于其开发者和贡献者。"
 msgid "AMD FSR"
 msgstr "AMD FSR"
 
+#. Settings > Apps: each app is Nightshade's own release of another project; until it has one, that project's release is offered.
+#: pe/ui/apps.cpp
+msgid "An app without a Nightshade release yet is offered from the project it is based on."
+msgstr "尚无 Nightshade 发行版的应用将从其所基于的项目提供。"
+
 #: pe/ui/settings.cpp
 msgid "An image of your own behind this menu."
 msgstr "在此菜单后方显示你自己的图片。"
@@ -118,6 +123,11 @@ msgstr "外观"
 
 #: pe/ui/settings.cpp
 msgid "Apply"
+msgstr "应用"
+
+#. Settings > Apps: Nightshade's own companion apps (an IPTV client, game streaming, a PS1 emulator), not games.
+#: pe/ui/apps.cpp, pe/ui/settings.cpp
+msgid "Apps"
 msgstr "应用"
 
 #. The button mapping has not been changed.
@@ -804,9 +814,32 @@ msgstr "你启动过的游戏会显示在这里。"
 msgid "German"
 msgstr "德语"
 
+#. Button hint in Settings > Apps: download and install an app that is not on the console yet. Keep it short.
+#: pe/ui/apps.cpp
+msgid "Get"
+msgstr "获取"
+
+#. Settings > Apps: what it is for. Nightshade TV, Stream and Station are the apps' names (unchanged).
+#: pe/ui/apps.cpp, pe/ui/settings.cpp
+msgid "Get, update and open Nightshade TV, Stream and Station."
+msgstr "获取、更新并打开 Nightshade TV、Stream 和 Station。"
+
 #: pe/ui/browse.cpp
 msgid "GETTING STARTED"
 msgstr "入门"
+
+#: pe/ui/apps.cpp
+msgid "GitHub could not be reached."
+msgstr "无法连接到 GitHub。"
+
+#. GitHub allows an address a number of requests an hour; that number was reached.
+#: pe/ui/apps.cpp
+msgid "GitHub is limiting requests. Try again in an hour."
+msgstr "GitHub 正在限制请求。请一小时后再试。"
+
+#: pe/ui/apps.cpp
+msgid "GitHub's answer could not be read."
+msgstr "无法读取 GitHub 的回复。"
 
 #: pe/ui/settings.cpp
 msgid "Gives back memory a game left empty, 16 KiB at a time. More free memory; a game that writes there again can stutter for a moment."
@@ -876,6 +909,16 @@ msgstr "使用中"
 #: pe/ui/multiplayer.cpp
 msgid "Incompatible"
 msgstr "不兼容"
+
+#. Settings > Apps: the app is installed as a disk image file, which this menu can't update.
+#: pe/ui/apps.cpp
+msgid "Installed as an image: replace the image to update it."
+msgstr "以映像方式安装：替换映像即可更新。"
+
+#. Settings > Apps: the new release's files are being put in the app's folder.
+#: pe/ui/apps.cpp
+msgid "Installing"
+msgstr "正在安装"
 
 #: pe/ui/save_sync.cpp
 msgid "It goes to the server."
@@ -1166,9 +1209,24 @@ msgstr "没有模组"
 msgid "No mods for this game yet. Copy each mod's folder to {0}."
 msgstr "此游戏还没有模组。请将每个模组的文件夹复制到 {0}。"
 
+#. {0} is a port number, {1} an app's name. The payload loader is the program on the console that starts the homebrew programs sent to it.
+#: pe/ui/apps.cpp
+msgid "No payload loader is listening on port {0}, so {1} can't be installed."
+msgstr "端口 {0} 上没有正在监听的 payload 加载器，因此无法安装 {1}。"
+
+#. See 'No payload loader is listening on port {0}, so {1} can't be installed.' The PS5's home screen is the console's own, not this menu's.
+#: pe/ui/apps.cpp
+msgid "No payload loader is listening on port {0}, so {1} can't be opened from here. Open it from the PS5's home screen."
+msgstr "端口 {0} 上没有正在监听的 payload 加载器，因此无法从这里打开 {1}。请从 PS5 主屏幕打开。"
+
 #: pe/ui/multiplayer.cpp
 msgid "No public rooms are available."
 msgstr "没有可用的公开房间。"
+
+#. Settings > Apps: neither the app's own GitHub repository nor the project it is based on has published a release.
+#: pe/ui/apps.cpp
+msgid "No release yet."
+msgstr "暂无发行版。"
 
 #: pe/ui/library.cpp
 msgid "No ROM files found."
@@ -1198,6 +1256,11 @@ msgstr "无"
 #: pe/ui/remote.cpp
 msgid "Not connected yet"
 msgstr "尚未连接"
+
+#. Settings > Apps: the app is not on the console.
+#: pe/ui/apps.cpp
+msgid "Not installed"
+msgstr "未安装"
 
 #: pe/ui/pairing.cpp
 msgid "Not linked"
@@ -1259,6 +1322,11 @@ msgstr "再次打开即可使用版本 {0}。"
 #: pe/ui/home.cpp
 msgid "Open library"
 msgstr "打开游戏库"
+
+#. {0} is an app's name.
+#: pe/ui/apps.cpp
+msgid "Opening {0}. Nightshade closes now."
+msgstr "正在打开 {0}。Nightshade 现在将关闭。"
 
 #. The DualSense button labelled OPTIONS: keep the label if the language's players do.
 #: pe/ui/game_options.cpp
@@ -1552,6 +1620,16 @@ msgstr "地区"
 #: pe/ui/game_options.cpp
 msgid "Regular"
 msgstr "常规"
+
+#. See 'Release {0}, from {1}': here the release is the one of the project the app is based on, because the app has no Nightshade release yet.
+#: pe/ui/apps.cpp
+msgid "Release {0} of the original project, {1}"
+msgstr "原项目的发行版 {0}，{1}"
+
+#. {0} is a release's name, such as v1.000.090 or 01.000.110; {1} a GitHub repository, such as Oliv3rmoon/Nightshade-TV (both unchanged).
+#: pe/ui/apps.cpp
+msgid "Release {0}, from {1}"
+msgstr "发行版 {0}，来自 {1}"
 
 #: pe/ui/profiles.cpp
 msgid "Remove"
@@ -1964,6 +2042,26 @@ msgstr "此档案的存档数据今后将以 {0} 的身份同步。"
 msgid "The profile's save data syncs with the server from now on."
 msgstr "此档案的存档数据今后将与服务器同步。"
 
+#. {0} is an app's name. The homebrew loader is the tool that puts homebrew apps on the PS5's home screen (ShadowMountPlus, for example).
+#: pe/ui/apps.cpp
+msgid "The PS5 doesn't list {0} yet. The homebrew loader lists it after its next scan or a restart."
+msgstr "PS5 尚未列出 {0}。homebrew 加载器会在下次扫描或重启后列出它。"
+
+#. {0} is a file name such as PPSA99003.zip; SHA-256 is the name of a checksum (unchanged).
+#: pe/ui/apps.cpp
+msgid "The release gives no SHA-256 for {0}, so it is not offered."
+msgstr "该发行版未提供 {0} 的 SHA-256，因此不予提供。"
+
+#. {0} is a file name such as PPSA99003.zip.
+#: pe/ui/apps.cpp
+msgid "The release has no {0}."
+msgstr "该发行版没有 {0}。"
+
+#. See 'The release gives no SHA-256 for {0}, so it is not offered.' Its SHA-256 values disagree or are malformed.
+#: pe/ui/apps.cpp
+msgid "The release's SHA-256 for {0} can't be trusted, so it is not offered."
+msgstr "该发行版中 {0} 的 SHA-256 不可信，因此不予提供。"
+
 #. Shown at the end of release notes that were cut short; homebrew.page is a site's name and stays as it is.
 #: pe/ui/update.cpp
 msgid "The rest is on the app's page on homebrew.page."
@@ -2098,6 +2196,11 @@ msgstr "正在解压"
 #: pe/ui/browse.cpp
 msgid "UP"
 msgstr "上级"
+
+#. Button hint in Settings > Apps: install an app's newer release over the one installed. Keep it short.
+#: pe/ui/apps.cpp
+msgid "Update"
+msgstr "更新"
 
 #. Notification title: a newer release of this app is listed (not a game update).
 #: pe/ui/launcher.cpp, pe/ui/update.cpp
@@ -2245,6 +2348,10 @@ msgstr "使用此主机的存档数据；游戏结束后同步。"
 msgid "with {0}"
 msgstr "与 {0}"
 
+#: pe/ui/apps.cpp
+msgid "Without filesystem access Nightshade can't tell which apps are installed."
+msgstr "没有文件系统访问权限，Nightshade 无法判断安装了哪些应用。"
+
 #: pe/ui/settings.cpp
 msgid "Write logs at once"
 msgstr "立即写入日志"
@@ -2275,6 +2382,16 @@ msgstr "正在将你的存档数据与服务器上的进行核对。"
 #: pe/ui/library.cpp
 msgid "{0} changed"
 msgstr "已更改 {0} 项"
+
+#. {0} is an app's name, {1} why (English, from the installer).
+#: pe/ui/apps.cpp
+msgid "{0} could not be installed: {1}"
+msgstr "无法安装 {0}：{1}"
+
+#. {0} is an app's name, {1} why (English, from the launch payload).
+#: pe/ui/apps.cpp
+msgid "{0} could not be opened: {1}"
+msgstr "无法打开 {0}：{1}"
 
 #. {0} is how many DLC (add-on content) a game has installed.
 #: eden_services.cpp, host/fake_services.cpp
@@ -2310,6 +2427,16 @@ msgstr "已安装 {0} 个游戏"
 msgid "{0} Hz"
 msgstr "{0} Hz"
 
+#. {0} is an app's name. See 'The PS5 doesn't list {0} yet...' for the homebrew loader.
+#: pe/ui/apps.cpp
+msgid "{0} is installed. The homebrew loader lists it after its next scan or a restart."
+msgstr "{0} 已安装。homebrew 加载器会在下次扫描或重启后列出它。"
+
+#. {0} is an app's name, {1} its new version, such as 01.000.110.
+#: pe/ui/apps.cpp
+msgid "{0} is updated to {1}."
+msgstr "{0} 已更新到 {1}。"
+
 #. Exactly one mod, in the list of what a game comes with (Update 1.2.0, 2 DLC, 1 mod). See '{0} game'.
 #: pe/ui/library.cpp
 msgid "{0} mod"
@@ -2339,6 +2466,11 @@ msgstr "{0}不可用"
 #: pe/ui/widgets.cpp
 msgid "{0} OF {1}"
 msgstr "{0} / {1}"
+
+#. Settings > Apps: how many of Nightshade's apps are on the console: 2 of 3 installed.
+#: pe/ui/settings.cpp
+msgid "{0} of {1} installed"
+msgstr "已安装 {0}/{1}"
 
 #. In the same list, when some of the game's mods are switched off: 1 of 2 mods on. Keep it short.
 #: pe/ui/library.cpp

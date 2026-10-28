@@ -104,6 +104,11 @@ msgstr "Эмулятор Eden — целиком заслуга его разр�
 msgid "AMD FSR"
 msgstr "AMD FSR"
 
+#. Settings > Apps: each app is Nightshade's own release of another project; until it has one, that project's release is offered.
+#: pe/ui/apps.cpp
+msgid "An app without a Nightshade release yet is offered from the project it is based on."
+msgstr "Приложение без выпуска Nightshade предлагается из проекта, на котором оно основано."
+
 #: pe/ui/settings.cpp
 msgid "An image of your own behind this menu."
 msgstr "Своё изображение за этим меню."
@@ -119,6 +124,11 @@ msgstr "Оформление"
 #: pe/ui/settings.cpp
 msgid "Apply"
 msgstr "Применить"
+
+#. Settings > Apps: Nightshade's own companion apps (an IPTV client, game streaming, a PS1 emulator), not games.
+#: pe/ui/apps.cpp, pe/ui/settings.cpp
+msgid "Apps"
+msgstr "Приложения"
 
 #. The button mapping has not been changed.
 #: pe/ui/game_options.cpp, pe/ui/settings.cpp
@@ -804,9 +814,32 @@ msgstr "Запущенные игры появятся здесь."
 msgid "German"
 msgstr "Немецкий"
 
+#. Button hint in Settings > Apps: download and install an app that is not on the console yet. Keep it short.
+#: pe/ui/apps.cpp
+msgid "Get"
+msgstr "Получить"
+
+#. Settings > Apps: what it is for. Nightshade TV, Stream and Station are the apps' names (unchanged).
+#: pe/ui/apps.cpp, pe/ui/settings.cpp
+msgid "Get, update and open Nightshade TV, Stream and Station."
+msgstr "Получайте, обновляйте и открывайте Nightshade TV, Stream и Station."
+
 #: pe/ui/browse.cpp
 msgid "GETTING STARTED"
 msgstr "НАЧАЛО РАБОТЫ"
+
+#: pe/ui/apps.cpp
+msgid "GitHub could not be reached."
+msgstr "Не удалось подключиться к GitHub."
+
+#. GitHub allows an address a number of requests an hour; that number was reached.
+#: pe/ui/apps.cpp
+msgid "GitHub is limiting requests. Try again in an hour."
+msgstr "GitHub ограничивает число запросов. Повторите попытку через час."
+
+#: pe/ui/apps.cpp
+msgid "GitHub's answer could not be read."
+msgstr "Не удалось прочитать ответ GitHub."
 
 #: pe/ui/settings.cpp
 msgid "Gives back memory a game left empty, 16 KiB at a time. More free memory; a game that writes there again can stutter for a moment."
@@ -876,6 +909,16 @@ msgstr "ИСПОЛЬЗУЕТСЯ"
 #: pe/ui/multiplayer.cpp
 msgid "Incompatible"
 msgstr "Несовместима"
+
+#. Settings > Apps: the app is installed as a disk image file, which this menu can't update.
+#: pe/ui/apps.cpp
+msgid "Installed as an image: replace the image to update it."
+msgstr "Установлено как образ: замените образ, чтобы обновить."
+
+#. Settings > Apps: the new release's files are being put in the app's folder.
+#: pe/ui/apps.cpp
+msgid "Installing"
+msgstr "Установка"
 
 #: pe/ui/save_sync.cpp
 msgid "It goes to the server."
@@ -1166,9 +1209,24 @@ msgstr "Нет модов"
 msgid "No mods for this game yet. Copy each mod's folder to {0}."
 msgstr "Для этой игры пока нет модов. Скопируйте папку каждого мода в {0}."
 
+#. {0} is a port number, {1} an app's name. The payload loader is the program on the console that starts the homebrew programs sent to it.
+#: pe/ui/apps.cpp
+msgid "No payload loader is listening on port {0}, so {1} can't be installed."
+msgstr "На порту {0} нет загрузчика payload, поэтому {1} установить нельзя."
+
+#. See 'No payload loader is listening on port {0}, so {1} can't be installed.' The PS5's home screen is the console's own, not this menu's.
+#: pe/ui/apps.cpp
+msgid "No payload loader is listening on port {0}, so {1} can't be opened from here. Open it from the PS5's home screen."
+msgstr "На порту {0} нет загрузчика payload, поэтому {1} нельзя открыть отсюда. Откройте его с главного экрана PS5."
+
 #: pe/ui/multiplayer.cpp
 msgid "No public rooms are available."
 msgstr "Нет доступных публичных комнат."
+
+#. Settings > Apps: neither the app's own GitHub repository nor the project it is based on has published a release.
+#: pe/ui/apps.cpp
+msgid "No release yet."
+msgstr "Выпусков пока нет."
 
 #: pe/ui/library.cpp
 msgid "No ROM files found."
@@ -1198,6 +1256,11 @@ msgstr "Нет"
 #: pe/ui/remote.cpp
 msgid "Not connected yet"
 msgstr "Ещё не подключён"
+
+#. Settings > Apps: the app is not on the console.
+#: pe/ui/apps.cpp
+msgid "Not installed"
+msgstr "Не установлено"
 
 #: pe/ui/pairing.cpp
 msgid "Not linked"
@@ -1259,6 +1322,11 @@ msgstr "Откройте его снова, чтобы использовать 
 #: pe/ui/home.cpp
 msgid "Open library"
 msgstr "Открыть библиотеку"
+
+#. {0} is an app's name.
+#: pe/ui/apps.cpp
+msgid "Opening {0}. Nightshade closes now."
+msgstr "Открывается {0}. Nightshade сейчас закроется."
 
 #. The DualSense button labelled OPTIONS: keep the label if the language's players do.
 #: pe/ui/game_options.cpp
@@ -1552,6 +1620,16 @@ msgstr "РЕГИОН"
 #: pe/ui/game_options.cpp
 msgid "Regular"
 msgstr "Обычный"
+
+#. See 'Release {0}, from {1}': here the release is the one of the project the app is based on, because the app has no Nightshade release yet.
+#: pe/ui/apps.cpp
+msgid "Release {0} of the original project, {1}"
+msgstr "Выпуск {0} исходного проекта, {1}"
+
+#. {0} is a release's name, such as v1.000.090 or 01.000.110; {1} a GitHub repository, such as Oliv3rmoon/Nightshade-TV (both unchanged).
+#: pe/ui/apps.cpp
+msgid "Release {0}, from {1}"
+msgstr "Выпуск {0} из {1}"
 
 #: pe/ui/profiles.cpp
 msgid "Remove"
@@ -1964,6 +2042,26 @@ msgstr "Сохранения профиля теперь синхронизир�
 msgid "The profile's save data syncs with the server from now on."
 msgstr "Сохранения профиля теперь синхронизируются с сервером."
 
+#. {0} is an app's name. The homebrew loader is the tool that puts homebrew apps on the PS5's home screen (ShadowMountPlus, for example).
+#: pe/ui/apps.cpp
+msgid "The PS5 doesn't list {0} yet. The homebrew loader lists it after its next scan or a restart."
+msgstr "PS5 пока не показывает {0}. Загрузчик homebrew покажет его после следующего сканирования или перезапуска."
+
+#. {0} is a file name such as PPSA99003.zip; SHA-256 is the name of a checksum (unchanged).
+#: pe/ui/apps.cpp
+msgid "The release gives no SHA-256 for {0}, so it is not offered."
+msgstr "В выпуске нет SHA-256 для {0}, поэтому он не предлагается."
+
+#. {0} is a file name such as PPSA99003.zip.
+#: pe/ui/apps.cpp
+msgid "The release has no {0}."
+msgstr "В выпуске нет {0}."
+
+#. See 'The release gives no SHA-256 for {0}, so it is not offered.' Its SHA-256 values disagree or are malformed.
+#: pe/ui/apps.cpp
+msgid "The release's SHA-256 for {0} can't be trusted, so it is not offered."
+msgstr "SHA-256 выпуска для {0} не заслуживает доверия, поэтому он не предлагается."
+
 #. Shown at the end of release notes that were cut short; homebrew.page is a site's name and stays as it is.
 #: pe/ui/update.cpp
 msgid "The rest is on the app's page on homebrew.page."
@@ -2098,6 +2196,11 @@ msgstr "Распаковка"
 #: pe/ui/browse.cpp
 msgid "UP"
 msgstr "ВВЕРХ"
+
+#. Button hint in Settings > Apps: install an app's newer release over the one installed. Keep it short.
+#: pe/ui/apps.cpp
+msgid "Update"
+msgstr "Обновить"
 
 #. Notification title: a newer release of this app is listed (not a game update).
 #: pe/ui/launcher.cpp, pe/ui/update.cpp
@@ -2245,6 +2348,10 @@ msgstr "С сохранениями консоли; синхронизация �
 msgid "with {0}"
 msgstr "к {0}"
 
+#: pe/ui/apps.cpp
+msgid "Without filesystem access Nightshade can't tell which apps are installed."
+msgstr "Без доступа к файловой системе Nightshade не может определить, какие приложения установлены."
+
 #: pe/ui/settings.cpp
 msgid "Write logs at once"
 msgstr "Сразу записывать журнал"
@@ -2275,6 +2382,16 @@ msgstr "Ваши сохранения сверяются с сохранения
 #: pe/ui/library.cpp
 msgid "{0} changed"
 msgstr "Изменено: {0}"
+
+#. {0} is an app's name, {1} why (English, from the installer).
+#: pe/ui/apps.cpp
+msgid "{0} could not be installed: {1}"
+msgstr "Не удалось установить {0}: {1}"
+
+#. {0} is an app's name, {1} why (English, from the launch payload).
+#: pe/ui/apps.cpp
+msgid "{0} could not be opened: {1}"
+msgstr "Не удалось открыть {0}: {1}"
 
 #. {0} is how many DLC (add-on content) a game has installed.
 #: eden_services.cpp, host/fake_services.cpp
@@ -2310,6 +2427,16 @@ msgstr "Установлено игр: {0}"
 msgid "{0} Hz"
 msgstr "{0} Гц"
 
+#. {0} is an app's name. See 'The PS5 doesn't list {0} yet...' for the homebrew loader.
+#: pe/ui/apps.cpp
+msgid "{0} is installed. The homebrew loader lists it after its next scan or a restart."
+msgstr "{0} установлено. Загрузчик homebrew покажет его после следующего сканирования или перезапуска."
+
+#. {0} is an app's name, {1} its new version, such as 01.000.110.
+#: pe/ui/apps.cpp
+msgid "{0} is updated to {1}."
+msgstr "{0} обновлено до {1}."
+
 #. Exactly one mod, in the list of what a game comes with (Update 1.2.0, 2 DLC, 1 mod). See '{0} game'.
 #: pe/ui/library.cpp
 msgid "{0} mod"
@@ -2339,6 +2466,11 @@ msgstr "{0} недоступен"
 #: pe/ui/widgets.cpp
 msgid "{0} OF {1}"
 msgstr "{0} ИЗ {1}"
+
+#. Settings > Apps: how many of Nightshade's apps are on the console: 2 of 3 installed.
+#: pe/ui/settings.cpp
+msgid "{0} of {1} installed"
+msgstr "Установлено: {0} из {1}"
 
 #. In the same list, when some of the game's mods are switched off: 1 of 2 mods on. Keep it short.
 #: pe/ui/library.cpp

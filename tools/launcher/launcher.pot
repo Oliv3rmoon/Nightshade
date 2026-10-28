@@ -104,6 +104,7 @@ msgstr ""
 msgid "AMD FSR"
 msgstr ""
 
+#. Settings > Apps: each app is Nightshade's own release of another project; until it has one, that project's release is offered.
 #: pe/ui/apps.cpp
 msgid "An app without a Nightshade release yet is offered from the project it is based on."
 msgstr ""
@@ -124,6 +125,7 @@ msgstr ""
 msgid "Apply"
 msgstr ""
 
+#. Settings > Apps: Nightshade's own companion apps (an IPTV client, game streaming, a PS1 emulator), not games.
 #: pe/ui/apps.cpp, pe/ui/settings.cpp
 msgid "Apps"
 msgstr ""
@@ -811,10 +813,12 @@ msgstr ""
 msgid "German"
 msgstr ""
 
+#. Button hint in Settings > Apps: download and install an app that is not on the console yet. Keep it short.
 #: pe/ui/apps.cpp
 msgid "Get"
 msgstr ""
 
+#. Settings > Apps: what it is for. Nightshade TV, Stream and Station are the apps' names (unchanged).
 #: pe/ui/apps.cpp, pe/ui/settings.cpp
 msgid "Get, update and open Nightshade TV, Stream and Station."
 msgstr ""
@@ -827,6 +831,7 @@ msgstr ""
 msgid "GitHub could not be reached."
 msgstr ""
 
+#. GitHub allows an address a number of requests an hour; that number was reached.
 #: pe/ui/apps.cpp
 msgid "GitHub is limiting requests. Try again in an hour."
 msgstr ""
@@ -904,10 +909,12 @@ msgstr ""
 msgid "Incompatible"
 msgstr ""
 
+#. Settings > Apps: the app is installed as a disk image file, which this menu can't update.
 #: pe/ui/apps.cpp
 msgid "Installed as an image: replace the image to update it."
 msgstr ""
 
+#. Settings > Apps: the new release's files are being put in the app's folder.
 #: pe/ui/apps.cpp
 msgid "Installing"
 msgstr ""
@@ -1221,10 +1228,12 @@ msgstr ""
 msgid "No mods for this game yet. Copy each mod's folder to {0}."
 msgstr ""
 
+#. {0} is a port number, {1} an app's name. The payload loader is the program on the console that starts the homebrew programs sent to it.
 #: pe/ui/apps.cpp
 msgid "No payload loader is listening on port {0}, so {1} can't be installed."
 msgstr ""
 
+#. See 'No payload loader is listening on port {0}, so {1} can't be installed.' The PS5's home screen is the console's own, not this menu's.
 #: pe/ui/apps.cpp
 msgid "No payload loader is listening on port {0}, so {1} can't be opened from here. Open it from the PS5's home screen."
 msgstr ""
@@ -1233,6 +1242,7 @@ msgstr ""
 msgid "No public rooms are available."
 msgstr ""
 
+#. Settings > Apps: neither the app's own GitHub repository nor the project it is based on has published a release.
 #: pe/ui/apps.cpp
 msgid "No release yet."
 msgstr ""
@@ -1266,6 +1276,7 @@ msgstr ""
 msgid "Not connected yet"
 msgstr ""
 
+#. Settings > Apps: the app is not on the console.
 #: pe/ui/apps.cpp
 msgid "Not installed"
 msgstr ""
@@ -1331,6 +1342,7 @@ msgstr ""
 msgid "Open library"
 msgstr ""
 
+#. {0} is an app's name.
 #: pe/ui/apps.cpp
 msgid "Opening {0}. Nightshade closes now."
 msgstr ""
@@ -1607,10 +1619,12 @@ msgstr ""
 msgid "Regular"
 msgstr ""
 
+#. See 'Release {0}, from {1}': here the release is the one of the project the app is based on, because the app has no Nightshade release yet.
 #: pe/ui/apps.cpp
 msgid "Release {0} of the original project, {1}"
 msgstr ""
 
+#. {0} is a release's name, such as v1.000.090 or 01.000.110; {1} a GitHub repository, such as Oliv3rmoon/Nightshade-TV (both unchanged).
 #: pe/ui/apps.cpp
 msgid "Release {0}, from {1}"
 msgstr ""
@@ -2026,18 +2040,22 @@ msgstr ""
 msgid "The profile's save data syncs with the server from now on."
 msgstr ""
 
+#. {0} is an app's name. The homebrew loader is the tool that puts homebrew apps on the PS5's home screen (ShadowMountPlus, for example).
 #: pe/ui/apps.cpp
 msgid "The PS5 doesn't list {0} yet. The homebrew loader lists it after its next scan or a restart."
 msgstr ""
 
+#. {0} is a file name such as PPSA99003.zip; SHA-256 is the name of a checksum (unchanged).
 #: pe/ui/apps.cpp
 msgid "The release gives no SHA-256 for {0}, so it is not offered."
 msgstr ""
 
+#. {0} is a file name such as PPSA99003.zip.
 #: pe/ui/apps.cpp
 msgid "The release has no {0}."
 msgstr ""
 
+#. See 'The release gives no SHA-256 for {0}, so it is not offered.' Its SHA-256 values disagree or are malformed.
 #: pe/ui/apps.cpp
 msgid "The release's SHA-256 for {0} can't be trusted, so it is not offered."
 msgstr ""
@@ -2181,6 +2199,7 @@ msgstr ""
 msgid "UP"
 msgstr ""
 
+#. Button hint in Settings > Apps: install an app's newer release over the one installed. Keep it short.
 #: pe/ui/apps.cpp
 msgid "Update"
 msgstr ""
@@ -2366,10 +2385,12 @@ msgstr ""
 msgid "{0} changed"
 msgstr ""
 
+#. {0} is an app's name, {1} why (English, from the installer).
 #: pe/ui/apps.cpp
 msgid "{0} could not be installed: {1}"
 msgstr ""
 
+#. {0} is an app's name, {1} why (English, from the launch payload).
 #: pe/ui/apps.cpp
 msgid "{0} could not be opened: {1}"
 msgstr ""
@@ -2408,10 +2429,12 @@ msgstr ""
 msgid "{0} Hz"
 msgstr ""
 
+#. {0} is an app's name. See 'The PS5 doesn't list {0} yet...' for the homebrew loader.
 #: pe/ui/apps.cpp
 msgid "{0} is installed. The homebrew loader lists it after its next scan or a restart."
 msgstr ""
 
+#. {0} is an app's name, {1} its new version, such as 01.000.110.
 #: pe/ui/apps.cpp
 msgid "{0} is updated to {1}."
 msgstr ""
@@ -2446,6 +2469,7 @@ msgstr ""
 msgid "{0} OF {1}"
 msgstr ""
 
+#. Settings > Apps: how many of Nightshade's apps are on the console: 2 of 3 installed.
 #: pe/ui/settings.cpp
 msgid "{0} of {1} installed"
 msgstr ""
