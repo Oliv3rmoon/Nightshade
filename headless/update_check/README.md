@@ -36,3 +36,14 @@ header). For it, `update_check.c` has one more reader,
 tells an answer too long for its buffer (`SELF_UPDATE_FETCH_TOO_LARGE`) from a
 failed transfer. The host test is `headless/update_check_check.cpp`
 (`tools/check-update-check.py`).
+
+For Nightshade's Apps (`headless/apps.h`), which install and update other apps from their own
+GitHub releases, the kit has three more things. `github_release_asset_check` finds a release's
+file by its name (`PPSA99003.zip`), whatever the tag, with its SHA-256 from the release's
+`SHA256SUMS` or else from GitHub's digest of the file, refusing it with neither or when the two
+differ; it asks `releases/latest` the way the app's own check does (`fetch_latest`, taken out of
+`github_release_check` as it was). `self_update.c` sends an offer with `beside` set as an
+`install` request (`self_update_protocol.h`), goes on to the helper's go-ahead by itself once it
+is staged and ends in `SELF_UPDATE_INSTALLED`; an offer without it is the kit's update, as
+before. And `self_update_ps5.c` sends any payload from the app's folder
+(`self_update_open_payload`), the launch payload as well as the helper.

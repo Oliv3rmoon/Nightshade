@@ -250,10 +250,11 @@ static void channel_close(void *user)
 }
 
 /* The loader reads the program up to the end of its section table and gives the rest of the
- * connection to the program as its standard input and output. */
-static int console_open_helper(void *user, self_update_channel *channel)
+ * connection to the program as its standard input and output. ProsperoEden: any payload in the
+ * app's folder (Nightshade's Apps opens an app with app-launch.elf, apps.h); the helper below. */
+int self_update_open_payload(const char *path, self_update_channel *channel)
 {
-    static unsigned char buffer[65536];
+    static unsigned char buffer[65536]; /* one at a time: the app sends one payload at a time */
     /* The helper reports five times a second while it works; this long a silence means it is
      * gone. */
     const int io_timeout_us = 60000000;
@@ -264,8 +265,7 @@ static int console_open_helper(void *user, self_update_channel *channel)
     int program;
     int socket;
     int sent = 0;
-    (void)user;
-    program = sceKernelOpen(SELF_UPDATE_HELPER_PATH, O_RDONLY, 0);
+    program = sceKernelOpen(path, O_RDONLY, 0);
     if (program < 0)
         return 0;
     socket = sceNetSocket("self_update", 2, 1, 6);
@@ -312,6 +312,12 @@ static int console_open_helper(void *user, self_update_channel *channel)
     channel->close = channel_close;
     channel->user = (void *)(intptr_t)socket;
     return 1;
+}
+
+static int console_open_helper(void *user, self_update_channel *channel)
+{
+    (void)user;
+    return self_update_open_payload(SELF_UPDATE_HELPER_PATH, channel);
 }
 
 /* ---- Kept between launches ----------------------------------------------------------------- */

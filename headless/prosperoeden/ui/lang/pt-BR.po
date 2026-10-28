@@ -1026,6 +1026,11 @@ msgstr "Biblioteca"
 msgid "Linked"
 msgstr "Vinculado"
 
+#. Settings > Apps: what the Nightshade TV app is. IPTV is a kind of TV service delivered over the internet (unchanged).
+#: pe/ui/apps_list.hpp
+msgid "Live TV, films and series from your IPTV provider."
+msgstr "TV ao vivo, filmes e séries do seu provedor de IPTV."
+
 #: pe/ui/multiplayer.cpp
 msgid "Loading public rooms..."
 msgstr "Carregando salas públicas..."
@@ -1340,6 +1345,16 @@ msgstr "Jogar mesmo assim"
 #: pe/ui/profiles.cpp
 msgid "Play as"
 msgstr "Jogar como"
+
+#. Settings > Apps: what the Nightshade Stream app is. Moonlight is the name of the game streaming client (unchanged).
+#: pe/ui/apps_list.hpp
+msgid "Play games streamed from your PC with Moonlight."
+msgstr "Jogue jogos transmitidos do seu PC com o Moonlight."
+
+#. Settings > Apps: what the Nightshade Station app is. PS1 is the first PlayStation, SwanStation the emulator's name (both unchanged).
+#: pe/ui/apps_list.hpp
+msgid "Play PS1 games with the SwanStation emulator."
+msgstr "Jogue jogos de PS1 com o emulador SwanStation."
 
 #: pe/ui/library.cpp
 msgid "Play when downloaded"

@@ -1026,6 +1026,11 @@ msgstr "라이브러리"
 msgid "Linked"
 msgstr "연결됨"
 
+#. Settings > Apps: what the Nightshade TV app is. IPTV is a kind of TV service delivered over the internet (unchanged).
+#: pe/ui/apps_list.hpp
+msgid "Live TV, films and series from your IPTV provider."
+msgstr "IPTV 제공업체의 실시간 TV, 영화, 시리즈."
+
 #: pe/ui/multiplayer.cpp
 msgid "Loading public rooms..."
 msgstr "공개 방을 불러오는 중..."
@@ -1340,6 +1345,16 @@ msgstr "그래도 플레이"
 #: pe/ui/profiles.cpp
 msgid "Play as"
 msgstr "이 프로필로"
+
+#. Settings > Apps: what the Nightshade Stream app is. Moonlight is the name of the game streaming client (unchanged).
+#: pe/ui/apps_list.hpp
+msgid "Play games streamed from your PC with Moonlight."
+msgstr "Moonlight로 PC에서 스트리밍되는 게임을 플레이합니다."
+
+#. Settings > Apps: what the Nightshade Station app is. PS1 is the first PlayStation, SwanStation the emulator's name (both unchanged).
+#: pe/ui/apps_list.hpp
+msgid "Play PS1 games with the SwanStation emulator."
+msgstr "SwanStation 에뮬레이터로 PS1 게임을 플레이합니다."
 
 #: pe/ui/library.cpp
 msgid "Play when downloaded"

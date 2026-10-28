@@ -232,6 +232,9 @@ NOTES = {
     "The look of this menu.": "Under the title Theme: what a theme changes.",
     "Tropical dusk, dark green glass and lime.": "One line about the theme named Canopy: its artwork is a tropical sunset, its panels are dark green glass, its accent colour is lime green.",
     "About": "The menu's last section: about this app (its credits, where its files go). One short word.",
+    "Live TV, films and series from your IPTV provider.": "Settings > Apps: what the Nightshade TV app is. IPTV is a kind of TV service delivered over the internet (unchanged).",
+    "Play games streamed from your PC with Moonlight.": "Settings > Apps: what the Nightshade Stream app is. Moonlight is the name of the game streaming client (unchanged).",
+    "Play PS1 games with the SwanStation emulator.": "Settings > Apps: what the Nightshade Station app is. PS1 is the first PlayStation, SwanStation the emulator's name (both unchanged).",
 }
 
 
