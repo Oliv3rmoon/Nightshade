@@ -105,7 +105,8 @@ Inside this repository, in `.deps/`:
   shared memory), and coherent storage buffers in shaders that use atomics, so a wait on another
   workgroup's write or an emulated atomic's retry reads memory instead of a stale cached copy. The
   cache operation of a global load or store (`LDG`/`STG` `.CG`, `.CV`, `.WT`) is kept, so a read the
-  game marks to skip the cache reads memory too.
+  game marks to skip the cache reads memory too, and a game's settings can make more storage buffers
+  coherent ([Settings](SETTINGS.md#for-testing-a-game-that-stops-the-gpu)).
 - **FFmpeg** at the commit Eden pins, built with only the decoders games use.
 - **PS5 OpenGL 4.6 SDK 1.0.2** (release archive), for the launcher and the OpenGL renderer.
 - **OpenSSL, zlib, libcurl and libpsl** from pacbrew v0.40.2.

@@ -35,7 +35,8 @@
 //                                      "mods_off": ["A mod's folder name"],
 //                                      "cheats_on": ["A mod's folder name#A cheat's name"],
 //                                      "cheats_off": ["A mod's folder name#Its one cheat's name"],
-//                                      "performance": { "fast_gpu": true } } }
+//                                      "performance": { "fast_gpu": true },
+//                                      "gpu_debug": { "coherent_storage": "compute" } } }
 //   }
 //
 // Missing or mistyped values read as their defaults. Writes replace the file atomically. The
@@ -819,6 +820,65 @@ inline bool LoadAdaptiveClock(uint64_t title_id, const std::string& file = Setti
     using Settings::Json;
     return Settings::Bool(Settings::Load(file),
                           Json::json_pointer("/games/" + Settings::TitleKey(title_id) + "/adaptive_clock"), false);
+}
+
+// For testing a game that stops the GPU (docs/SETTINGS.md), in the settings file only and per
+// game: "gpu_debug" in its entry under "games" changes how its Vulkan renderer synchronizes and
+// how its shaders read memory (headless/dev_vulkan.h has what each one does). Each value is -1
+// while absent, and the session then takes its default (kGpuDebugDefaults); in a development
+// build dev-settings.txt names them too and goes first. The Library neither shows nor writes them.
+//   "gpu_debug": { "coherent_storage": "compute", "submit_sync": true, "hcr": 2,
+//                  "compute_barriers": true, "conditional_rendering": false }
+inline constexpr const char* kCoherentStorageKeys[] = {"atomics", "compute", "all"};
+struct GpuDebugSettings {
+    int coherent_storage = -1;       // index into kCoherentStorageKeys (Shader::CoherentStorage)
+    int submit_sync = -1;            // wait for the GPU after every submission
+    int hcr = -1;                    // host conditional rendering: 0 Eden's, 1 exact, 2 on the CPU
+    int compute_barriers = -1;       // barriers after compute dispatches
+    int conditional_rendering = -1;  // VK_EXT_conditional_rendering
+};
+// What a session has without them: patch 07's coherent storage, the barriers and the extension on.
+inline constexpr GpuDebugSettings kGpuDebugDefaults{0, 0, 1, 1, 1};
+
+inline GpuDebugSettings LoadGpuDebug(uint64_t title_id, const std::string& file = SettingsFile()) {
+    GpuDebugSettings result;
+    if (!title_id) return result;
+    using Settings::Json;
+    const Json document = Settings::Load(file);
+    const std::string base = "/games/" + Settings::TitleKey(title_id) + "/gpu_debug/";
+    result.coherent_storage = KeyIndex(Settings::String(document, Json::json_pointer(base + "coherent_storage")),
+                                       kCoherentStorageKeys, int(std::size(kCoherentStorageKeys)), -1);
+    const auto flag = [&](const char* name) {
+        const Json::json_pointer at(base + name);
+        return document.contains(at) && document.at(at).is_boolean() ? int(document.at(at).get<bool>()) : -1;
+    };
+    result.submit_sync = flag("submit_sync");
+    result.compute_barriers = flag("compute_barriers");
+    result.conditional_rendering = flag("conditional_rendering");
+    const int hcr = Settings::Int(document, Json::json_pointer(base + "hcr"), -1);
+    result.hcr = hcr >= 0 && hcr <= 2 ? hcr : -1;
+    return result;
+}
+
+// What a session uses: each value from dev-settings (first), else the game's, else the default.
+inline GpuDebugSettings ResolveGpuDebug(const GpuDebugSettings& game, const GpuDebugSettings& first = {}) {
+    const auto pick = [](int chosen, int own, int fallback) { return chosen >= 0 ? chosen : own >= 0 ? own : fallback; };
+    const GpuDebugSettings& base = kGpuDebugDefaults;
+    return {pick(first.coherent_storage, game.coherent_storage, base.coherent_storage),
+            pick(first.submit_sync, game.submit_sync, base.submit_sync),
+            pick(first.hcr, game.hcr, base.hcr),
+            pick(first.compute_barriers, game.compute_barriers, base.compute_barriers),
+            pick(first.conditional_rendering, game.conditional_rendering, base.conditional_rendering)};
+}
+
+// The line a session's start writes to stderr.log with the values it uses (ResolveGpuDebug's).
+inline std::string GpuDebugLine(const GpuDebugSettings& value) {
+    const int mode = value.coherent_storage >= 0 && value.coherent_storage < int(std::size(kCoherentStorageKeys))
+                         ? value.coherent_storage : kGpuDebugDefaults.coherent_storage;
+    return std::string("EDEN_GPU_DEBUG coherent=") + kCoherentStorageKeys[mode] +
+           " submit_sync=" + std::to_string(value.submit_sync) + " hcr=" + std::to_string(value.hcr) +
+           " compute_barriers=" + std::to_string(value.compute_barriers) +
+           " conditional_rendering=" + std::to_string(value.conditional_rendering);
 }
 
 // Speed against accuracy, for every game ("performance") and for one ("games/<title>/performance",
