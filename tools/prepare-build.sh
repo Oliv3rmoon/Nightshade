@@ -37,19 +37,24 @@ if [[ ! -f $eden/CMakeLists.txt || $(cat "$eden/.unpacked-from" 2>/dev/null) != 
 fi
 printf '%s\n' '67bada77f8a43a90da2e94e89b8e7da73c256989' > "$eden/GIT-COMMIT"
 printf '%s\n' 'ps5-headless' > "$eden/GIT-REFSPEC"
-# Fixes to Eden's own source (tools/eden-patches, in name order), each applied once: a patch that
-# reverses cleanly is already in the tree. One that neither reverses nor applies was changed after
-# an earlier version of it went in: the files it touches come back from the pinned archive first.
+# Fixes to Eden's own source (tools/eden-patches, in name order). A later patch can change lines
+# an earlier one changed (08 rewrites some of 06's), so the earlier one no longer reverses on its
+# own: the patches go in as one set. The tree keeps the set's hash (.eden-patches); a tree with
+# another set, or none, gets every file any patch touches back from the pinned archive, and then
+# all of them in order.
 command -v patch >/dev/null || { echo "patch is required (apt install patch)" >&2; exit 1; }
-for eden_patch in tools/eden-patches/*.diff; do
-    if patch -d "$eden" -p1 -R --dry-run -s -f < "$eden_patch" >/dev/null 2>&1; then continue; fi
-    step "Eden patch $(basename "$eden_patch")"
-    if ! patch -d "$eden" -p1 -N --dry-run -s -f < "$eden_patch" >/dev/null 2>&1; then
-        sed -n 's|^+++ b/||p' "$eden_patch" | sed 's|^|*/|' |
-            xargs tar -xzf ".deps/$eden_archive" --wildcards --strip-components=1 -C "$eden"
-    fi
-    patch -d "$eden" -p1 -N -s < "$eden_patch" || { echo "$eden_patch does not apply to Eden's source" >&2; exit 1; }
-done
+eden_patches=(tools/eden-patches/*.diff)
+eden_patch_set=$(cat "${eden_patches[@]}" | sha256sum | cut -d' ' -f1)
+if [[ $(cat "$eden/.eden-patches" 2>/dev/null) != "$eden_patch_set" ]]; then
+    step "Eden patches (${#eden_patches[@]})"
+    rm -f "$eden/.eden-patches"
+    sed -n 's|^+++ b/||p' "${eden_patches[@]}" | sort -u | sed 's|^|*/|' |
+        xargs tar -xzf ".deps/$eden_archive" --wildcards --strip-components=1 -C "$eden"
+    for eden_patch in "${eden_patches[@]}"; do
+        patch -d "$eden" -p1 -N -s < "$eden_patch" || { echo "$eden_patch does not apply to Eden's source" >&2; exit 1; }
+    done
+    printf '%s\n' "$eden_patch_set" > "$eden/.eden-patches"
+fi
 # Optional: seed Eden's package cache from another checkout's (CI reuses a development cache).
 if [[ -n ${EDEN_CPM_CACHE_SEED:-} && ! -d $eden/.cache/cpm ]]; then
     step "Eden package cache from $EDEN_CPM_CACHE_SEED"

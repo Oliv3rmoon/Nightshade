@@ -99,7 +99,7 @@ Inside this repository, in `.deps/`:
   Eden's own hash-pinned packages, which its configure step downloads. The PS5 frontend in
   `headless/` replaces and derives sources at configure time (`headless/inject.cmake`). This
   fork also patches a few of Eden's files when `make prepare` extracts them
-  (`tools/eden-patches/*.diff`, in name order, each applied once): faster reads of game files,
+  (`tools/eden-patches/*.diff`, applied in name order as one set; a tree with another set gets the files they touch back from the archive first): faster reads of game files,
   per-game cache storage, bounds-checked shader local memory, CPU reads of GPU-cached pages
   without reactive flushing, the shader instructions `ATOM.CAS` and `ATOMS.CAS` (compare and swap in global and
   shared memory), and coherent storage buffers in shaders that use atomics, so a wait on another
