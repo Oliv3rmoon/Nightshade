@@ -162,15 +162,11 @@ static size_t on_stream(char *data, size_t size, size_t count, void *user)
     return bytes;
 }
 
-static int console_download(void *user, const char *url, uint64_t limit, self_update_sink sink,
-                            void *sink_user)
+/* The download from the address in `current` (SELF_UPDATE_MAX_URL bytes), following GitHub's
+ * redirects in it. */
+static int download_from(char *current, uint64_t limit, self_update_sink sink, void *sink_user)
 {
-    static char current[SELF_UPDATE_MAX_URL]; /* one download at a time */
     int hop;
-    (void)user;
-    if (!self_update_url_allowed(url, 0))
-        return -1;
-    (void)snprintf(current, sizeof(current), "%s", url);
     for (hop = 0; hop <= self_update_redirects; ++hop)
     {
         stream_sink stream = {sink, sink_user, limit, 0, 0};
@@ -192,7 +188,7 @@ static int console_download(void *user, const char *url, uint64_t limit, self_up
             code != 306 && curl_easy_getinfo(easy, CURLINFO_REDIRECT_URL, &next) == CURLE_OK &&
             next != NULL && self_update_url_allowed(next, 1) && stream.received == 0)
         {
-            (void)snprintf(current, sizeof(current), "%s", next);
+            (void)snprintf(current, SELF_UPDATE_MAX_URL, "%s", next);
             curl_easy_cleanup(easy);
             continue;
         }
@@ -202,6 +198,26 @@ static int console_download(void *user, const char *url, uint64_t limit, self_up
         return code == 200 ? 0 : -(int)code;
     }
     return -1; /* too many redirects */
+}
+
+static int console_download(void *user, const char *url, uint64_t limit, self_update_sink sink,
+                            void *sink_user)
+{
+    /* ProsperoEden: the address followed is this call's own, not one shared buffer: downloads can
+       run at once (an app's install, releases' SHA256SUMS, the app's own update). On the heap,
+       so a job's thread takes no more stack than before. */
+    char *current;
+    int result;
+    (void)user;
+    if (!self_update_url_allowed(url, 0))
+        return -1;
+    current = (char *)malloc(SELF_UPDATE_MAX_URL);
+    if (current == NULL)
+        return -(10000 + (int)CURLE_OUT_OF_MEMORY);
+    (void)snprintf(current, SELF_UPDATE_MAX_URL, "%s", url);
+    result = download_from(current, limit, sink, sink_user);
+    free(current);
+    return result;
 }
 
 /* ---- The signature ------------------------------------------------------------------------- */
