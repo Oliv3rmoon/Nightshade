@@ -740,6 +740,28 @@ void icon(Canvas &c, Icon which, float cx, float cy, float size, Color ink)
         box(6.0f, 11.0f, 12.0f, 9.0f, 2.0f);
         bow(12.0f, 11.0f, 4.0f, kPi, kPi);
         return;
+    case Icon::apps:
+        box(3.5f, 3.5f, 7.0f, 7.0f, 1.6f);
+        box(13.5f, 3.5f, 7.0f, 7.0f, 1.6f);
+        box(3.5f, 13.5f, 7.0f, 7.0f, 1.6f);
+        stroke(17.0f, 13.5f, 17.0f, 20.5f);
+        stroke(13.5f, 17.0f, 20.5f, 17.0f);
+        return;
+    case Icon::tv:
+        box(3.0f, 7.5f, 18.0f, 12.0f, 2.0f);
+        path({8.0f, 3.0f, 12.0f, 7.5f, 16.0f, 3.0f});
+        return;
+    case Icon::stream:
+        box(3.0f, 6.5f, 18.0f, 12.0f, 2.0f);
+        path({10.0f, 9.5f, 15.0f, 12.5f, 10.0f, 15.5f, 10.0f, 9.5f});
+        stroke(8.5f, 21.0f, 15.5f, 21.0f);
+        bow(12.0f, 6.0f, 3.0f, 1.2f * kPi, 0.6f * kPi);
+        return;
+    case Icon::disc:
+        round(12.0f, 12.0f, 8.5f);
+        round(12.0f, 12.0f, 2.2f);
+        bow(12.0f, 12.0f, 5.4f, 1.1f * kPi, 0.4f * kPi);
+        return;
     }
 }
 

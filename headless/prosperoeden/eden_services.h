@@ -41,6 +41,13 @@ public:
     void cancel_update() override;
     bool apply_update() override;
     void finish_update() override;
+    std::vector<pe::ui::AppState> apps() override;
+    void refresh_apps(bool releases) override;
+    bool install_app(int app, std::string* reason) override;
+    pe::ui::AppJob app_job() override;
+    void cancel_app() override;
+    void finish_app() override;
+    pe::ui::AppOpen open_app(int app, std::string* reason) override;
     bool docked(std::uint64_t title_id) override;
     bool set_docked(std::uint64_t title_id, bool docked) override;
     pe::ui::GameSettings game_settings(std::uint64_t title_id) override;

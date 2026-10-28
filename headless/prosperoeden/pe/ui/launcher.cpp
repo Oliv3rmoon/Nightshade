@@ -48,9 +48,9 @@ Launcher::Launcher(Services &services, Textures &textures, const Fonts &fonts, b
     home_springs_[0].snap(1.0f);
     rail_active_[0].snap(1.0f);
     settings_.wrap = false;
-    settings_.visible = th().list_settings ? 10 : 13;
+    settings_.visible = th().list_settings ? 10 : 14;
     settings_.pitch = th().list_settings ? 84.0f : 88.0f;
-    settings_.reset(13, 0);
+    settings_.reset(14, 0);
     section_.snap(1.0f);
     detail_.snap(1.0f);
     cue(home_.launch_failed ? Cue::notify : first_start ? Cue::welcome : Cue::resume);
@@ -66,6 +66,7 @@ Launcher::~Launcher()
     if (room_edit_.valid()) room_edit_.wait();
     seed_edit_stop_ = true;
     if (seed_edit_.valid()) seed_edit_.wait();
+    if (app_open_.valid()) app_open_.wait();
     // The game list may still be reading; it uses the services this launcher was given.
     if (scan_.valid())
         scan_.wait();
@@ -252,6 +253,8 @@ void Launcher::press(Key key)
         return press_choice(key);
     if (modal_ == Modal::sources)
         return press_sources(key);
+    if (modal_ == Modal::apps)
+        return press_apps(key);
     if (modal_ == Modal::save_sync)
         return press_save_sync(key);
     if (modal_ == Modal::sync_setup)
@@ -332,6 +335,7 @@ void Launcher::update(float dt)
     textures_.pump(dt);
     finish_scan(false);
     poll_sources(dt);
+    poll_apps(dt);
     poll_save_sync(dt);
     poll_pairing(dt);
     refresh_sync_setup(dt);
@@ -396,6 +400,7 @@ void Launcher::update(float dt)
     hud_rows_.update(dt);
     profile_rows_.update(dt);
     source_rows_.update(dt);
+    app_rows_.update(dt);
     choice_rows_.update(dt);
     sync_rows_.update(dt);
     sync_setup_rows_.update(dt);
@@ -802,6 +807,8 @@ void Launcher::draw(gfx::DrawList &list)
             draw_pairing(c, opened);
         else if (modal_shown_ == Modal::sources)
             draw_sources(c, opened);
+        else if (modal_shown_ == Modal::apps)
+            draw_apps(c, opened);
         else
             draw_dialog(c, modal_shown_, opened);
     }
@@ -815,6 +822,13 @@ void Launcher::draw(gfx::DrawList &list)
     if (modal_shown_ == Modal::update && update_stage_ == UpdateStage::closing)
     {
         const float dark = tween::cubic_in_out((update_stage_time_ - 2.2f) / 0.8f);
+        if (dark > 0.0f)
+            list.rounded_rect(kScreen, 0.0f, Color{0.0f, 0.0f, 0.0f, dark});
+    }
+    // Closing for an app to open (Settings > Apps): the same, sooner.
+    if (app_closing_ >= 0.0f)
+    {
+        const float dark = tween::cubic_in_out((app_closing_ - 0.8f) / 0.7f);
         if (dark > 0.0f)
             list.rounded_rect(kScreen, 0.0f, Color{0.0f, 0.0f, 0.0f, dark});
     }

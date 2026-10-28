@@ -1134,6 +1134,67 @@ void pictures(Stage &s)
     s.press({Key::down, Key::square});
     s.wait(0.4f);
     s.shoot("B6-save-sync-unlink-asked");
+
+    // Settings > Apps, the last tile or row: the apps, a new one installed, an update that fails,
+    // opening one with no payload loader, then opening one (Nightshade closes).
+    s.restart();
+    s.wait(1.0f);
+    s.settings();
+    s.wait(1.0f);
+    s.walk_settings(0, 13);
+    s.wait(0.6f);
+    s.shoot("N0-settings-apps");
+    s.press({Key::cross});
+    s.wait(0.8f);
+    s.shoot("N1-apps");
+    if (s.services.apps_refreshed != 1)
+    {
+        std::fprintf(stderr, "error: the Apps dialog did not ask for the releases\n");
+        s.ok = false;
+    }
+    s.press({Key::down, Key::down});
+    s.wait(0.5f);
+    s.shoot("N2-apps-not-installed");
+    s.press({Key::cross});
+    s.wait(5.0f);
+    s.shoot("N3-apps-downloading");
+    for (int frame = 0; frame < 1200 && s.services.app_steps >= 0; ++frame)
+        s.frame();
+    s.wait(0.5f);
+    s.shoot("N4-apps-installed");
+    if (s.services.app_list[2].installed != "01.005.009")
+    {
+        std::fprintf(stderr, "error: the app installed did not reach the list\n");
+        s.ok = false;
+    }
+    // Nightshade Stream: the original project's newer release, Square; it fails.
+    s.press({Key::up});
+    s.wait(0.5f);
+    s.shoot("N5-apps-update");
+    s.services.app_fails = true;
+    s.press({Key::square});
+    for (int frame = 0; frame < 1200 && s.services.app_steps >= 0; ++frame)
+        s.frame();
+    s.wait(0.5f);
+    s.shoot("N6-apps-update-failed");
+    s.services.app_fails = false;
+    // Open, with no payload loader: the card says so (Left closes it and does nothing else).
+    s.press({Key::left});
+    s.services.app_open = pe::ui::AppOpen::no_loader;
+    s.press({Key::cross});
+    s.wait(0.6f);
+    s.shoot("N7-apps-no-loader");
+    s.press({Key::left});
+    s.services.app_open = pe::ui::AppOpen::closing;
+    s.press({Key::cross});
+    s.wait(0.4f);
+    s.shoot("N8-apps-opening");
+    s.wait(2.0f);
+    if (!s.launcher->done())
+    {
+        std::fprintf(stderr, "error: opening an app did not close the launcher\n");
+        s.ok = false;
+    }
 }
 
 // The first seconds after the app is started, one frame per call of frame().

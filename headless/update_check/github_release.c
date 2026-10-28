@@ -786,6 +786,14 @@ const char *github_release_reason_text(github_release_reason reason)
         return "too-large";
     case GITHUB_RELEASE_TOO_MANY_ZIPS:
         return "too-many-zips";
+    case GITHUB_RELEASE_NO_HASH:
+        return "no-sha256";
+    case GITHUB_RELEASE_HASHES_DIFFER:
+        return "sha256-differ";
+    case GITHUB_RELEASE_BAD_TAG:
+        return "bad-tag";
+    case GITHUB_RELEASE_OWNER_CHANGED:
+        return "owner-changed";
     }
     return "unknown";
 }
@@ -841,6 +849,50 @@ static self_update_check_result no_offer(self_update_offer *offer, github_releas
     return reason == GITHUB_RELEASE_NOT_NEWER ? SELF_UPDATE_UP_TO_DATE : SELF_UPDATE_UNKNOWN;
 }
 
+/* releases/latest of `repository` into `answer`, following a renamed repository's redirect.
+ * GITHUB_RELEASE_NEWER: a 200 answer of *length bytes is there; otherwise why there is none. */
+static github_release_reason fetch_latest(const self_update_platform *platform, const char *repository,
+                                          char *answer, size_t capacity, size_t *length,
+                                          github_release_report *report)
+{
+    char url[256];
+    int status = 0;
+    int hop;
+    if (github_release_url(url, sizeof(url), repository) == 0)
+        return GITHUB_RELEASE_BAD_ARGUMENT;
+    for (hop = 0;; ++hop)
+    {
+        const int code = platform->fetch(platform->user, url, answer, capacity, length, &status);
+        char next[256];
+        report->http_status = status;
+        if (code == SELF_UPDATE_FETCH_TOO_LARGE || (code == 0 && *length > capacity))
+            return GITHUB_RELEASE_TOO_LARGE;
+        if (code != 0)
+        {
+            report->platform_error = code;
+            return GITHUB_RELEASE_NETWORK;
+        }
+        if (status != 301 && status != 302 && status != 307 && status != 308)
+            break;
+        /* A renamed repository: GitHub's redirect names its new address in its body as well as in
+         * its Location header, and the kit's fetch gives the body. Followed to that address alone
+         * (github_release_api_url_allowed). */
+        if (hop >= GITHUB_RELEASE_REDIRECTS || string_member(answer, *length, "url", next, sizeof(next)) != 1 ||
+            !github_release_api_url_allowed(next))
+            return GITHUB_RELEASE_REDIRECT_REFUSED;
+        memcpy(url, next, sizeof(url));
+        report->redirects = hop + 1;
+    }
+    if (status == 404)
+        return GITHUB_RELEASE_NONE;
+    /* The rate limit for requests without an account: 403 with no requests left, or 429. */
+    if (status == 403 || status == 429)
+        return GITHUB_RELEASE_RATE_LIMITED;
+    if (status != 200)
+        return GITHUB_RELEASE_HTTP_STATUS;
+    return GITHUB_RELEASE_NEWER;
+}
+
 self_update_check_result github_release_check(const self_update_platform *platform,
                                               const char *repository, const char *name,
                                               const char *title_id, const char *installed,
@@ -856,8 +908,7 @@ self_update_check_result github_release_check(const self_update_platform *platfo
     char sums[GITHUB_RELEASE_MAX_SUMS];
     sums_sink sink;
     size_t length = 0;
-    int status = 0;
-    int hop;
+    github_release_reason fetched;
     if (report == NULL)
         report = &unused;
     memset(report, 0, sizeof(*report));
@@ -868,36 +919,9 @@ self_update_check_result github_release_check(const self_update_platform *platfo
         !update_check_version_parse(installed, NULL) || github_release_url(url, sizeof(url), repository) == 0)
         return no_offer(offer, report, GITHUB_RELEASE_BAD_ARGUMENT);
 
-    for (hop = 0;; ++hop)
-    {
-        const int code = platform->fetch(platform->user, url, answer, sizeof(answer), &length, &status);
-        char next[256];
-        report->http_status = status;
-        if (code == SELF_UPDATE_FETCH_TOO_LARGE || (code == 0 && length > sizeof(answer)))
-            return no_offer(offer, report, GITHUB_RELEASE_TOO_LARGE);
-        if (code != 0)
-        {
-            report->platform_error = code;
-            return no_offer(offer, report, GITHUB_RELEASE_NETWORK);
-        }
-        if (status != 301 && status != 302 && status != 307 && status != 308)
-            break;
-        /* A renamed repository: GitHub's redirect names its new address in its body as well as in
-         * its Location header, and the kit's fetch gives the body. Followed to that address alone
-         * (github_release_api_url_allowed). */
-        if (hop >= GITHUB_RELEASE_REDIRECTS || string_member(answer, length, "url", next, sizeof(next)) != 1 ||
-            !github_release_api_url_allowed(next))
-            return no_offer(offer, report, GITHUB_RELEASE_REDIRECT_REFUSED);
-        memcpy(url, next, sizeof(url));
-        report->redirects = hop + 1;
-    }
-    if (status == 404)
-        return no_offer(offer, report, GITHUB_RELEASE_NONE);
-    /* The rate limit for requests without an account: 403 with no requests left, or 429. */
-    if (status == 403 || status == 429)
-        return no_offer(offer, report, GITHUB_RELEASE_RATE_LIMITED);
-    if (status != 200)
-        return no_offer(offer, report, GITHUB_RELEASE_HTTP_STATUS);
+    if ((fetched = fetch_latest(platform, repository, answer, sizeof(answer), &length, report)) !=
+        GITHUB_RELEASE_NEWER)
+        return no_offer(offer, report, fetched);
     report->reason = github_release_evaluate(answer, length, installed, &release);
     log_text(report->tag, sizeof(report->tag), release.tag);
     if (release.zip_count == 1)
@@ -952,4 +976,207 @@ self_update_check_result self_update_check_from(const self_update_platform *plat
     if (repository == NULL || repository[0] == '\0')
         return self_update_check(platform, title_id, installed, offer);
     return github_release_check(platform, repository, name, title_id, installed, offer, report);
+}
+
+/* ---- Another app's release ----------------------------------------------------------------- */
+
+static github_release_reason asset_reason(github_release_report *report, github_release_reason reason)
+{
+    report->reason = reason;
+    return reason;
+}
+
+/* Whether a release's answer is of a repository of `repository`'s owner: its "url" is
+ * https://api.github.com/repos/<owner>/<name>/releases/<id>, with GitHub's own spelling of the
+ * owner (an account's name is the same whatever its letters' case). */
+static int same_owner(const char *json, size_t length, const char *repository)
+{
+    static const char start[] = GITHUB_RELEASE_API;
+    char url[256];
+    const char *owner;
+    const size_t wanted = (size_t)(strchr(repository, '/') - repository);
+    size_t i;
+    if (string_member(json, length, "url", url, sizeof(url)) != 1 || strncmp(url, start, sizeof(start) - 1) != 0)
+        return 0;
+    owner = url + sizeof(start) - 1;
+    if (strlen(owner) <= wanted || owner[wanted] != '/')
+        return 0;
+    for (i = 0; i < wanted; ++i)
+    {
+        char a = owner[i];
+        char b = repository[i];
+        if (a >= 'A' && a <= 'Z')
+            a = (char)(a - 'A' + 'a');
+        if (b >= 'A' && b <= 'Z')
+            b = (char)(b - 'A' + 'a');
+        if (a != b)
+            return 0;
+    }
+    return 1;
+}
+
+/* "sha256:<64 hex>", GitHub's digest of a file, as 64 lowercase characters. 1: it is one. */
+static int sha256_digest(const char *text, char out[65])
+{
+    size_t i;
+    if (strncmp(text, "sha256:", 7) != 0 || strlen(text) != 7 + 64)
+        return 0;
+    for (i = 0; i < 64; ++i)
+    {
+        const int value = hex_value(text[7 + i]);
+        if (value < 0)
+            return 0;
+        out[i] = "0123456789abcdef"[value];
+    }
+    out[64] = '\0';
+    return 1;
+}
+
+github_release_reason github_release_asset_check(const self_update_platform *platform,
+                                                 const char *repository, const char *file,
+                                                 github_release_asset *asset,
+                                                 github_release_report *report)
+{
+    github_release_report unused;
+    char *answer;
+    const char *assets = NULL;
+    size_t assets_length = 0;
+    size_t cursor = 0;
+    size_t length = 0;
+    char digest[65] = {0};
+    char sums_url[512];
+    char sums[GITHUB_RELEASE_MAX_SUMS];
+    sums_sink sink;
+    unsigned sums_size = 0;
+    int sums_files = 0;
+    int named = 0;
+    int found;
+    github_release_reason reason;
+    if (report == NULL)
+        report = &unused;
+    memset(report, 0, sizeof(*report));
+    if (asset == NULL)
+        return GITHUB_RELEASE_BAD_ARGUMENT;
+    memset(asset, 0, sizeof(*asset));
+    if (platform == NULL || !is_file_name(file, 64) || !github_release_repository_valid(repository))
+        return asset_reason(report, GITHUB_RELEASE_BAD_ARGUMENT);
+    /* Its own memory: the app's update check can be asking at the same time. */
+    answer = (char *)malloc(GITHUB_RELEASE_MAX_ANSWER);
+    if (answer == NULL)
+        return asset_reason(report, GITHUB_RELEASE_NETWORK);
+    reason = fetch_latest(platform, repository, answer, GITHUB_RELEASE_MAX_ANSWER, &length, report);
+    /* A renamed repository is followed to its number; where that is now must be the same owner's. */
+    if (reason == GITHUB_RELEASE_NEWER && report->redirects > 0 && !same_owner(answer, length, repository))
+        reason = GITHUB_RELEASE_OWNER_CHANGED;
+    /* As github_release_evaluate reads it: one whole object, of a release that is published. */
+    if (reason == GITHUB_RELEASE_NEWER &&
+        update_check_json_value(answer, length, "assets", &assets, &assets_length) != 1)
+        reason = GITHUB_RELEASE_BAD_RESPONSE;
+    if (reason == GITHUB_RELEASE_NEWER && (reason = published(answer, length, "draft")) == GITHUB_RELEASE_NEWER)
+        reason = published(answer, length, "prerelease");
+    if (reason == GITHUB_RELEASE_NEWER &&
+        (found = string_member(answer, length, "tag_name", asset->tag, sizeof(asset->tag))) != 1)
+        reason = found == -2 ? GITHUB_RELEASE_BAD_RESPONSE : GITHUB_RELEASE_BAD_TAG;
+    /* The tag goes into the download's address: letters, digits, '.', '_' and '-'. */
+    if (reason == GITHUB_RELEASE_NEWER && !is_file_name(asset->tag, sizeof(asset->tag)))
+        reason = GITHUB_RELEASE_BAD_TAG;
+    if (reason == GITHUB_RELEASE_NEWER)
+        log_text(report->tag, sizeof(report->tag), asset->tag);
+
+    /* Its files, read once: the one asked for and SHA256SUMS, each uploaded in full. */
+    while (reason == GITHUB_RELEASE_NEWER)
+    {
+        const char *item = NULL;
+        size_t item_length = 0;
+        char name[128];
+        char upload[16];
+        char text[80];
+        unsigned bytes = 0;
+        found = update_check_json_array_next(assets, assets_length, &cursor, &item, &item_length);
+        if (found == 0)
+            break;
+        if (found != 1 || (found = string_member(item, item_length, "name", name, sizeof(name))) == -2)
+        {
+            reason = GITHUB_RELEASE_BAD_RESPONSE;
+            break;
+        }
+        if (found != 1 || (strcmp(name, file) != 0 && strcmp(name, "SHA256SUMS") != 0))
+            continue;
+        if ((found = string_member(item, item_length, "state", upload, sizeof(upload))) == -2)
+        {
+            reason = GITHUB_RELEASE_BAD_RESPONSE;
+            break;
+        }
+        if (found != 1 || strcmp(upload, "uploaded") != 0 ||
+            update_check_json_uint(item, item_length, "size", &bytes) != 1)
+            continue;
+        if (strcmp(name, "SHA256SUMS") == 0)
+        {
+            ++sums_files;
+            sums_size = bytes;
+            continue;
+        }
+        if (bytes == 0 || bytes > SELF_UPDATE_MAX_ARCHIVE)
+            continue;
+        ++named;
+        asset->size = bytes;
+        /* null for a file uploaded before GitHub kept digests; another kind of digest is none. */
+        if ((found = string_member(item, item_length, "digest", text, sizeof(text))) == -2)
+        {
+            reason = GITHUB_RELEASE_BAD_RESPONSE;
+            break;
+        }
+        if (found != 1 || !sha256_digest(text, digest))
+            digest[0] = '\0';
+    }
+    free(answer);
+    if (reason != GITHUB_RELEASE_NEWER)
+        return asset_reason(report, reason);
+    /* GitHub names a release's files once; an answer that lists one twice says two things. */
+    if (named > 1 || sums_files > 1)
+        return asset_reason(report, GITHUB_RELEASE_BAD_RESPONSE);
+    if (named == 0)
+        return asset_reason(report, GITHUB_RELEASE_NO_ZIP);
+    log_text(report->zip, sizeof(report->zip), file);
+
+    if (sums_files == 1)
+    {
+        /* From github.com, as the file will be: its address made, not taken from the answer. */
+        if (sums_size == 0 || sums_size > GITHUB_RELEASE_MAX_SUMS)
+            return asset_reason(report, GITHUB_RELEASE_SUMS_MALFORMED);
+        found = snprintf(sums_url, sizeof(sums_url), "https://github.com/%s/releases/download/%s/SHA256SUMS",
+                         repository, asset->tag);
+        if (found <= 0 || (size_t)found >= sizeof(sums_url) || !self_update_url_allowed(sums_url, 0))
+            return asset_reason(report, GITHUB_RELEASE_BAD_TAG);
+        sink.body = sums;
+        sink.capacity = sizeof(sums);
+        sink.used = 0;
+        if (platform->download(platform->user, sums_url, sizeof(sums), on_sums, &sink) != 0)
+            return asset_reason(report, GITHUB_RELEASE_SUMS_UNREADABLE);
+        found = github_release_sums(sums, sink.used, file, asset->sha256);
+        if (found == 0)
+            return asset_reason(report, GITHUB_RELEASE_SUMS_NO_LINE);
+        if (found < 0)
+            return asset_reason(report, GITHUB_RELEASE_SUMS_MALFORMED);
+        if (digest[0] != '\0' && strcmp(digest, asset->sha256) != 0)
+        {
+            asset->sha256[0] = '\0';
+            return asset_reason(report, GITHUB_RELEASE_HASHES_DIFFER);
+        }
+        asset->from_sums = 1;
+    }
+    else if (digest[0] != '\0')
+        memcpy(asset->sha256, digest, sizeof(digest));
+    else
+        return asset_reason(report, GITHUB_RELEASE_NO_HASH);
+
+    found = snprintf(asset->url, sizeof(asset->url), "https://github.com/%s/releases/download/%s/%s", repository,
+                     asset->tag, file);
+    if (found <= 0 || (size_t)found >= sizeof(asset->url) || !self_update_url_allowed(asset->url, 0))
+    {
+        memset(asset, 0, sizeof(*asset));
+        return asset_reason(report, GITHUB_RELEASE_BAD_TAG);
+    }
+    (void)snprintf(asset->page, sizeof(asset->page), "https://github.com/%s/releases/tag/%s", repository, asset->tag);
+    return asset_reason(report, GITHUB_RELEASE_NEWER);
 }

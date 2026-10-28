@@ -104,6 +104,11 @@ msgstr "เครดิต​ทั้งหมด​ของ​อีมูเ
 msgid "AMD FSR"
 msgstr "AMD FSR"
 
+#. Settings > Apps: each app is Nightshade's own release of another project; until it has one, that project's release is offered.
+#: pe/ui/apps.cpp
+msgid "An app without a Nightshade release yet is offered from the project it is based on."
+msgstr "แอป​ที่​ยัง​ไม่​มี​รุ่น​เผยแพร่​ของ Nightshade จะ​นำ​เสนอ​จาก​โปรเจกต์​ต้นแบบ​ของ​แอป​นั้น"
+
 #: pe/ui/settings.cpp
 msgid "An image of your own behind this menu."
 msgstr "รูปภาพของคุณเองด้านหลังเมนูนี้"
@@ -119,6 +124,11 @@ msgstr "รูปลักษณ์"
 #: pe/ui/settings.cpp
 msgid "Apply"
 msgstr "ใช้"
+
+#. Settings > Apps: Nightshade's own companion apps (an IPTV client, game streaming, a PS1 emulator), not games.
+#: pe/ui/apps.cpp, pe/ui/settings.cpp
+msgid "Apps"
+msgstr "แอป"
 
 #. The button mapping has not been changed.
 #: pe/ui/game_options.cpp, pe/ui/settings.cpp
@@ -804,9 +814,32 @@ msgstr "เกม​ที่​คุณ​เปิด​จะ​แสดง
 msgid "German"
 msgstr "เยอรมัน"
 
+#. Button hint in Settings > Apps: download and install an app that is not on the console yet. Keep it short.
+#: pe/ui/apps.cpp
+msgid "Get"
+msgstr "รับ"
+
+#. Settings > Apps: what it is for. Nightshade TV, Stream and Station are the apps' names (unchanged).
+#: pe/ui/apps.cpp, pe/ui/settings.cpp
+msgid "Get, update and open Nightshade TV, Stream and Station."
+msgstr "รับ อัปเดต และ​เปิด Nightshade TV, Stream และ Station"
+
 #: pe/ui/browse.cpp
 msgid "GETTING STARTED"
 msgstr "เริ่มต้นใช้งาน"
+
+#: pe/ui/apps.cpp
+msgid "GitHub could not be reached."
+msgstr "เชื่อมต่อ GitHub ไม่​ได้"
+
+#. GitHub allows an address a number of requests an hour; that number was reached.
+#: pe/ui/apps.cpp
+msgid "GitHub is limiting requests. Try again in an hour."
+msgstr "GitHub กำลัง​จำกัด​คำขอ ลอง​ใหม่​ใน​อีก​หนึ่ง​ชั่วโมง"
+
+#: pe/ui/apps.cpp
+msgid "GitHub's answer could not be read."
+msgstr "อ่าน​คำตอบ​ของ GitHub ไม่​ได้"
 
 #: pe/ui/settings.cpp
 msgid "Gives back memory a game left empty, 16 KiB at a time. More free memory; a game that writes there again can stutter for a moment."
@@ -876,6 +909,16 @@ msgstr "ใช้อยู่"
 #: pe/ui/multiplayer.cpp
 msgid "Incompatible"
 msgstr "เข้ากัน​ไม่ได้"
+
+#. Settings > Apps: the app is installed as a disk image file, which this menu can't update.
+#: pe/ui/apps.cpp
+msgid "Installed as an image: replace the image to update it."
+msgstr "ติดตั้ง​เป็น​อิมเมจ: แทนที่​อิมเมจ​เพื่อ​อัปเดต"
+
+#. Settings > Apps: the new release's files are being put in the app's folder.
+#: pe/ui/apps.cpp
+msgid "Installing"
+msgstr "กำลัง​ติดตั้ง"
 
 #: pe/ui/save_sync.cpp
 msgid "It goes to the server."
@@ -1026,6 +1069,11 @@ msgstr "คลังเกม"
 msgid "Linked"
 msgstr "เชื่อมโยงแล้ว"
 
+#. Settings > Apps: what the Nightshade TV app is. IPTV is a kind of TV service delivered over the internet (unchanged).
+#: pe/ui/apps_list.hpp
+msgid "Live TV, films and series from your IPTV provider."
+msgstr "ทีวี​สด ภาพยนตร์ และ​ซีรีส์​จาก​ผู้​ให้​บริการ IPTV ของ​คุณ"
+
 #: pe/ui/multiplayer.cpp
 msgid "Loading public rooms..."
 msgstr "กำลัง​โหลด​ห้อง​สาธารณะ..."
@@ -1161,9 +1209,24 @@ msgstr "ไม่มี​ม็อด"
 msgid "No mods for this game yet. Copy each mod's folder to {0}."
 msgstr "เกม​นี้​ยัง​ไม่มี​ม็อด คัดลอก​โฟลเดอร์​ของ​แต่ละ​ม็อด​ไป​ที่ {0}"
 
+#. {0} is a port number, {1} an app's name. The payload loader is the program on the console that starts the homebrew programs sent to it.
+#: pe/ui/apps.cpp
+msgid "No payload loader is listening on port {0}, so {1} can't be installed."
+msgstr "ไม่​มี​ตัว​โหลด payload รอ​รับ​ที่​พอร์ต {0} จึง​ติดตั้ง {1} ไม่​ได้"
+
+#. See 'No payload loader is listening on port {0}, so {1} can't be installed.' The PS5's home screen is the console's own, not this menu's.
+#: pe/ui/apps.cpp
+msgid "No payload loader is listening on port {0}, so {1} can't be opened from here. Open it from the PS5's home screen."
+msgstr "ไม่​มี​ตัว​โหลด payload รอ​รับ​ที่​พอร์ต {0} จึง​เปิด {1} จาก​ที่​นี่​ไม่​ได้ เปิด​จาก​หน้า​หลัก​ของ PS5"
+
 #: pe/ui/multiplayer.cpp
 msgid "No public rooms are available."
 msgstr "ไม่มี​ห้อง​สาธารณะ​ที่​ใช้ได้"
+
+#. Settings > Apps: neither the app's own GitHub repository nor the project it is based on has published a release.
+#: pe/ui/apps.cpp
+msgid "No release yet."
+msgstr "ยัง​ไม่​มี​รุ่น​เผยแพร่"
 
 #: pe/ui/library.cpp
 msgid "No ROM files found."
@@ -1193,6 +1256,11 @@ msgstr "ไม่มี"
 #: pe/ui/remote.cpp
 msgid "Not connected yet"
 msgstr "ยังไม่ได้เชื่อมต่อ"
+
+#. Settings > Apps: the app is not on the console.
+#: pe/ui/apps.cpp
+msgid "Not installed"
+msgstr "ยัง​ไม่​ได้​ติดตั้ง"
 
 #: pe/ui/pairing.cpp
 msgid "Not linked"
@@ -1254,6 +1322,16 @@ msgstr "เปิดอีกครั้งเพื่อใช้เวอร
 #: pe/ui/home.cpp
 msgid "Open library"
 msgstr "เปิดคลังเกม"
+
+#. {0} is an app's name.
+#: pe/ui/apps.cpp
+msgid "Opening {0}. Nightshade closes now."
+msgstr "กำลัง​เปิด {0} Nightshade จะ​ปิด​ตอน​นี้"
+
+#. {0} is an app's name: Nightshade asks for it to be opened, and closes once that is under way.
+#: pe/ui/apps.cpp
+msgid "Opening {0}..."
+msgstr "กำลัง​เปิด {0}..."
 
 #. The DualSense button labelled OPTIONS: keep the label if the language's players do.
 #: pe/ui/game_options.cpp
@@ -1340,6 +1418,16 @@ msgstr "เล่นต่อไป"
 #: pe/ui/profiles.cpp
 msgid "Play as"
 msgstr "เล่นเป็น"
+
+#. Settings > Apps: what the Nightshade Stream app is. Moonlight is the name of the game streaming client (unchanged).
+#: pe/ui/apps_list.hpp
+msgid "Play games streamed from your PC with Moonlight."
+msgstr "เล่น​เกม​ที่​สตรีม​จาก​พีซี​ของ​คุณ​ด้วย Moonlight"
+
+#. Settings > Apps: what the Nightshade Station app is. PS1 is the first PlayStation, SwanStation the emulator's name (both unchanged).
+#: pe/ui/apps_list.hpp
+msgid "Play PS1 games with the SwanStation emulator."
+msgstr "เล่น​เกม PS1 ด้วย​อีมูเลเตอร์ SwanStation"
 
 #: pe/ui/library.cpp
 msgid "Play when downloaded"
@@ -1537,6 +1625,16 @@ msgstr "ภูมิภาค"
 #: pe/ui/game_options.cpp
 msgid "Regular"
 msgstr "ปกติ"
+
+#. See 'Release {0}, from {1}': here the release is the one of the project the app is based on, because the app has no Nightshade release yet.
+#: pe/ui/apps.cpp
+msgid "Release {0} of the original project, {1}"
+msgstr "รุ่น​เผยแพร่ {0} ของ​โปรเจกต์​ต้นฉบับ {1}"
+
+#. {0} is a release's name, such as v1.000.090 or 01.000.110; {1} a GitHub repository, such as Oliv3rmoon/Nightshade-TV (both unchanged).
+#: pe/ui/apps.cpp
+msgid "Release {0}, from {1}"
+msgstr "รุ่น​เผยแพร่ {0} จาก {1}"
 
 #: pe/ui/profiles.cpp
 msgid "Remove"
@@ -1949,6 +2047,26 @@ msgstr "ข้อมูล​เซฟ​ของ​โปรไฟล์​จ
 msgid "The profile's save data syncs with the server from now on."
 msgstr "ข้อมูล​เซฟ​ของ​โปรไฟล์​จะ​ซิงค์​กับ​เซิร์ฟเวอร์​นับ​จาก​นี้"
 
+#. {0} is an app's name. The homebrew loader is the tool that puts homebrew apps on the PS5's home screen (ShadowMountPlus, for example).
+#: pe/ui/apps.cpp
+msgid "The PS5 doesn't list {0} yet. The homebrew loader lists it after its next scan or a restart."
+msgstr "PS5 ยัง​ไม่​แสดง {0} ตัว​โหลด homebrew จะ​แสดง​หลัง​การ​สแกน​ครั้ง​ถัด​ไป​หรือ​หลัง​รีสตาร์ท"
+
+#. {0} is a file name such as PPSA99003.zip; SHA-256 is the name of a checksum (unchanged).
+#: pe/ui/apps.cpp
+msgid "The release gives no SHA-256 for {0}, so it is not offered."
+msgstr "รุ่น​เผยแพร่​ไม่​มี SHA-256 ของ {0} จึง​ไม่​นำ​เสนอ"
+
+#. {0} is a file name such as PPSA99003.zip.
+#: pe/ui/apps.cpp
+msgid "The release has no {0}."
+msgstr "รุ่น​เผยแพร่​ไม่​มี {0}"
+
+#. See 'The release gives no SHA-256 for {0}, so it is not offered.' Its SHA-256 values disagree or are malformed.
+#: pe/ui/apps.cpp
+msgid "The release's SHA-256 for {0} can't be trusted, so it is not offered."
+msgstr "SHA-256 ของ {0} ใน​รุ่น​เผยแพร่​เชื่อ​ถือ​ไม่​ได้ จึง​ไม่​นำ​เสนอ"
+
 #. Shown at the end of release notes that were cut short; homebrew.page is a site's name and stays as it is.
 #: pe/ui/update.cpp
 msgid "The rest is on the app's page on homebrew.page."
@@ -2083,6 +2201,11 @@ msgstr "กำลังแตกไฟล์"
 #: pe/ui/browse.cpp
 msgid "UP"
 msgstr "ขึ้น"
+
+#. Button hint in Settings > Apps: install an app's newer release over the one installed. Keep it short.
+#: pe/ui/apps.cpp
+msgid "Update"
+msgstr "อัปเดต"
 
 #. Notification title: a newer release of this app is listed (not a game update).
 #: pe/ui/launcher.cpp, pe/ui/update.cpp
@@ -2230,6 +2353,10 @@ msgstr "ใช้​ข้อมูล​เซฟ​ของ​เครื่
 msgid "with {0}"
 msgstr "กับ {0}"
 
+#: pe/ui/apps.cpp
+msgid "Without filesystem access Nightshade can't tell which apps are installed."
+msgstr "หาก​ไม่​มี​สิทธิ์​เข้าถึง​ระบบ​ไฟล์ Nightshade จะ​ไม่​รู้​ว่า​ติดตั้ง​แอป​ใด​ไว้"
+
 #: pe/ui/settings.cpp
 msgid "Write logs at once"
 msgstr "เขียน​ล็อก​ทันที"
@@ -2261,6 +2388,16 @@ msgstr "กำลัง​ตรวจสอบ​ข้อมูล​เซฟ
 msgid "{0} changed"
 msgstr "เปลี่ยน {0} รายการ"
 
+#. {0} is an app's name, {1} why (English, from the installer).
+#: pe/ui/apps.cpp
+msgid "{0} could not be installed: {1}"
+msgstr "ติดตั้ง {0} ไม่​ได้: {1}"
+
+#. {0} is an app's name, {1} why (English, from the launch payload).
+#: pe/ui/apps.cpp
+msgid "{0} could not be opened: {1}"
+msgstr "เปิด {0} ไม่​ได้: {1}"
+
 #. {0} is how many DLC (add-on content) a game has installed.
 #: eden_services.cpp, host/fake_services.cpp
 msgid "{0} DLC"
@@ -2290,10 +2427,25 @@ msgstr "{0} เกม"
 msgid "{0} games installed"
 msgstr "ติดตั้งแล้ว {0} เกม"
 
+#. {0} is a GitHub repository, such as blackbearreloaded/ProsperoTV (unchanged): GitHub now sends requests for it to another account's repository, which Nightshade does not install from.
+#: pe/ui/apps.cpp
+msgid "{0} has moved to another account, so its release is not offered."
+msgstr "{0} ย้าย​ไป​บัญชี​อื่น​แล้ว จึง​ไม่​นำ​เสนอ​รุ่น​เผยแพร่"
+
 #. {0} is 60 or 120 (hertz).
 #: pe/ui/game_options.cpp, pe/ui/library.cpp, pe/ui/settings.cpp
 msgid "{0} Hz"
 msgstr "{0} Hz"
+
+#. {0} is an app's name. See 'The PS5 doesn't list {0} yet...' for the homebrew loader.
+#: pe/ui/apps.cpp
+msgid "{0} is installed. The homebrew loader lists it after its next scan or a restart."
+msgstr "ติดตั้ง {0} แล้ว ตัว​โหลด homebrew จะ​แสดง​หลัง​การ​สแกน​ครั้ง​ถัด​ไป​หรือ​หลัง​รีสตาร์ท"
+
+#. {0} is an app's name, {1} its new version, such as 01.000.110.
+#: pe/ui/apps.cpp
+msgid "{0} is updated to {1}."
+msgstr "อัปเดต {0} เป็น {1} แล้ว"
 
 #. Exactly one mod, in the list of what a game comes with (Update 1.2.0, 2 DLC, 1 mod). See '{0} game'.
 #: pe/ui/library.cpp
@@ -2324,6 +2476,11 @@ msgstr "ไม่มีภาษา{0}"
 #: pe/ui/widgets.cpp
 msgid "{0} OF {1}"
 msgstr "{0} จาก {1}"
+
+#. Settings > Apps: how many of Nightshade's apps are on the console: 2 of 3 installed.
+#: pe/ui/settings.cpp
+msgid "{0} of {1} installed"
+msgstr "ติดตั้ง​แล้ว {0} จาก {1}"
 
 #. In the same list, when some of the game's mods are switched off: 1 of 2 mods on. Keep it short.
 #: pe/ui/library.cpp

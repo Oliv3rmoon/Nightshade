@@ -104,6 +104,11 @@ msgstr "Eden 에뮬레이터의 모든 공로는 개발자와 기여자에게 �
 msgid "AMD FSR"
 msgstr "AMD FSR"
 
+#. Settings > Apps: each app is Nightshade's own release of another project; until it has one, that project's release is offered.
+#: pe/ui/apps.cpp
+msgid "An app without a Nightshade release yet is offered from the project it is based on."
+msgstr "아직 Nightshade 릴리스가 없는 앱은 기반 프로젝트에서 제공됩니다."
+
 #: pe/ui/settings.cpp
 msgid "An image of your own behind this menu."
 msgstr "이 메뉴 뒤에 원하는 이미지를 표시합니다."
@@ -119,6 +124,11 @@ msgstr "모양"
 #: pe/ui/settings.cpp
 msgid "Apply"
 msgstr "적용"
+
+#. Settings > Apps: Nightshade's own companion apps (an IPTV client, game streaming, a PS1 emulator), not games.
+#: pe/ui/apps.cpp, pe/ui/settings.cpp
+msgid "Apps"
+msgstr "앱"
 
 #. The button mapping has not been changed.
 #: pe/ui/game_options.cpp, pe/ui/settings.cpp
@@ -804,9 +814,32 @@ msgstr "실행한 게임이 여기에 표시됩니다."
 msgid "German"
 msgstr "독일어"
 
+#. Button hint in Settings > Apps: download and install an app that is not on the console yet. Keep it short.
+#: pe/ui/apps.cpp
+msgid "Get"
+msgstr "받기"
+
+#. Settings > Apps: what it is for. Nightshade TV, Stream and Station are the apps' names (unchanged).
+#: pe/ui/apps.cpp, pe/ui/settings.cpp
+msgid "Get, update and open Nightshade TV, Stream and Station."
+msgstr "Nightshade TV, Stream, Station을 받고 업데이트하고 엽니다."
+
 #: pe/ui/browse.cpp
 msgid "GETTING STARTED"
 msgstr "시작하기"
+
+#: pe/ui/apps.cpp
+msgid "GitHub could not be reached."
+msgstr "GitHub에 연결할 수 없습니다."
+
+#. GitHub allows an address a number of requests an hour; that number was reached.
+#: pe/ui/apps.cpp
+msgid "GitHub is limiting requests. Try again in an hour."
+msgstr "GitHub가 요청을 제한하고 있습니다. 1시간 후에 다시 시도하세요."
+
+#: pe/ui/apps.cpp
+msgid "GitHub's answer could not be read."
+msgstr "GitHub의 응답을 읽을 수 없습니다."
 
 #: pe/ui/settings.cpp
 msgid "Gives back memory a game left empty, 16 KiB at a time. More free memory; a game that writes there again can stutter for a moment."
@@ -876,6 +909,16 @@ msgstr "사용 중"
 #: pe/ui/multiplayer.cpp
 msgid "Incompatible"
 msgstr "호환되지 않음"
+
+#. Settings > Apps: the app is installed as a disk image file, which this menu can't update.
+#: pe/ui/apps.cpp
+msgid "Installed as an image: replace the image to update it."
+msgstr "이미지로 설치됨: 업데이트하려면 이미지를 교체하세요."
+
+#. Settings > Apps: the new release's files are being put in the app's folder.
+#: pe/ui/apps.cpp
+msgid "Installing"
+msgstr "설치 중"
 
 #: pe/ui/save_sync.cpp
 msgid "It goes to the server."
@@ -1026,6 +1069,11 @@ msgstr "라이브러리"
 msgid "Linked"
 msgstr "연결됨"
 
+#. Settings > Apps: what the Nightshade TV app is. IPTV is a kind of TV service delivered over the internet (unchanged).
+#: pe/ui/apps_list.hpp
+msgid "Live TV, films and series from your IPTV provider."
+msgstr "IPTV 제공업체의 실시간 TV, 영화, 시리즈."
+
 #: pe/ui/multiplayer.cpp
 msgid "Loading public rooms..."
 msgstr "공개 방을 불러오는 중..."
@@ -1161,9 +1209,24 @@ msgstr "모드 없음"
 msgid "No mods for this game yet. Copy each mod's folder to {0}."
 msgstr "이 게임에는 아직 모드가 없습니다. 각 모드의 폴더를 {0}에 복사하세요."
 
+#. {0} is a port number, {1} an app's name. The payload loader is the program on the console that starts the homebrew programs sent to it.
+#: pe/ui/apps.cpp
+msgid "No payload loader is listening on port {0}, so {1} can't be installed."
+msgstr "포트 {0}에서 대기 중인 페이로드 로더가 없어 {1}을(를) 설치할 수 없습니다."
+
+#. See 'No payload loader is listening on port {0}, so {1} can't be installed.' The PS5's home screen is the console's own, not this menu's.
+#: pe/ui/apps.cpp
+msgid "No payload loader is listening on port {0}, so {1} can't be opened from here. Open it from the PS5's home screen."
+msgstr "포트 {0}에서 대기 중인 페이로드 로더가 없어 여기서 {1}을(를) 열 수 없습니다. PS5 홈 화면에서 여세요."
+
 #: pe/ui/multiplayer.cpp
 msgid "No public rooms are available."
 msgstr "이용 가능한 공개 방이 없습니다."
+
+#. Settings > Apps: neither the app's own GitHub repository nor the project it is based on has published a release.
+#: pe/ui/apps.cpp
+msgid "No release yet."
+msgstr "아직 릴리스가 없습니다."
 
 #: pe/ui/library.cpp
 msgid "No ROM files found."
@@ -1193,6 +1256,11 @@ msgstr "없음"
 #: pe/ui/remote.cpp
 msgid "Not connected yet"
 msgstr "아직 연결되지 않음"
+
+#. Settings > Apps: the app is not on the console.
+#: pe/ui/apps.cpp
+msgid "Not installed"
+msgstr "설치 안 됨"
 
 #: pe/ui/pairing.cpp
 msgid "Not linked"
@@ -1254,6 +1322,16 @@ msgstr "다시 열면 버전 {0}을(를) 사용할 수 있습니다."
 #: pe/ui/home.cpp
 msgid "Open library"
 msgstr "라이브러리 열기"
+
+#. {0} is an app's name.
+#: pe/ui/apps.cpp
+msgid "Opening {0}. Nightshade closes now."
+msgstr "{0}을(를) 엽니다. Nightshade이 지금 종료됩니다."
+
+#. {0} is an app's name: Nightshade asks for it to be opened, and closes once that is under way.
+#: pe/ui/apps.cpp
+msgid "Opening {0}..."
+msgstr "{0}을(를) 여는 중..."
 
 #. The DualSense button labelled OPTIONS: keep the label if the language's players do.
 #: pe/ui/game_options.cpp
@@ -1340,6 +1418,16 @@ msgstr "그래도 플레이"
 #: pe/ui/profiles.cpp
 msgid "Play as"
 msgstr "이 프로필로"
+
+#. Settings > Apps: what the Nightshade Stream app is. Moonlight is the name of the game streaming client (unchanged).
+#: pe/ui/apps_list.hpp
+msgid "Play games streamed from your PC with Moonlight."
+msgstr "Moonlight로 PC에서 스트리밍되는 게임을 플레이합니다."
+
+#. Settings > Apps: what the Nightshade Station app is. PS1 is the first PlayStation, SwanStation the emulator's name (both unchanged).
+#: pe/ui/apps_list.hpp
+msgid "Play PS1 games with the SwanStation emulator."
+msgstr "SwanStation 에뮬레이터로 PS1 게임을 플레이합니다."
 
 #: pe/ui/library.cpp
 msgid "Play when downloaded"
@@ -1537,6 +1625,16 @@ msgstr "지역"
 #: pe/ui/game_options.cpp
 msgid "Regular"
 msgstr "보통"
+
+#. See 'Release {0}, from {1}': here the release is the one of the project the app is based on, because the app has no Nightshade release yet.
+#: pe/ui/apps.cpp
+msgid "Release {0} of the original project, {1}"
+msgstr "원래 프로젝트의 릴리스 {0}, {1}"
+
+#. {0} is a release's name, such as v1.000.090 or 01.000.110; {1} a GitHub repository, such as Oliv3rmoon/Nightshade-TV (both unchanged).
+#: pe/ui/apps.cpp
+msgid "Release {0}, from {1}"
+msgstr "릴리스 {0}, 출처 {1}"
 
 #: pe/ui/profiles.cpp
 msgid "Remove"
@@ -1949,6 +2047,26 @@ msgstr "이제부터 프로필의 세이브 데이터가 {0}(으)로 동기화�
 msgid "The profile's save data syncs with the server from now on."
 msgstr "이제부터 프로필의 세이브 데이터가 서버와 동기화됩니다."
 
+#. {0} is an app's name. The homebrew loader is the tool that puts homebrew apps on the PS5's home screen (ShadowMountPlus, for example).
+#: pe/ui/apps.cpp
+msgid "The PS5 doesn't list {0} yet. The homebrew loader lists it after its next scan or a restart."
+msgstr "PS5에 아직 {0}이(가) 표시되지 않습니다. 홈브루 로더가 다음 검색 후나 재시작 후에 표시합니다."
+
+#. {0} is a file name such as PPSA99003.zip; SHA-256 is the name of a checksum (unchanged).
+#: pe/ui/apps.cpp
+msgid "The release gives no SHA-256 for {0}, so it is not offered."
+msgstr "릴리스에 {0}의 SHA-256이 없어 제공되지 않습니다."
+
+#. {0} is a file name such as PPSA99003.zip.
+#: pe/ui/apps.cpp
+msgid "The release has no {0}."
+msgstr "릴리스에 {0}이(가) 없습니다."
+
+#. See 'The release gives no SHA-256 for {0}, so it is not offered.' Its SHA-256 values disagree or are malformed.
+#: pe/ui/apps.cpp
+msgid "The release's SHA-256 for {0} can't be trusted, so it is not offered."
+msgstr "릴리스의 {0} SHA-256을 신뢰할 수 없어 제공되지 않습니다."
+
 #. Shown at the end of release notes that were cut short; homebrew.page is a site's name and stays as it is.
 #: pe/ui/update.cpp
 msgid "The rest is on the app's page on homebrew.page."
@@ -2083,6 +2201,11 @@ msgstr "압축 푸는 중"
 #: pe/ui/browse.cpp
 msgid "UP"
 msgstr "위로"
+
+#. Button hint in Settings > Apps: install an app's newer release over the one installed. Keep it short.
+#: pe/ui/apps.cpp
+msgid "Update"
+msgstr "업데이트"
 
 #. Notification title: a newer release of this app is listed (not a game update).
 #: pe/ui/launcher.cpp, pe/ui/update.cpp
@@ -2230,6 +2353,10 @@ msgstr "이 본체의 세이브 데이터 사용. 게임 후에 동기화됩니�
 msgid "with {0}"
 msgstr "대상: {0}"
 
+#: pe/ui/apps.cpp
+msgid "Without filesystem access Nightshade can't tell which apps are installed."
+msgstr "파일 시스템에 접근할 수 없어 Nightshade가 설치된 앱을 알 수 없습니다."
+
 #: pe/ui/settings.cpp
 msgid "Write logs at once"
 msgstr "로그 즉시 기록"
@@ -2261,6 +2388,16 @@ msgstr "세이브 데이터를 서버의 데이터와 비교합니다."
 msgid "{0} changed"
 msgstr "{0}개 변경"
 
+#. {0} is an app's name, {1} why (English, from the installer).
+#: pe/ui/apps.cpp
+msgid "{0} could not be installed: {1}"
+msgstr "{0}을(를) 설치할 수 없습니다: {1}"
+
+#. {0} is an app's name, {1} why (English, from the launch payload).
+#: pe/ui/apps.cpp
+msgid "{0} could not be opened: {1}"
+msgstr "{0}을(를) 열 수 없습니다: {1}"
+
 #. {0} is how many DLC (add-on content) a game has installed.
 #: eden_services.cpp, host/fake_services.cpp
 msgid "{0} DLC"
@@ -2290,10 +2427,25 @@ msgstr "게임 {0}개"
 msgid "{0} games installed"
 msgstr "게임 {0}개 설치됨"
 
+#. {0} is a GitHub repository, such as blackbearreloaded/ProsperoTV (unchanged): GitHub now sends requests for it to another account's repository, which Nightshade does not install from.
+#: pe/ui/apps.cpp
+msgid "{0} has moved to another account, so its release is not offered."
+msgstr "{0}이(가) 다른 계정으로 옮겨져 릴리스가 제공되지 않습니다."
+
 #. {0} is 60 or 120 (hertz).
 #: pe/ui/game_options.cpp, pe/ui/library.cpp, pe/ui/settings.cpp
 msgid "{0} Hz"
 msgstr "{0}Hz"
+
+#. {0} is an app's name. See 'The PS5 doesn't list {0} yet...' for the homebrew loader.
+#: pe/ui/apps.cpp
+msgid "{0} is installed. The homebrew loader lists it after its next scan or a restart."
+msgstr "{0}이(가) 설치되었습니다. 홈브루 로더가 다음 검색 후나 재시작 후에 표시합니다."
+
+#. {0} is an app's name, {1} its new version, such as 01.000.110.
+#: pe/ui/apps.cpp
+msgid "{0} is updated to {1}."
+msgstr "{0}이(가) {1}(으)로 업데이트되었습니다."
 
 #. Exactly one mod, in the list of what a game comes with (Update 1.2.0, 2 DLC, 1 mod). See '{0} game'.
 #: pe/ui/library.cpp
@@ -2324,6 +2476,11 @@ msgstr "{0} 사용 불가"
 #: pe/ui/widgets.cpp
 msgid "{0} OF {1}"
 msgstr "{0} / {1}"
+
+#. Settings > Apps: how many of Nightshade's apps are on the console: 2 of 3 installed.
+#: pe/ui/settings.cpp
+msgid "{0} of {1} installed"
+msgstr "{1}개 중 {0}개 설치됨"
 
 #. In the same list, when some of the game's mods are switched off: 1 of 2 mods on. Keep it short.
 #: pe/ui/library.cpp

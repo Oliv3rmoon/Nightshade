@@ -21,6 +21,21 @@
  * gone, puts the new files in place and posts a notification. A connection
  * that ends before "apply", or "cancel" at any time before it, makes the
  * helper remove everything it wrote and leave the app untouched.
+ *
+ * ProsperoEden: another app's release (Nightshade's Apps, headless/apps.h) is
+ * the same conversation with "install" and one line more; the app stays open:
+ *
+ *   app     PSU1, install, <title ID>, <its installed content version, or none>,
+ *           <the release's content version, or any when it names none>,
+ *           <size>, <sha256>, <app name>, <version name>,
+ *           <the asking app's title ID>                   (ten lines)
+ *   ...     as above, to "applying"
+ *   helper  installed <content version> [<folder>]     or  fail <reason>
+ *
+ * The helper puts the release in the title's one installed folder (it must be
+ * at that version), or with none in a new folder beside the asking app's.
+ * A helper from before this answers "fail The request was refused"; the app's
+ * own update is the conversation above, unchanged.
  */
 #ifndef PS5_BOILERPLATE_SELF_UPDATE_PROTOCOL_H
 #define PS5_BOILERPLATE_SELF_UPDATE_PROTOCOL_H
