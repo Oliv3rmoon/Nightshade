@@ -145,6 +145,20 @@ constexpr float kAccentRowHeight = 72.0f;
 constexpr int kAccentRowsShown = 6;
 constexpr Rect kAccentWindow{592.0f, kVideoRowsTop, 736.0f,
                              kAccentRowPitch * (kAccentRowsShown - 1) + kAccentRowHeight};
+// The Diagnostics dialog's rows, under the setup's state: three of the four show and the list
+// scrolls, as Controls' do.
+enum DiagnosticsRow : int
+{
+    diagnostics_logging,
+    diagnostics_immediate,
+    diagnostics_notices,
+    diagnostics_backup, // opens Back up to USB (backup.cpp)
+    kDiagnosticsRows,
+};
+constexpr float kDiagnosticsRowsTop = 470.0f;
+constexpr int kDiagnosticsRowsShown = 3;
+constexpr Rect kDiagnosticsWindow{592.0f, kDiagnosticsRowsTop, 736.0f,
+                                  kVideoRowPitch * (kDiagnosticsRowsShown - 1) + kVideoRowHeight};
 // The Controls rows, in order.
 enum ControlRow : int
 {
@@ -323,6 +337,9 @@ void Launcher::press_settings(Key key)
             break;
         default:
             open_modal(Modal::diagnostics);
+            diagnostics_rows_.visible = kDiagnosticsRowsShown;
+            diagnostics_rows_.pitch = kVideoRowPitch;
+            diagnostics_rows_.reset(kDiagnosticsRows, 0);
             break;
         }
         return;
@@ -486,7 +503,7 @@ void Launcher::draw_settings(Canvas &c)
             about = tr("Make the menu easier to see and follow.");
             break;
         case kDiagnostics:
-            about = tr("Setup status and detailed logs.");
+            about = tr("Setup status, detailed logs and a backup to USB.");
             break;
         case kFiles:
             about = tr("The folder that holds your keys, firmware and games.");
@@ -595,8 +612,8 @@ int Launcher::dialog_rows(Modal modal) const
                         !games_[static_cast<std::size_t>(library_.selected)].remote ? 1 : 0);
     case Modal::controls:     // vibration, its strength, the button mapping, the menu's own buttons
         return kControlRows;
-    case Modal::diagnostics:  // detailed logging, logs written at once, update notices
-        return 3;
+    case Modal::diagnostics:  // detailed logging, logs written at once, update notices, the backup
+        return kDiagnosticsRows;
     default:
         return 1;
     }
@@ -623,8 +640,8 @@ float Launcher::dialog_row_top(Modal modal, int row) const
         return 334.0f + 96.0f * static_cast<float>(row);
     case Modal::controls: // under the shortcuts; the list scrolls
         return kControlsRowsTop + kVideoRowPitch * static_cast<float>(row) - controls_rows_.scroll();
-    case Modal::diagnostics: // under the setup's state, spaced as Video's rows so three fit
-        return 470.0f + kVideoRowPitch * static_cast<float>(row);
+    case Modal::diagnostics: // under the setup's state, spaced as Video's rows; three show, the list scrolls
+        return kDiagnosticsRowsTop + kVideoRowPitch * static_cast<float>(row) - diagnostics_rows_.scroll();
     default:
         return 670.0f;
     }
@@ -654,13 +671,14 @@ void Launcher::press_dialog(Key key)
     }
     if ((key == Key::up || key == Key::down) &&
         (modal_ == Modal::video || modal_ == Modal::performance || modal_ == Modal::controls ||
-         modal_ == Modal::accent || modal_ == Modal::wallpaper))
+         modal_ == Modal::accent || modal_ == Modal::wallpaper || modal_ == Modal::diagnostics))
     {
-        ListView &rows_view = modal_ == Modal::video       ? video_rows_
-                              : modal_ == Modal::controls  ? controls_rows_
-                              : modal_ == Modal::accent    ? accent_rows_
-                              : modal_ == Modal::wallpaper ? wallpaper_rows_
-                                                           : performance_rows_;
+        ListView &rows_view = modal_ == Modal::video         ? video_rows_
+                              : modal_ == Modal::controls    ? controls_rows_
+                              : modal_ == Modal::accent      ? accent_rows_
+                              : modal_ == Modal::wallpaper   ? wallpaper_rows_
+                              : modal_ == Modal::diagnostics ? diagnostics_rows_
+                                                             : performance_rows_;
         if (rows_view.move(key == Key::down ? 1 : -1))
         {
             option_ = rows_view.selected;
@@ -695,14 +713,16 @@ void Launcher::press_dialog(Key key)
         }
         else
         {
-            // The wallpaper's own dialog (docs/WALLPAPERS.md): the folder's images, each on its
-            // own row, with "None" above them.
+            // The wallpaper's own dialog (docs/WALLPAPERS.md): the folders' images, each on its
+            // own row, with "None" above them. The one in use is looked for again too: it may have
+            // been put in the other folder since.
             std::vector<std::string> files = services_.wallpapers();
             std::vector<std::string> images;
             for (std::string &name : files)
                 if (WallpaperImage(name))
                     images.push_back(std::move(name));
             wallpaper_files_ = std::move(images);
+            wallpaper_looked_ = false;
             open_modal(Modal::wallpaper);
             wallpaper_rows_.visible = kWallpaperRowsShown;
             wallpaper_rows_.pitch = kVideoRowPitch;
@@ -915,9 +935,16 @@ void Launcher::press_dialog(Key key)
             prefs_.reduce_motion = !prefs_.reduce_motion;
         break;
     case Modal::diagnostics:
-        if (option_ == 0)
+        if (option_ == diagnostics_backup)
+        {
+            // Back up to USB has its own dialog (backup.cpp).
+            if (activate)
+                open_backup();
+            return;
+        }
+        if (option_ == diagnostics_logging)
             prefs_.detailed_logging = !prefs_.detailed_logging;
-        else if (option_ == 1)
+        else if (option_ == diagnostics_immediate)
             prefs_.immediate_logs = !prefs_.immediate_logs;
         else
             prefs_.update_notices = !prefs_.update_notices;
@@ -967,7 +994,7 @@ void Launcher::press_dialog(Key key)
         // change arrives.
         say(tr("Saved. Applies when a game starts."));
     }
-    else if (modal_ == Modal::diagnostics && option_ == 2)
+    else if (modal_ == Modal::diagnostics && option_ == diagnostics_notices)
     {
         // Update notices: the check and its answer come as the app opens.
         say(tr("Saved. Applies the next time Nightshade opens."));
@@ -1029,9 +1056,10 @@ void Launcher::draw_dialog(Canvas &c, Modal modal, float open)
     default:
         title = tr("Diagnostics");
         sourced = update_text(tr("Says when homebrew.page has a newer version. Off, only About names it."));
-        copy = option_ == 0 ? tr("Detailed logs apply to the next game launch.") :
-               option_ == 1 ? tr("Keeps the last line before a crash, but games stutter. From the next start.") :
-                              sourced.c_str();
+        copy = option_ == diagnostics_logging   ? tr("Detailed logs apply to the next game launch.") :
+               option_ == diagnostics_immediate ? tr("Keeps the last line before a crash, but games stutter. From the next start.") :
+               option_ == diagnostics_backup    ? tr("Copies settings, profiles and save data to a USB drive.") :
+                                                  sourced.c_str();
         break;
     }
     text_shrink(c, title, 592.0f, baseline(218.0f, 62.0f, th().size_display), th().size_display,
@@ -1041,22 +1069,26 @@ void Launcher::draw_dialog(Canvas &c, Modal modal, float open)
 
     const int rows = dialog_rows(modal);
     // Video's rows scroll in a window of five, Performance's in one of four, Controls' in one
-    // of three under its shortcuts, Colour's in one of six and Wallpaper's in one of four; the
-    // other dialogs show all of theirs.
+    // of three under its shortcuts, Colour's in one of six, Wallpaper's in one of four and
+    // Diagnostics' in one of three under the setup's state; the other dialogs show all of theirs.
     const bool scrolls = modal == Modal::video || modal == Modal::performance ||
                          modal == Modal::controls || modal == Modal::accent ||
-                         modal == Modal::wallpaper;
+                         modal == Modal::wallpaper || modal == Modal::diagnostics;
     const ListView &rows_view = modal == Modal::performance    ? performance_rows_
                                 : modal == Modal::controls     ? controls_rows_
                                 : modal == Modal::accent       ? accent_rows_
                                 : modal == Modal::wallpaper    ? wallpaper_rows_
+                                : modal == Modal::diagnostics  ? diagnostics_rows_
                                                                : video_rows_;
     const Rect &window = modal == Modal::performance    ? kPerformanceWindow
                          : modal == Modal::controls     ? kControlsWindow
                          : modal == Modal::accent       ? kAccentWindow
                          : modal == Modal::wallpaper    ? kWallpaperWindow
+                         : modal == Modal::diagnostics  ? kDiagnosticsWindow
                                                         : kVideoWindow;
-    const float rows_top = modal == Modal::controls ? kControlsRowsTop : kVideoRowsTop;
+    const float rows_top = modal == Modal::controls      ? kControlsRowsTop
+                           : modal == Modal::diagnostics ? kDiagnosticsRowsTop
+                                                         : kVideoRowsTop;
     const int first = scrolls ? rows_view.first_row() : 0;
     const int last = scrolls ? rows_view.last_row() : rows - 1;
     if (scrolls)
@@ -1392,21 +1424,35 @@ void Launcher::draw_dialog(Canvas &c, Modal modal, float open)
     {
         text_block(c, services_.setup_details(), 592.0f, baseline(350.0f, 38.0f, th().size_text),
                    th().size_text, 38.0f, th().body, 736.0f, 3, kShrink);
-        static constexpr const char *kNames[] = {TR("Detailed logging"), TR("Write logs at once"),
-                                                 TR("Update notices")};
-        static constexpr const char *kAbout[] = {
+        static constexpr const char *kNames[kDiagnosticsRows] = {TR("Detailed logging"), TR("Write logs at once"),
+                                                                 TR("Update notices"), TR("Back up to USB")};
+        static constexpr const char *kAbout[kDiagnosticsRows] = {
             TR("Eden's debug messages in the logs of a game."),
             TR("Keeps the last line before a crash, but games stutter. From the next start."),
-            TR("Says when homebrew.page has a newer version. Off, only About names it.")};
-        for (int row = 0; row < 3; ++row)
+            TR("Says when homebrew.page has a newer version. Off, only About names it."),
+            TR("Copies settings, profiles and save data to a USB drive.")};
+        for (int row = first; row <= last; ++row)
         {
-            label(row, tr(kNames[row]), kToggle);
-            toggle(c, 1292.0f, row_centre(row),
-                   tween::clamp01(switches_[static_cast<std::size_t>(row)].value));
+            list.push_opacity(rows_view.row_alpha(row, kVideoRowHeight));
+            if (row == diagnostics_backup)
+            {
+                // Opens Back up to USB (backup.cpp): a hint that more is inside, as Overlay options has.
+                const float shown = text_shrink(c, ">", 1292.0f,
+                                                baseline(dialog_row_top(modal, row), 94.0f, th().size_small),
+                                                th().size_small, th().meta, 320.0f, Align::right);
+                label(row, tr(kNames[row]), shown);
+            }
+            else
+            {
+                label(row, tr(kNames[row]), kToggle);
+                toggle(c, 1292.0f, row_centre(row),
+                       tween::clamp01(switches_[static_cast<std::size_t>(row)].value));
+            }
+            list.pop_opacity();
         }
         // The folder stays available after the startup notice is gone.
         const std::string reports = services_.crash_reports_folder();
-        text_block(c, reports.empty() ? update_text(tr(kAbout[std::clamp(option_, 0, 2)])) :
+        text_block(c, reports.empty() ? update_text(tr(kAbout[std::clamp(option_, 0, kDiagnosticsRows - 1)])) :
                        fill(tr("Crash reports (FTP): {0}\nAttach crash-*.txt and its matching logs to your issue."), {reports}),
                    592.0f, baseline(772.0f, 26.0f, th().size_small),
                    th().size_small, 26.0f, th().body, 736.0f, 3, kShrink);
@@ -1428,11 +1474,14 @@ void Launcher::draw_dialog(Canvas &c, Modal modal, float open)
     }
     if (modal == Modal::wallpaper)
     {
-        // The folder the images are put in (as Performance says what its switches do).
-        const std::string folder = services_.wallpapers_folder();
-        text_block(c, folder.empty() ?
+        // The folders the images are put in (as Performance says what its switches do): the game
+        // files folder's wallpapers/ and the data folder's, or the one when they are the same.
+        const std::vector<std::string> folders = services_.wallpaper_folders();
+        text_block(c, folders.empty() ?
                           std::string{tr("Put images in the wallpapers folder to show them here.")} :
-                          fill(tr("Images in this folder: {0}"), {short_path(folder, 64)}),
+                      folders.size() == 1 ?
+                          fill(tr("Images in this folder: {0}"), {short_path(folders[0], 64)}) :
+                          fill(tr("Images in {0} and in {1}"), {short_path(folders[0], 44), short_path(folders[1], 44)}),
                    592.0f, baseline(window.y + window.h + 22.0f, 30.0f, th().size_small), th().size_small,
                    30.0f, th().meta, 736.0f, 2, kShrink);
     }
@@ -1441,10 +1490,10 @@ void Launcher::draw_dialog(Canvas &c, Modal modal, float open)
     // scroll under its shortcuts and Diagnostics' three over the crash reports' folder all end
     // lower than the other dialogs' rows.
     const float foot = scrolls || modal == Modal::diagnostics ? 848.0f : 811.0f;
-    if (!message_.empty() && scrolls)
+    if (!message_.empty() && scrolls && modal != Modal::diagnostics)
     {
         // Two lines, placed as a game's own settings place theirs: what a Video choice costs
-        // takes more than one.
+        // takes more than one. Diagnostics' one line stays under the crash reports' folder.
         notice_block(c, message_, 592.0f, foot - 6.0f, th().size_small, 26.0f,
                      message_warning_ ? th().warning : th().accent_pale, 736.0f, 2, message_warning_);
     }
@@ -1459,7 +1508,8 @@ void Launcher::draw_dialog(Canvas &c, Modal modal, float open)
             {Pad::updown, TR("Select")}, {Pad::cross, TR("Open")}, {Pad::circle, TR("Back")}};
         draw_menu_hints(c, kOpen, 3, 592.0f, foot, th().copy, 736.0f);
     }
-    else if (modal == Modal::video && option_ == video_overlay_options)
+    else if ((modal == Modal::video && option_ == video_overlay_options) ||
+             (modal == Modal::diagnostics && option_ == diagnostics_backup))
     {
         static constexpr Hint kOpen[] = {
             {Pad::updown, TR("Select")}, {Pad::cross, TR("Open")}, {Pad::circle, TR("Back")}};

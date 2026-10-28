@@ -170,6 +170,21 @@ msgstr "Automatycznie"
 msgid "Back"
 msgstr "Wstecz"
 
+#. Button hint in Back up to USB: start a backup to the highlighted USB drive. Keep it short.
+#: pe/ui/backup.cpp
+msgid "Back up"
+msgstr "Utwórz kopię"
+
+#. Settings > Diagnostics: copies the app's data (settings, profiles, save data) to a USB drive. USB stays.
+#: pe/ui/backup.cpp, pe/ui/settings.cpp
+msgid "Back up to USB"
+msgstr "Kopia zapasowa na USB"
+
+#. {0} is the backup's folder on the USB drive.
+#: pe/ui/backup.cpp
+msgid "Backed up to {0}."
+msgstr "Kopia zapisana w {0}."
+
 #: pe/ui/settings.cpp
 msgid "Backend"
 msgstr "Renderer"
@@ -177,6 +192,11 @@ msgstr "Renderer"
 #: pe/ui/save_sync.cpp
 msgid "Backing up save data"
 msgstr "Tworzenie kopii zapasowej zapisów"
+
+#. A sentence saying what was left on the drive follows it.
+#: pe/ui/backup.cpp
+msgid "Backup cancelled."
+msgstr "Kopia anulowana."
 
 #. An upscaling filter.
 #: settings_store.h
@@ -386,6 +406,16 @@ msgstr "KONTROLERY"
 #: pe/ui/library.cpp, pe/ui/settings.cpp
 msgid "Controls"
 msgstr "Sterowanie"
+
+#. What Back up to USB does; nothing is restored from there.
+#: pe/ui/backup.cpp, pe/ui/settings.cpp
+msgid "Copies settings, profiles and save data to a USB drive."
+msgstr "Kopiuje ustawienia, profile i zapisane dane na dysk USB."
+
+#. A backup's files are being copied to the USB drive. Keep it short.
+#: pe/ui/backup.cpp
+msgid "Copying"
+msgstr "Kopiowanie"
 
 #: pe/ui/settings.cpp
 msgid "Corner"
@@ -739,6 +769,11 @@ msgstr "Generowanie klatek wymaga wag MihawkGen (network.fgw)."
 msgid "Frame time"
 msgstr "Czas klatki"
 
+#. The console does not say how much room a USB drive has. Keep it short.
+#: pe/ui/backup.cpp
+msgid "Free space unknown"
+msgstr "Wolne miejsce nieznane"
+
 #: settings_store.h
 msgid "French"
 msgstr "Francuski"
@@ -849,6 +884,11 @@ msgstr "Oddaje pamięć, którą gra zostawiła pustą, po 16 KiB. Więcej wolne
 msgid "Go offline"
 msgstr "Przejdź w tryb offline"
 
+#. {0} is a folder such as /mnt/usb0/nightshade-backup: where a backup is put.
+#: pe/ui/backup.cpp
+msgid "Goes to {0}"
+msgstr "Trafi do {0}"
+
 #: pe/ui/settings.cpp
 msgid "GPU"
 msgstr "GPU"
@@ -883,6 +923,11 @@ msgstr "Jak gry są renderowane i skalowane na telewizorze."
 #: pe/ui/settings.cpp
 msgid "Images in this folder: {0}"
 msgstr "Obrazy w tym folderze: {0}"
+
+#. Under the Wallpaper list: {0} and {1} are the two folders the images are read from (the game files folder's wallpapers folder, then /data/prosperoeden/wallpapers).
+#: pe/ui/settings.cpp
+msgid "Images in {0} and in {1}"
+msgstr "Obrazy w folderach {0} i {1}"
 
 #. Button hint: copy a save in.
 #: pe/ui/library.cpp
@@ -1171,6 +1216,11 @@ msgstr "Pseudonim"
 msgid "Nickname: {0}"
 msgstr "Pseudonim: {0}"
 
+#. {0} is why (English, technical).
+#: pe/ui/backup.cpp
+msgid "Nightshade's data could not be read: {0}"
+msgstr "Nie można odczytać danych Nightshade: {0}"
+
 #: pe/ui/library.cpp
 msgid "No cheats"
 msgstr "Brak kodów"
@@ -1244,6 +1294,11 @@ msgstr "Brak folderu roms"
 msgid "No server to pair with: add a RomM server to sources.json, or set save-sync.json up over FTP."
 msgstr "Brak serwera do sparowania: dodaj serwer RomM do sources.json albo skonfiguruj save-sync.json przez FTP."
 
+#. exFAT and FAT32 are names of disk formats (unchanged).
+#: pe/ui/backup.cpp
+msgid "No USB drive is connected. Connect one formatted as exFAT or FAT32."
+msgstr "Nie podłączono dysku USB. Podłącz dysk sformatowany jako exFAT lub FAT32."
+
 #: pe/ui/pairing.cpp
 msgid "Nobody approved the code in time."
 msgstr "Nikt nie zatwierdził kodu na czas."
@@ -1256,6 +1311,11 @@ msgstr "Brak"
 #: pe/ui/remote.cpp
 msgid "Not connected yet"
 msgstr "Jeszcze nie połączono"
+
+#. {0} and {1} are sizes such as 1.2 GB.
+#: pe/ui/backup.cpp
+msgid "Not enough room on the drive: the backup needs {0}, {1} is free."
+msgstr "Za mało miejsca na dysku: kopia potrzebuje {0}, wolne jest {1}."
 
 #. Settings > Apps: the app is not on the console.
 #: pe/ui/apps.cpp
@@ -1290,6 +1350,11 @@ msgstr "Nie skonfigurowano"
 #: pe/ui/library.cpp
 msgid "Nothing to import"
 msgstr "Nic do zaimportowania"
+
+#. After a backup that was cancelled or failed: what it had written was removed.
+#: pe/ui/backup.cpp
+msgid "Nothing was left on the drive."
+msgstr "Na dysku nic nie zostało."
 
 #. A setting that is switched off.
 #: pe/ui/game_options.cpp, pe/ui/library.cpp, pe/ui/settings.cpp
@@ -1837,9 +1902,10 @@ msgstr "Wymagana konfiguracja"
 msgid "Setup required: {0} Open Settings, Game files to choose the folder that holds your keys, firmware and roms folders (or add the files to {1}), then reopen Nightshade."
 msgstr "Wymagana konfiguracja: {0} Otwórz Ustawienia, Pliki gier i wybierz folder, w którym są foldery keys, firmware i roms (lub dodaj pliki do {1}), a potem uruchom Nightshade ponownie."
 
+#. What the Diagnostics item of Settings has.
 #: pe/ui/settings.cpp
-msgid "Setup status and detailed logs."
-msgstr "Stan konfiguracji i szczegółowe logi."
+msgid "Setup status, detailed logs and a backup to USB."
+msgstr "Stan konfiguracji, szczegółowe logi i kopia zapasowa na USB."
 
 #: eden_services.cpp
 msgid "Setup validation failed. Check that firmware and key files are readable and valid."
@@ -1981,9 +2047,19 @@ msgstr "Dziękujemy całej społeczności homebrew PS5 i wszystkim twórcom, dzi
 msgid "The accent colour of the current theme."
 msgstr "Kolor akcentu bieżącego motywu."
 
+#. {0} is why (English, technical). A sentence saying what was left on the drive follows it.
+#: pe/ui/backup.cpp
+msgid "The backup failed: {0}"
+msgstr "Kopia zapasowa nie powiodła się: {0}"
+
 #: pe/ui/remote.cpp
 msgid "The download stopped"
 msgstr "Pobieranie zatrzymane"
+
+#. The USB drive ran out of room during a backup. A sentence saying what was left on it follows.
+#: pe/ui/backup.cpp
+msgid "The drive is full."
+msgstr "Dysk jest pełny."
 
 #: pe/ui/settings.cpp
 msgid "The folder that holds your keys, firmware and games."
@@ -2126,6 +2202,16 @@ msgstr "Nie można zapisać ustawień tej gry (brak ID tytułu)."
 msgid "This room uses a different protocol version."
 msgstr "Ten pokój używa innej wersji protokołu."
 
+#. Exactly one file; {0} is a size such as 1.2 GB. See '{0} game'.
+#: pe/ui/backup.cpp
+msgid "To back up: {0} in {1} file"
+msgstr "Do skopiowania: {0} w {1} pliku"
+
+#. {0} is a size such as 1.2 GB, {1} how many files (any number but one). See '{0} game'.
+#: pe/ui/backup.cpp
+msgid "To back up: {0} in {1} files"
+msgstr "Do skopiowania: {0} w {1} plikach"
+
 #. ryujinx/, save-import/ and roms/ are folder names (unchanged); {0} is the game's ID.
 #: eden_services.cpp
 msgid "To import, copy a Ryujinx folder to ryujinx/ or a save to save-import/{0}/, next to roms/."
@@ -2243,6 +2329,11 @@ msgstr "Filtr skalowania"
 msgid "USA"
 msgstr "USA"
 
+#. {0} is a number from 1 to 8: which of the USB drives connected.
+#: pe/ui/backup.cpp
+msgid "USB drive {0}"
+msgstr "Dysk USB {0}"
+
 #: pe/ui/settings.cpp
 msgid "Use another home screen, library and menu layout."
 msgstr "Użyj innego układu ekranu głównego, biblioteki i menu."
@@ -2357,6 +2448,11 @@ msgstr "z {0}"
 msgid "Without filesystem access Nightshade can't tell which apps are installed."
 msgstr "Bez dostępu do systemu plików Nightshade nie wie, które aplikacje są zainstalowane."
 
+#. Filesystem access is what the app asks the console for when it starts (as in 'Without filesystem access Nightshade can't tell which apps are installed.').
+#: pe/ui/backup.cpp
+msgid "Without filesystem access there is nothing to back up."
+msgstr "Bez dostępu do systemu plików nie ma czego skopiować."
+
 #: pe/ui/settings.cpp
 msgid "Write logs at once"
 msgstr "Zapisuj logi od razu"
@@ -2403,6 +2499,11 @@ msgstr "Nie można otworzyć {0}: {1}"
 msgid "{0} DLC"
 msgstr "{0} DLC"
 
+#. {0} is a size such as 61.0 GB: the room left on a USB drive. Keep it short.
+#: pe/ui/backup.cpp
+msgid "{0} free"
+msgstr "Wolne: {0}"
+
 #. Exactly one game. In a language with more than two plural forms, word it so that it reads well with any number (Games: {0}).
 #: pe/ui/browse.cpp, pe/ui/remote.cpp
 msgid "{0} game"
@@ -2441,6 +2542,11 @@ msgstr "{0} Hz"
 #: pe/ui/apps.cpp
 msgid "{0} is installed. The homebrew loader lists it after its next scan or a restart."
 msgstr "Zainstalowano {0}. Loader homebrew wyświetli ją po następnym skanowaniu lub ponownym uruchomieniu."
+
+#. {0} is a folder whose name ends in .incomplete: the part of a backup that could not be removed.
+#: pe/ui/backup.cpp
+msgid "{0} is left on the drive, marked incomplete: delete it."
+msgstr "Na dysku zostało {0}, oznaczone jako niepełne: usuń to."
 
 #. {0} is an app's name, {1} its new version, such as 01.000.110.
 #: pe/ui/apps.cpp

@@ -92,6 +92,8 @@ python3 -B "$root/headless/check_audio_shutdown.py" "$scratch/build/headless/cor
 "$scratch/build/bin/eden-update-files-check"
 python3 -B "$root/tools/check-update-helper.py"
 python3 -B "$root/tools/check-apps.py"
+python3 -B "$root/tools/check-wallpapers.py"
+python3 -B "$root/tools/check-backup.py"
 "$scratch/build/bin/eden-profiles-check"
 "$scratch/build/bin/eden-save-sync-check"
 "$scratch/build/bin/eden-mods-check"

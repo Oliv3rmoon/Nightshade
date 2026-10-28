@@ -24,6 +24,7 @@
 #include "remote/save_sync.h"
 #include "save_sync_config.h"
 #include "version.h"
+#include "wallpapers.h"
 #include "video_core/post_processing/fx_preset.h"
 #include "../system_keyboard.h"
 #include "common/string_util.h"
@@ -611,6 +612,17 @@ EdenServices::EdenServices(std::string launch_error, Eden::Multiplayer::RoomClie
     (void)mkdir(Eden::ConfigDir().c_str(), 0777);
     // The folder the wallpapers are put in (docs/WALLPAPERS.md), so it exists to be filled.
     (void)mkdir(Eden::WallpapersDir().c_str(), 0777);
+    // Back up to USB: the data folder, less what the games folder keeps there, to /mnt/usb0 to 7.
+    {
+        Eden::Backup::Setup backup;
+        backup.data = Eden::kDataDir;
+        backup.games = Eden::GamesDir();
+        backup.drives = Eden::Backup::UsbDrives();
+        backup.version = Eden::kAppVersion;
+        backup.access = Eden::FilesystemAccess();
+        backup.platform = Eden::Backup::Native();
+        backup_ = std::make_unique<Eden::Backup::Worker>(std::move(backup));
+    }
     // Who is playing (profiles.h): the profile this PS5 user chose last, else the one chosen last.
     (void)sceUserServiceInitialize(nullptr); // already done by the controller code: refused, harmless
     if (sceUserServiceGetForegroundUser(&user_) < 0) user_ = -1;
@@ -929,6 +941,17 @@ void EdenServices::cancel_app() { Eden::Apps::Cancel(); }
 void EdenServices::finish_app() { Eden::Apps::Finish(); }
 
 pe::ui::AppOpen EdenServices::open_app(int app, std::string* reason) { return Eden::Apps::Open(app, reason); }
+
+// Settings > Diagnostics > Back up to USB (backup.h): /data/prosperoeden to a USB drive.
+void EdenServices::refresh_backup() { backup_->Refresh(); }
+
+pe::ui::BackupStatus EdenServices::backup_status() { return backup_->Status(); }
+
+bool EdenServices::start_backup(int drive, std::string* reason) { return backup_->Start(drive, reason); }
+
+void EdenServices::cancel_backup() { backup_->Cancel(); }
+
+void EdenServices::finish_backup() { backup_->Finish(); }
 
 std::vector<pe::ui::Profile> EdenServices::profiles() {
     const auto who = Eden::Profiles::Resolve(user_);
@@ -1317,12 +1340,24 @@ bool EdenServices::folders(const std::string& directory, std::vector<std::string
     return ok;
 }
 
-std::vector<std::string> EdenServices::wallpapers() {
-    bool ok = false;
-    return ListEntries(Eden::WallpapersDir(), false, ok);
+// The wallpapers (wallpapers.h): the game files folder's wallpapers/, which a player can fill on a PC
+// with the rest of that folder, then the data folder's.
+std::vector<std::string> EdenServices::wallpaper_folders() {
+    return Eden::Wallpapers::Folders(Eden::AssetsDir(), Eden::WallpapersDir());
 }
 
-std::string EdenServices::wallpapers_folder() { return Eden::WallpapersDir(); }
+std::vector<std::string> EdenServices::wallpapers() {
+    return Eden::Wallpapers::Names(
+        Eden::Wallpapers::List(wallpaper_folders(), [](const std::string& folder, std::vector<std::string>* files) {
+            bool ok = false;
+            *files = ListEntries(folder, false, ok);
+            return ok;
+        }));
+}
+
+std::string EdenServices::wallpaper_file(const std::string& name) {
+    return Eden::Wallpapers::Find(wallpaper_folders(), name, [](const std::string& path) { return IsFile(path); });
+}
 
 pe::ui::FolderInfo EdenServices::folder_info(const std::string& directory) {
     pe::ui::FolderInfo info;

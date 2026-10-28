@@ -170,6 +170,21 @@ msgstr "Automatisch"
 msgid "Back"
 msgstr "Terug"
 
+#. Button hint in Back up to USB: start a backup to the highlighted USB drive. Keep it short.
+#: pe/ui/backup.cpp
+msgid "Back up"
+msgstr "Back-up"
+
+#. Settings > Diagnostics: copies the app's data (settings, profiles, save data) to a USB drive. USB stays.
+#: pe/ui/backup.cpp, pe/ui/settings.cpp
+msgid "Back up to USB"
+msgstr "Back-up naar USB"
+
+#. {0} is the backup's folder on the USB drive.
+#: pe/ui/backup.cpp
+msgid "Backed up to {0}."
+msgstr "Back-up gemaakt in {0}."
+
 #: pe/ui/settings.cpp
 msgid "Backend"
 msgstr "Renderer"
@@ -177,6 +192,11 @@ msgstr "Renderer"
 #: pe/ui/save_sync.cpp
 msgid "Backing up save data"
 msgstr "Back-up van opgeslagen data maken"
+
+#. A sentence saying what was left on the drive follows it.
+#: pe/ui/backup.cpp
+msgid "Backup cancelled."
+msgstr "Back-up geannuleerd."
 
 #. An upscaling filter.
 #: settings_store.h
@@ -386,6 +406,16 @@ msgstr "CONTROLLERS"
 #: pe/ui/library.cpp, pe/ui/settings.cpp
 msgid "Controls"
 msgstr "Besturing"
+
+#. What Back up to USB does; nothing is restored from there.
+#: pe/ui/backup.cpp, pe/ui/settings.cpp
+msgid "Copies settings, profiles and save data to a USB drive."
+msgstr "Kopieert instellingen, profielen en opgeslagen data naar een USB-schijf."
+
+#. A backup's files are being copied to the USB drive. Keep it short.
+#: pe/ui/backup.cpp
+msgid "Copying"
+msgstr "Kopiëren"
 
 #: pe/ui/settings.cpp
 msgid "Corner"
@@ -739,6 +769,11 @@ msgstr "Framegeneratie heeft de MihawkGen-gewichten (network.fgw) nodig."
 msgid "Frame time"
 msgstr "Frametijd"
 
+#. The console does not say how much room a USB drive has. Keep it short.
+#: pe/ui/backup.cpp
+msgid "Free space unknown"
+msgstr "Vrije ruimte onbekend"
+
 #: settings_store.h
 msgid "French"
 msgstr "Frans"
@@ -849,6 +884,11 @@ msgstr "Geeft geheugen terug dat een game leeg liet, 16 KiB per keer. Meer vrij 
 msgid "Go offline"
 msgstr "Offline gaan"
 
+#. {0} is a folder such as /mnt/usb0/nightshade-backup: where a backup is put.
+#: pe/ui/backup.cpp
+msgid "Goes to {0}"
+msgstr "Naar {0}"
+
 #: pe/ui/settings.cpp
 msgid "GPU"
 msgstr "GPU"
@@ -883,6 +923,11 @@ msgstr "Hoe games worden weergegeven en geschaald naar je tv."
 #: pe/ui/settings.cpp
 msgid "Images in this folder: {0}"
 msgstr "Afbeeldingen in deze map: {0}"
+
+#. Under the Wallpaper list: {0} and {1} are the two folders the images are read from (the game files folder's wallpapers folder, then /data/prosperoeden/wallpapers).
+#: pe/ui/settings.cpp
+msgid "Images in {0} and in {1}"
+msgstr "Afbeeldingen in {0} en in {1}"
 
 #. Button hint: copy a save in.
 #: pe/ui/library.cpp
@@ -1171,6 +1216,11 @@ msgstr "Bijnaam"
 msgid "Nickname: {0}"
 msgstr "Bijnaam: {0}"
 
+#. {0} is why (English, technical).
+#: pe/ui/backup.cpp
+msgid "Nightshade's data could not be read: {0}"
+msgstr "De data van Nightshade kon niet worden gelezen: {0}"
+
 #: pe/ui/library.cpp
 msgid "No cheats"
 msgstr "Geen cheats"
@@ -1244,6 +1294,11 @@ msgstr "Geen roms-map"
 msgid "No server to pair with: add a RomM server to sources.json, or set save-sync.json up over FTP."
 msgstr "Geen server om mee te koppelen: voeg een RomM-server toe aan sources.json of stel save-sync.json in via FTP."
 
+#. exFAT and FAT32 are names of disk formats (unchanged).
+#: pe/ui/backup.cpp
+msgid "No USB drive is connected. Connect one formatted as exFAT or FAT32."
+msgstr "Er is geen USB-schijf aangesloten. Sluit er een aan die als exFAT of FAT32 is geformatteerd."
+
 #: pe/ui/pairing.cpp
 msgid "Nobody approved the code in time."
 msgstr "Niemand heeft de code op tijd goedgekeurd."
@@ -1256,6 +1311,11 @@ msgstr "Geen"
 #: pe/ui/remote.cpp
 msgid "Not connected yet"
 msgstr "Nog niet verbonden"
+
+#. {0} and {1} are sizes such as 1.2 GB.
+#: pe/ui/backup.cpp
+msgid "Not enough room on the drive: the backup needs {0}, {1} is free."
+msgstr "Niet genoeg ruimte op de schijf: de back-up heeft {0} nodig, {1} is vrij."
 
 #. Settings > Apps: the app is not on the console.
 #: pe/ui/apps.cpp
@@ -1290,6 +1350,11 @@ msgstr "Niet ingesteld"
 #: pe/ui/library.cpp
 msgid "Nothing to import"
 msgstr "Niets te importeren"
+
+#. After a backup that was cancelled or failed: what it had written was removed.
+#: pe/ui/backup.cpp
+msgid "Nothing was left on the drive."
+msgstr "Er is niets op de schijf achtergebleven."
 
 #. A setting that is switched off.
 #: pe/ui/game_options.cpp, pe/ui/library.cpp, pe/ui/settings.cpp
@@ -1837,9 +1902,10 @@ msgstr "Configuratie vereist"
 msgid "Setup required: {0} Open Settings, Game files to choose the folder that holds your keys, firmware and roms folders (or add the files to {1}), then reopen Nightshade."
 msgstr "Configuratie vereist: {0} Open Instellingen > Gamebestanden en kies de map waarin je mappen keys, firmware en roms staan (of zet de bestanden in {1}). Open Nightshade daarna opnieuw."
 
+#. What the Diagnostics item of Settings has.
 #: pe/ui/settings.cpp
-msgid "Setup status and detailed logs."
-msgstr "Configuratiestatus en uitgebreide logs."
+msgid "Setup status, detailed logs and a backup to USB."
+msgstr "Configuratiestatus, uitgebreide logs en een back-up naar USB."
 
 #: eden_services.cpp
 msgid "Setup validation failed. Check that firmware and key files are readable and valid."
@@ -1981,9 +2047,19 @@ msgstr "Dank aan de hele PS5-homebrewcommunity en aan elke ontwikkelaar wiens dr
 msgid "The accent colour of the current theme."
 msgstr "De accentkleur van het huidige thema."
 
+#. {0} is why (English, technical). A sentence saying what was left on the drive follows it.
+#: pe/ui/backup.cpp
+msgid "The backup failed: {0}"
+msgstr "De back-up is mislukt: {0}"
+
 #: pe/ui/remote.cpp
 msgid "The download stopped"
 msgstr "De download is gestopt"
+
+#. The USB drive ran out of room during a backup. A sentence saying what was left on it follows.
+#: pe/ui/backup.cpp
+msgid "The drive is full."
+msgstr "De schijf is vol."
 
 #: pe/ui/settings.cpp
 msgid "The folder that holds your keys, firmware and games."
@@ -2126,6 +2202,16 @@ msgstr "Kan de instellingen van deze game niet opslaan (geen titel-ID)."
 msgid "This room uses a different protocol version."
 msgstr "Deze kamer gebruikt een andere protocolversie."
 
+#. Exactly one file; {0} is a size such as 1.2 GB. See '{0} game'.
+#: pe/ui/backup.cpp
+msgid "To back up: {0} in {1} file"
+msgstr "Te kopiëren: {0} in {1} bestand"
+
+#. {0} is a size such as 1.2 GB, {1} how many files (any number but one). See '{0} game'.
+#: pe/ui/backup.cpp
+msgid "To back up: {0} in {1} files"
+msgstr "Te kopiëren: {0} in {1} bestanden"
+
 #. ryujinx/, save-import/ and roms/ are folder names (unchanged); {0} is the game's ID.
 #: eden_services.cpp
 msgid "To import, copy a Ryujinx folder to ryujinx/ or a save to save-import/{0}/, next to roms/."
@@ -2243,6 +2329,11 @@ msgstr "Upscalingfilter"
 msgid "USA"
 msgstr "VS"
 
+#. {0} is a number from 1 to 8: which of the USB drives connected.
+#: pe/ui/backup.cpp
+msgid "USB drive {0}"
+msgstr "USB-schijf {0}"
+
 #: pe/ui/settings.cpp
 msgid "Use another home screen, library and menu layout."
 msgstr "Gebruik een andere indeling voor startscherm, bibliotheek en menu."
@@ -2357,6 +2448,11 @@ msgstr "met {0}"
 msgid "Without filesystem access Nightshade can't tell which apps are installed."
 msgstr "Zonder toegang tot het bestandssysteem kan Nightshade niet zien welke apps er geïnstalleerd zijn."
 
+#. Filesystem access is what the app asks the console for when it starts (as in 'Without filesystem access Nightshade can't tell which apps are installed.').
+#: pe/ui/backup.cpp
+msgid "Without filesystem access there is nothing to back up."
+msgstr "Zonder toegang tot het bestandssysteem valt er niets te back-uppen."
+
 #: pe/ui/settings.cpp
 msgid "Write logs at once"
 msgstr "Logs direct schrijven"
@@ -2403,6 +2499,11 @@ msgstr "{0} kon niet worden geopend: {1}"
 msgid "{0} DLC"
 msgstr "{0} DLC"
 
+#. {0} is a size such as 61.0 GB: the room left on a USB drive. Keep it short.
+#: pe/ui/backup.cpp
+msgid "{0} free"
+msgstr "{0} vrij"
+
 #. Exactly one game. In a language with more than two plural forms, word it so that it reads well with any number (Games: {0}).
 #: pe/ui/browse.cpp, pe/ui/remote.cpp
 msgid "{0} game"
@@ -2441,6 +2542,11 @@ msgstr "{0} Hz"
 #: pe/ui/apps.cpp
 msgid "{0} is installed. The homebrew loader lists it after its next scan or a restart."
 msgstr "{0} is geïnstalleerd. De homebrew-loader toont hem na zijn volgende scan of een herstart."
+
+#. {0} is a folder whose name ends in .incomplete: the part of a backup that could not be removed.
+#: pe/ui/backup.cpp
+msgid "{0} is left on the drive, marked incomplete: delete it."
+msgstr "{0} is op de schijf achtergebleven, gemarkeerd als onvolledig: verwijder het."
 
 #. {0} is an app's name, {1} its new version, such as 01.000.110.
 #: pe/ui/apps.cpp

@@ -170,6 +170,21 @@ msgstr "Automatikus"
 msgid "Back"
 msgstr "Vissza"
 
+#. Button hint in Back up to USB: start a backup to the highlighted USB drive. Keep it short.
+#: pe/ui/backup.cpp
+msgid "Back up"
+msgstr "Mentés indítása"
+
+#. Settings > Diagnostics: copies the app's data (settings, profiles, save data) to a USB drive. USB stays.
+#: pe/ui/backup.cpp, pe/ui/settings.cpp
+msgid "Back up to USB"
+msgstr "Biztonsági mentés USB-re"
+
+#. {0} is the backup's folder on the USB drive.
+#: pe/ui/backup.cpp
+msgid "Backed up to {0}."
+msgstr "Mentve ide: {0}."
+
 #: pe/ui/settings.cpp
 msgid "Backend"
 msgstr "Renderelő"
@@ -177,6 +192,11 @@ msgstr "Renderelő"
 #: pe/ui/save_sync.cpp
 msgid "Backing up save data"
 msgstr "Biztonsági másolat készül a mentésekről"
+
+#. A sentence saying what was left on the drive follows it.
+#: pe/ui/backup.cpp
+msgid "Backup cancelled."
+msgstr "A mentés megszakítva."
 
 #. An upscaling filter.
 #: settings_store.h
@@ -386,6 +406,16 @@ msgstr "VEZÉRLŐK"
 #: pe/ui/library.cpp, pe/ui/settings.cpp
 msgid "Controls"
 msgstr "Irányítás"
+
+#. What Back up to USB does; nothing is restored from there.
+#: pe/ui/backup.cpp, pe/ui/settings.cpp
+msgid "Copies settings, profiles and save data to a USB drive."
+msgstr "Átmásolja a beállításokat, a profilokat és a mentett adatokat egy USB-meghajtóra."
+
+#. A backup's files are being copied to the USB drive. Keep it short.
+#: pe/ui/backup.cpp
+msgid "Copying"
+msgstr "Másolás"
 
 #: pe/ui/settings.cpp
 msgid "Corner"
@@ -739,6 +769,11 @@ msgstr "A képkockagenerálásnak a MihawkGen súlyai kellenek (network.fgw)."
 msgid "Frame time"
 msgstr "Képkockaidő"
 
+#. The console does not say how much room a USB drive has. Keep it short.
+#: pe/ui/backup.cpp
+msgid "Free space unknown"
+msgstr "A szabad hely ismeretlen"
+
 #: settings_store.h
 msgid "French"
 msgstr "Francia"
@@ -849,6 +884,11 @@ msgstr "Visszaadja a játék által üresen hagyott memóriát, 16 KiB-onként. 
 msgid "Go offline"
 msgstr "Váltás offline módra"
 
+#. {0} is a folder such as /mnt/usb0/nightshade-backup: where a backup is put.
+#: pe/ui/backup.cpp
+msgid "Goes to {0}"
+msgstr "Ide kerül: {0}"
+
 #: pe/ui/settings.cpp
 msgid "GPU"
 msgstr "GPU"
@@ -883,6 +923,11 @@ msgstr "A játékok megjelenítése és skálázása a TV-re."
 #: pe/ui/settings.cpp
 msgid "Images in this folder: {0}"
 msgstr "Képek ebben a mappában: {0}"
+
+#. Under the Wallpaper list: {0} and {1} are the two folders the images are read from (the game files folder's wallpapers folder, then /data/prosperoeden/wallpapers).
+#: pe/ui/settings.cpp
+msgid "Images in {0} and in {1}"
+msgstr "Képek ezekben a mappákban: {0} és {1}"
 
 #. Button hint: copy a save in.
 #: pe/ui/library.cpp
@@ -1171,6 +1216,11 @@ msgstr "Becenév"
 msgid "Nickname: {0}"
 msgstr "Becenév: {0}"
 
+#. {0} is why (English, technical).
+#: pe/ui/backup.cpp
+msgid "Nightshade's data could not be read: {0}"
+msgstr "A Nightshade adatai nem olvashatók: {0}"
+
 #: pe/ui/library.cpp
 msgid "No cheats"
 msgstr "Nincs csalás"
@@ -1244,6 +1294,11 @@ msgstr "Nincs roms mappa"
 msgid "No server to pair with: add a RomM server to sources.json, or set save-sync.json up over FTP."
 msgstr "Nincs párosítható szerver: adj hozzá egy RomM-szervert a sources.json fájlhoz, vagy állítsd be a save-sync.json fájlt FTP-n."
 
+#. exFAT and FAT32 are names of disk formats (unchanged).
+#: pe/ui/backup.cpp
+msgid "No USB drive is connected. Connect one formatted as exFAT or FAT32."
+msgstr "Nincs csatlakoztatva USB-meghajtó. Csatlakoztass egy exFAT vagy FAT32 formátumút."
+
 #: pe/ui/pairing.cpp
 msgid "Nobody approved the code in time."
 msgstr "Senki sem hagyta jóvá időben a kódot."
@@ -1256,6 +1311,11 @@ msgstr "Nincs"
 #: pe/ui/remote.cpp
 msgid "Not connected yet"
 msgstr "Még nincs kapcsolat"
+
+#. {0} and {1} are sizes such as 1.2 GB.
+#: pe/ui/backup.cpp
+msgid "Not enough room on the drive: the backup needs {0}, {1} is free."
+msgstr "Nincs elég hely a meghajtón: a mentéshez {0} kell, szabad {1}."
 
 #. Settings > Apps: the app is not on the console.
 #: pe/ui/apps.cpp
@@ -1290,6 +1350,11 @@ msgstr "Nincs beállítva"
 #: pe/ui/library.cpp
 msgid "Nothing to import"
 msgstr "Nincs mit importálni"
+
+#. After a backup that was cancelled or failed: what it had written was removed.
+#: pe/ui/backup.cpp
+msgid "Nothing was left on the drive."
+msgstr "Semmi sem maradt a meghajtón."
 
 #. A setting that is switched off.
 #: pe/ui/game_options.cpp, pe/ui/library.cpp, pe/ui/settings.cpp
@@ -1837,9 +1902,10 @@ msgstr "Előkészítés szükséges"
 msgid "Setup required: {0} Open Settings, Game files to choose the folder that holds your keys, firmware and roms folders (or add the files to {1}), then reopen Nightshade."
 msgstr "Előkészítés szükséges: {0} Nyisd meg a Beállítások, Játékfájlok menüt, és válaszd ki azt a mappát, amelyben a keys, firmware és roms mappa van (vagy tedd a fájlokat ide: {1}), majd indítsd újra a Nightshade alkalmazást."
 
+#. What the Diagnostics item of Settings has.
 #: pe/ui/settings.cpp
-msgid "Setup status and detailed logs."
-msgstr "Az előkészítés állapota és részletes naplók."
+msgid "Setup status, detailed logs and a backup to USB."
+msgstr "Az előkészítés állapota, részletes naplók és biztonsági mentés USB-re."
 
 #: eden_services.cpp
 msgid "Setup validation failed. Check that firmware and key files are readable and valid."
@@ -1981,9 +2047,19 @@ msgstr "Köszönet a teljes PS5 homebrew közösségnek és minden fejlesztőnek
 msgid "The accent colour of the current theme."
 msgstr "Az aktuális téma kiemelőszíne."
 
+#. {0} is why (English, technical). A sentence saying what was left on the drive follows it.
+#: pe/ui/backup.cpp
+msgid "The backup failed: {0}"
+msgstr "A biztonsági mentés nem sikerült: {0}"
+
 #: pe/ui/remote.cpp
 msgid "The download stopped"
 msgstr "A letöltés leállt"
+
+#. The USB drive ran out of room during a backup. A sentence saying what was left on it follows.
+#: pe/ui/backup.cpp
+msgid "The drive is full."
+msgstr "A meghajtó megtelt."
 
 #: pe/ui/settings.cpp
 msgid "The folder that holds your keys, firmware and games."
@@ -2126,6 +2202,16 @@ msgstr "A játék beállításai nem menthetők (nincs játékazonosító)."
 msgid "This room uses a different protocol version."
 msgstr "Ez a szoba más protokollverziót használ."
 
+#. Exactly one file; {0} is a size such as 1.2 GB. See '{0} game'.
+#: pe/ui/backup.cpp
+msgid "To back up: {0} in {1} file"
+msgstr "Mentendő: {0}, {1} fájl"
+
+#. {0} is a size such as 1.2 GB, {1} how many files (any number but one). See '{0} game'.
+#: pe/ui/backup.cpp
+msgid "To back up: {0} in {1} files"
+msgstr "Mentendő: {0}, {1} fájl"
+
 #. ryujinx/, save-import/ and roms/ are folder names (unchanged); {0} is the game's ID.
 #: eden_services.cpp
 msgid "To import, copy a Ryujinx folder to ryujinx/ or a save to save-import/{0}/, next to roms/."
@@ -2243,6 +2329,11 @@ msgstr "Felskálázó szűrő"
 msgid "USA"
 msgstr "USA"
 
+#. {0} is a number from 1 to 8: which of the USB drives connected.
+#: pe/ui/backup.cpp
+msgid "USB drive {0}"
+msgstr "{0}. USB-meghajtó"
+
 #: pe/ui/settings.cpp
 msgid "Use another home screen, library and menu layout."
 msgstr "Másik kezdőképernyő-, könyvtár- és menüelrendezés használata."
@@ -2357,6 +2448,11 @@ msgstr "ezzel: {0}"
 msgid "Without filesystem access Nightshade can't tell which apps are installed."
 msgstr "Fájlrendszer-hozzáférés nélkül a Nightshade nem tudja, mely alkalmazások vannak telepítve."
 
+#. Filesystem access is what the app asks the console for when it starts (as in 'Without filesystem access Nightshade can't tell which apps are installed.').
+#: pe/ui/backup.cpp
+msgid "Without filesystem access there is nothing to back up."
+msgstr "Fájlrendszer-hozzáférés nélkül nincs mit menteni."
+
 #: pe/ui/settings.cpp
 msgid "Write logs at once"
 msgstr "Naplók azonnali írása"
@@ -2403,6 +2499,11 @@ msgstr "{0} megnyitása nem sikerült: {1}"
 msgid "{0} DLC"
 msgstr "{0} DLC"
 
+#. {0} is a size such as 61.0 GB: the room left on a USB drive. Keep it short.
+#: pe/ui/backup.cpp
+msgid "{0} free"
+msgstr "{0} szabad"
+
 #. Exactly one game. In a language with more than two plural forms, word it so that it reads well with any number (Games: {0}).
 #: pe/ui/browse.cpp, pe/ui/remote.cpp
 msgid "{0} game"
@@ -2441,6 +2542,11 @@ msgstr "{0} Hz"
 #: pe/ui/apps.cpp
 msgid "{0} is installed. The homebrew loader lists it after its next scan or a restart."
 msgstr "{0} telepítve. A homebrew-betöltő a következő keresése vagy egy újraindítás után listázza."
+
+#. {0} is a folder whose name ends in .incomplete: the part of a backup that could not be removed.
+#: pe/ui/backup.cpp
+msgid "{0} is left on the drive, marked incomplete: delete it."
+msgstr "{0} a meghajtón maradt, befejezetlenként jelölve: töröld."
 
 #. {0} is an app's name, {1} its new version, such as 01.000.110.
 #: pe/ui/apps.cpp

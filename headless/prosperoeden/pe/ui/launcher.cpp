@@ -255,6 +255,8 @@ void Launcher::press(Key key)
         return press_sources(key);
     if (modal_ == Modal::apps)
         return press_apps(key);
+    if (modal_ == Modal::backup)
+        return press_backup(key);
     if (modal_ == Modal::save_sync)
         return press_save_sync(key);
     if (modal_ == Modal::sync_setup)
@@ -317,12 +319,15 @@ void Launcher::update(float dt)
     message_age_ += dt;
     backdrop_.update(dt);
     // The wallpaper (Settings > Appearance > Wallpaper): the same call with the same file does
-    // nothing, so the choice is only read when it changed.
+    // nothing, so the choice is only read when it changed. Which folder has it (the game files
+    // folder's or the data folder's) is looked up when the choice changes.
+    if (!wallpaper_looked_ || wallpaper_name_ != prefs_.wallpaper)
     {
-        const std::string folder = services_.wallpapers_folder();
-        textures_.load_wallpaper(
-            prefs_.wallpaper.empty() || folder.empty() ? std::string{} : folder + "/" + prefs_.wallpaper);
+        wallpaper_name_ = prefs_.wallpaper;
+        wallpaper_path_ = prefs_.wallpaper.empty() ? std::string{} : services_.wallpaper_file(prefs_.wallpaper);
+        wallpaper_looked_ = true;
     }
+    textures_.load_wallpaper(wallpaper_path_);
     if (th().game_backdrop)
     {
         if (screen_ == Screen::home && !home_.last_cover.empty())
@@ -336,6 +341,7 @@ void Launcher::update(float dt)
     finish_scan(false);
     poll_sources(dt);
     poll_apps(dt);
+    poll_backup(dt);
     poll_save_sync(dt);
     poll_pairing(dt);
     refresh_sync_setup(dt);
@@ -390,6 +396,7 @@ void Launcher::update(float dt)
     controls_rows_.update(dt);
     accent_rows_.update(dt);
     wallpaper_rows_.update(dt);
+    diagnostics_rows_.update(dt);
     game_rows_.update(dt);
     mod_rows_.update(dt);
     cheat_rows_.update(dt);
@@ -401,6 +408,7 @@ void Launcher::update(float dt)
     profile_rows_.update(dt);
     source_rows_.update(dt);
     app_rows_.update(dt);
+    backup_rows_.update(dt);
     choice_rows_.update(dt);
     sync_rows_.update(dt);
     sync_setup_rows_.update(dt);
@@ -809,6 +817,8 @@ void Launcher::draw(gfx::DrawList &list)
             draw_sources(c, opened);
         else if (modal_shown_ == Modal::apps)
             draw_apps(c, opened);
+        else if (modal_shown_ == Modal::backup)
+            draw_backup(c, opened);
         else
             draw_dialog(c, modal_shown_, opened);
     }

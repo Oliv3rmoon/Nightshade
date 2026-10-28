@@ -170,6 +170,21 @@ msgstr "自动"
 msgid "Back"
 msgstr "返回"
 
+#. Button hint in Back up to USB: start a backup to the highlighted USB drive. Keep it short.
+#: pe/ui/backup.cpp
+msgid "Back up"
+msgstr "备份"
+
+#. Settings > Diagnostics: copies the app's data (settings, profiles, save data) to a USB drive. USB stays.
+#: pe/ui/backup.cpp, pe/ui/settings.cpp
+msgid "Back up to USB"
+msgstr "备份到 USB"
+
+#. {0} is the backup's folder on the USB drive.
+#: pe/ui/backup.cpp
+msgid "Backed up to {0}."
+msgstr "已备份到 {0}。"
+
 #: pe/ui/settings.cpp
 msgid "Backend"
 msgstr "渲染器"
@@ -177,6 +192,11 @@ msgstr "渲染器"
 #: pe/ui/save_sync.cpp
 msgid "Backing up save data"
 msgstr "正在备份存档数据"
+
+#. A sentence saying what was left on the drive follows it.
+#: pe/ui/backup.cpp
+msgid "Backup cancelled."
+msgstr "已取消备份。"
 
 #. An upscaling filter.
 #: settings_store.h
@@ -386,6 +406,16 @@ msgstr "手柄"
 #: pe/ui/library.cpp, pe/ui/settings.cpp
 msgid "Controls"
 msgstr "操作"
+
+#. What Back up to USB does; nothing is restored from there.
+#: pe/ui/backup.cpp, pe/ui/settings.cpp
+msgid "Copies settings, profiles and save data to a USB drive."
+msgstr "将设置、玩家档案和存档数据复制到 USB 驱动器。"
+
+#. A backup's files are being copied to the USB drive. Keep it short.
+#: pe/ui/backup.cpp
+msgid "Copying"
+msgstr "正在复制"
 
 #: pe/ui/settings.cpp
 msgid "Corner"
@@ -739,6 +769,11 @@ msgstr "帧生成需要 MihawkGen 权重 (network.fgw)。"
 msgid "Frame time"
 msgstr "帧时间"
 
+#. The console does not say how much room a USB drive has. Keep it short.
+#: pe/ui/backup.cpp
+msgid "Free space unknown"
+msgstr "可用空间未知"
+
 #: settings_store.h
 msgid "French"
 msgstr "法语"
@@ -849,6 +884,11 @@ msgstr "以 16 KiB 为单位归还游戏留空的内存。可用内存更多；�
 msgid "Go offline"
 msgstr "切换为离线"
 
+#. {0} is a folder such as /mnt/usb0/nightshade-backup: where a backup is put.
+#: pe/ui/backup.cpp
+msgid "Goes to {0}"
+msgstr "保存到 {0}"
+
 #: pe/ui/settings.cpp
 msgid "GPU"
 msgstr "GPU"
@@ -883,6 +923,11 @@ msgstr "游戏的绘制方式，以及如何缩放到电视。"
 #: pe/ui/settings.cpp
 msgid "Images in this folder: {0}"
 msgstr "此文件夹中的图片：{0}"
+
+#. Under the Wallpaper list: {0} and {1} are the two folders the images are read from (the game files folder's wallpapers folder, then /data/prosperoeden/wallpapers).
+#: pe/ui/settings.cpp
+msgid "Images in {0} and in {1}"
+msgstr "这些文件夹中的图片：{0} 和 {1}"
 
 #. Button hint: copy a save in.
 #: pe/ui/library.cpp
@@ -1171,6 +1216,11 @@ msgstr "昵称"
 msgid "Nickname: {0}"
 msgstr "昵称：{0}"
 
+#. {0} is why (English, technical).
+#: pe/ui/backup.cpp
+msgid "Nightshade's data could not be read: {0}"
+msgstr "无法读取 Nightshade 的数据：{0}"
+
 #: pe/ui/library.cpp
 msgid "No cheats"
 msgstr "没有金手指"
@@ -1244,6 +1294,11 @@ msgstr "没有 roms 文件夹"
 msgid "No server to pair with: add a RomM server to sources.json, or set save-sync.json up over FTP."
 msgstr "没有可配对的服务器：请在 sources.json 中添加 RomM 服务器，或通过 FTP 设置 save-sync.json。"
 
+#. exFAT and FAT32 are names of disk formats (unchanged).
+#: pe/ui/backup.cpp
+msgid "No USB drive is connected. Connect one formatted as exFAT or FAT32."
+msgstr "未连接 USB 驱动器。请连接一个格式化为 exFAT 或 FAT32 的驱动器。"
+
 #: pe/ui/pairing.cpp
 msgid "Nobody approved the code in time."
 msgstr "无人及时批准代码。"
@@ -1256,6 +1311,11 @@ msgstr "无"
 #: pe/ui/remote.cpp
 msgid "Not connected yet"
 msgstr "尚未连接"
+
+#. {0} and {1} are sizes such as 1.2 GB.
+#: pe/ui/backup.cpp
+msgid "Not enough room on the drive: the backup needs {0}, {1} is free."
+msgstr "驱动器空间不足：备份需要 {0}，可用 {1}。"
 
 #. Settings > Apps: the app is not on the console.
 #: pe/ui/apps.cpp
@@ -1290,6 +1350,11 @@ msgstr "未设置"
 #: pe/ui/library.cpp
 msgid "Nothing to import"
 msgstr "没有可导入的内容"
+
+#. After a backup that was cancelled or failed: what it had written was removed.
+#: pe/ui/backup.cpp
+msgid "Nothing was left on the drive."
+msgstr "驱动器上未留下任何内容。"
 
 #. A setting that is switched off.
 #: pe/ui/game_options.cpp, pe/ui/library.cpp, pe/ui/settings.cpp
@@ -1837,9 +1902,10 @@ msgstr "需要设置"
 msgid "Setup required: {0} Open Settings, Game files to choose the folder that holds your keys, firmware and roms folders (or add the files to {1}), then reopen Nightshade."
 msgstr "需要设置：{0} 请打开“设置”中的“游戏文件”，选择存放 keys、firmware 和 roms 文件夹的文件夹（或将文件放入 {1}），然后重新打开 Nightshade。"
 
+#. What the Diagnostics item of Settings has.
 #: pe/ui/settings.cpp
-msgid "Setup status and detailed logs."
-msgstr "设置状态和详细日志。"
+msgid "Setup status, detailed logs and a backup to USB."
+msgstr "设置状态、详细日志和 USB 备份。"
 
 #: eden_services.cpp
 msgid "Setup validation failed. Check that firmware and key files are readable and valid."
@@ -1981,9 +2047,19 @@ msgstr "感谢整个 PS5 自制软件社区，以及让 Nightshade 成为可能�
 msgid "The accent colour of the current theme."
 msgstr "当前主题的强调色。"
 
+#. {0} is why (English, technical). A sentence saying what was left on the drive follows it.
+#: pe/ui/backup.cpp
+msgid "The backup failed: {0}"
+msgstr "备份失败：{0}"
+
 #: pe/ui/remote.cpp
 msgid "The download stopped"
 msgstr "下载已中断"
+
+#. The USB drive ran out of room during a backup. A sentence saying what was left on it follows.
+#: pe/ui/backup.cpp
+msgid "The drive is full."
+msgstr "驱动器已满。"
 
 #: pe/ui/settings.cpp
 msgid "The folder that holds your keys, firmware and games."
@@ -2126,6 +2202,16 @@ msgstr "无法保存此游戏的设置（没有游戏 ID）。"
 msgid "This room uses a different protocol version."
 msgstr "此房间使用不同的协议版本。"
 
+#. Exactly one file; {0} is a size such as 1.2 GB. See '{0} game'.
+#: pe/ui/backup.cpp
+msgid "To back up: {0} in {1} file"
+msgstr "待备份：{0}，{1} 个文件"
+
+#. {0} is a size such as 1.2 GB, {1} how many files (any number but one). See '{0} game'.
+#: pe/ui/backup.cpp
+msgid "To back up: {0} in {1} files"
+msgstr "待备份：{0}，{1} 个文件"
+
 #. ryujinx/, save-import/ and roms/ are folder names (unchanged); {0} is the game's ID.
 #: eden_services.cpp
 msgid "To import, copy a Ryujinx folder to ryujinx/ or a save to save-import/{0}/, next to roms/."
@@ -2243,6 +2329,11 @@ msgstr "缩放滤镜"
 msgid "USA"
 msgstr "美国"
 
+#. {0} is a number from 1 to 8: which of the USB drives connected.
+#: pe/ui/backup.cpp
+msgid "USB drive {0}"
+msgstr "USB 驱动器 {0}"
+
 #: pe/ui/settings.cpp
 msgid "Use another home screen, library and menu layout."
 msgstr "使用其他主屏幕、游戏库和菜单布局。"
@@ -2357,6 +2448,11 @@ msgstr "与 {0}"
 msgid "Without filesystem access Nightshade can't tell which apps are installed."
 msgstr "没有文件系统访问权限，Nightshade 无法判断安装了哪些应用。"
 
+#. Filesystem access is what the app asks the console for when it starts (as in 'Without filesystem access Nightshade can't tell which apps are installed.').
+#: pe/ui/backup.cpp
+msgid "Without filesystem access there is nothing to back up."
+msgstr "没有文件系统访问权限，没有可备份的内容。"
+
 #: pe/ui/settings.cpp
 msgid "Write logs at once"
 msgstr "立即写入日志"
@@ -2403,6 +2499,11 @@ msgstr "无法打开 {0}：{1}"
 msgid "{0} DLC"
 msgstr "{0} 个 DLC"
 
+#. {0} is a size such as 61.0 GB: the room left on a USB drive. Keep it short.
+#: pe/ui/backup.cpp
+msgid "{0} free"
+msgstr "可用 {0}"
+
 #. Exactly one game. In a language with more than two plural forms, word it so that it reads well with any number (Games: {0}).
 #: pe/ui/browse.cpp, pe/ui/remote.cpp
 msgid "{0} game"
@@ -2441,6 +2542,11 @@ msgstr "{0} Hz"
 #: pe/ui/apps.cpp
 msgid "{0} is installed. The homebrew loader lists it after its next scan or a restart."
 msgstr "{0} 已安装。homebrew 加载器会在下次扫描或重启后列出它。"
+
+#. {0} is a folder whose name ends in .incomplete: the part of a backup that could not be removed.
+#: pe/ui/backup.cpp
+msgid "{0} is left on the drive, marked incomplete: delete it."
+msgstr "{0} 留在了驱动器上，已标记为未完成：请将其删除。"
 
 #. {0} is an app's name, {1} its new version, such as 01.000.110.
 #: pe/ui/apps.cpp

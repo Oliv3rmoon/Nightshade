@@ -170,6 +170,21 @@ msgstr "Αυτόματα"
 msgid "Back"
 msgstr "Πίσω"
 
+#. Button hint in Back up to USB: start a backup to the highlighted USB drive. Keep it short.
+#: pe/ui/backup.cpp
+msgid "Back up"
+msgstr "Αντίγραφο"
+
+#. Settings > Diagnostics: copies the app's data (settings, profiles, save data) to a USB drive. USB stays.
+#: pe/ui/backup.cpp, pe/ui/settings.cpp
+msgid "Back up to USB"
+msgstr "Αντίγραφο σε USB"
+
+#. {0} is the backup's folder on the USB drive.
+#: pe/ui/backup.cpp
+msgid "Backed up to {0}."
+msgstr "Αποθηκεύτηκε στο {0}."
+
 #: pe/ui/settings.cpp
 msgid "Backend"
 msgstr "Απόδοση γραφικών"
@@ -177,6 +192,11 @@ msgstr "Απόδοση γραφικών"
 #: pe/ui/save_sync.cpp
 msgid "Backing up save data"
 msgstr "Αντίγραφο ασφαλείας αποθηκευμένων δεδομένων"
+
+#. A sentence saying what was left on the drive follows it.
+#: pe/ui/backup.cpp
+msgid "Backup cancelled."
+msgstr "Η αντιγραφή ακυρώθηκε."
 
 #. An upscaling filter.
 #: settings_store.h
@@ -386,6 +406,16 @@ msgstr "ΧΕΙΡΙΣΤΗΡΙΑ"
 #: pe/ui/library.cpp, pe/ui/settings.cpp
 msgid "Controls"
 msgstr "Χειρισμός"
+
+#. What Back up to USB does; nothing is restored from there.
+#: pe/ui/backup.cpp, pe/ui/settings.cpp
+msgid "Copies settings, profiles and save data to a USB drive."
+msgstr "Αντιγράφει ρυθμίσεις, προφίλ και δεδομένα αποθήκευσης σε μονάδα USB."
+
+#. A backup's files are being copied to the USB drive. Keep it short.
+#: pe/ui/backup.cpp
+msgid "Copying"
+msgstr "Αντιγράφεται"
 
 #: pe/ui/settings.cpp
 msgid "Corner"
@@ -739,6 +769,11 @@ msgstr "Η δημιουργία καρέ χρειάζεται τα βάρη το
 msgid "Frame time"
 msgstr "Χρόνος καρέ"
 
+#. The console does not say how much room a USB drive has. Keep it short.
+#: pe/ui/backup.cpp
+msgid "Free space unknown"
+msgstr "Άγνωστος ελεύθερος χώρος"
+
 #: settings_store.h
 msgid "French"
 msgstr "Γαλλικά"
@@ -849,6 +884,11 @@ msgstr "Επιστρέφει μνήμη που ένα παιχνίδι άφησ�
 msgid "Go offline"
 msgstr "Αποσύνδεση"
 
+#. {0} is a folder such as /mnt/usb0/nightshade-backup: where a backup is put.
+#: pe/ui/backup.cpp
+msgid "Goes to {0}"
+msgstr "Προορισμός: {0}"
+
 #: pe/ui/settings.cpp
 msgid "GPU"
 msgstr "GPU"
@@ -883,6 +923,11 @@ msgstr "Πώς σχεδιάζονται και κλιμακώνονται τα �
 #: pe/ui/settings.cpp
 msgid "Images in this folder: {0}"
 msgstr "Εικόνες σε αυτόν τον φάκελο: {0}"
+
+#. Under the Wallpaper list: {0} and {1} are the two folders the images are read from (the game files folder's wallpapers folder, then /data/prosperoeden/wallpapers).
+#: pe/ui/settings.cpp
+msgid "Images in {0} and in {1}"
+msgstr "Εικόνες στους φακέλους {0} και {1}"
 
 #. Button hint: copy a save in.
 #: pe/ui/library.cpp
@@ -1171,6 +1216,11 @@ msgstr "Ψευδώνυμο"
 msgid "Nickname: {0}"
 msgstr "Ψευδώνυμο: {0}"
 
+#. {0} is why (English, technical).
+#: pe/ui/backup.cpp
+msgid "Nightshade's data could not be read: {0}"
+msgstr "Δεν ήταν δυνατή η ανάγνωση των δεδομένων του Nightshade: {0}"
+
 #: pe/ui/library.cpp
 msgid "No cheats"
 msgstr "Κανένα cheat"
@@ -1244,6 +1294,11 @@ msgstr "Δεν υπάρχει φάκελος roms"
 msgid "No server to pair with: add a RomM server to sources.json, or set save-sync.json up over FTP."
 msgstr "Δεν υπάρχει διακομιστής για σύζευξη: πρόσθεσε έναν διακομιστή RomM στο sources.json ή ρύθμισε το save-sync.json μέσω FTP."
 
+#. exFAT and FAT32 are names of disk formats (unchanged).
+#: pe/ui/backup.cpp
+msgid "No USB drive is connected. Connect one formatted as exFAT or FAT32."
+msgstr "Δεν είναι συνδεδεμένη μονάδα USB. Συνδέστε μία μορφοποιημένη ως exFAT ή FAT32."
+
 #: pe/ui/pairing.cpp
 msgid "Nobody approved the code in time."
 msgstr "Κανείς δεν ενέκρινε τον κωδικό εγκαίρως."
@@ -1256,6 +1311,11 @@ msgstr "Κανένα"
 #: pe/ui/remote.cpp
 msgid "Not connected yet"
 msgstr "Χωρίς σύνδεση ακόμη"
+
+#. {0} and {1} are sizes such as 1.2 GB.
+#: pe/ui/backup.cpp
+msgid "Not enough room on the drive: the backup needs {0}, {1} is free."
+msgstr "Δεν υπάρχει αρκετός χώρος στη μονάδα: το αντίγραφο χρειάζεται {0}, ελεύθερα είναι {1}."
 
 #. Settings > Apps: the app is not on the console.
 #: pe/ui/apps.cpp
@@ -1290,6 +1350,11 @@ msgstr "Δεν έχει ρυθμιστεί"
 #: pe/ui/library.cpp
 msgid "Nothing to import"
 msgstr "Τίποτα για εισαγωγή"
+
+#. After a backup that was cancelled or failed: what it had written was removed.
+#: pe/ui/backup.cpp
+msgid "Nothing was left on the drive."
+msgstr "Δεν έμεινε τίποτα στη μονάδα."
 
 #. A setting that is switched off.
 #: pe/ui/game_options.cpp, pe/ui/library.cpp, pe/ui/settings.cpp
@@ -1837,9 +1902,10 @@ msgstr "Απαιτείται ρύθμιση"
 msgid "Setup required: {0} Open Settings, Game files to choose the folder that holds your keys, firmware and roms folders (or add the files to {1}), then reopen Nightshade."
 msgstr "Απαιτείται ρύθμιση: {0} Ανοίξτε Ρυθμίσεις, Αρχεία παιχνιδιών για να επιλέξετε τον φάκελο που περιέχει τους φακέλους keys, firmware και roms (ή προσθέστε τα αρχεία στο {1}) και ανοίξτε ξανά το Nightshade."
 
+#. What the Diagnostics item of Settings has.
 #: pe/ui/settings.cpp
-msgid "Setup status and detailed logs."
-msgstr "Κατάσταση ρύθμισης και αναλυτική καταγραφή."
+msgid "Setup status, detailed logs and a backup to USB."
+msgstr "Κατάσταση ρύθμισης, αναλυτική καταγραφή και αντίγραφο ασφαλείας σε USB."
 
 #: eden_services.cpp
 msgid "Setup validation failed. Check that firmware and key files are readable and valid."
@@ -1981,9 +2047,19 @@ msgstr "Ευχαριστούμε όλη την κοινότητα homebrew το�
 msgid "The accent colour of the current theme."
 msgstr "Το χρώμα έμφασης του τρέχοντος θέματος."
 
+#. {0} is why (English, technical). A sentence saying what was left on the drive follows it.
+#: pe/ui/backup.cpp
+msgid "The backup failed: {0}"
+msgstr "Η δημιουργία αντιγράφου απέτυχε: {0}"
+
 #: pe/ui/remote.cpp
 msgid "The download stopped"
 msgstr "Η λήψη σταμάτησε"
+
+#. The USB drive ran out of room during a backup. A sentence saying what was left on it follows.
+#: pe/ui/backup.cpp
+msgid "The drive is full."
+msgstr "Η μονάδα είναι γεμάτη."
 
 #: pe/ui/settings.cpp
 msgid "The folder that holds your keys, firmware and games."
@@ -2126,6 +2202,16 @@ msgstr "Οι ρυθμίσεις αυτού του παιχνιδιού δεν μ
 msgid "This room uses a different protocol version."
 msgstr "Αυτό το δωμάτιο χρησιμοποιεί άλλη έκδοση πρωτοκόλλου."
 
+#. Exactly one file; {0} is a size such as 1.2 GB. See '{0} game'.
+#: pe/ui/backup.cpp
+msgid "To back up: {0} in {1} file"
+msgstr "Για αντιγραφή: {0} σε {1} αρχείο"
+
+#. {0} is a size such as 1.2 GB, {1} how many files (any number but one). See '{0} game'.
+#: pe/ui/backup.cpp
+msgid "To back up: {0} in {1} files"
+msgstr "Για αντιγραφή: {0}, αρχεία: {1}"
+
 #. ryujinx/, save-import/ and roms/ are folder names (unchanged); {0} is the game's ID.
 #: eden_services.cpp
 msgid "To import, copy a Ryujinx folder to ryujinx/ or a save to save-import/{0}/, next to roms/."
@@ -2243,6 +2329,11 @@ msgstr "Φίλτρο κλιμάκωσης"
 msgid "USA"
 msgstr "ΗΠΑ"
 
+#. {0} is a number from 1 to 8: which of the USB drives connected.
+#: pe/ui/backup.cpp
+msgid "USB drive {0}"
+msgstr "Μονάδα USB {0}"
+
 #: pe/ui/settings.cpp
 msgid "Use another home screen, library and menu layout."
 msgstr "Χρησιμοποιήστε άλλη διάταξη για αρχική οθόνη, βιβλιοθήκη και μενού."
@@ -2357,6 +2448,11 @@ msgstr "με {0}"
 msgid "Without filesystem access Nightshade can't tell which apps are installed."
 msgstr "Χωρίς πρόσβαση στο σύστημα αρχείων το Nightshade δεν μπορεί να ξέρει ποιες εφαρμογές είναι εγκατεστημένες."
 
+#. Filesystem access is what the app asks the console for when it starts (as in 'Without filesystem access Nightshade can't tell which apps are installed.').
+#: pe/ui/backup.cpp
+msgid "Without filesystem access there is nothing to back up."
+msgstr "Χωρίς πρόσβαση στο σύστημα αρχείων δεν υπάρχει τίποτα για αντιγραφή."
+
 #: pe/ui/settings.cpp
 msgid "Write logs at once"
 msgstr "Άμεση εγγραφή καταγραφής"
@@ -2403,6 +2499,11 @@ msgstr "Δεν ήταν δυνατό το άνοιγμα του {0}: {1}"
 msgid "{0} DLC"
 msgstr "{0} DLC"
 
+#. {0} is a size such as 61.0 GB: the room left on a USB drive. Keep it short.
+#: pe/ui/backup.cpp
+msgid "{0} free"
+msgstr "{0} ελεύθερα"
+
 #. Exactly one game. In a language with more than two plural forms, word it so that it reads well with any number (Games: {0}).
 #: pe/ui/browse.cpp, pe/ui/remote.cpp
 msgid "{0} game"
@@ -2441,6 +2542,11 @@ msgstr "{0} Hz"
 #: pe/ui/apps.cpp
 msgid "{0} is installed. The homebrew loader lists it after its next scan or a restart."
 msgstr "Το {0} εγκαταστάθηκε. Ο φορτωτής homebrew το εμφανίζει μετά την επόμενη σάρωσή του ή μια επανεκκίνηση."
+
+#. {0} is a folder whose name ends in .incomplete: the part of a backup that could not be removed.
+#: pe/ui/backup.cpp
+msgid "{0} is left on the drive, marked incomplete: delete it."
+msgstr "Το {0} έμεινε στη μονάδα, σημειωμένο ως ημιτελές: διαγράψτε το."
 
 #. {0} is an app's name, {1} its new version, such as 01.000.110.
 #: pe/ui/apps.cpp

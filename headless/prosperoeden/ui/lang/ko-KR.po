@@ -170,6 +170,21 @@ msgstr "자동"
 msgid "Back"
 msgstr "뒤로"
 
+#. Button hint in Back up to USB: start a backup to the highlighted USB drive. Keep it short.
+#: pe/ui/backup.cpp
+msgid "Back up"
+msgstr "백업"
+
+#. Settings > Diagnostics: copies the app's data (settings, profiles, save data) to a USB drive. USB stays.
+#: pe/ui/backup.cpp, pe/ui/settings.cpp
+msgid "Back up to USB"
+msgstr "USB에 백업"
+
+#. {0} is the backup's folder on the USB drive.
+#: pe/ui/backup.cpp
+msgid "Backed up to {0}."
+msgstr "{0}에 백업했습니다."
+
 #: pe/ui/settings.cpp
 msgid "Backend"
 msgstr "렌더러"
@@ -177,6 +192,11 @@ msgstr "렌더러"
 #: pe/ui/save_sync.cpp
 msgid "Backing up save data"
 msgstr "세이브 데이터 백업 중"
+
+#. A sentence saying what was left on the drive follows it.
+#: pe/ui/backup.cpp
+msgid "Backup cancelled."
+msgstr "백업을 취소했습니다."
 
 #. An upscaling filter.
 #: settings_store.h
@@ -386,6 +406,16 @@ msgstr "컨트롤러"
 #: pe/ui/library.cpp, pe/ui/settings.cpp
 msgid "Controls"
 msgstr "조작"
+
+#. What Back up to USB does; nothing is restored from there.
+#: pe/ui/backup.cpp, pe/ui/settings.cpp
+msgid "Copies settings, profiles and save data to a USB drive."
+msgstr "설정, 프로필, 세이브 데이터를 USB 드라이브에 복사합니다."
+
+#. A backup's files are being copied to the USB drive. Keep it short.
+#: pe/ui/backup.cpp
+msgid "Copying"
+msgstr "복사하는 중"
 
 #: pe/ui/settings.cpp
 msgid "Corner"
@@ -739,6 +769,11 @@ msgstr "프레임 생성에는 MihawkGen 가중치(network.fgw)가 필요합니�
 msgid "Frame time"
 msgstr "프레임 시간"
 
+#. The console does not say how much room a USB drive has. Keep it short.
+#: pe/ui/backup.cpp
+msgid "Free space unknown"
+msgstr "남은 공간 알 수 없음"
+
 #: settings_store.h
 msgid "French"
 msgstr "프랑스어"
@@ -849,6 +884,11 @@ msgstr "게임이 비워 둔 메모리를 16KiB 단위로 반환합니다. 여�
 msgid "Go offline"
 msgstr "오프라인으로 전환"
 
+#. {0} is a folder such as /mnt/usb0/nightshade-backup: where a backup is put.
+#: pe/ui/backup.cpp
+msgid "Goes to {0}"
+msgstr "저장 위치: {0}"
+
 #: pe/ui/settings.cpp
 msgid "GPU"
 msgstr "GPU"
@@ -883,6 +923,11 @@ msgstr "게임을 그리는 방식과 TV에 맞춘 확대 방식."
 #: pe/ui/settings.cpp
 msgid "Images in this folder: {0}"
 msgstr "이 폴더의 이미지: {0}"
+
+#. Under the Wallpaper list: {0} and {1} are the two folders the images are read from (the game files folder's wallpapers folder, then /data/prosperoeden/wallpapers).
+#: pe/ui/settings.cpp
+msgid "Images in {0} and in {1}"
+msgstr "이 폴더들의 이미지: {0} 및 {1}"
 
 #. Button hint: copy a save in.
 #: pe/ui/library.cpp
@@ -1171,6 +1216,11 @@ msgstr "닉네임"
 msgid "Nickname: {0}"
 msgstr "닉네임: {0}"
 
+#. {0} is why (English, technical).
+#: pe/ui/backup.cpp
+msgid "Nightshade's data could not be read: {0}"
+msgstr "Nightshade 데이터를 읽을 수 없습니다: {0}"
+
 #: pe/ui/library.cpp
 msgid "No cheats"
 msgstr "치트 없음"
@@ -1244,6 +1294,11 @@ msgstr "roms 폴더 없음"
 msgid "No server to pair with: add a RomM server to sources.json, or set save-sync.json up over FTP."
 msgstr "페어링할 서버가 없습니다: sources.json에 RomM 서버를 추가하거나 FTP로 save-sync.json을 설정하세요."
 
+#. exFAT and FAT32 are names of disk formats (unchanged).
+#: pe/ui/backup.cpp
+msgid "No USB drive is connected. Connect one formatted as exFAT or FAT32."
+msgstr "연결된 USB 드라이브가 없습니다. exFAT 또는 FAT32로 포맷된 드라이브를 연결하세요."
+
 #: pe/ui/pairing.cpp
 msgid "Nobody approved the code in time."
 msgstr "시간 안에 코드가 승인되지 않았습니다."
@@ -1256,6 +1311,11 @@ msgstr "없음"
 #: pe/ui/remote.cpp
 msgid "Not connected yet"
 msgstr "아직 연결되지 않음"
+
+#. {0} and {1} are sizes such as 1.2 GB.
+#: pe/ui/backup.cpp
+msgid "Not enough room on the drive: the backup needs {0}, {1} is free."
+msgstr "드라이브 공간이 부족합니다: 백업에 {0}이(가) 필요하지만 남은 공간은 {1}입니다."
 
 #. Settings > Apps: the app is not on the console.
 #: pe/ui/apps.cpp
@@ -1290,6 +1350,11 @@ msgstr "설정되지 않음"
 #: pe/ui/library.cpp
 msgid "Nothing to import"
 msgstr "가져올 항목 없음"
+
+#. After a backup that was cancelled or failed: what it had written was removed.
+#: pe/ui/backup.cpp
+msgid "Nothing was left on the drive."
+msgstr "드라이브에 남은 것이 없습니다."
 
 #. A setting that is switched off.
 #: pe/ui/game_options.cpp, pe/ui/library.cpp, pe/ui/settings.cpp
@@ -1837,9 +1902,10 @@ msgstr "설정 필요"
 msgid "Setup required: {0} Open Settings, Game files to choose the folder that holds your keys, firmware and roms folders (or add the files to {1}), then reopen Nightshade."
 msgstr "설정 필요: {0} 설정의 게임 파일에서 keys, firmware, roms 폴더가 들어 있는 폴더를 선택하거나 파일을 {1}에 넣은 다음 Nightshade을 다시 여세요."
 
+#. What the Diagnostics item of Settings has.
 #: pe/ui/settings.cpp
-msgid "Setup status and detailed logs."
-msgstr "설정 상태와 상세 로그."
+msgid "Setup status, detailed logs and a backup to USB."
+msgstr "설정 상태, 상세 로그, USB 백업."
 
 #: eden_services.cpp
 msgid "Setup validation failed. Check that firmware and key files are readable and valid."
@@ -1981,9 +2047,19 @@ msgstr "PS5 홈브루 커뮤니티 여러분과 Nightshade을 가능하게 한 �
 msgid "The accent colour of the current theme."
 msgstr "현재 테마의 강조 색상."
 
+#. {0} is why (English, technical). A sentence saying what was left on the drive follows it.
+#: pe/ui/backup.cpp
+msgid "The backup failed: {0}"
+msgstr "백업하지 못했습니다: {0}"
+
 #: pe/ui/remote.cpp
 msgid "The download stopped"
 msgstr "다운로드가 중단되었습니다"
+
+#. The USB drive ran out of room during a backup. A sentence saying what was left on it follows.
+#: pe/ui/backup.cpp
+msgid "The drive is full."
+msgstr "드라이브가 가득 찼습니다."
 
 #: pe/ui/settings.cpp
 msgid "The folder that holds your keys, firmware and games."
@@ -2126,6 +2202,16 @@ msgstr "이 게임의 설정을 저장할 수 없습니다(타이틀 ID 없음).
 msgid "This room uses a different protocol version."
 msgstr "이 방은 다른 프로토콜 버전을 사용합니다."
 
+#. Exactly one file; {0} is a size such as 1.2 GB. See '{0} game'.
+#: pe/ui/backup.cpp
+msgid "To back up: {0} in {1} file"
+msgstr "백업할 항목: {0}, 파일 {1}개"
+
+#. {0} is a size such as 1.2 GB, {1} how many files (any number but one). See '{0} game'.
+#: pe/ui/backup.cpp
+msgid "To back up: {0} in {1} files"
+msgstr "백업할 항목: {0}, 파일 {1}개"
+
 #. ryujinx/, save-import/ and roms/ are folder names (unchanged); {0} is the game's ID.
 #: eden_services.cpp
 msgid "To import, copy a Ryujinx folder to ryujinx/ or a save to save-import/{0}/, next to roms/."
@@ -2243,6 +2329,11 @@ msgstr "확대 필터"
 msgid "USA"
 msgstr "미국"
 
+#. {0} is a number from 1 to 8: which of the USB drives connected.
+#: pe/ui/backup.cpp
+msgid "USB drive {0}"
+msgstr "USB 드라이브 {0}"
+
 #: pe/ui/settings.cpp
 msgid "Use another home screen, library and menu layout."
 msgstr "다른 홈 화면, 라이브러리, 메뉴 레이아웃을 사용합니다."
@@ -2357,6 +2448,11 @@ msgstr "대상: {0}"
 msgid "Without filesystem access Nightshade can't tell which apps are installed."
 msgstr "파일 시스템에 접근할 수 없어 Nightshade가 설치된 앱을 알 수 없습니다."
 
+#. Filesystem access is what the app asks the console for when it starts (as in 'Without filesystem access Nightshade can't tell which apps are installed.').
+#: pe/ui/backup.cpp
+msgid "Without filesystem access there is nothing to back up."
+msgstr "파일 시스템에 접근할 수 없어 백업할 것이 없습니다."
+
 #: pe/ui/settings.cpp
 msgid "Write logs at once"
 msgstr "로그 즉시 기록"
@@ -2403,6 +2499,11 @@ msgstr "{0}을(를) 열 수 없습니다: {1}"
 msgid "{0} DLC"
 msgstr "DLC {0}개"
 
+#. {0} is a size such as 61.0 GB: the room left on a USB drive. Keep it short.
+#: pe/ui/backup.cpp
+msgid "{0} free"
+msgstr "{0} 남음"
+
 #. Exactly one game. In a language with more than two plural forms, word it so that it reads well with any number (Games: {0}).
 #: pe/ui/browse.cpp, pe/ui/remote.cpp
 msgid "{0} game"
@@ -2441,6 +2542,11 @@ msgstr "{0}Hz"
 #: pe/ui/apps.cpp
 msgid "{0} is installed. The homebrew loader lists it after its next scan or a restart."
 msgstr "{0}이(가) 설치되었습니다. 홈브루 로더가 다음 검색 후나 재시작 후에 표시합니다."
+
+#. {0} is a folder whose name ends in .incomplete: the part of a backup that could not be removed.
+#: pe/ui/backup.cpp
+msgid "{0} is left on the drive, marked incomplete: delete it."
+msgstr "{0}이(가) 미완료로 표시된 채 드라이브에 남아 있습니다. 삭제하세요."
 
 #. {0} is an app's name, {1} its new version, such as 01.000.110.
 #: pe/ui/apps.cpp
