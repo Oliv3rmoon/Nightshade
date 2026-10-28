@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 // Development A/B switches for Vulkan device features, set from /app0/dev-settings.txt
-// before the renderer creates its device (tools/prepare-vulkan-port.py applies them).
+// before the renderer creates its device (tools/prepare-vulkan-port.py applies them). Five of
+// them a game's "gpu_debug" in the settings file sets too, for testing a game that stops the GPU
+// (settings_store.h GpuDebugSettings, docs/SETTINGS.md): every session sets those five again.
 namespace Eden::DevVulkan {
 inline bool disable_null_descriptor = false;
 // Pipelines whose vertex shader reads no vertex attribute get a static vertex input (no attribute)
@@ -20,7 +22,7 @@ inline bool disable_multi_range = false; // bind multi-range SSBOs the pre-2026 
 // standard colours stay exact, others go to the nearest one. dev-settings custom_border=on
 // restores them.
 inline bool disable_custom_border = true;
-inline bool sync_submissions = false; // wait for the GPU after every scheduler flush
+inline bool sync_submissions = false; // wait for the GPU after every scheduler flush (submit_sync)
 inline bool gpu_time = false; // EDEN_GPU_TIME: GPU execution time of scheduler submissions
 // No VK_EXT_conditional_rendering (dev-settings conditional_rendering=off). The extension is on:
 // RADV's predication is correct on the console (2.7M predicated conditions in one game, 45k
@@ -39,4 +41,9 @@ inline bool compute_barriers = true;
 // 1/60 of conditions that should skip. 2 (hcr=cpu): every condition evaluated on the CPU and the
 // driver predicates the draws from constant 0/1 buffers (the driver check with exact inputs).
 inline int hcr_mode = 1;
+// Storage buffers the shader compiler makes device-coherent (Shader::CoherentStorage, Eden patch
+// 10, read when the pipeline cache builds its profile): 0 those of shaders with atomics (patch 07),
+// 1 also every one of every compute shader, 2 also every one of every shader. Each is Coherent and
+// its loads Volatile, so a shader waiting on another workgroup's write reads it from L2.
+inline int coherent_storage = 0;
 } // namespace Eden::DevVulkan

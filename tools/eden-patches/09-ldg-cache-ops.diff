@@ -1,0 +1,696 @@
+--- a/src/shader_recompiler/backend/spirv/emit_spirv_instructions.h
++++ b/src/shader_recompiler/backend/spirv/emit_spirv_instructions.h
+@@ -104,27 +104,34 @@
+ void EmitWriteGlobal32(EmitContext& ctx, Id address, Id value);
+ void EmitWriteGlobal64(EmitContext& ctx, Id address, Id value);
+ void EmitWriteGlobal128(EmitContext& ctx, Id address, Id value);
+-Id EmitLoadStorageU8(EmitContext& ctx, const IR::Value& binding, const IR::Value& offset);
+-Id EmitLoadStorageS8(EmitContext& ctx, const IR::Value& binding, const IR::Value& offset);
+-Id EmitLoadStorageU16(EmitContext& ctx, const IR::Value& binding, const IR::Value& offset);
+-Id EmitLoadStorageS16(EmitContext& ctx, const IR::Value& binding, const IR::Value& offset);
+-Id EmitLoadStorage32(EmitContext& ctx, const IR::Value& binding, const IR::Value& offset);
+-Id EmitLoadStorage64(EmitContext& ctx, const IR::Value& binding, const IR::Value& offset);
+-Id EmitLoadStorage128(EmitContext& ctx, const IR::Value& binding, const IR::Value& offset);
+-void EmitWriteStorageU8(EmitContext& ctx, const IR::Value& binding, const IR::Value& offset,
+-                        Id value);
+-void EmitWriteStorageS8(EmitContext& ctx, const IR::Value& binding, const IR::Value& offset,
+-                        Id value);
+-void EmitWriteStorageU16(EmitContext& ctx, const IR::Value& binding, const IR::Value& offset,
+-                         Id value);
+-void EmitWriteStorageS16(EmitContext& ctx, const IR::Value& binding, const IR::Value& offset,
+-                         Id value);
+-void EmitWriteStorage32(EmitContext& ctx, const IR::Value& binding, const IR::Value& offset,
+-                        Id value);
+-void EmitWriteStorage64(EmitContext& ctx, const IR::Value& binding, const IR::Value& offset,
+-                        Id value);
+-void EmitWriteStorage128(EmitContext& ctx, const IR::Value& binding, const IR::Value& offset,
+-                         Id value);
++Id EmitLoadStorageU8(EmitContext& ctx, IR::Inst* inst, const IR::Value& binding,
++                     const IR::Value& offset);
++Id EmitLoadStorageS8(EmitContext& ctx, IR::Inst* inst, const IR::Value& binding,
++                     const IR::Value& offset);
++Id EmitLoadStorageU16(EmitContext& ctx, IR::Inst* inst, const IR::Value& binding,
++                      const IR::Value& offset);
++Id EmitLoadStorageS16(EmitContext& ctx, IR::Inst* inst, const IR::Value& binding,
++                      const IR::Value& offset);
++Id EmitLoadStorage32(EmitContext& ctx, IR::Inst* inst, const IR::Value& binding,
++                     const IR::Value& offset);
++Id EmitLoadStorage64(EmitContext& ctx, IR::Inst* inst, const IR::Value& binding,
++                     const IR::Value& offset);
++Id EmitLoadStorage128(EmitContext& ctx, IR::Inst* inst, const IR::Value& binding,
++                      const IR::Value& offset);
++void EmitWriteStorageU8(EmitContext& ctx, IR::Inst* inst, const IR::Value& binding,
++                        const IR::Value& offset, Id value);
++void EmitWriteStorageS8(EmitContext& ctx, IR::Inst* inst, const IR::Value& binding,
++                        const IR::Value& offset, Id value);
++void EmitWriteStorageU16(EmitContext& ctx, IR::Inst* inst, const IR::Value& binding,
++                         const IR::Value& offset, Id value);
++void EmitWriteStorageS16(EmitContext& ctx, IR::Inst* inst, const IR::Value& binding,
++                         const IR::Value& offset, Id value);
++void EmitWriteStorage32(EmitContext& ctx, IR::Inst* inst, const IR::Value& binding,
++                        const IR::Value& offset, Id value);
++void EmitWriteStorage64(EmitContext& ctx, IR::Inst* inst, const IR::Value& binding,
++                        const IR::Value& offset, Id value);
++void EmitWriteStorage128(EmitContext& ctx, IR::Inst* inst, const IR::Value& binding,
++                         const IR::Value& offset, Id value);
+ Id EmitLoadSharedU8(EmitContext& ctx, Id offset);
+ Id EmitLoadSharedS8(EmitContext& ctx, Id offset);
+ Id EmitLoadSharedU16(EmitContext& ctx, Id offset);
+--- a/src/shader_recompiler/backend/spirv/emit_spirv_memory.cpp
++++ b/src/shader_recompiler/backend/spirv/emit_spirv_memory.cpp
+@@ -9,6 +9,7 @@
+ #include "shader_recompiler/backend/spirv/emit_spirv.h"
+ #include "shader_recompiler/backend/spirv/emit_spirv_instructions.h"
+ #include "shader_recompiler/backend/spirv/spirv_emit_context.h"
++#include "shader_recompiler/frontend/ir/modifiers.h"
+ 
+ namespace Shader::Backend::SPIRV {
+ namespace {
+@@ -41,31 +42,45 @@
+     return ctx.OpAccessChain(type_def.element, ssbo, ctx.u32_zero_value, index);
+ }
+ 
+-Id LoadStorage(EmitContext& ctx, const IR::Value& binding, const IR::Value& offset, Id result_type,
+-               const StorageTypeDefinition& type_def, size_t element_size,
+-               Id StorageDefinitions::*member_ptr, u32 index_offset = 0) {
++// A load or store the guest marked device-coherent (IR::MemoryInstInfo, LDG/STG .CG and the like)
++// is Volatile: RADV gives a Volatile access glc/dlc on RDNA2, which reads past the per-CU caches.
++// Unmarked accesses keep no memory operand, as before.
++bool IsCoherent(IR::Inst* inst) {
++    return inst->Flags<IR::MemoryInstInfo>().coherent;
++}
++
++Id LoadStorage(EmitContext& ctx, IR::Inst* inst, const IR::Value& binding,
++               const IR::Value& offset, Id result_type, const StorageTypeDefinition& type_def,
++               size_t element_size, Id StorageDefinitions::*member_ptr, u32 index_offset = 0) {
+     const Id pointer{
+         StoragePointer(ctx, binding, offset, type_def, element_size, member_ptr, index_offset)};
++    if (IsCoherent(inst)) {
++        return ctx.OpLoad(result_type, pointer, spv::MemoryAccessMask::Volatile);
++    }
+     return ctx.OpLoad(result_type, pointer);
+ }
+ 
+-Id LoadStorage32(EmitContext& ctx, const IR::Value& binding, const IR::Value& offset,
+-                 u32 index_offset = 0) {
+-    return LoadStorage(ctx, binding, offset, ctx.U32[1], ctx.storage_types.U32, sizeof(u32),
++Id LoadStorage32(EmitContext& ctx, IR::Inst* inst, const IR::Value& binding,
++                 const IR::Value& offset, u32 index_offset = 0) {
++    return LoadStorage(ctx, inst, binding, offset, ctx.U32[1], ctx.storage_types.U32, sizeof(u32),
+                        &StorageDefinitions::U32, index_offset);
+ }
+ 
+-void WriteStorage(EmitContext& ctx, const IR::Value& binding, const IR::Value& offset, Id value,
+-                  const StorageTypeDefinition& type_def, size_t element_size,
+-                  Id StorageDefinitions::*member_ptr, u32 index_offset = 0) {
++void WriteStorage(EmitContext& ctx, IR::Inst* inst, const IR::Value& binding,
++                  const IR::Value& offset, Id value, const StorageTypeDefinition& type_def,
++                  size_t element_size, Id StorageDefinitions::*member_ptr, u32 index_offset = 0) {
+     const Id pointer{
+         StoragePointer(ctx, binding, offset, type_def, element_size, member_ptr, index_offset)};
++    if (IsCoherent(inst)) {
++        ctx.OpStore(pointer, value, spv::MemoryAccessMask::Volatile);
++        return;
++    }
+     ctx.OpStore(pointer, value);
+ }
+ 
+-void WriteStorage32(EmitContext& ctx, const IR::Value& binding, const IR::Value& offset, Id value,
+-                    u32 index_offset = 0) {
+-    WriteStorage(ctx, binding, offset, value, ctx.storage_types.U32, sizeof(u32),
++void WriteStorage32(EmitContext& ctx, IR::Inst* inst, const IR::Value& binding,
++                    const IR::Value& offset, Id value, u32 index_offset = 0) {
++    WriteStorage(ctx, inst, binding, offset, value, ctx.storage_types.U32, sizeof(u32),
+                  &StorageDefinitions::U32, index_offset);
+ }
+ 
+@@ -158,151 +173,158 @@
+     LOG_WARNING(Shader_SPIRV, "Int64 not supported, ignoring memory operation");
+ }
+ 
+-Id EmitLoadStorageU8(EmitContext& ctx, const IR::Value& binding, const IR::Value& offset) {
++Id EmitLoadStorageU8(EmitContext& ctx, IR::Inst* inst, const IR::Value& binding,
++                     const IR::Value& offset) {
+     if (ctx.profile.support_int8 && ctx.profile.support_storage_buffer_8bit &&
+         ctx.profile.support_descriptor_aliasing) {
+         return ctx.OpUConvert(ctx.U32[1],
+-                              LoadStorage(ctx, binding, offset, ctx.U8, ctx.storage_types.U8,
++                              LoadStorage(ctx, inst, binding, offset, ctx.U8, ctx.storage_types.U8,
+                                           sizeof(u8), &StorageDefinitions::U8));
+     } else {
+-        return ctx.OpBitFieldUExtract(ctx.U32[1], LoadStorage32(ctx, binding, offset),
++        return ctx.OpBitFieldUExtract(ctx.U32[1], LoadStorage32(ctx, inst, binding, offset),
+                                       ctx.BitOffset8(offset), ctx.Const(8u));
+     }
+ }
+ 
+-Id EmitLoadStorageS8(EmitContext& ctx, const IR::Value& binding, const IR::Value& offset) {
++Id EmitLoadStorageS8(EmitContext& ctx, IR::Inst* inst, const IR::Value& binding,
++                     const IR::Value& offset) {
+     if (ctx.profile.support_int8 && ctx.profile.support_storage_buffer_8bit &&
+         ctx.profile.support_descriptor_aliasing) {
+         return ctx.OpSConvert(ctx.U32[1],
+-                              LoadStorage(ctx, binding, offset, ctx.S8, ctx.storage_types.S8,
++                              LoadStorage(ctx, inst, binding, offset, ctx.S8, ctx.storage_types.S8,
+                                           sizeof(s8), &StorageDefinitions::S8));
+     } else {
+-        return ctx.OpBitFieldSExtract(ctx.U32[1], LoadStorage32(ctx, binding, offset),
++        return ctx.OpBitFieldSExtract(ctx.U32[1], LoadStorage32(ctx, inst, binding, offset),
+                                       ctx.BitOffset8(offset), ctx.Const(8u));
+     }
+ }
+ 
+-Id EmitLoadStorageU16(EmitContext& ctx, const IR::Value& binding, const IR::Value& offset) {
++Id EmitLoadStorageU16(EmitContext& ctx, IR::Inst* inst, const IR::Value& binding,
++                      const IR::Value& offset) {
+     if (ctx.profile.support_int16 && ctx.profile.support_storage_buffer_16bit &&
+         ctx.profile.support_descriptor_aliasing) {
+-        return ctx.OpUConvert(ctx.U32[1],
+-                              LoadStorage(ctx, binding, offset, ctx.U16, ctx.storage_types.U16,
+-                                          sizeof(u16), &StorageDefinitions::U16));
++        return ctx.OpUConvert(ctx.U32[1], LoadStorage(ctx, inst, binding, offset, ctx.U16,
++                                                  ctx.storage_types.U16, sizeof(u16),
++                                                  &StorageDefinitions::U16));
+     } else {
+-        return ctx.OpBitFieldUExtract(ctx.U32[1], LoadStorage32(ctx, binding, offset),
++        return ctx.OpBitFieldUExtract(ctx.U32[1], LoadStorage32(ctx, inst, binding, offset),
+                                       ctx.BitOffset16(offset), ctx.Const(16u));
+     }
+ }
+ 
+-Id EmitLoadStorageS16(EmitContext& ctx, const IR::Value& binding, const IR::Value& offset) {
++Id EmitLoadStorageS16(EmitContext& ctx, IR::Inst* inst, const IR::Value& binding,
++                      const IR::Value& offset) {
+     if (ctx.profile.support_int16 && ctx.profile.support_storage_buffer_16bit &&
+         ctx.profile.support_descriptor_aliasing) {
+-        return ctx.OpSConvert(ctx.U32[1],
+-                              LoadStorage(ctx, binding, offset, ctx.S16, ctx.storage_types.S16,
+-                                          sizeof(s16), &StorageDefinitions::S16));
++        return ctx.OpSConvert(ctx.U32[1], LoadStorage(ctx, inst, binding, offset, ctx.S16,
++                                                  ctx.storage_types.S16, sizeof(s16),
++                                                  &StorageDefinitions::S16));
+     } else {
+-        return ctx.OpBitFieldSExtract(ctx.U32[1], LoadStorage32(ctx, binding, offset),
++        return ctx.OpBitFieldSExtract(ctx.U32[1], LoadStorage32(ctx, inst, binding, offset),
+                                       ctx.BitOffset16(offset), ctx.Const(16u));
+     }
+ }
+ 
+-Id EmitLoadStorage32(EmitContext& ctx, const IR::Value& binding, const IR::Value& offset) {
+-    return LoadStorage32(ctx, binding, offset);
++Id EmitLoadStorage32(EmitContext& ctx, IR::Inst* inst, const IR::Value& binding,
++                     const IR::Value& offset) {
++    return LoadStorage32(ctx, inst, binding, offset);
+ }
+ 
+-Id EmitLoadStorage64(EmitContext& ctx, const IR::Value& binding, const IR::Value& offset) {
++Id EmitLoadStorage64(EmitContext& ctx, IR::Inst* inst, const IR::Value& binding,
++                     const IR::Value& offset) {
+     if (ctx.profile.support_descriptor_aliasing) {
+-        return LoadStorage(ctx, binding, offset, ctx.U32[2], ctx.storage_types.U32x2,
++        return LoadStorage(ctx, inst, binding, offset, ctx.U32[2], ctx.storage_types.U32x2,
+                            sizeof(u32[2]), &StorageDefinitions::U32x2);
+     } else {
+-        return ctx.OpCompositeConstruct(ctx.U32[2], LoadStorage32(ctx, binding, offset, 0),
+-                                        LoadStorage32(ctx, binding, offset, 1));
++        return ctx.OpCompositeConstruct(ctx.U32[2], LoadStorage32(ctx, inst, binding, offset, 0),
++                                        LoadStorage32(ctx, inst, binding, offset, 1));
+     }
+ }
+ 
+-Id EmitLoadStorage128(EmitContext& ctx, const IR::Value& binding, const IR::Value& offset) {
++Id EmitLoadStorage128(EmitContext& ctx, IR::Inst* inst, const IR::Value& binding,
++                      const IR::Value& offset) {
+     if (ctx.profile.support_descriptor_aliasing) {
+-        return LoadStorage(ctx, binding, offset, ctx.U32[4], ctx.storage_types.U32x4,
++        return LoadStorage(ctx, inst, binding, offset, ctx.U32[4], ctx.storage_types.U32x4,
+                            sizeof(u32[4]), &StorageDefinitions::U32x4);
+     } else {
+-        return ctx.OpCompositeConstruct(ctx.U32[4], LoadStorage32(ctx, binding, offset, 0),
+-                                        LoadStorage32(ctx, binding, offset, 1),
+-                                        LoadStorage32(ctx, binding, offset, 2),
+-                                        LoadStorage32(ctx, binding, offset, 3));
++        return ctx.OpCompositeConstruct(ctx.U32[4], LoadStorage32(ctx, inst, binding, offset, 0),
++                                        LoadStorage32(ctx, inst, binding, offset, 1),
++                                        LoadStorage32(ctx, inst, binding, offset, 2),
++                                        LoadStorage32(ctx, inst, binding, offset, 3));
+     }
+ }
+ 
+-void EmitWriteStorageU8(EmitContext& ctx, const IR::Value& binding, const IR::Value& offset,
+-                        Id value) {
++void EmitWriteStorageU8(EmitContext& ctx, IR::Inst* inst, const IR::Value& binding,
++                        const IR::Value& offset, Id value) {
+     if (ctx.profile.support_int8 && ctx.profile.support_storage_buffer_8bit &&
+         ctx.profile.support_descriptor_aliasing) {
+-        WriteStorage(ctx, binding, offset, ctx.OpSConvert(ctx.U8, value), ctx.storage_types.U8,
+-                     sizeof(u8), &StorageDefinitions::U8);
++        WriteStorage(ctx, inst, binding, offset, ctx.OpSConvert(ctx.U8, value),
++                     ctx.storage_types.U8, sizeof(u8), &StorageDefinitions::U8);
+     } else {
+         WriteStorageByCasLoop(ctx, binding, offset, value, ctx.BitOffset8(offset), ctx.Const(8u));
+     }
+ }
+ 
+-void EmitWriteStorageS8(EmitContext& ctx, const IR::Value& binding, const IR::Value& offset,
+-                        Id value) {
++void EmitWriteStorageS8(EmitContext& ctx, IR::Inst* inst, const IR::Value& binding,
++                        const IR::Value& offset, Id value) {
+     if (ctx.profile.support_int8 && ctx.profile.support_storage_buffer_8bit &&
+         ctx.profile.support_descriptor_aliasing) {
+-        WriteStorage(ctx, binding, offset, ctx.OpSConvert(ctx.S8, value), ctx.storage_types.S8,
+-                     sizeof(s8), &StorageDefinitions::S8);
++        WriteStorage(ctx, inst, binding, offset, ctx.OpSConvert(ctx.S8, value),
++                     ctx.storage_types.S8, sizeof(s8), &StorageDefinitions::S8);
+     } else {
+         WriteStorageByCasLoop(ctx, binding, offset, value, ctx.BitOffset8(offset), ctx.Const(8u));
+     }
+ }
+ 
+-void EmitWriteStorageU16(EmitContext& ctx, const IR::Value& binding, const IR::Value& offset,
+-                         Id value) {
++void EmitWriteStorageU16(EmitContext& ctx, IR::Inst* inst, const IR::Value& binding,
++                         const IR::Value& offset, Id value) {
+     if (ctx.profile.support_int16 && ctx.profile.support_storage_buffer_16bit &&
+         ctx.profile.support_descriptor_aliasing) {
+-        WriteStorage(ctx, binding, offset, ctx.OpSConvert(ctx.U16, value), ctx.storage_types.U16,
+-                     sizeof(u16), &StorageDefinitions::U16);
++        WriteStorage(ctx, inst, binding, offset, ctx.OpSConvert(ctx.U16, value),
++                     ctx.storage_types.U16, sizeof(u16), &StorageDefinitions::U16);
+     } else {
+         WriteStorageByCasLoop(ctx, binding, offset, value, ctx.BitOffset16(offset), ctx.Const(16u));
+     }
+ }
+ 
+-void EmitWriteStorageS16(EmitContext& ctx, const IR::Value& binding, const IR::Value& offset,
+-                         Id value) {
++void EmitWriteStorageS16(EmitContext& ctx, IR::Inst* inst, const IR::Value& binding,
++                         const IR::Value& offset, Id value) {
+     if (ctx.profile.support_int16 && ctx.profile.support_storage_buffer_16bit &&
+         ctx.profile.support_descriptor_aliasing) {
+-        WriteStorage(ctx, binding, offset, ctx.OpSConvert(ctx.S16, value), ctx.storage_types.S16,
+-                     sizeof(s16), &StorageDefinitions::S16);
++        WriteStorage(ctx, inst, binding, offset, ctx.OpSConvert(ctx.S16, value),
++                     ctx.storage_types.S16, sizeof(s16), &StorageDefinitions::S16);
+     } else {
+         WriteStorageByCasLoop(ctx, binding, offset, value, ctx.BitOffset16(offset), ctx.Const(16u));
+     }
+ }
+ 
+-void EmitWriteStorage32(EmitContext& ctx, const IR::Value& binding, const IR::Value& offset,
+-                        Id value) {
+-    WriteStorage32(ctx, binding, offset, value);
++void EmitWriteStorage32(EmitContext& ctx, IR::Inst* inst, const IR::Value& binding,
++                        const IR::Value& offset, Id value) {
++    WriteStorage32(ctx, inst, binding, offset, value);
+ }
+ 
+-void EmitWriteStorage64(EmitContext& ctx, const IR::Value& binding, const IR::Value& offset,
+-                        Id value) {
++void EmitWriteStorage64(EmitContext& ctx, IR::Inst* inst, const IR::Value& binding,
++                        const IR::Value& offset, Id value) {
+     if (ctx.profile.support_descriptor_aliasing) {
+-        WriteStorage(ctx, binding, offset, value, ctx.storage_types.U32x2, sizeof(u32[2]),
++        WriteStorage(ctx, inst, binding, offset, value, ctx.storage_types.U32x2, sizeof(u32[2]),
+                      &StorageDefinitions::U32x2);
+     } else {
+         for (u32 index = 0; index < 2; ++index) {
+             const Id element{ctx.OpCompositeExtract(ctx.U32[1], value, index)};
+-            WriteStorage32(ctx, binding, offset, element, index);
++            WriteStorage32(ctx, inst, binding, offset, element, index);
+         }
+     }
+ }
+ 
+-void EmitWriteStorage128(EmitContext& ctx, const IR::Value& binding, const IR::Value& offset,
+-                         Id value) {
++void EmitWriteStorage128(EmitContext& ctx, IR::Inst* inst, const IR::Value& binding,
++                         const IR::Value& offset, Id value) {
+     if (ctx.profile.support_descriptor_aliasing) {
+-        WriteStorage(ctx, binding, offset, value, ctx.storage_types.U32x4, sizeof(u32[4]),
++        WriteStorage(ctx, inst, binding, offset, value, ctx.storage_types.U32x4, sizeof(u32[4]),
+                      &StorageDefinitions::U32x4);
+     } else {
+         for (u32 index = 0; index < 4; ++index) {
+             const Id element{ctx.OpCompositeExtract(ctx.U32[1], value, index)};
+-            WriteStorage32(ctx, binding, offset, element, index);
++            WriteStorage32(ctx, inst, binding, offset, element, index);
+         }
+     }
+ }
+--- a/src/shader_recompiler/backend/spirv/spirv_emit_context.cpp
++++ b/src/shader_recompiler/backend/spirv/spirv_emit_context.cpp
+@@ -993,12 +993,17 @@
+             AddLabel(else_label);
+         }
+     }};
++    // A global access the guest marked device-coherent (LDG .CG and the like) shares these
++    // functions with every other one: all of their accesses are then Volatile.
++    const bool coherent{info.uses_coherent_global_memory};
+     const auto define_load{[&](DefPtr ssbo_member, Id element_pointer, Id type, u32 shift) {
+         const Id function_type{TypeFunction(type, U64)};
+         const Id func_id{OpFunction(type, spv::FunctionControlMask::MaskNone, function_type)};
+         const Id addr{OpFunctionParameter(U64)};
+-        define_body(ssbo_member, addr, element_pointer, shift,
+-                    [&](Id ssbo_pointer) { OpReturnValue(OpLoad(type, ssbo_pointer)); });
++        define_body(ssbo_member, addr, element_pointer, shift, [&](Id ssbo_pointer) {
++            OpReturnValue(coherent ? OpLoad(type, ssbo_pointer, spv::MemoryAccessMask::Volatile)
++                                   : OpLoad(type, ssbo_pointer));
++        });
+         OpReturnValue(ConstantNull(type));
+         OpFunctionEnd();
+         return func_id;
+@@ -1009,7 +1014,11 @@
+         const Id addr{OpFunctionParameter(U64)};
+         const Id data{OpFunctionParameter(type)};
+         define_body(ssbo_member, addr, element_pointer, shift, [&](Id ssbo_pointer) {
+-            OpStore(ssbo_pointer, data);
++            if (coherent) {
++                OpStore(ssbo_pointer, data, spv::MemoryAccessMask::Volatile);
++            } else {
++                OpStore(ssbo_pointer, data);
++            }
+             OpReturn();
+         });
+         OpReturn();
+--- a/src/shader_recompiler/frontend/ir/ir_emitter.cpp
++++ b/src/shader_recompiler/frontend/ir/ir_emitter.cpp
+@@ -413,60 +413,60 @@
+     return Inst<U32>(Opcode::LaneId);
+ }
+ 
+-U32 IREmitter::LoadGlobalU8(const U64& address) {
+-    return Inst<U32>(Opcode::LoadGlobalU8, address);
++U32 IREmitter::LoadGlobalU8(const U64& address, MemoryInstInfo info) {
++    return Inst<U32>(Opcode::LoadGlobalU8, Flags{info}, address);
+ }
+ 
+-U32 IREmitter::LoadGlobalS8(const U64& address) {
+-    return Inst<U32>(Opcode::LoadGlobalS8, address);
++U32 IREmitter::LoadGlobalS8(const U64& address, MemoryInstInfo info) {
++    return Inst<U32>(Opcode::LoadGlobalS8, Flags{info}, address);
+ }
+ 
+-U32 IREmitter::LoadGlobalU16(const U64& address) {
+-    return Inst<U32>(Opcode::LoadGlobalU16, address);
++U32 IREmitter::LoadGlobalU16(const U64& address, MemoryInstInfo info) {
++    return Inst<U32>(Opcode::LoadGlobalU16, Flags{info}, address);
+ }
+ 
+-U32 IREmitter::LoadGlobalS16(const U64& address) {
+-    return Inst<U32>(Opcode::LoadGlobalS16, address);
++U32 IREmitter::LoadGlobalS16(const U64& address, MemoryInstInfo info) {
++    return Inst<U32>(Opcode::LoadGlobalS16, Flags{info}, address);
+ }
+ 
+-U32 IREmitter::LoadGlobal32(const U64& address) {
+-    return Inst<U32>(Opcode::LoadGlobal32, address);
++U32 IREmitter::LoadGlobal32(const U64& address, MemoryInstInfo info) {
++    return Inst<U32>(Opcode::LoadGlobal32, Flags{info}, address);
+ }
+ 
+-Value IREmitter::LoadGlobal64(const U64& address) {
+-    return Inst<Value>(Opcode::LoadGlobal64, address);
++Value IREmitter::LoadGlobal64(const U64& address, MemoryInstInfo info) {
++    return Inst<Value>(Opcode::LoadGlobal64, Flags{info}, address);
+ }
+ 
+-Value IREmitter::LoadGlobal128(const U64& address) {
+-    return Inst<Value>(Opcode::LoadGlobal128, address);
++Value IREmitter::LoadGlobal128(const U64& address, MemoryInstInfo info) {
++    return Inst<Value>(Opcode::LoadGlobal128, Flags{info}, address);
+ }
+ 
+-void IREmitter::WriteGlobalU8(const U64& address, const U32& value) {
+-    Inst(Opcode::WriteGlobalU8, address, value);
++void IREmitter::WriteGlobalU8(const U64& address, const U32& value, MemoryInstInfo info) {
++    Inst(Opcode::WriteGlobalU8, Flags{info}, address, value);
+ }
+ 
+-void IREmitter::WriteGlobalS8(const U64& address, const U32& value) {
+-    Inst(Opcode::WriteGlobalS8, address, value);
++void IREmitter::WriteGlobalS8(const U64& address, const U32& value, MemoryInstInfo info) {
++    Inst(Opcode::WriteGlobalS8, Flags{info}, address, value);
+ }
+ 
+-void IREmitter::WriteGlobalU16(const U64& address, const U32& value) {
+-    Inst(Opcode::WriteGlobalU16, address, value);
++void IREmitter::WriteGlobalU16(const U64& address, const U32& value, MemoryInstInfo info) {
++    Inst(Opcode::WriteGlobalU16, Flags{info}, address, value);
+ }
+ 
+-void IREmitter::WriteGlobalS16(const U64& address, const U32& value) {
+-    Inst(Opcode::WriteGlobalS16, address, value);
++void IREmitter::WriteGlobalS16(const U64& address, const U32& value, MemoryInstInfo info) {
++    Inst(Opcode::WriteGlobalS16, Flags{info}, address, value);
+ }
+ 
+-void IREmitter::WriteGlobal32(const U64& address, const U32& value) {
+-    Inst(Opcode::WriteGlobal32, address, value);
++void IREmitter::WriteGlobal32(const U64& address, const U32& value, MemoryInstInfo info) {
++    Inst(Opcode::WriteGlobal32, Flags{info}, address, value);
+ }
+ 
+-void IREmitter::WriteGlobal64(const U64& address, const IR::Value& vector) {
+-    Inst(Opcode::WriteGlobal64, address, vector);
++void IREmitter::WriteGlobal64(const U64& address, const IR::Value& vector, MemoryInstInfo info) {
++    Inst(Opcode::WriteGlobal64, Flags{info}, address, vector);
+ }
+ 
+-void IREmitter::WriteGlobal128(const U64& address, const IR::Value& vector) {
+-    Inst(Opcode::WriteGlobal128, address, vector);
++void IREmitter::WriteGlobal128(const U64& address, const IR::Value& vector, MemoryInstInfo info) {
++    Inst(Opcode::WriteGlobal128, Flags{info}, address, vector);
+ }
+ 
+ U32 IREmitter::LoadLocal(const IR::U32& word_offset) {
+--- a/src/shader_recompiler/frontend/ir/ir_emitter.h
++++ b/src/shader_recompiler/frontend/ir/ir_emitter.h
+@@ -116,21 +116,21 @@
+ 
+     [[nodiscard]] U32 LaneId();
+ 
+-    [[nodiscard]] U32 LoadGlobalU8(const U64& address);
+-    [[nodiscard]] U32 LoadGlobalS8(const U64& address);
+-    [[nodiscard]] U32 LoadGlobalU16(const U64& address);
+-    [[nodiscard]] U32 LoadGlobalS16(const U64& address);
+-    [[nodiscard]] U32 LoadGlobal32(const U64& address);
+-    [[nodiscard]] Value LoadGlobal64(const U64& address);
+-    [[nodiscard]] Value LoadGlobal128(const U64& address);
++    [[nodiscard]] U32 LoadGlobalU8(const U64& address, MemoryInstInfo info = {});
++    [[nodiscard]] U32 LoadGlobalS8(const U64& address, MemoryInstInfo info = {});
++    [[nodiscard]] U32 LoadGlobalU16(const U64& address, MemoryInstInfo info = {});
++    [[nodiscard]] U32 LoadGlobalS16(const U64& address, MemoryInstInfo info = {});
++    [[nodiscard]] U32 LoadGlobal32(const U64& address, MemoryInstInfo info = {});
++    [[nodiscard]] Value LoadGlobal64(const U64& address, MemoryInstInfo info = {});
++    [[nodiscard]] Value LoadGlobal128(const U64& address, MemoryInstInfo info = {});
+ 
+-    void WriteGlobalU8(const U64& address, const U32& value);
+-    void WriteGlobalS8(const U64& address, const U32& value);
+-    void WriteGlobalU16(const U64& address, const U32& value);
+-    void WriteGlobalS16(const U64& address, const U32& value);
+-    void WriteGlobal32(const U64& address, const U32& value);
+-    void WriteGlobal64(const U64& address, const IR::Value& vector);
+-    void WriteGlobal128(const U64& address, const IR::Value& vector);
++    void WriteGlobalU8(const U64& address, const U32& value, MemoryInstInfo info = {});
++    void WriteGlobalS8(const U64& address, const U32& value, MemoryInstInfo info = {});
++    void WriteGlobalU16(const U64& address, const U32& value, MemoryInstInfo info = {});
++    void WriteGlobalS16(const U64& address, const U32& value, MemoryInstInfo info = {});
++    void WriteGlobal32(const U64& address, const U32& value, MemoryInstInfo info = {});
++    void WriteGlobal64(const U64& address, const IR::Value& vector, MemoryInstInfo info = {});
++    void WriteGlobal128(const U64& address, const IR::Value& vector, MemoryInstInfo info = {});
+ 
+     [[nodiscard]] U32 LoadLocal(const U32& word_offset);
+     void WriteLocal(const U32& word_offset, const U32& value);
+--- a/src/shader_recompiler/frontend/ir/modifiers.h
++++ b/src/shader_recompiler/frontend/ir/modifiers.h
+@@ -34,6 +34,14 @@
+ };
+ static_assert(sizeof(FpControl) <= sizeof(u32));
+ 
++/// Flags of a global or storage buffer load or store (LDG, STG and what they become).
++struct MemoryInstInfo {
++    /// The guest asked for an access past the per-SM cache: LDG .CG (cache in L2 only) or .CV
++    /// (fetch again), STG .CG or .WT. The host access must reach memory every workgroup sees.
++    bool coherent{false};
++};
++static_assert(sizeof(MemoryInstInfo) <= sizeof(u32));
++
+ union TextureInstInfo {
+     u32 raw;
+     BitField<0, 16, u32> descriptor_index;
+--- a/src/shader_recompiler/frontend/maxwell/translate/impl/load_store_memory.cpp
++++ b/src/shader_recompiler/frontend/maxwell/translate/impl/load_store_memory.cpp
+@@ -76,6 +76,18 @@
+     // Apply the offset
+     return v.ir.IAdd(address, v.ir.Imm64(addr_offset));
+ }
++
++// .CG keeps the line out of the SM's L1 and .CV fetches it again: the game reads what another
++// workgroup or the host wrote, often in a loop until it changes. A plain host load can be served
++// from a per-CU cache and never see the write, so these become device-coherent loads.
++IR::MemoryInstInfo LoadInfo(LoadCache cache) {
++    return {.coherent = cache == LoadCache::CG || cache == LoadCache::CV};
++}
++
++// .CG and .WT stores are meant for other SMs and the host to read.
++IR::MemoryInstInfo StoreInfo(StoreCache cache) {
++    return {.coherent = cache == StoreCache::CG || cache == StoreCache::WT};
++}
+ } // Anonymous namespace
+ 
+ void TranslatorVisitor::LDG(u64 insn) {
+@@ -90,27 +102,28 @@
+     // Pointer to load data from
+     const IR::U64 address{Address(*this, insn)};
+     const IR::Reg dest_reg{ldg.dest_reg};
++    const IR::MemoryInstInfo info{LoadInfo(ldg.cache)};
+     switch (ldg.size) {
+     case LoadSize::U8:
+-        X(dest_reg, ir.LoadGlobalU8(address));
++        X(dest_reg, ir.LoadGlobalU8(address, info));
+         break;
+     case LoadSize::S8:
+-        X(dest_reg, ir.LoadGlobalS8(address));
++        X(dest_reg, ir.LoadGlobalS8(address, info));
+         break;
+     case LoadSize::U16:
+-        X(dest_reg, ir.LoadGlobalU16(address));
++        X(dest_reg, ir.LoadGlobalU16(address, info));
+         break;
+     case LoadSize::S16:
+-        X(dest_reg, ir.LoadGlobalS16(address));
++        X(dest_reg, ir.LoadGlobalS16(address, info));
+         break;
+     case LoadSize::B32:
+-        X(dest_reg, ir.LoadGlobal32(address));
++        X(dest_reg, ir.LoadGlobal32(address, info));
+         break;
+     case LoadSize::B64: {
+         if (!IR::IsAligned(dest_reg, 2)) {
+             throw NotImplementedException("Unaligned data registers");
+         }
+-        const IR::Value vector{ir.LoadGlobal64(address)};
++        const IR::Value vector{ir.LoadGlobal64(address, info)};
+         for (int i = 0; i < 2; ++i) {
+             X(dest_reg + i, IR::U32{ir.CompositeExtract(vector, static_cast<size_t>(i))});
+         }
+@@ -121,7 +134,7 @@
+         if (!IR::IsAligned(dest_reg, 4)) {
+             throw NotImplementedException("Unaligned data registers");
+         }
+-        const IR::Value vector{ir.LoadGlobal128(address)};
++        const IR::Value vector{ir.LoadGlobal128(address, info)};
+         for (int i = 0; i < 4; ++i) {
+             X(dest_reg + i, IR::U32{ir.CompositeExtract(vector, static_cast<size_t>(i))});
+         }
+@@ -144,28 +157,29 @@
+     // Pointer to store data into
+     const IR::U64 address{Address(*this, insn)};
+     const IR::Reg data_reg{stg.data_reg};
++    const IR::MemoryInstInfo info{StoreInfo(stg.cache)};
+     switch (stg.size) {
+     case StoreSize::U8:
+-        ir.WriteGlobalU8(address, X(data_reg));
++        ir.WriteGlobalU8(address, X(data_reg), info);
+         break;
+     case StoreSize::S8:
+-        ir.WriteGlobalS8(address, X(data_reg));
++        ir.WriteGlobalS8(address, X(data_reg), info);
+         break;
+     case StoreSize::U16:
+-        ir.WriteGlobalU16(address, X(data_reg));
++        ir.WriteGlobalU16(address, X(data_reg), info);
+         break;
+     case StoreSize::S16:
+-        ir.WriteGlobalS16(address, X(data_reg));
++        ir.WriteGlobalS16(address, X(data_reg), info);
+         break;
+     case StoreSize::B32:
+-        ir.WriteGlobal32(address, X(data_reg));
++        ir.WriteGlobal32(address, X(data_reg), info);
+         break;
+     case StoreSize::B64: {
+         if (!IR::IsAligned(data_reg, 2)) {
+             throw NotImplementedException("Unaligned data registers");
+         }
+         const IR::Value vector{ir.CompositeConstruct(X(data_reg), X(data_reg + 1))};
+-        ir.WriteGlobal64(address, vector);
++        ir.WriteGlobal64(address, vector, info);
+         break;
+     }
+     case StoreSize::B128:
+@@ -174,7 +188,7 @@
+         }
+         const IR::Value vector{
+             ir.CompositeConstruct(X(data_reg), X(data_reg + 1), X(data_reg + 2), X(data_reg + 3))};
+-        ir.WriteGlobal128(address, vector);
++        ir.WriteGlobal128(address, vector, info);
+         break;
+     }
+ }
+--- a/src/shader_recompiler/ir_opt/collect_shader_info_pass.cpp
++++ b/src/shader_recompiler/ir_opt/collect_shader_info_pass.cpp
+@@ -517,6 +517,30 @@
+     case IR::Opcode::StorageAtomicMaxF16x2:
+     case IR::Opcode::StorageAtomicMaxF32x2:
+         info.uses_storage_atomics = true;
++        break;
++    default:
++        break;
++    }
++    switch (inst.GetOpcode()) {
++    case IR::Opcode::LoadGlobalU8:
++    case IR::Opcode::LoadGlobalS8:
++    case IR::Opcode::LoadGlobalU16:
++    case IR::Opcode::LoadGlobalS16:
++    case IR::Opcode::LoadGlobal32:
++    case IR::Opcode::LoadGlobal64:
++    case IR::Opcode::LoadGlobal128:
++    case IR::Opcode::WriteGlobalU8:
++    case IR::Opcode::WriteGlobalS8:
++    case IR::Opcode::WriteGlobalU16:
++    case IR::Opcode::WriteGlobalS16:
++    case IR::Opcode::WriteGlobal32:
++    case IR::Opcode::WriteGlobal64:
++    case IR::Opcode::WriteGlobal128:
++        // An access no storage buffer was found for goes through the global memory functions,
++        // which then read and write device-coherently (IR::MemoryInstInfo).
++        if (inst.Flags<IR::MemoryInstInfo>().coherent) {
++            info.uses_coherent_global_memory = true;
++        }
+         break;
+     default:
+         break;
+--- a/src/shader_recompiler/ir_opt/global_memory_to_storage_buffer_pass.cpp
++++ b/src/shader_recompiler/ir_opt/global_memory_to_storage_buffer_pass.cpp
+@@ -445,7 +445,9 @@
+                  const IR::U32& offset) {
+     const IR::Opcode new_opcode{GlobalToStorage(inst.GetOpcode())};
+     const auto it{IR::Block::InstructionList::s_iterator_to(inst)};
+-    const IR::Value value{&*block.PrependNewInst(it, new_opcode, {storage_index, offset})};
++    // The flags (IR::MemoryInstInfo) go with it: a coherent global load stays coherent.
++    const IR::Value value{
++        &*block.PrependNewInst(it, new_opcode, {storage_index, offset}, inst.Flags<u32>())};
+     inst.ReplaceUsesWith(value);
+ }
+ 
+@@ -454,7 +456,7 @@
+                   const IR::U32& offset) {
+     const IR::Opcode new_opcode{GlobalToStorage(inst.GetOpcode())};
+     const auto it{IR::Block::InstructionList::s_iterator_to(inst)};
+-    block.PrependNewInst(it, new_opcode, {storage_index, offset, inst.Arg(1)});
++    block.PrependNewInst(it, new_opcode, {storage_index, offset, inst.Arg(1)}, inst.Flags<u32>());
+     inst.Invalidate();
+ }
+ 
+--- a/src/shader_recompiler/shader_info.h
++++ b/src/shader_recompiler/shader_info.h
+@@ -312,6 +312,7 @@
+     bool uses_int64_bit_atomics{};
+     bool uses_storage_atomics{};
+     bool uses_global_memory{};
++    bool uses_coherent_global_memory{};
+     bool uses_atomic_image_u32{};
+     bool uses_shadow_lod{};
+     bool uses_rescaling_uniform{};

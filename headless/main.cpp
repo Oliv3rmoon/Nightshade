@@ -882,6 +882,8 @@ int main(int argc, char** argv) {
         // A development run that names jit_list in dev-settings decides the block list by itself.
         [[maybe_unused]] bool dev_block_list = false;  // read where a session applies its settings
         [[maybe_unused]] int dev_vertex_input = -1;  // likewise: dev-settings vertex_input_dynamic=off/on
+        // Likewise the switches a game's "gpu_debug" has too (settings_store.h): -1 where not named.
+        [[maybe_unused]] Eden::GpuDebugSettings dev_gpu_debug;
         [[maybe_unused]] bool dev_cram_on = true, dev_cram_scan = true, dev_cram_dedup = false, dev_cram_fine = false;
 #ifdef EDEN_DEV_PROFILE
         // One-run A/B switches written by the development runner; absent = defaults.
@@ -1053,14 +1055,14 @@ int main(int argc, char** argv) {
                     Settings::values.vram_usage_mode.SetValue(Settings::VramUsageMode::Aggressive);
                 } else if (entry == "vram=conservative") {
                     Settings::values.vram_usage_mode.SetValue(Settings::VramUsageMode::Conservative);
-                } else if (entry == "conditional_rendering=off") {
-                    Eden::DevVulkan::disable_conditional_rendering = true;
-                } else if (entry == "conditional_rendering=on") {
-                    Eden::DevVulkan::disable_conditional_rendering = false;
+                } else if (entry == "conditional_rendering=off" || entry == "conditional_rendering=on") {
+                    dev_gpu_debug.conditional_rendering = entry.ends_with("on") ? 1 : 0;
+                    Eden::DevVulkan::disable_conditional_rendering = dev_gpu_debug.conditional_rendering == 0;
                 } else if (entry == "gpu_time=on") {
                     Eden::DevVulkan::gpu_time = true;
-                } else if (entry == "submit_sync=on") {
-                    Eden::DevVulkan::sync_submissions = true;
+                } else if (entry == "submit_sync=on" || entry == "submit_sync=off") {
+                    dev_gpu_debug.submit_sync = entry.ends_with("on") ? 1 : 0;
+                    Eden::DevVulkan::sync_submissions = dev_gpu_debug.submit_sync != 0;
                 } else if (entry == "astc=cpu") {
                     Settings::values.accelerate_astc.SetValue(Settings::AstcDecodeMode::Cpu);
                 } else if (entry == "log=render") {
@@ -1075,9 +1077,21 @@ int main(int argc, char** argv) {
                     Eden::Performance::boot_trace_begin = now + std::stoll(entry.substr(11, colon - 11)) * 1000000;
                     Eden::Performance::boot_trace_end = now + std::stoll(entry.substr(colon + 1)) * 1000000;
                 } else if (entry == "hcr=eden" || entry == "hcr=exact" || entry == "hcr=cpu") {
-                    Eden::DevVulkan::hcr_mode = entry == "hcr=eden" ? 0 : entry == "hcr=exact" ? 1 : 2;
-                } else if (entry == "compute_barriers=off") {
-                    Eden::DevVulkan::compute_barriers = false;
+                    dev_gpu_debug.hcr = entry == "hcr=eden" ? 0 : entry == "hcr=exact" ? 1 : 2;
+                    Eden::DevVulkan::hcr_mode = dev_gpu_debug.hcr;
+                } else if (entry == "compute_barriers=off" || entry == "compute_barriers=on") {
+                    dev_gpu_debug.compute_barriers = entry.ends_with("on") ? 1 : 0;
+                    Eden::DevVulkan::compute_barriers = dev_gpu_debug.compute_barriers != 0;
+                } else if (entry.starts_with("coherent_storage=")) {
+                    // Storage buffers the shaders read device-coherently: atomics, compute or all.
+                    const int mode = Eden::KeyIndex(entry.substr(17), Eden::kCoherentStorageKeys,
+                                                    int(std::size(Eden::kCoherentStorageKeys)), -1);
+                    if (mode >= 0) {
+                        dev_gpu_debug.coherent_storage = mode;
+                        Eden::DevVulkan::coherent_storage = mode;
+                    } else {
+                        std::printf("EDEN_DEV_SETTINGS unknown=%s\n", entry.c_str());
+                    }
                 } else if (entry == "gpu_clock=normal" || entry == "gpu_clock=boost" || entry == "gpu_clock=overclock") {
                     // Guest-visible GPU timestamp scale (Eden's fast_gpu_time; Boost is the default).
                     Settings::values.gpu_clock.SetValue(entry.ends_with("normal") ? Settings::GpuClock::Normal :
@@ -1363,6 +1377,19 @@ int main(int argc, char** argv) {
             const int game_vertex_input = Eden::LoadGameSettings(eden_game_title_id(guest)).vertex_input_dynamic;
             Settings::values.vertex_input_dynamic_state.SetValue(
                 dev_vertex_input >= 0 ? dev_vertex_input != 0 : game_vertex_input != 0);
+            // For testing a game that stops the GPU: dev-settings first, then the game's "gpu_debug"
+            // (settings_store.h, docs/SETTINGS.md), else the defaults. Set for every session: the
+            // switches outlive one, and the renderer reads them as the game loads (below).
+            const Eden::GpuDebugSettings gpu_debug =
+                Eden::ResolveGpuDebug(Eden::LoadGpuDebug(eden_game_title_id(guest)), dev_gpu_debug);
+            Eden::DevVulkan::coherent_storage = gpu_debug.coherent_storage;
+            Eden::DevVulkan::sync_submissions = gpu_debug.submit_sync != 0;
+            Eden::DevVulkan::hcr_mode = gpu_debug.hcr;
+            Eden::DevVulkan::compute_barriers = gpu_debug.compute_barriers != 0;
+            Eden::DevVulkan::disable_conditional_rendering = gpu_debug.conditional_rendering == 0;
+            // Which ones the session has, in stderr.log: the Vulkan renderer's alone.
+            std::fprintf(stderr, "%s renderer=%s\n", Eden::GpuDebugLine(gpu_debug).c_str(),
+                         Eden::BackendName(backend));
             // The report reads the values back: what the emulator has, whoever set it.
             const auto on = [](bool value) { return value ? "on" : "off"; };
             Eden::Report("launch", (std::string("Performance: block list ") + on(Eden::JitList::enabled) +
