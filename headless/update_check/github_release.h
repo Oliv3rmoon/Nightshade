@@ -80,7 +80,12 @@ extern "C"
         GITHUB_RELEASE_SUMS_TWO_ZIPS = 15,  /* it lists two of them: which one is meant? */
         GITHUB_RELEASE_REDIRECT_REFUSED = 16, /* a redirect elsewhere than api.github.com, or too many */
         GITHUB_RELEASE_TOO_LARGE = 17,       /* an answer over GITHUB_RELEASE_MAX_ANSWER */
-        GITHUB_RELEASE_TOO_MANY_ZIPS = 18    /* more than GITHUB_RELEASE_MAX_ZIPS *-<tag>.zip */
+        GITHUB_RELEASE_TOO_MANY_ZIPS = 18,   /* more than GITHUB_RELEASE_MAX_ZIPS *-<tag>.zip */
+        /* ProsperoEden, for another app's release (github_release_asset_check): */
+        GITHUB_RELEASE_NO_HASH = 19,         /* neither SHA256SUMS nor a digest of the file */
+        GITHUB_RELEASE_HASHES_DIFFER = 20,   /* SHA256SUMS and GitHub's digest of the file differ */
+        GITHUB_RELEASE_BAD_TAG = 21,         /* a tag that can't be in a download's address */
+        GITHUB_RELEASE_OWNER_CHANGED = 22    /* a renamed repository's redirect led to another owner */
     } github_release_reason;
 
     /* What the check found, for the log. */
@@ -184,6 +189,34 @@ extern "C"
     self_update_check_result self_update_check_self_from(const char *repository, const char *name,
                                                          self_update_offer *offer,
                                                          github_release_report *report);
+
+    /* ---- ProsperoEden: another app's release (Nightshade's Apps, headless/apps.h) ---------- */
+
+    /* The newest release of a repository and one of its files, whatever its tag says. */
+    typedef struct github_release_asset
+    {
+        char tag[40];     /* as GitHub has it: "01.000.090", "v1.005.100", "1.5.9" */
+        uint64_t size;    /* the file's, as GitHub lists it */
+        char sha256[65];  /* lowercase */
+        int from_sums;    /* 1: the release's SHA256SUMS gives it; 0: GitHub's digest of the file */
+        char url[512];    /* https://github.com/<repository>/releases/download/<tag>/<file> */
+        char page[160];   /* https://github.com/<repository>/releases/tag/<tag> */
+    } github_release_asset;
+
+    /* releases/latest of `repository` (a renamed one's redirect followed, as for the app's own
+     * update, but only to a repository of the same owner: the answer names where it is now, and
+     * another owner's is GITHUB_RELEASE_OWNER_CHANGED, so nothing is installed from an account the
+     * caller did not name), and its uploaded file named `file` ("PPSA99003.zip"). Its SHA-256 is the line
+     * SHA256SUMS has for it when the release has a SHA256SUMS, otherwise the digest GitHub keeps of
+     * every file it holds (the file's "digest", "sha256:<64 hex>"); when both are there they must
+     * be the same, and with neither nothing is offered (GITHUB_RELEASE_NO_HASH). The download's
+     * address is made from the repository, the tag and the name, not taken from the answer.
+     * GITHUB_RELEASE_NEWER: found (newer or not is the caller's to say); `report` as above.
+     * Blocking. */
+    github_release_reason github_release_asset_check(const self_update_platform *platform,
+                                                     const char *repository, const char *file,
+                                                     github_release_asset *asset,
+                                                     github_release_report *report);
 
 #ifdef __cplusplus
 }

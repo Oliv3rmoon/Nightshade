@@ -162,15 +162,11 @@ static size_t on_stream(char *data, size_t size, size_t count, void *user)
     return bytes;
 }
 
-static int console_download(void *user, const char *url, uint64_t limit, self_update_sink sink,
-                            void *sink_user)
+/* The download from the address in `current` (SELF_UPDATE_MAX_URL bytes), following GitHub's
+ * redirects in it. */
+static int download_from(char *current, uint64_t limit, self_update_sink sink, void *sink_user)
 {
-    static char current[SELF_UPDATE_MAX_URL]; /* one download at a time */
     int hop;
-    (void)user;
-    if (!self_update_url_allowed(url, 0))
-        return -1;
-    (void)snprintf(current, sizeof(current), "%s", url);
     for (hop = 0; hop <= self_update_redirects; ++hop)
     {
         stream_sink stream = {sink, sink_user, limit, 0, 0};
@@ -192,7 +188,7 @@ static int console_download(void *user, const char *url, uint64_t limit, self_up
             code != 306 && curl_easy_getinfo(easy, CURLINFO_REDIRECT_URL, &next) == CURLE_OK &&
             next != NULL && self_update_url_allowed(next, 1) && stream.received == 0)
         {
-            (void)snprintf(current, sizeof(current), "%s", next);
+            (void)snprintf(current, SELF_UPDATE_MAX_URL, "%s", next);
             curl_easy_cleanup(easy);
             continue;
         }
@@ -202,6 +198,26 @@ static int console_download(void *user, const char *url, uint64_t limit, self_up
         return code == 200 ? 0 : -(int)code;
     }
     return -1; /* too many redirects */
+}
+
+static int console_download(void *user, const char *url, uint64_t limit, self_update_sink sink,
+                            void *sink_user)
+{
+    /* ProsperoEden: the address followed is this call's own, not one shared buffer: downloads can
+       run at once (an app's install, releases' SHA256SUMS, the app's own update). On the heap,
+       so a job's thread takes no more stack than before. */
+    char *current;
+    int result;
+    (void)user;
+    if (!self_update_url_allowed(url, 0))
+        return -1;
+    current = (char *)malloc(SELF_UPDATE_MAX_URL);
+    if (current == NULL)
+        return -(10000 + (int)CURLE_OUT_OF_MEMORY);
+    (void)snprintf(current, SELF_UPDATE_MAX_URL, "%s", url);
+    result = download_from(current, limit, sink, sink_user);
+    free(current);
+    return result;
 }
 
 /* ---- The signature ------------------------------------------------------------------------- */
@@ -250,10 +266,11 @@ static void channel_close(void *user)
 }
 
 /* The loader reads the program up to the end of its section table and gives the rest of the
- * connection to the program as its standard input and output. */
-static int console_open_helper(void *user, self_update_channel *channel)
+ * connection to the program as its standard input and output. ProsperoEden: any payload in the
+ * app's folder (Nightshade's Apps opens an app with app-launch.elf, apps.h); the helper below. */
+int self_update_open_payload(const char *path, self_update_channel *channel)
 {
-    static unsigned char buffer[65536];
+    static unsigned char buffer[65536]; /* one at a time: the app sends one payload at a time */
     /* The helper reports five times a second while it works; this long a silence means it is
      * gone. */
     const int io_timeout_us = 60000000;
@@ -264,8 +281,7 @@ static int console_open_helper(void *user, self_update_channel *channel)
     int program;
     int socket;
     int sent = 0;
-    (void)user;
-    program = sceKernelOpen(SELF_UPDATE_HELPER_PATH, O_RDONLY, 0);
+    program = sceKernelOpen(path, O_RDONLY, 0);
     if (program < 0)
         return 0;
     socket = sceNetSocket("self_update", 2, 1, 6);
@@ -312,6 +328,20 @@ static int console_open_helper(void *user, self_update_channel *channel)
     channel->close = channel_close;
     channel->user = (void *)(intptr_t)socket;
     return 1;
+}
+
+static int console_open_helper(void *user, self_update_channel *channel)
+{
+    (void)user;
+    return self_update_open_payload(SELF_UPDATE_HELPER_PATH, channel);
+}
+
+/* ProsperoEden: a shorter wait for an answer on a payload's connection than the helper's minute
+ * (the launch payload answers at once). */
+int self_update_channel_timeout(const self_update_channel *channel, int milliseconds)
+{
+    const int timeout_us = milliseconds * 1000;
+    return sceNetSetsockopt((int)(intptr_t)channel->user, 0xffff, 0x1106, &timeout_us, sizeof(timeout_us)) >= 0;
 }
 
 /* ---- Kept between launches ----------------------------------------------------------------- */

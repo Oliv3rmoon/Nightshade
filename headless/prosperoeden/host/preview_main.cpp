@@ -753,6 +753,54 @@ void pictures(Stage &s)
         std::fprintf(stderr, "error: the Update notices switch did not reach the settings\n");
         s.ok = false;
     }
+    // Back up to USB, Diagnostics' fourth row: the drives and the size, a backup copying and done,
+    // one on a drive that fills up, a cancel; then back to Diagnostics on its row.
+    s.press({Key::down});
+    s.wait(0.6f);
+    s.shoot("18e-diagnostics-backup");
+    s.press({Key::cross});
+    s.wait(0.8f);
+    s.shoot("18f-backup");
+    if (s.services.backups_refreshed < 1)
+    {
+        std::fprintf(stderr, "error: Back up to USB did not look for the drives\n");
+        s.ok = false;
+    }
+    s.press({Key::cross});
+    s.wait(2.5f);
+    s.shoot("18g-backup-copying");
+    for (int frame = 0; frame < 1200 && s.services.backup_steps >= 0; ++frame)
+        s.frame();
+    s.wait(0.5f);
+    s.shoot("18h-backup-done");
+    if (s.services.backups_made != 1)
+    {
+        std::fprintf(stderr, "error: the backup did not finish\n");
+        s.ok = false;
+    }
+    s.press({Key::down});
+    s.services.backup_full = true;
+    s.press({Key::cross});
+    for (int frame = 0; frame < 1200 && s.services.backup_steps >= 0; ++frame)
+        s.frame();
+    s.wait(0.5f);
+    s.shoot("18i-backup-drive-full");
+    s.press({Key::left}); // closes the card
+    s.services.backup_full = false;
+    s.press({Key::cross});
+    s.wait(1.5f);
+    s.press({Key::circle});
+    for (int frame = 0; frame < 1200 && s.services.backup_steps >= 0; ++frame)
+        s.frame();
+    s.wait(0.3f);
+    s.shoot("18j-backup-cancelled");
+    if (s.services.backups_made != 1 || !s.services.backup_cancelled)
+    {
+        std::fprintf(stderr, "error: the backup was not cancelled\n");
+        s.ok = false;
+    }
+    s.press({Key::circle});
+    s.wait(0.4f);
     s.press({Key::circle});
     s.walk_settings(6, 7);
     s.press({Key::cross});
@@ -1134,6 +1182,67 @@ void pictures(Stage &s)
     s.press({Key::down, Key::square});
     s.wait(0.4f);
     s.shoot("B6-save-sync-unlink-asked");
+
+    // Settings > Apps, the last tile or row: the apps, a new one installed, an update that fails,
+    // opening one with no payload loader, then opening one (Nightshade closes).
+    s.restart();
+    s.wait(1.0f);
+    s.settings();
+    s.wait(1.0f);
+    s.walk_settings(0, 13);
+    s.wait(0.6f);
+    s.shoot("N0-settings-apps");
+    s.press({Key::cross});
+    s.wait(0.8f);
+    s.shoot("N1-apps");
+    if (s.services.apps_refreshed != 1)
+    {
+        std::fprintf(stderr, "error: the Apps dialog did not ask for the releases\n");
+        s.ok = false;
+    }
+    s.press({Key::down, Key::down});
+    s.wait(0.5f);
+    s.shoot("N2-apps-not-installed");
+    s.press({Key::cross});
+    s.wait(5.0f);
+    s.shoot("N3-apps-downloading");
+    for (int frame = 0; frame < 1200 && s.services.app_steps >= 0; ++frame)
+        s.frame();
+    s.wait(0.5f);
+    s.shoot("N4-apps-installed");
+    if (s.services.app_list[2].installed != "01.005.009")
+    {
+        std::fprintf(stderr, "error: the app installed did not reach the list\n");
+        s.ok = false;
+    }
+    // Nightshade Stream: the original project's newer release, Square; it fails.
+    s.press({Key::up});
+    s.wait(0.5f);
+    s.shoot("N5-apps-update");
+    s.services.app_fails = true;
+    s.press({Key::square});
+    for (int frame = 0; frame < 1200 && s.services.app_steps >= 0; ++frame)
+        s.frame();
+    s.wait(0.5f);
+    s.shoot("N6-apps-update-failed");
+    s.services.app_fails = false;
+    // Open, with no payload loader: the card says so (Left closes it and does nothing else).
+    s.press({Key::left});
+    s.services.app_open = pe::ui::AppOpen::no_loader;
+    s.press({Key::cross});
+    s.wait(0.6f);
+    s.shoot("N7-apps-no-loader");
+    s.press({Key::left});
+    s.services.app_open = pe::ui::AppOpen::closing;
+    s.press({Key::cross});
+    s.wait(0.4f);
+    s.shoot("N8-apps-opening");
+    s.wait(2.0f);
+    if (!s.launcher->done())
+    {
+        std::fprintf(stderr, "error: opening an app did not close the launcher\n");
+        s.ok = false;
+    }
 }
 
 // The first seconds after the app is started, one frame per call of frame().

@@ -104,6 +104,11 @@ msgstr "Az Eden emulátorért minden elismerés a fejlesztőit és közreműköd
 msgid "AMD FSR"
 msgstr "AMD FSR"
 
+#. Settings > Apps: each app is Nightshade's own release of another project; until it has one, that project's release is offered.
+#: pe/ui/apps.cpp
+msgid "An app without a Nightshade release yet is offered from the project it is based on."
+msgstr "A még Nightshade-kiadás nélküli alkalmazást abból a projektből kínáljuk, amelyre épül."
+
 #: pe/ui/settings.cpp
 msgid "An image of your own behind this menu."
 msgstr "Saját kép a menü mögött."
@@ -119,6 +124,11 @@ msgstr "Megjelenés"
 #: pe/ui/settings.cpp
 msgid "Apply"
 msgstr "Alkalmaz"
+
+#. Settings > Apps: Nightshade's own companion apps (an IPTV client, game streaming, a PS1 emulator), not games.
+#: pe/ui/apps.cpp, pe/ui/settings.cpp
+msgid "Apps"
+msgstr "Alkalmazások"
 
 #. The button mapping has not been changed.
 #: pe/ui/game_options.cpp, pe/ui/settings.cpp
@@ -160,6 +170,21 @@ msgstr "Automatikus"
 msgid "Back"
 msgstr "Vissza"
 
+#. Button hint in Back up to USB: start a backup to the highlighted USB drive. Keep it short.
+#: pe/ui/backup.cpp
+msgid "Back up"
+msgstr "Mentés indítása"
+
+#. Settings > Diagnostics: copies the app's data (settings, profiles, save data) to a USB drive. USB stays.
+#: pe/ui/backup.cpp, pe/ui/settings.cpp
+msgid "Back up to USB"
+msgstr "Biztonsági mentés USB-re"
+
+#. {0} is the backup's folder on the USB drive.
+#: pe/ui/backup.cpp
+msgid "Backed up to {0}."
+msgstr "Mentve ide: {0}."
+
 #: pe/ui/settings.cpp
 msgid "Backend"
 msgstr "Renderelő"
@@ -167,6 +192,11 @@ msgstr "Renderelő"
 #: pe/ui/save_sync.cpp
 msgid "Backing up save data"
 msgstr "Biztonsági másolat készül a mentésekről"
+
+#. A sentence saying what was left on the drive follows it.
+#: pe/ui/backup.cpp
+msgid "Backup cancelled."
+msgstr "A mentés megszakítva."
 
 #. An upscaling filter.
 #: settings_store.h
@@ -376,6 +406,16 @@ msgstr "VEZÉRLŐK"
 #: pe/ui/library.cpp, pe/ui/settings.cpp
 msgid "Controls"
 msgstr "Irányítás"
+
+#. What Back up to USB does; nothing is restored from there.
+#: pe/ui/backup.cpp, pe/ui/settings.cpp
+msgid "Copies settings, profiles and save data to a USB drive."
+msgstr "Átmásolja a beállításokat, a profilokat és a mentett adatokat egy USB-meghajtóra."
+
+#. A backup's files are being copied to the USB drive. Keep it short.
+#: pe/ui/backup.cpp
+msgid "Copying"
+msgstr "Másolás"
 
 #: pe/ui/settings.cpp
 msgid "Corner"
@@ -729,6 +769,11 @@ msgstr "A képkockagenerálásnak a MihawkGen súlyai kellenek (network.fgw)."
 msgid "Frame time"
 msgstr "Képkockaidő"
 
+#. The console does not say how much room a USB drive has. Keep it short.
+#: pe/ui/backup.cpp
+msgid "Free space unknown"
+msgstr "A szabad hely ismeretlen"
+
 #: settings_store.h
 msgid "French"
 msgstr "Francia"
@@ -804,9 +849,32 @@ msgstr "Az elindított játékok itt jelennek meg."
 msgid "German"
 msgstr "Német"
 
+#. Button hint in Settings > Apps: download and install an app that is not on the console yet. Keep it short.
+#: pe/ui/apps.cpp
+msgid "Get"
+msgstr "Letöltés"
+
+#. Settings > Apps: what it is for. Nightshade TV, Stream and Station are the apps' names (unchanged).
+#: pe/ui/apps.cpp, pe/ui/settings.cpp
+msgid "Get, update and open Nightshade TV, Stream and Station."
+msgstr "A Nightshade TV, Stream és Station letöltése, frissítése és megnyitása."
+
 #: pe/ui/browse.cpp
 msgid "GETTING STARTED"
 msgstr "ELSŐ LÉPÉSEK"
+
+#: pe/ui/apps.cpp
+msgid "GitHub could not be reached."
+msgstr "A GitHub nem érhető el."
+
+#. GitHub allows an address a number of requests an hour; that number was reached.
+#: pe/ui/apps.cpp
+msgid "GitHub is limiting requests. Try again in an hour."
+msgstr "A GitHub korlátozza a kéréseket. Próbáld újra egy óra múlva."
+
+#: pe/ui/apps.cpp
+msgid "GitHub's answer could not be read."
+msgstr "A GitHub válasza nem olvasható."
 
 #: pe/ui/settings.cpp
 msgid "Gives back memory a game left empty, 16 KiB at a time. More free memory; a game that writes there again can stutter for a moment."
@@ -815,6 +883,11 @@ msgstr "Visszaadja a játék által üresen hagyott memóriát, 16 KiB-onként. 
 #: pe/ui/multiplayer.cpp
 msgid "Go offline"
 msgstr "Váltás offline módra"
+
+#. {0} is a folder such as /mnt/usb0/nightshade-backup: where a backup is put.
+#: pe/ui/backup.cpp
+msgid "Goes to {0}"
+msgstr "Ide kerül: {0}"
 
 #: pe/ui/settings.cpp
 msgid "GPU"
@@ -851,6 +924,11 @@ msgstr "A játékok megjelenítése és skálázása a TV-re."
 msgid "Images in this folder: {0}"
 msgstr "Képek ebben a mappában: {0}"
 
+#. Under the Wallpaper list: {0} and {1} are the two folders the images are read from (the game files folder's wallpapers folder, then /data/prosperoeden/wallpapers).
+#: pe/ui/settings.cpp
+msgid "Images in {0} and in {1}"
+msgstr "Képek ezekben a mappákban: {0} és {1}"
+
 #. Button hint: copy a save in.
 #: pe/ui/library.cpp
 msgid "Import"
@@ -876,6 +954,16 @@ msgstr "HASZNÁLATBAN"
 #: pe/ui/multiplayer.cpp
 msgid "Incompatible"
 msgstr "Nem kompatibilis"
+
+#. Settings > Apps: the app is installed as a disk image file, which this menu can't update.
+#: pe/ui/apps.cpp
+msgid "Installed as an image: replace the image to update it."
+msgstr "Lemezképként telepítve: a frissítéshez cseréld le a lemezképet."
+
+#. Settings > Apps: the new release's files are being put in the app's folder.
+#: pe/ui/apps.cpp
+msgid "Installing"
+msgstr "Telepítés"
 
 #: pe/ui/save_sync.cpp
 msgid "It goes to the server."
@@ -1026,6 +1114,11 @@ msgstr "Játéktár"
 msgid "Linked"
 msgstr "Párosítva"
 
+#. Settings > Apps: what the Nightshade TV app is. IPTV is a kind of TV service delivered over the internet (unchanged).
+#: pe/ui/apps_list.hpp
+msgid "Live TV, films and series from your IPTV provider."
+msgstr "Élő tévé, filmek és sorozatok az IPTV-szolgáltatódtól."
+
 #: pe/ui/multiplayer.cpp
 msgid "Loading public rooms..."
 msgstr "Nyilvános szobák betöltése..."
@@ -1123,6 +1216,11 @@ msgstr "Becenév"
 msgid "Nickname: {0}"
 msgstr "Becenév: {0}"
 
+#. {0} is why (English, technical).
+#: pe/ui/backup.cpp
+msgid "Nightshade's data could not be read: {0}"
+msgstr "A Nightshade adatai nem olvashatók: {0}"
+
 #: pe/ui/library.cpp
 msgid "No cheats"
 msgstr "Nincs csalás"
@@ -1161,9 +1259,24 @@ msgstr "Nincs mod"
 msgid "No mods for this game yet. Copy each mod's folder to {0}."
 msgstr "Ehhez a játékhoz még nincs mod. Másold az egyes modok mappáját ide: {0}."
 
+#. {0} is a port number, {1} an app's name. The payload loader is the program on the console that starts the homebrew programs sent to it.
+#: pe/ui/apps.cpp
+msgid "No payload loader is listening on port {0}, so {1} can't be installed."
+msgstr "Nem figyel payload-betöltő ezen a porton: {0}, ezért nem telepíthető: {1}."
+
+#. See 'No payload loader is listening on port {0}, so {1} can't be installed.' The PS5's home screen is the console's own, not this menu's.
+#: pe/ui/apps.cpp
+msgid "No payload loader is listening on port {0}, so {1} can't be opened from here. Open it from the PS5's home screen."
+msgstr "Nem figyel payload-betöltő ezen a porton: {0}, ezért innen nem nyitható meg: {1}. Nyisd meg a PS5 kezdőképernyőjéről."
+
 #: pe/ui/multiplayer.cpp
 msgid "No public rooms are available."
 msgstr "Nincs elérhető nyilvános szoba."
+
+#. Settings > Apps: neither the app's own GitHub repository nor the project it is based on has published a release.
+#: pe/ui/apps.cpp
+msgid "No release yet."
+msgstr "Még nincs kiadás."
 
 #: pe/ui/library.cpp
 msgid "No ROM files found."
@@ -1181,6 +1294,11 @@ msgstr "Nincs roms mappa"
 msgid "No server to pair with: add a RomM server to sources.json, or set save-sync.json up over FTP."
 msgstr "Nincs párosítható szerver: adj hozzá egy RomM-szervert a sources.json fájlhoz, vagy állítsd be a save-sync.json fájlt FTP-n."
 
+#. exFAT and FAT32 are names of disk formats (unchanged).
+#: pe/ui/backup.cpp
+msgid "No USB drive is connected. Connect one formatted as exFAT or FAT32."
+msgstr "Nincs csatlakoztatva USB-meghajtó. Csatlakoztass egy exFAT vagy FAT32 formátumút."
+
 #: pe/ui/pairing.cpp
 msgid "Nobody approved the code in time."
 msgstr "Senki sem hagyta jóvá időben a kódot."
@@ -1193,6 +1311,16 @@ msgstr "Nincs"
 #: pe/ui/remote.cpp
 msgid "Not connected yet"
 msgstr "Még nincs kapcsolat"
+
+#. {0} and {1} are sizes such as 1.2 GB.
+#: pe/ui/backup.cpp
+msgid "Not enough room on the drive: the backup needs {0}, {1} is free."
+msgstr "Nincs elég hely a meghajtón: a mentéshez {0} kell, szabad {1}."
+
+#. Settings > Apps: the app is not on the console.
+#: pe/ui/apps.cpp
+msgid "Not installed"
+msgstr "Nincs telepítve"
 
 #: pe/ui/pairing.cpp
 msgid "Not linked"
@@ -1222,6 +1350,11 @@ msgstr "Nincs beállítva"
 #: pe/ui/library.cpp
 msgid "Nothing to import"
 msgstr "Nincs mit importálni"
+
+#. After a backup that was cancelled or failed: what it had written was removed.
+#: pe/ui/backup.cpp
+msgid "Nothing was left on the drive."
+msgstr "Semmi sem maradt a meghajtón."
 
 #. A setting that is switched off.
 #: pe/ui/game_options.cpp, pe/ui/library.cpp, pe/ui/settings.cpp
@@ -1254,6 +1387,16 @@ msgstr "Nyisd meg újra a(z) {0} verzió használatához."
 #: pe/ui/home.cpp
 msgid "Open library"
 msgstr "Játéktár megnyitása"
+
+#. {0} is an app's name.
+#: pe/ui/apps.cpp
+msgid "Opening {0}. Nightshade closes now."
+msgstr "Megnyitás: {0}. A Nightshade most bezárul."
+
+#. {0} is an app's name: Nightshade asks for it to be opened, and closes once that is under way.
+#: pe/ui/apps.cpp
+msgid "Opening {0}..."
+msgstr "Megnyitás: {0}..."
 
 #. The DualSense button labelled OPTIONS: keep the label if the language's players do.
 #: pe/ui/game_options.cpp
@@ -1340,6 +1483,16 @@ msgstr "Játék mindenképp"
 #: pe/ui/profiles.cpp
 msgid "Play as"
 msgstr "Játék ezzel"
+
+#. Settings > Apps: what the Nightshade Stream app is. Moonlight is the name of the game streaming client (unchanged).
+#: pe/ui/apps_list.hpp
+msgid "Play games streamed from your PC with Moonlight."
+msgstr "Játssz a PC-dről streamelt játékokkal a Moonlight segítségével."
+
+#. Settings > Apps: what the Nightshade Station app is. PS1 is the first PlayStation, SwanStation the emulator's name (both unchanged).
+#: pe/ui/apps_list.hpp
+msgid "Play PS1 games with the SwanStation emulator."
+msgstr "Játssz PS1-játékokkal a SwanStation emulátorral."
 
 #: pe/ui/library.cpp
 msgid "Play when downloaded"
@@ -1537,6 +1690,16 @@ msgstr "RÉGIÓ"
 #: pe/ui/game_options.cpp
 msgid "Regular"
 msgstr "Normál"
+
+#. See 'Release {0}, from {1}': here the release is the one of the project the app is based on, because the app has no Nightshade release yet.
+#: pe/ui/apps.cpp
+msgid "Release {0} of the original project, {1}"
+msgstr "Az eredeti projekt {0} kiadása, {1}"
+
+#. {0} is a release's name, such as v1.000.090 or 01.000.110; {1} a GitHub repository, such as Oliv3rmoon/Nightshade-TV (both unchanged).
+#: pe/ui/apps.cpp
+msgid "Release {0}, from {1}"
+msgstr "{0} kiadás, innen: {1}"
 
 #: pe/ui/profiles.cpp
 msgid "Remove"
@@ -1739,9 +1902,10 @@ msgstr "Előkészítés szükséges"
 msgid "Setup required: {0} Open Settings, Game files to choose the folder that holds your keys, firmware and roms folders (or add the files to {1}), then reopen Nightshade."
 msgstr "Előkészítés szükséges: {0} Nyisd meg a Beállítások, Játékfájlok menüt, és válaszd ki azt a mappát, amelyben a keys, firmware és roms mappa van (vagy tedd a fájlokat ide: {1}), majd indítsd újra a Nightshade alkalmazást."
 
+#. What the Diagnostics item of Settings has.
 #: pe/ui/settings.cpp
-msgid "Setup status and detailed logs."
-msgstr "Az előkészítés állapota és részletes naplók."
+msgid "Setup status, detailed logs and a backup to USB."
+msgstr "Az előkészítés állapota, részletes naplók és biztonsági mentés USB-re."
 
 #: eden_services.cpp
 msgid "Setup validation failed. Check that firmware and key files are readable and valid."
@@ -1883,9 +2047,19 @@ msgstr "Köszönet a teljes PS5 homebrew közösségnek és minden fejlesztőnek
 msgid "The accent colour of the current theme."
 msgstr "Az aktuális téma kiemelőszíne."
 
+#. {0} is why (English, technical). A sentence saying what was left on the drive follows it.
+#: pe/ui/backup.cpp
+msgid "The backup failed: {0}"
+msgstr "A biztonsági mentés nem sikerült: {0}"
+
 #: pe/ui/remote.cpp
 msgid "The download stopped"
 msgstr "A letöltés leállt"
+
+#. The USB drive ran out of room during a backup. A sentence saying what was left on it follows.
+#: pe/ui/backup.cpp
+msgid "The drive is full."
+msgstr "A meghajtó megtelt."
 
 #: pe/ui/settings.cpp
 msgid "The folder that holds your keys, firmware and games."
@@ -1949,6 +2123,26 @@ msgstr "A profil mentései mostantól {0} néven szinkronizálódnak."
 msgid "The profile's save data syncs with the server from now on."
 msgstr "A profil mentései mostantól szinkronizálódnak a szerverrel."
 
+#. {0} is an app's name. The homebrew loader is the tool that puts homebrew apps on the PS5's home screen (ShadowMountPlus, for example).
+#: pe/ui/apps.cpp
+msgid "The PS5 doesn't list {0} yet. The homebrew loader lists it after its next scan or a restart."
+msgstr "A PS5 még nem listázza: {0}. A homebrew-betöltő a következő keresése vagy egy újraindítás után listázza."
+
+#. {0} is a file name such as PPSA99003.zip; SHA-256 is the name of a checksum (unchanged).
+#: pe/ui/apps.cpp
+msgid "The release gives no SHA-256 for {0}, so it is not offered."
+msgstr "A kiadás nem ad meg SHA-256-ot ehhez: {0}, ezért nem kínáljuk fel."
+
+#. {0} is a file name such as PPSA99003.zip.
+#: pe/ui/apps.cpp
+msgid "The release has no {0}."
+msgstr "A kiadásban nincs ilyen: {0}."
+
+#. See 'The release gives no SHA-256 for {0}, so it is not offered.' Its SHA-256 values disagree or are malformed.
+#: pe/ui/apps.cpp
+msgid "The release's SHA-256 for {0} can't be trusted, so it is not offered."
+msgstr "A kiadás SHA-256-ja ehhez nem megbízható: {0}, ezért nem kínáljuk fel."
+
 #. Shown at the end of release notes that were cut short; homebrew.page is a site's name and stays as it is.
 #: pe/ui/update.cpp
 msgid "The rest is on the app's page on homebrew.page."
@@ -2007,6 +2201,16 @@ msgstr "A játék beállításai nem menthetők (nincs játékazonosító)."
 #: pe/ui/multiplayer.cpp
 msgid "This room uses a different protocol version."
 msgstr "Ez a szoba más protokollverziót használ."
+
+#. Exactly one file; {0} is a size such as 1.2 GB. See '{0} game'.
+#: pe/ui/backup.cpp
+msgid "To back up: {0} in {1} file"
+msgstr "Mentendő: {0}, {1} fájl"
+
+#. {0} is a size such as 1.2 GB, {1} how many files (any number but one). See '{0} game'.
+#: pe/ui/backup.cpp
+msgid "To back up: {0} in {1} files"
+msgstr "Mentendő: {0}, {1} fájl"
 
 #. ryujinx/, save-import/ and roms/ are folder names (unchanged); {0} is the game's ID.
 #: eden_services.cpp
@@ -2084,6 +2288,11 @@ msgstr "Kicsomagolás"
 msgid "UP"
 msgstr "FEL"
 
+#. Button hint in Settings > Apps: install an app's newer release over the one installed. Keep it short.
+#: pe/ui/apps.cpp
+msgid "Update"
+msgstr "Frissítés"
+
 #. Notification title: a newer release of this app is listed (not a game update).
 #: pe/ui/launcher.cpp, pe/ui/update.cpp
 msgid "Update available"
@@ -2119,6 +2328,11 @@ msgstr "Felskálázó szűrő"
 #: eden_services.cpp
 msgid "USA"
 msgstr "USA"
+
+#. {0} is a number from 1 to 8: which of the USB drives connected.
+#: pe/ui/backup.cpp
+msgid "USB drive {0}"
+msgstr "{0}. USB-meghajtó"
 
 #: pe/ui/settings.cpp
 msgid "Use another home screen, library and menu layout."
@@ -2230,6 +2444,15 @@ msgstr "A konzol mentéseivel; a játék után szinkronizálódnak."
 msgid "with {0}"
 msgstr "ezzel: {0}"
 
+#: pe/ui/apps.cpp
+msgid "Without filesystem access Nightshade can't tell which apps are installed."
+msgstr "Fájlrendszer-hozzáférés nélkül a Nightshade nem tudja, mely alkalmazások vannak telepítve."
+
+#. Filesystem access is what the app asks the console for when it starts (as in 'Without filesystem access Nightshade can't tell which apps are installed.').
+#: pe/ui/backup.cpp
+msgid "Without filesystem access there is nothing to back up."
+msgstr "Fájlrendszer-hozzáférés nélkül nincs mit menteni."
+
 #: pe/ui/settings.cpp
 msgid "Write logs at once"
 msgstr "Naplók azonnali írása"
@@ -2261,10 +2484,25 @@ msgstr "A mentéseidet összevetjük a szerveren lévőkkel."
 msgid "{0} changed"
 msgstr "{0} módosítva"
 
+#. {0} is an app's name, {1} why (English, from the installer).
+#: pe/ui/apps.cpp
+msgid "{0} could not be installed: {1}"
+msgstr "{0} telepítése nem sikerült: {1}"
+
+#. {0} is an app's name, {1} why (English, from the launch payload).
+#: pe/ui/apps.cpp
+msgid "{0} could not be opened: {1}"
+msgstr "{0} megnyitása nem sikerült: {1}"
+
 #. {0} is how many DLC (add-on content) a game has installed.
 #: eden_services.cpp, host/fake_services.cpp
 msgid "{0} DLC"
 msgstr "{0} DLC"
+
+#. {0} is a size such as 61.0 GB: the room left on a USB drive. Keep it short.
+#: pe/ui/backup.cpp
+msgid "{0} free"
+msgstr "{0} szabad"
 
 #. Exactly one game. In a language with more than two plural forms, word it so that it reads well with any number (Games: {0}).
 #: pe/ui/browse.cpp, pe/ui/remote.cpp
@@ -2290,10 +2528,30 @@ msgstr "{0} játék"
 msgid "{0} games installed"
 msgstr "{0} játék telepítve"
 
+#. {0} is a GitHub repository, such as blackbearreloaded/ProsperoTV (unchanged): GitHub now sends requests for it to another account's repository, which Nightshade does not install from.
+#: pe/ui/apps.cpp
+msgid "{0} has moved to another account, so its release is not offered."
+msgstr "Másik fiókhoz költözött: {0}, ezért a kiadását nem kínáljuk fel."
+
 #. {0} is 60 or 120 (hertz).
 #: pe/ui/game_options.cpp, pe/ui/library.cpp, pe/ui/settings.cpp
 msgid "{0} Hz"
 msgstr "{0} Hz"
+
+#. {0} is an app's name. See 'The PS5 doesn't list {0} yet...' for the homebrew loader.
+#: pe/ui/apps.cpp
+msgid "{0} is installed. The homebrew loader lists it after its next scan or a restart."
+msgstr "{0} telepítve. A homebrew-betöltő a következő keresése vagy egy újraindítás után listázza."
+
+#. {0} is a folder whose name ends in .incomplete: the part of a backup that could not be removed.
+#: pe/ui/backup.cpp
+msgid "{0} is left on the drive, marked incomplete: delete it."
+msgstr "{0} a meghajtón maradt, befejezetlenként jelölve: töröld."
+
+#. {0} is an app's name, {1} its new version, such as 01.000.110.
+#: pe/ui/apps.cpp
+msgid "{0} is updated to {1}."
+msgstr "{0} frissítve erre: {1}."
 
 #. Exactly one mod, in the list of what a game comes with (Update 1.2.0, 2 DLC, 1 mod). See '{0} game'.
 #: pe/ui/library.cpp
@@ -2324,6 +2582,11 @@ msgstr "{0} nem érhető el"
 #: pe/ui/widgets.cpp
 msgid "{0} OF {1}"
 msgstr "{0} / {1}"
+
+#. Settings > Apps: how many of Nightshade's apps are on the console: 2 of 3 installed.
+#: pe/ui/settings.cpp
+msgid "{0} of {1} installed"
+msgstr "{0} / {1} telepítve"
 
 #. In the same list, when some of the game's mods are switched off: 1 of 2 mods on. Keep it short.
 #: pe/ui/library.cpp

@@ -8,6 +8,9 @@ code, the kit's JSON reader and miniz, and runs it: the launcher compatibility c
 JSON readers, and the wait for the app to close before its files are replaced (wait_for_close: a
 sandbox the system leaves behind once the app's connection has ended, Swordpdf/ProsperoEden#232).
 Also checks that the helper writes its log to /data/prosperoeden/logs/updater.log.
+
+Then headless/update_helper_check.cpp, the helper's whole conversation in a console made in the
+temporary folder: the app's own update, and another app installed or updated (Nightshade's Apps).
 """
 from pathlib import Path
 import os, subprocess, sys, tempfile
@@ -40,6 +43,17 @@ with tempfile.TemporaryDirectory() as scratch:
     cases = scratch / 'cases'
     cases.mkdir()
     result = subprocess.run([str(binary), str(cases)], capture_output=True, text=True)
+    sys.stdout.write(result.stdout)
+    sys.stderr.write(result.stderr)
+    if result.returncode != 0:
+        sys.exit(result.returncode)
+    conversation = scratch / 'update-helper-conversation'
+    subprocess.run([cxx, '-std=c++20', '-O1', '-Wall', '-Wextra', '-Werror', f'-I{root / "headless"}', f'-I{helper}',
+                    f'-I{root / "headless/update_check"}', f'-I{root / "third_party"}',
+                    str(root / 'headless/update_helper_check.cpp'), str(helper / 'updater.cpp'),
+                    str(helper / 'files.cpp'), str(helper / 'archive.cpp'), *objects, '-pthread', '-o',
+                    str(conversation)], check=True)
+    result = subprocess.run([str(conversation)], capture_output=True, text=True, timeout=300)
     sys.stdout.write(result.stdout)
     sys.stderr.write(result.stderr)
     sys.exit(result.returncode)

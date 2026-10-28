@@ -86,7 +86,7 @@ std::string shown(const std::string &text, std::size_t limit, const std::string 
 
 bool list_entries(const std::string &folder, std::size_t limit, std::vector<std::string> &names)
 {
-    std::unique_ptr<DIR, decltype(&closedir)> directory(opendir(folder.c_str()), closedir);
+    std::unique_ptr<DIR, CloseDirectory> directory(opendir(folder.c_str()));
     if (!directory)
         return false;
     for (;;)
@@ -195,7 +195,10 @@ bool open_permissions(const std::string &path, unsigned depth = 0)
         return false;
     if (chmod(path.c_str(), 0777) != 0)
         return false;
-    (void)chown(path.c_str(), 0, 0); // best effort: the mode is what decides
+    if (chown(path.c_str(), 0, 0) != 0)
+    {
+        // best effort: the mode is what decides
+    }
     if (what == Kind::file)
         return true;
     std::vector<std::string> names;
@@ -410,6 +413,97 @@ bool receive_archive(Session &session, const std::string &path, std::uint64_t si
     error.clear();
     return true;
 }
+
+// The release, from the app into <work>/staged: saved as it arrives and checked against its
+// digest, a thread listening for what the app says next, the app's folder unpacked from it and
+// opened to everyone. 0: staged (info says how much was unpacked). 1: not; the work folder is gone
+// (clean) and the app was told why, unless it cancelled.
+int stage_release(const std::shared_ptr<Session> &shared, const std::string &title, std::uint64_t size,
+                  const std::string &digest, const std::string &work, const std::function<void()> &clean,
+                  ArchiveInfo &info)
+{
+    Session &session = *shared;
+    const Environment &environment = session.environment;
+    const std::string archive = work + "/update.zip", staged = work + "/staged";
+    std::uint64_t free_bytes = 0;
+    std::string error;
+    if (!receive_archive(session, archive, size, digest, error))
+    {
+        clean();
+        if (!session.cancelled.load())
+            session.say("fail " + error + "\n");
+        return 1;
+    }
+
+    pthread_t listener{};
+    auto *reference = new std::shared_ptr<Session>(shared);
+    if (pthread_create(&listener, nullptr, listen, reference) != 0)
+    {
+        delete reference;
+        clean();
+        session.say("fail The helper couldn't start\n");
+        return 1;
+    }
+    // The listener stays in its read until the app goes away, which a failed
+    // update doesn't wait for: nothing it touches is used after this function.
+    pthread_detach(listener);
+    const auto fail = [&](const std::string &reason)
+    {
+        clean();
+        if (!session.cancelled.load())
+            session.say("fail " + reason + "\n");
+        return 1;
+    };
+
+    if (!inspect_archive(archive, title, info, error))
+        return fail(error);
+    if (environment.space && environment.space(work, free_bytes) &&
+        free_bytes < info.unpacked + kUnpackMargin)
+        return fail("There isn't enough free space to unpack the update");
+    session.to_unpack = info.unpacked;
+    session.unpacking = true;
+    pthread_t reporter{};
+    const bool reporting = pthread_create(&reporter, nullptr, report, &session) == 0;
+    const bool unpacked =
+        extract_archive(archive, title, staged, session.cancelled, session.written, error);
+    session.unpacking = false;
+    if (reporting)
+        pthread_join(reporter, nullptr);
+    if (!unpacked)
+        return fail(error.empty() ? "The update could not be unpacked" : error);
+    (void)unlink(archive.c_str());
+    if (!open_permissions(staged))
+        return fail("The update's files could not be prepared");
+    return 0;
+}
+
+// ProsperoEden: a title's one installed folder, found as run() finds the app's own: the folder
+// ShadowMountPlus mounted it from when it recorded one, otherwise the one copy under the roots.
+// 1: found; 0: there is none; -1: it is an image; -2: more than one copy; -3: a root could not be
+// read whole, so there may be one.
+int locate(const Session &session, const std::string &title, Copy &out)
+{
+    const Environment &environment = session.environment;
+    std::string source, id, version;
+    const int mounted = mounted_source(environment, title, source);
+    if (mounted < 0)
+        return -1;
+    if (mounted > 0 && kind(source) == Kind::directory && read_param(source, id, version) && id == title)
+    {
+        out = {source, version};
+        session.log("installed folder of " + title + " (ShadowMountPlus): " + source);
+        return 1;
+    }
+    std::vector<Copy> copies;
+    if (!find_copies(environment, title, copies))
+        return -3;
+    if (copies.size() > 1)
+        return -2;
+    if (copies.empty())
+        return 0;
+    out = copies[0];
+    return 1;
+}
 } // namespace
 
 std::vector<std::string> default_drives()
@@ -555,7 +649,8 @@ bool launcher_update_compatible(const std::string& data_root, const std::string&
     for(std::size_t at=0;at<=supported.size();) {
         const auto end=supported.find(',',at);
         if(supported.substr(at,end==supported.npos?supported.size()-at:end-at)==contract) return true;
-        if(end==supported.npos) break;at=end+1;
+        if(end==supported.npos) break;
+        at=end+1;
     }
     reason="The selected launcher needs a different runtime contract. Select the built-in launcher before updating.";return false;
 }
@@ -601,6 +696,179 @@ bool swap_entries(const std::string &target, const std::string &staged, const st
     return false;
 }
 
+namespace
+{
+// ProsperoEden: another app's release (Nightshade's Apps, self_update_protocol.h): put in a new
+// folder beside the asking app's, or in place of its own folder's entries when it has one. The
+// asking app stays open: the console runs one app at a time, so the title is not running and
+// nothing waits for it to close. The app's own update (run) has more to check and is not this.
+int install(const std::shared_ptr<Session> &shared, const std::string &title, const std::string &installed,
+            const std::string &available, const std::string &size_text, const std::string &digest,
+            std::string name, std::string label)
+{
+    Session &session = *shared;
+    const Environment &environment = session.environment;
+    std::string beside;
+    if (!session.read_line(beside))
+        return 1;
+    // "none": not installed yet. "any": the release names no version; its param.json says it.
+    const bool fresh = installed == "none", any = available == "any";
+    char *end = nullptr;
+    errno = 0;
+    const std::uint64_t size = std::strtoull(size_text.c_str(), &end, 10);
+    if (!title_id(title) || !title_id(beside) || title == beside || (!fresh && !content_version(installed)) ||
+        (!any && !content_version(available)) || !hex_digest(digest) || size_text.empty() || errno ||
+        *end != '\0' || size > SELF_UPDATE_MAX_ARCHIVE)
+    {
+        session.say("fail The request was refused\n");
+        return 1;
+    }
+    name = shown(name, 64, title);
+    label = shown(label, 40, title);
+    const auto refuse = [&](const std::string &reason)
+    {
+        session.say("fail " + reason + "\n");
+        return 1;
+    };
+    // Never the files of the app the console runs: the asking one (refused above, it is the one
+    // that runs while it asks) or any other. Asked of the console, not read from /mnt/sandbox, which
+    // keeps a closed app's sandbox until a restart (Swordpdf/ProsperoEden#232). When the console
+    // can't say, nothing is installed.
+    std::string running;
+    if (!environment.running_app || !environment.running_app(running) || running.empty())
+        return refuse("The app the console runs couldn't be told, so nothing was installed");
+    session.log("install " + title + " while " + running + " runs");
+    if (running == title)
+        return refuse("The app is running; close it and try again");
+
+    // Where it goes: its one folder, at the version that was asked about; a new one beside the
+    // asking app's when it has none, where nothing may be yet.
+    Copy copy;
+    const int found = locate(session, title, copy);
+    if (found == -1)
+        return refuse("The app is installed as an image; update it by replacing the image");
+    if (found == -2)
+        return refuse("More than one copy of the app is installed");
+    if (found == -3)
+        return refuse("The installed apps couldn't all be looked at");
+    std::string target;
+    if (found == 1)
+    {
+        if (fresh)
+            return refuse("The app is already installed in " + copy.path);
+        if (copy.version != installed)
+            return refuse("The installed app isn't the version that was asked about");
+        target = copy.path;
+    }
+    else
+    {
+        if (!fresh)
+            return refuse("The app's folder wasn't found");
+        Copy asking;
+        if (locate(session, beside, asking) != 1)
+            return refuse("The folder of the app asking wasn't found");
+        target = asking.path.substr(0, asking.path.rfind('/')) + "/" + title;
+        if (kind(target) != Kind::absent)
+            return refuse("A folder that isn't the app is in the way: " + target);
+    }
+    const std::string parent = target.substr(0, target.rfind('/'));
+    const std::string drive = drive_root(environment.drives, target);
+    if (drive.empty() || parent.empty())
+        return refuse("The app can't be installed in " + target);
+
+    const std::string base = drive + "/self-update", work = base + "/" + title;
+    const std::string staged = work + "/staged";
+    const auto clean = [&]
+    {
+        (void)remove_tree(work);
+        (void)rmdir(base.c_str());
+    };
+    std::uint64_t free_bytes = 0;
+    if (!remove_tree(work) || !make_directory(base) || !make_directory(work) ||
+        !same_filesystem(fresh ? parent : target, work))
+    {
+        clean();
+        return refuse("The install's work folder couldn't be made");
+    }
+    if (environment.space && environment.space(work, free_bytes) && free_bytes < size + kDownloadMargin)
+    {
+        clean();
+        return refuse("There isn't enough free space for the download");
+    }
+    session.log("install " + title + " " + installed + " -> " + available + " in " + target + " (asked by " +
+                beside + ")");
+    if (!session.say("ready\n"))
+    {
+        clean();
+        return 1;
+    }
+
+    ArchiveInfo info;
+    if (stage_release(shared, title, size, digest, work, clean, info) != 0)
+        return 1;
+    const auto fail = [&](const std::string &reason)
+    {
+        clean();
+        if (!session.cancelled.load())
+            session.say("fail " + reason + "\n");
+        return 1;
+    };
+    std::string staged_title, version;
+    if (!read_param(staged, staged_title, version) || staged_title != title || !content_version(version) ||
+        (!any && version != available))
+        return fail("The download isn't the app and version the release names");
+    session.say("p " + std::to_string(info.unpacked) + " " + std::to_string(info.unpacked) + "\n");
+    if (!session.say("staged\n"))
+    {
+        clean();
+        return 1;
+    }
+    while (!session.apply.load())
+    {
+        if (session.cancelled.load())
+        {
+            clean();
+            return 1;
+        }
+        session.sleep(50);
+    }
+    session.say("applying\n");
+
+    if (fresh)
+    {
+        if (kind(target) != Kind::absent || rename(staged.c_str(), target.c_str()) != 0)
+            return fail("The app's folder couldn't be made: " + target);
+        (void)sync_directory(parent);
+    }
+    else
+    {
+        if (!swap_entries(target, staged, work + "/backup"))
+            return fail("The app's files couldn't be replaced; it is as it was");
+        refresh_registered(environment, title, target);
+    }
+    session.log("installed " + title + " " + version + " in " + target);
+    // Said as soon as the files are in place, with where they are when the line has room for it:
+    // keeping the replaced version below can be a copy to another drive that outlasts the app's
+    // wait for this line.
+    const std::string done = "installed " + version + " " + target;
+    session.say((done.size() < SELF_UPDATE_LINE ? done : "installed " + version) + "\n");
+    if (environment.notify)
+        environment.notify(fresh ? name + " " + label +
+                                       " was installed. The homebrew loader lists it after its next scan or a restart."
+                                 : name + " was updated to " + label + ".");
+    if (!fresh && !environment.previous.empty())
+    {
+        const std::string kept = environment.previous + "/" + title + "-backup";
+        if (make_directory(environment.previous) && remove_tree(kept) && move_tree(work + "/backup", kept))
+            session.log("version " + installed + " is kept in " + kept);
+        else
+            session.log("version " + installed + " could not be kept in " + kept);
+    }
+    clean();
+    return 0;
+}
+} // namespace
+
 int run(const Environment &environment, const Io &io)
 {
     const auto shared = std::make_shared<Session>(environment, io);
@@ -611,6 +879,9 @@ int run(const Environment &environment, const Io &io)
         !session.read_line(available) || !session.read_line(size_text) ||
         !session.read_line(digest) || !session.read_line(name) || !session.read_line(label))
         return 1;
+    // ProsperoEden: another app's release, with one line more (install above).
+    if (verb == "install")
+        return install(shared, title, installed, available, size_text, digest, name, label);
     char *end = nullptr;
     errno = 0;
     const std::uint64_t size = std::strtoull(size_text.c_str(), &end, 10);
@@ -667,7 +938,7 @@ int run(const Environment &environment, const Io &io)
         return 1;
     }
     const std::string base = drive + "/self-update", work = base + "/" + title;
-    const std::string archive = work + "/update.zip", staged = work + "/staged";
+    const std::string staged = work + "/staged";
     const auto clean = [&]
     {
         (void)remove_tree(work);
@@ -695,27 +966,9 @@ int run(const Environment &environment, const Io &io)
         return 1;
     }
 
-    std::string error;
-    if (!receive_archive(session, archive, size, digest, error))
-    {
-        clean();
-        if (!session.cancelled.load())
-            session.say("fail " + error + "\n");
+    ArchiveInfo info;
+    if (stage_release(shared, title, size, digest, work, clean, info) != 0)
         return 1;
-    }
-
-    pthread_t listener{};
-    auto *reference = new std::shared_ptr<Session>(shared);
-    if (pthread_create(&listener, nullptr, listen, reference) != 0)
-    {
-        delete reference;
-        clean();
-        session.say("fail The helper couldn't start\n");
-        return 1;
-    }
-    // The listener stays in its read until the app goes away, which a failed
-    // update doesn't wait for: nothing it touches is used after this function.
-    pthread_detach(listener);
     const auto fail = [&](const std::string &reason)
     {
         clean();
@@ -724,28 +977,7 @@ int run(const Environment &environment, const Io &io)
         return 1;
     };
 
-    ArchiveInfo info;
-    if (!inspect_archive(archive, title, info, error))
-        return fail(error);
-    if (environment.space && environment.space(work, free_bytes) &&
-        free_bytes < info.unpacked + kUnpackMargin)
-        return fail("There isn't enough free space to unpack the update");
-    session.to_unpack = info.unpacked;
-    session.unpacking = true;
-    pthread_t reporter{};
-    const bool reporting = pthread_create(&reporter, nullptr, report, &session) == 0;
-    const bool unpacked =
-        extract_archive(archive, title, staged, session.cancelled, session.written, error);
-    session.unpacking = false;
-    if (reporting)
-        pthread_join(reporter, nullptr);
-    if (!unpacked)
-        return fail(error.empty() ? "The update could not be unpacked" : error);
-    (void)unlink(archive.c_str());
-    if (!open_permissions(staged))
-        return fail("The update's files could not be prepared");
-
-    std::string staged_title, staged_version;
+    std::string error, staged_title, staged_version;
     if (!read_param(staged, staged_title, staged_version) || staged_title != title ||
         staged_version != available)
         return fail("The download isn't the version the catalog lists");

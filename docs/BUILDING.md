@@ -99,10 +99,11 @@ Inside this repository, in `.deps/`:
   Eden's own hash-pinned packages, which its configure step downloads. The PS5 frontend in
   `headless/` replaces and derives sources at configure time (`headless/inject.cmake`). This
   fork also patches a few of Eden's files when `make prepare` extracts them
-  (`tools/eden-patches/*.diff`, in name order, each applied once): faster reads of game files,
+  (`tools/eden-patches/*.diff`, applied in name order as one set; a tree with another set gets the files they touch back from the archive first): faster reads of game files,
   per-game cache storage, bounds-checked shader local memory, CPU reads of GPU-cached pages
-  without reactive flushing, and the shader instruction `ATOM.CAS` (compare and swap in global
-  memory).
+  without reactive flushing, the shader instructions `ATOM.CAS` and `ATOMS.CAS` (compare and swap in global and
+  shared memory), and coherent storage buffers in shaders that use atomics, so a wait on another
+  workgroup's write or an emulated atomic's retry reads memory instead of a stale cached copy.
 - **FFmpeg** at the commit Eden pins, built with only the decoders games use.
 - **PS5 OpenGL 4.6 SDK 1.0.2** (release archive), for the launcher and the OpenGL renderer.
 - **OpenSSL, zlib, libcurl and libpsl** from pacbrew v0.40.2.
@@ -176,7 +177,8 @@ sudo apt install --no-install-recommends $(grep -v '^#' tools/ci/ubuntu-packages
 
 When the app crashes it writes `crash-YYYYMMDD-HHMMSS.txt` to its logs folder
 (`/data/prosperoeden/logs`), starts again and says on the home screen where the report is
-(`headless/crash_report.h`). At the next start that run's logs are moved beside the report
+(`headless/crash_report.h`). When the GPU stopped responding (`VK_ERROR_DEVICE_LOST`) it closes
+instead: an app started again would find the GPU still stuck. At the next start that run's logs are moved beside the report
 (`-stderr.log`, `-heap.log`, `-eden_log.txt`); the five newest reports are kept.
 
 The report lists addresses as `eboot+0x...`. To get function names, files and lines:

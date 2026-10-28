@@ -290,6 +290,12 @@ void PutRegister(const char* before, const char* name, std::uint64_t value) noex
     report.Hex(value, 16);
 }
 
+// The GPU stopped responding (VK_ERROR_DEVICE_LOST): an app started again finds it still stuck and
+// does not respond either (Oliv3rmoon/Nightshade#1), so the app closes and the system has it back.
+bool GpuLost(const char* reason) noexcept {
+    return reason && std::strcmp(reason, "VK_ERROR_DEVICE_LOST") == 0;
+}
+
 // The report, complete in its buffer.
 void Compose(const Kind* kind, int code, std::uint64_t address, const Registers& r, const char* reason,
              const Stamp& stamp, bool restart) noexcept {
@@ -428,7 +434,9 @@ void Compose(const Kind* kind, int code, std::uint64_t address, const Registers&
     t.Put(" (eboot+offset is an address in the build's llvm-pie.elf)\n");
     t.Put("calls found on the stack, most recent first (\"?\": not checked against a call instruction):\n");
     PutCalls(r.rsp);
-    t.Put(restart ? "then: the app starts again\n" : "then: the app closes (it had just started again after a crash)\n");
+    t.Put(restart          ? "then: the app starts again\n"
+          : GpuLost(reason) ? "then: the app closes (the GPU stopped responding, and an app started again would find it stuck)\n"
+                            : "then: the app closes (it had just started again after a crash)\n");
 }
 
 bool WriteFile(const char* path, const char* data, std::size_t size) noexcept {
@@ -472,8 +480,9 @@ bool Enter() noexcept {
 void WriteReport(const Kind* kind, int code, std::uint64_t address, const Registers& registers,
                  const char* reason) noexcept {
     // Right after a restart, with no game started since: the crash comes with starting the app,
-    // and starting it again would only repeat it.
-    const bool restart = !(restarted_process && !game_started.load(std::memory_order_relaxed) &&
+    // and starting it again would only repeat it. A stopped GPU stays stopped.
+    const bool restart = !GpuLost(reason) &&
+                         !(restarted_process && !game_started.load(std::memory_order_relaxed) &&
                            std::time(nullptr) - started_at < 60);
     leave.store(!restart, std::memory_order_release);
     const Stamp stamp = LocalNow();

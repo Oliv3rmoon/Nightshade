@@ -61,7 +61,8 @@ inline std::string ConfigDir() { return std::string{kDataDir} + "/config"; }
 // The logs alone have a place in the sandbox: they are how a start without access is looked into.
 inline std::string LogsDir() { return FilesystemAccess() ? std::string{kDataDir} + "/logs" : "/download0/eden-headless-g7"; }
 inline std::string CoversDir() { return std::string{kDataDir} + "/covers"; }
-// The wallpaper images the launcher can show (Settings > Appearance > Wallpaper).
+// The wallpaper images the launcher can show (Settings > Appearance > Wallpaper), with those in
+// the game files folder's wallpapers/ (wallpapers.h).
 inline std::string WallpapersDir() { return std::string{kDataDir} + "/wallpapers"; }
 // A game's cover in that folder. Covers are keyed by the ROM's file name in the game files
 // folder, not its full path, so they survive a new game files folder.

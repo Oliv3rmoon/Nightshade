@@ -206,6 +206,179 @@ class FakeServices : public ui::Services
     {
         update_steps = -1;
     }
+    // Settings > Apps: Nightshade TV installed and current, Nightshade Stream installed with a
+    // newer release of the original project, Nightshade Station not installed with a release of
+    // its own. An install goes through its phases a step per look (the launcher looks four times a
+    // second); app_fails ends it in a failure. app_open says what opening one comes to.
+    std::vector<ui::AppState> app_list = [] {
+        std::vector<ui::AppState> list(3);
+        for (ui::AppState &app : list)
+            app.looked = app.checked = true;
+        list[0].installed = "01.000.090";
+        list[0].offer = ui::AppOffer::current;
+        list[0].release = "v1.000.090";
+        list[0].repository = "Oliv3rmoon/Nightshade-TV";
+        list[0].size = 42353289;
+        list[1].installed = "01.000.100";
+        list[1].offer = ui::AppOffer::update;
+        list[1].release = "01.000.110";
+        list[1].repository = "blackbearreloaded/ProsperoLight";
+        list[1].fallback = true;
+        list[1].size = 36520955;
+        list[2].offer = ui::AppOffer::get;
+        list[2].release = "v1.005.009";
+        list[2].repository = "Oliv3rmoon/Nightshade-Station";
+        list[2].size = 18267896;
+        return list;
+    }();
+    int apps_refreshed = 0;
+    bool app_fails = false;
+    ui::AppOpen app_open = ui::AppOpen::no_loader;
+    int app_steps = -1; // looks since install_app; -1: none
+    int app_installing = -1;
+    bool app_cancelled = false;
+    std::vector<ui::AppState> apps() override
+    {
+        return app_list;
+    }
+    void refresh_apps(bool releases) override
+    {
+        apps_refreshed += releases ? 1 : 0;
+    }
+    bool install_app(int app, std::string *reason) override
+    {
+        if (app < 0 || app >= static_cast<int>(app_list.size()) || app_steps >= 0)
+        {
+            *reason = "another app is being installed";
+            return false;
+        }
+        app_installing = app;
+        app_steps = 0;
+        app_cancelled = false;
+        return true;
+    }
+    ui::AppJob app_job() override
+    {
+        ui::AppJob job;
+        if (app_steps < 0)
+            return job;
+        const int step = app_steps++;
+        const ui::AppState &app = app_list[static_cast<std::size_t>(app_installing)];
+        job.app = app_installing;
+        job.fresh = app.installed.empty();
+        if (app_cancelled)
+            job.phase = ui::AppPhase::cancelled;
+        else if (step < 4)
+            job.phase = ui::AppPhase::starting;
+        else if (step < 40)
+        {
+            job.phase = ui::AppPhase::downloading;
+            job.total = app.size;
+            job.done = app.size * static_cast<std::uint64_t>(step - 4) / 36;
+        }
+        else if (app_fails)
+        {
+            job.phase = ui::AppPhase::failed;
+            job.error = "The download doesn't match the catalog's listing";
+        }
+        else if (step < 48)
+            job.phase = ui::AppPhase::unpacking;
+        else if (step < 52)
+            job.phase = ui::AppPhase::installing;
+        else
+        {
+            job.phase = ui::AppPhase::installed;
+            job.version = app.release == "v1.005.009" ? "01.005.009" : app.release;
+            ui::AppState &done = app_list[static_cast<std::size_t>(app_installing)];
+            done.installed = job.version;
+            done.offer = ui::AppOffer::current;
+        }
+        return job;
+    }
+    void cancel_app() override
+    {
+        app_cancelled = true;
+    }
+    void finish_app() override
+    {
+        app_steps = -1;
+    }
+    ui::AppOpen open_app(int, std::string *reason) override
+    {
+        if (app_open == ui::AppOpen::refused)
+            *reason = "The request was refused";
+        return app_open;
+    }
+
+    // Settings > Diagnostics > Back up to USB: two USB drives, the second with its room known (on the
+    // console it never is). A backup goes through its phases a step per look (the launcher looks four
+    // times a second); backup_full ends it on a drive that fills up, a cancel removes what it wrote.
+    ui::BackupStatus backup_state = [] {
+        ui::BackupStatus status;
+        status.drives = {{"/mnt/usb0", 0, false}, {"/mnt/usb1", 61ull << 30, true}};
+        return status;
+    }();
+    int backups_refreshed = 0;
+    int backups_made = 0;
+    int backup_steps = -1; // looks since start_backup; -1: none
+    bool backup_full = false;
+    bool backup_cancelled = false;
+    void refresh_backup() override
+    {
+        ++backups_refreshed;
+        backup_state.measured = true;
+        backup_state.files = 4182;
+        backup_state.bytes = 1288490189; // 1.2 GB
+    }
+    ui::BackupStatus backup_status() override
+    {
+        if (backup_steps < 0)
+            return backup_state;
+        const int step = backup_steps++;
+        ui::BackupStatus status = backup_state;
+        if (backup_cancelled)
+            status.phase = ui::BackupPhase::cancelled;
+        else if (step < 2)
+            status.phase = ui::BackupPhase::measuring;
+        else if (step < 30 && !(backup_full && step >= 14))
+        {
+            status.phase = ui::BackupPhase::copying;
+            status.done_bytes = status.bytes * static_cast<std::uint64_t>(step - 2) / 28;
+            status.done_files = status.files * static_cast<std::uint64_t>(step - 2) / 28;
+        }
+        else if (backup_full)
+            status.phase = ui::BackupPhase::no_room;
+        else
+        {
+            status.phase = ui::BackupPhase::done;
+            status.folder = status.drives[static_cast<std::size_t>(std::max(0, status.drive))].path +
+                            "/nightshade-backup/20261028-153000";
+        }
+        return status;
+    }
+    bool start_backup(int drive, std::string *reason) override
+    {
+        if (backup_steps >= 0 || drive < 0 || drive >= static_cast<int>(backup_state.drives.size()))
+        {
+            *reason = "a backup runs";
+            return false;
+        }
+        backup_state.drive = drive;
+        backup_steps = 0;
+        backup_cancelled = false;
+        return true;
+    }
+    void cancel_backup() override
+    {
+        backup_cancelled = true;
+    }
+    void finish_backup() override
+    {
+        backups_made += backup_steps >= 30 && !backup_full && !backup_cancelled ? 1 : 0;
+        backup_steps = -1;
+        backup_state.drive = -1;
+    }
+
     // Game files the preview takes away from the folder, as a player would by deleting them.
     std::vector<std::string> removed;
     bool game_exists(const std::string &file) override
@@ -273,9 +446,9 @@ class FakeServices : public ui::Services
     std::string setup_details() override;
     std::string crash_reports_folder() override { return "/data/prosperoeden/logs"; }
     std::vector<std::string> wallpapers() override;
-    std::string wallpapers_folder() override
+    std::vector<std::string> wallpaper_folders() override
     {
-        return wallpapers_directory_;
+        return {wallpapers_directory_};
     }
     bool folders(const std::string &directory, std::vector<std::string> *names) override;
     ui::FolderInfo folder_info(const std::string &directory) override;

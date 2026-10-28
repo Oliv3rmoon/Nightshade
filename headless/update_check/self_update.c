@@ -458,6 +458,55 @@ static int on_download(void *user, const void *data, size_t size)
     return 1;
 }
 
+/* ProsperoEden: an install of another app's release (offer.beside) goes on once it is staged: the
+ * go-ahead at once (a cancel from here on is too late, as after self_update_apply()), then the
+ * helper's last line, "installed <version> [<folder>]" or "fail <reason>". The app stays open. */
+static void finish_install(self_update_job *job)
+{
+    char line[SELF_UPDATE_LINE];
+    const char *folder;
+    size_t version;
+    int going;
+    int close_channel;
+    pthread_mutex_lock(&job->lock);
+    going = !job->cancel;
+    if (going)
+        job->phase = SELF_UPDATE_APPLYING;
+    pthread_mutex_unlock(&job->lock);
+    if (!going)
+    {
+        (void)send_all(job, "cancel\n", 7);
+        stop(job, "");
+        return;
+    }
+    if (!send_all(job, "apply\n", 6) || !read_line(job, line, sizeof(line)) || strcmp(line, "applying") != 0)
+    {
+        stop(job, "The update helper stopped");
+        return;
+    }
+    if (!read_line(job, line, sizeof(line)))
+    {
+        stop(job, "The update helper stopped before it said how the install went");
+        return;
+    }
+    if (!starts_with(line, "installed "))
+    {
+        stop(job, starts_with(line, "fail ") ? line + 5 : "The app could not be installed");
+        return;
+    }
+    version = strcspn(line + 10, " ");
+    folder = line[10 + version] == ' ' ? line + 11 + version : "";
+    pthread_mutex_lock(&job->lock);
+    (void)snprintf(job->version, sizeof(job->version), "%.*s", (int)version, line + 10);
+    (void)snprintf(job->folder, sizeof(job->folder), "%s", folder);
+    job->phase = SELF_UPDATE_INSTALLED;
+    close_channel = job->channel_open;
+    job->channel_open = 0;
+    pthread_mutex_unlock(&job->lock);
+    if (close_channel)
+        job->channel.close(job->channel.user);
+}
+
 static void *run_job(void *argument)
 {
     self_update_job *job = (self_update_job *)argument;
@@ -468,6 +517,8 @@ static void *run_job(void *argument)
     download_state state;
     unsigned char digest[32];
     int length;
+    /* ProsperoEden: another app's release asks to be installed, with one line more. */
+    const int install = offer->beside[0] != '\0';
 
     if (job->platform->open_helper(job->platform->user, &job->channel) != 1)
     {
@@ -478,9 +529,15 @@ static void *run_job(void *argument)
     job->channel_open = 1;
     pthread_mutex_unlock(&job->lock);
 
-    length = snprintf(request, sizeof(request), "%s\nupdate\n%s\n%s\n%s\n%llu\n%s\n%s\n%s\n",
-                      SELF_UPDATE_MAGIC, offer->title, offer->installed, offer->available,
-                      (unsigned long long)offer->size, offer->sha256, offer->name, offer->version);
+    if (install)
+        length = snprintf(request, sizeof(request), "%s\ninstall\n%s\n%s\n%s\n%llu\n%s\n%s\n%s\n%s\n",
+                          SELF_UPDATE_MAGIC, offer->title, offer->installed, offer->available,
+                          (unsigned long long)offer->size, offer->sha256, offer->name, offer->version,
+                          offer->beside);
+    else
+        length = snprintf(request, sizeof(request), "%s\nupdate\n%s\n%s\n%s\n%llu\n%s\n%s\n%s\n",
+                          SELF_UPDATE_MAGIC, offer->title, offer->installed, offer->available,
+                          (unsigned long long)offer->size, offer->sha256, offer->name, offer->version);
     if (length <= 0 || (size_t)length >= sizeof(request) ||
         !send_all(job, request, (size_t)length) || !read_line(job, line, sizeof(line)))
     {
@@ -552,7 +609,11 @@ static void *run_job(void *argument)
         stop(job, "");
         return NULL;
     }
-    set_phase(job, SELF_UPDATE_READY);
+    /* An install is never READY: a cancel there would close the connection under its feet. */
+    if (install)
+        finish_install(job);
+    else
+        set_phase(job, SELF_UPDATE_READY);
     return NULL;
 }
 
@@ -607,6 +668,8 @@ void self_update_poll(self_update_job *job, self_update_status *status)
     status->total = job->total;
     status->rate = job->rate;
     memcpy(status->error, job->error, sizeof(status->error));
+    memcpy(status->version, job->version, sizeof(status->version));
+    memcpy(status->folder, job->folder, sizeof(status->folder));
     pthread_mutex_unlock(&job->lock);
     if (status->phase == SELF_UPDATE_DOWNLOADING || status->phase == SELF_UPDATE_UNPACKING)
         self_update_time_left(status->done, status->total, status->rate, status->time_left,
@@ -619,7 +682,8 @@ void self_update_cancel(self_update_job *job)
     if (job == NULL || !job->started)
         return;
     pthread_mutex_lock(&job->lock);
-    if (job->phase != SELF_UPDATE_APPLYING && job->phase != SELF_UPDATE_FAILED)
+    if (job->phase != SELF_UPDATE_APPLYING && job->phase != SELF_UPDATE_FAILED &&
+        job->phase != SELF_UPDATE_INSTALLED)
     {
         job->cancel = 1;
         /* Staged and waiting: nothing is running that would notice, so end it here. */

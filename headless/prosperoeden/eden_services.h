@@ -3,6 +3,7 @@
 // the settings file, Eden's metadata reader.
 #pragma once
 
+#include "backup.h"
 #include "mods.h"
 #include "pe/ui/services.hpp"
 #include "remote/remote.h"
@@ -12,6 +13,7 @@
 #include <condition_variable>
 #include <cstdint>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -41,6 +43,18 @@ public:
     void cancel_update() override;
     bool apply_update() override;
     void finish_update() override;
+    std::vector<pe::ui::AppState> apps() override;
+    void refresh_apps(bool releases) override;
+    bool install_app(int app, std::string* reason) override;
+    pe::ui::AppJob app_job() override;
+    void cancel_app() override;
+    void finish_app() override;
+    pe::ui::AppOpen open_app(int app, std::string* reason) override;
+    void refresh_backup() override;
+    pe::ui::BackupStatus backup_status() override;
+    bool start_backup(int drive, std::string* reason) override;
+    void cancel_backup() override;
+    void finish_backup() override;
     bool docked(std::uint64_t title_id) override;
     bool set_docked(std::uint64_t title_id, bool docked) override;
     pe::ui::GameSettings game_settings(std::uint64_t title_id) override;
@@ -62,7 +76,8 @@ public:
     std::string crash_reports_folder() override;
 
     std::vector<std::string> wallpapers() override;
-    std::string wallpapers_folder() override;
+    std::vector<std::string> wallpaper_folders() override;
+    std::string wallpaper_file(const std::string& name) override;
 
     bool folders(const std::string& directory, std::vector<std::string>* names) override;
     pe::ui::FolderInfo folder_info(const std::string& directory) override;
@@ -182,4 +197,8 @@ private:
     pe::ui::PairingStatus pair_;
     std::chrono::steady_clock::time_point pair_until_;
     std::atomic<bool> pair_stop_{false};
+
+    // Settings > Diagnostics > Back up to USB (backup.h), on a thread of its own; a backup that runs
+    // when the menu goes stops, and what it wrote is removed.
+    std::unique_ptr<Eden::Backup::Worker> backup_;
 };

@@ -112,6 +112,8 @@ class Launcher
         wallpaper,    // Settings > Appearance > Wallpaper: the image behind the screens
         accent,       // Settings > Colour: the accent preset
         cheats,       // a game's cheats, opened from its settings
+        apps,         // Settings > Apps: Nightshade's own apps, got, updated and opened (apps.cpp)
+        backup,       // Settings > Diagnostics > Back up to USB: the app's data to a USB drive (backup.cpp)
     };
     // The update dialog's steps: the offer, installing, stopping it, closing for the helper to
     // finish, and a failure.
@@ -334,6 +336,23 @@ class Launcher
     void press_sources(Key key);
     void draw_sources(Canvas &c, float open);
 
+    // ---- Settings > Apps (apps.cpp) ----
+    // Where the apps are is read when Settings first shows (its tile says how many are installed),
+    // their releases when the dialog first opens; a few times a second while either is shown, or
+    // while an app installs, the launcher looks again. Opening an app closes Nightshade.
+    void open_apps();
+    void poll_apps(float dt);
+    void press_apps(Key key);
+    void draw_apps(Canvas &c, float open);
+
+    // ---- Settings > Diagnostics > Back up to USB (backup.cpp) ----
+    // Opening it looks for the USB drives and measures the backup; a backup shows in its drive's
+    // row and runs until it ends or Circle stops it. Circle otherwise goes back to Diagnostics.
+    void open_backup();
+    void poll_backup(float dt);
+    void press_backup(Key key);
+    void draw_backup(Canvas &c, float open);
+
     // ---- save sync (save_sync.cpp) ----
     // Looks at the sync a few times a second: the game starts once its save data is in step, a
     // conflict opens the dialog, and the end of a sync after a game shows at the top right.
@@ -518,7 +537,7 @@ class Launcher
     // settings and dialogs
     Preferences prefs_;
     ListView settings_;
-    std::array<tween::Spring, 13> settings_springs_{}; // the highlight on each tile
+    std::array<tween::Spring, 14> settings_springs_{}; // the highlight on each tile
     tween::Spring section_;
     int option_ = 0;
     tween::Spring option_cursor_; // highlight position in pixels
@@ -529,8 +548,14 @@ class Launcher
     ListView controls_rows_;    // the Controls dialog's rows (more than it shows)
     ListView accent_rows_;      // the Colour dialog's rows (more than it shows)
     ListView wallpaper_rows_;   // the Wallpaper dialog's rows (more than it shows)
-    // The images in the wallpapers folder, as the Wallpaper dialog lists them (settings.cpp).
+    ListView diagnostics_rows_; // the Diagnostics dialog's rows (more than it shows)
+    // The images in the wallpapers folders, as the Wallpaper dialog lists them (settings.cpp).
     std::vector<std::string> wallpaper_files_;
+    // The file the chosen wallpaper is read from (Services::wallpaper_file), looked for again when
+    // the choice changes or the Wallpaper dialog reads the folders, not every frame.
+    std::string wallpaper_name_;
+    std::string wallpaper_path_;
+    bool wallpaper_looked_ = false;
     GameSettings game_settings_;
     bool game_docked_ = true;
     SaveSource import_source_ = SaveSource::none; // what Save data could import for the game
@@ -582,6 +607,27 @@ class Launcher
     tween::Spring download_fraction_;
     float download_time_ = 0.0f;
     ListView source_rows_; // Settings > Downloads: the sources, then the downloads
+
+    // Settings > Apps
+    std::vector<AppState> apps_;    // as last looked at
+    bool apps_looked_ = false;      // where they are was asked for (Settings showed)
+    bool apps_asked_ = false;       // GitHub was asked (the dialog opened)
+    float apps_wait_ = 0.0f;
+    ListView app_rows_;
+    AppJob app_job_;                // the install, as last looked at
+    bool app_working_ = false;      // an install runs
+    // The launch payload, while it is asked to open an app (open_app takes a moment), and once it
+    // took it the seconds since, until Nightshade closes.
+    std::future<std::pair<AppOpen, std::string>> app_open_;
+    int app_opening_ = -1;
+    float app_closing_ = -1.0f;
+
+    // Settings > Diagnostics > Back up to USB (backup.cpp).
+    BackupStatus backup_;           // as last looked at
+    bool backup_working_ = false;   // a backup runs, or its end is still to be taken
+    bool backup_cancelling_ = false;
+    float backup_wait_ = 0.0f;
+    ListView backup_rows_;          // the drives
 
     // save sync
     SaveSync save_sync_;            // as last looked at

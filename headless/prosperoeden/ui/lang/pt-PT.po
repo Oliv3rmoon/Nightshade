@@ -104,6 +104,11 @@ msgstr "Todo o crédito pelo emulador Eden pertence aos seus programadores e col
 msgid "AMD FSR"
 msgstr "AMD FSR"
 
+#. Settings > Apps: each app is Nightshade's own release of another project; until it has one, that project's release is offered.
+#: pe/ui/apps.cpp
+msgid "An app without a Nightshade release yet is offered from the project it is based on."
+msgstr "Uma aplicação que ainda não tem versão do Nightshade é oferecida a partir do projeto em que se baseia."
+
 #: pe/ui/settings.cpp
 msgid "An image of your own behind this menu."
 msgstr "Uma imagem sua atrás deste menu."
@@ -119,6 +124,11 @@ msgstr "Aspeto"
 #: pe/ui/settings.cpp
 msgid "Apply"
 msgstr "Aplicar"
+
+#. Settings > Apps: Nightshade's own companion apps (an IPTV client, game streaming, a PS1 emulator), not games.
+#: pe/ui/apps.cpp, pe/ui/settings.cpp
+msgid "Apps"
+msgstr "Aplicações"
 
 #. The button mapping has not been changed.
 #: pe/ui/game_options.cpp, pe/ui/settings.cpp
@@ -160,6 +170,21 @@ msgstr "Automático"
 msgid "Back"
 msgstr "Retroceder"
 
+#. Button hint in Back up to USB: start a backup to the highlighted USB drive. Keep it short.
+#: pe/ui/backup.cpp
+msgid "Back up"
+msgstr "Fazer cópia"
+
+#. Settings > Diagnostics: copies the app's data (settings, profiles, save data) to a USB drive. USB stays.
+#: pe/ui/backup.cpp, pe/ui/settings.cpp
+msgid "Back up to USB"
+msgstr "Cópia de segurança em USB"
+
+#. {0} is the backup's folder on the USB drive.
+#: pe/ui/backup.cpp
+msgid "Backed up to {0}."
+msgstr "Cópia guardada em {0}."
+
 #: pe/ui/settings.cpp
 msgid "Backend"
 msgstr "Renderizador"
@@ -167,6 +192,11 @@ msgstr "Renderizador"
 #: pe/ui/save_sync.cpp
 msgid "Backing up save data"
 msgstr "A fazer cópia de segurança dos dados guardados"
+
+#. A sentence saying what was left on the drive follows it.
+#: pe/ui/backup.cpp
+msgid "Backup cancelled."
+msgstr "Cópia cancelada."
 
 #. An upscaling filter.
 #: settings_store.h
@@ -376,6 +406,16 @@ msgstr "COMANDOS"
 #: pe/ui/library.cpp, pe/ui/settings.cpp
 msgid "Controls"
 msgstr "Controlos"
+
+#. What Back up to USB does; nothing is restored from there.
+#: pe/ui/backup.cpp, pe/ui/settings.cpp
+msgid "Copies settings, profiles and save data to a USB drive."
+msgstr "Copia as definições, os perfis e os dados guardados para uma unidade USB."
+
+#. A backup's files are being copied to the USB drive. Keep it short.
+#: pe/ui/backup.cpp
+msgid "Copying"
+msgstr "A copiar"
 
 #: pe/ui/settings.cpp
 msgid "Corner"
@@ -729,6 +769,11 @@ msgstr "A geração de fotogramas precisa dos pesos do MihawkGen (network.fgw)."
 msgid "Frame time"
 msgstr "Tempo de fotograma"
 
+#. The console does not say how much room a USB drive has. Keep it short.
+#: pe/ui/backup.cpp
+msgid "Free space unknown"
+msgstr "Espaço livre desconhecido"
+
 #: settings_store.h
 msgid "French"
 msgstr "Francês"
@@ -804,9 +849,32 @@ msgstr "Os jogos que iniciares aparecem aqui."
 msgid "German"
 msgstr "Alemão"
 
+#. Button hint in Settings > Apps: download and install an app that is not on the console yet. Keep it short.
+#: pe/ui/apps.cpp
+msgid "Get"
+msgstr "Obter"
+
+#. Settings > Apps: what it is for. Nightshade TV, Stream and Station are the apps' names (unchanged).
+#: pe/ui/apps.cpp, pe/ui/settings.cpp
+msgid "Get, update and open Nightshade TV, Stream and Station."
+msgstr "Obtém, atualiza e abre o Nightshade TV, Stream e Station."
+
 #: pe/ui/browse.cpp
 msgid "GETTING STARTED"
 msgstr "PRIMEIROS PASSOS"
+
+#: pe/ui/apps.cpp
+msgid "GitHub could not be reached."
+msgstr "Não foi possível contactar o GitHub."
+
+#. GitHub allows an address a number of requests an hour; that number was reached.
+#: pe/ui/apps.cpp
+msgid "GitHub is limiting requests. Try again in an hour."
+msgstr "O GitHub está a limitar os pedidos. Tenta novamente daqui a uma hora."
+
+#: pe/ui/apps.cpp
+msgid "GitHub's answer could not be read."
+msgstr "Não foi possível ler a resposta do GitHub."
 
 #: pe/ui/settings.cpp
 msgid "Gives back memory a game left empty, 16 KiB at a time. More free memory; a game that writes there again can stutter for a moment."
@@ -815,6 +883,11 @@ msgstr "Devolve a memória que um jogo deixou vazia, 16 KiB de cada vez. Mais me
 #: pe/ui/multiplayer.cpp
 msgid "Go offline"
 msgstr "Ficar offline"
+
+#. {0} is a folder such as /mnt/usb0/nightshade-backup: where a backup is put.
+#: pe/ui/backup.cpp
+msgid "Goes to {0}"
+msgstr "Vai para {0}"
 
 #: pe/ui/settings.cpp
 msgid "GPU"
@@ -851,6 +924,11 @@ msgstr "Como os jogos são desenhados e ajustados à tua TV."
 msgid "Images in this folder: {0}"
 msgstr "Imagens nesta pasta: {0}"
 
+#. Under the Wallpaper list: {0} and {1} are the two folders the images are read from (the game files folder's wallpapers folder, then /data/prosperoeden/wallpapers).
+#: pe/ui/settings.cpp
+msgid "Images in {0} and in {1}"
+msgstr "Imagens em {0} e em {1}"
+
 #. Button hint: copy a save in.
 #: pe/ui/library.cpp
 msgid "Import"
@@ -876,6 +954,16 @@ msgstr "EM USO"
 #: pe/ui/multiplayer.cpp
 msgid "Incompatible"
 msgstr "Incompatível"
+
+#. Settings > Apps: the app is installed as a disk image file, which this menu can't update.
+#: pe/ui/apps.cpp
+msgid "Installed as an image: replace the image to update it."
+msgstr "Instalada como imagem: substitui a imagem para a atualizar."
+
+#. Settings > Apps: the new release's files are being put in the app's folder.
+#: pe/ui/apps.cpp
+msgid "Installing"
+msgstr "A instalar"
 
 #: pe/ui/save_sync.cpp
 msgid "It goes to the server."
@@ -1026,6 +1114,11 @@ msgstr "Biblioteca"
 msgid "Linked"
 msgstr "Associado"
 
+#. Settings > Apps: what the Nightshade TV app is. IPTV is a kind of TV service delivered over the internet (unchanged).
+#: pe/ui/apps_list.hpp
+msgid "Live TV, films and series from your IPTV provider."
+msgstr "TV em direto, filmes e séries do teu fornecedor de IPTV."
+
 #: pe/ui/multiplayer.cpp
 msgid "Loading public rooms..."
 msgstr "A carregar salas públicas..."
@@ -1123,6 +1216,11 @@ msgstr "Alcunha"
 msgid "Nickname: {0}"
 msgstr "Alcunha: {0}"
 
+#. {0} is why (English, technical).
+#: pe/ui/backup.cpp
+msgid "Nightshade's data could not be read: {0}"
+msgstr "Não foi possível ler os dados do Nightshade: {0}"
+
 #: pe/ui/library.cpp
 msgid "No cheats"
 msgstr "Sem batotas"
@@ -1161,9 +1259,24 @@ msgstr "Sem mods"
 msgid "No mods for this game yet. Copy each mod's folder to {0}."
 msgstr "Este jogo ainda não tem mods. Copia a pasta de cada mod para {0}."
 
+#. {0} is a port number, {1} an app's name. The payload loader is the program on the console that starts the homebrew programs sent to it.
+#: pe/ui/apps.cpp
+msgid "No payload loader is listening on port {0}, so {1} can't be installed."
+msgstr "Nenhum carregador de payloads está à escuta na porta {0}, por isso {1} não pode ser instalada."
+
+#. See 'No payload loader is listening on port {0}, so {1} can't be installed.' The PS5's home screen is the console's own, not this menu's.
+#: pe/ui/apps.cpp
+msgid "No payload loader is listening on port {0}, so {1} can't be opened from here. Open it from the PS5's home screen."
+msgstr "Nenhum carregador de payloads está à escuta na porta {0}, por isso {1} não pode ser aberta daqui. Abre-a a partir do ecrã inicial da PS5."
+
 #: pe/ui/multiplayer.cpp
 msgid "No public rooms are available."
 msgstr "Não há salas públicas disponíveis."
+
+#. Settings > Apps: neither the app's own GitHub repository nor the project it is based on has published a release.
+#: pe/ui/apps.cpp
+msgid "No release yet."
+msgstr "Ainda não há versão."
 
 #: pe/ui/library.cpp
 msgid "No ROM files found."
@@ -1181,6 +1294,11 @@ msgstr "Sem pasta roms"
 msgid "No server to pair with: add a RomM server to sources.json, or set save-sync.json up over FTP."
 msgstr "Nenhum servidor para emparelhar: adiciona um servidor RomM a sources.json ou configura save-sync.json por FTP."
 
+#. exFAT and FAT32 are names of disk formats (unchanged).
+#: pe/ui/backup.cpp
+msgid "No USB drive is connected. Connect one formatted as exFAT or FAT32."
+msgstr "Nenhuma unidade USB ligada. Ligue uma formatada em exFAT ou FAT32."
+
 #: pe/ui/pairing.cpp
 msgid "Nobody approved the code in time."
 msgstr "Ninguém aprovou o código a tempo."
@@ -1193,6 +1311,16 @@ msgstr "Nenhum"
 #: pe/ui/remote.cpp
 msgid "Not connected yet"
 msgstr "Ainda não ligado"
+
+#. {0} and {1} are sizes such as 1.2 GB.
+#: pe/ui/backup.cpp
+msgid "Not enough room on the drive: the backup needs {0}, {1} is free."
+msgstr "Não há espaço suficiente na unidade: a cópia precisa de {0} e há {1} livres."
+
+#. Settings > Apps: the app is not on the console.
+#: pe/ui/apps.cpp
+msgid "Not installed"
+msgstr "Não instalada"
 
 #: pe/ui/pairing.cpp
 msgid "Not linked"
@@ -1222,6 +1350,11 @@ msgstr "Não configurado"
 #: pe/ui/library.cpp
 msgid "Nothing to import"
 msgstr "Nada para importar"
+
+#. After a backup that was cancelled or failed: what it had written was removed.
+#: pe/ui/backup.cpp
+msgid "Nothing was left on the drive."
+msgstr "Não ficou nada na unidade."
 
 #. A setting that is switched off.
 #: pe/ui/game_options.cpp, pe/ui/library.cpp, pe/ui/settings.cpp
@@ -1254,6 +1387,16 @@ msgstr "Abre-o novamente para usar a versão {0}."
 #: pe/ui/home.cpp
 msgid "Open library"
 msgstr "Abrir biblioteca"
+
+#. {0} is an app's name.
+#: pe/ui/apps.cpp
+msgid "Opening {0}. Nightshade closes now."
+msgstr "A abrir {0}. O Nightshade vai fechar agora."
+
+#. {0} is an app's name: Nightshade asks for it to be opened, and closes once that is under way.
+#: pe/ui/apps.cpp
+msgid "Opening {0}..."
+msgstr "A abrir {0}..."
 
 #. The DualSense button labelled OPTIONS: keep the label if the language's players do.
 #: pe/ui/game_options.cpp
@@ -1340,6 +1483,16 @@ msgstr "Jogar mesmo assim"
 #: pe/ui/profiles.cpp
 msgid "Play as"
 msgstr "Jogar como"
+
+#. Settings > Apps: what the Nightshade Stream app is. Moonlight is the name of the game streaming client (unchanged).
+#: pe/ui/apps_list.hpp
+msgid "Play games streamed from your PC with Moonlight."
+msgstr "Joga jogos transmitidos a partir do teu PC com o Moonlight."
+
+#. Settings > Apps: what the Nightshade Station app is. PS1 is the first PlayStation, SwanStation the emulator's name (both unchanged).
+#: pe/ui/apps_list.hpp
+msgid "Play PS1 games with the SwanStation emulator."
+msgstr "Joga jogos de PS1 com o emulador SwanStation."
 
 #: pe/ui/library.cpp
 msgid "Play when downloaded"
@@ -1537,6 +1690,16 @@ msgstr "REGIÃO"
 #: pe/ui/game_options.cpp
 msgid "Regular"
 msgstr "Normal"
+
+#. See 'Release {0}, from {1}': here the release is the one of the project the app is based on, because the app has no Nightshade release yet.
+#: pe/ui/apps.cpp
+msgid "Release {0} of the original project, {1}"
+msgstr "Versão {0} do projeto original, {1}"
+
+#. {0} is a release's name, such as v1.000.090 or 01.000.110; {1} a GitHub repository, such as Oliv3rmoon/Nightshade-TV (both unchanged).
+#: pe/ui/apps.cpp
+msgid "Release {0}, from {1}"
+msgstr "Versão {0}, de {1}"
 
 #: pe/ui/profiles.cpp
 msgid "Remove"
@@ -1739,9 +1902,10 @@ msgstr "Configuração necessária"
 msgid "Setup required: {0} Open Settings, Game files to choose the folder that holds your keys, firmware and roms folders (or add the files to {1}), then reopen Nightshade."
 msgstr "Configuração necessária: {0} Acede a Definições, Ficheiros de jogo para escolheres a pasta que contém as pastas keys, firmware e roms (ou adiciona os ficheiros a {1}) e, em seguida, reabre o Nightshade."
 
+#. What the Diagnostics item of Settings has.
 #: pe/ui/settings.cpp
-msgid "Setup status and detailed logs."
-msgstr "Estado da configuração e registos detalhados."
+msgid "Setup status, detailed logs and a backup to USB."
+msgstr "Estado da configuração, registos detalhados e cópia de segurança em USB."
 
 #: eden_services.cpp
 msgid "Setup validation failed. Check that firmware and key files are readable and valid."
@@ -1883,9 +2047,19 @@ msgstr "Obrigado a toda a comunidade homebrew da PS5 e a todos os programadores 
 msgid "The accent colour of the current theme."
 msgstr "A cor de destaque do tema atual."
 
+#. {0} is why (English, technical). A sentence saying what was left on the drive follows it.
+#: pe/ui/backup.cpp
+msgid "The backup failed: {0}"
+msgstr "A cópia de segurança falhou: {0}"
+
 #: pe/ui/remote.cpp
 msgid "The download stopped"
 msgstr "A transferência parou"
+
+#. The USB drive ran out of room during a backup. A sentence saying what was left on it follows.
+#: pe/ui/backup.cpp
+msgid "The drive is full."
+msgstr "A unidade está cheia."
 
 #: pe/ui/settings.cpp
 msgid "The folder that holds your keys, firmware and games."
@@ -1949,6 +2123,26 @@ msgstr "Os dados guardados do perfil passam a ser sincronizados como {0}."
 msgid "The profile's save data syncs with the server from now on."
 msgstr "Os dados guardados do perfil passam a ser sincronizados com o servidor."
 
+#. {0} is an app's name. The homebrew loader is the tool that puts homebrew apps on the PS5's home screen (ShadowMountPlus, for example).
+#: pe/ui/apps.cpp
+msgid "The PS5 doesn't list {0} yet. The homebrew loader lists it after its next scan or a restart."
+msgstr "A PS5 ainda não lista {0}. O carregador de homebrew lista-a após a próxima análise ou um reinício."
+
+#. {0} is a file name such as PPSA99003.zip; SHA-256 is the name of a checksum (unchanged).
+#: pe/ui/apps.cpp
+msgid "The release gives no SHA-256 for {0}, so it is not offered."
+msgstr "A versão não indica um SHA-256 para {0}, por isso não é oferecida."
+
+#. {0} is a file name such as PPSA99003.zip.
+#: pe/ui/apps.cpp
+msgid "The release has no {0}."
+msgstr "A versão não tem {0}."
+
+#. See 'The release gives no SHA-256 for {0}, so it is not offered.' Its SHA-256 values disagree or are malformed.
+#: pe/ui/apps.cpp
+msgid "The release's SHA-256 for {0} can't be trusted, so it is not offered."
+msgstr "O SHA-256 da versão para {0} não é fiável, por isso não é oferecida."
+
 #. Shown at the end of release notes that were cut short; homebrew.page is a site's name and stays as it is.
 #: pe/ui/update.cpp
 msgid "The rest is on the app's page on homebrew.page."
@@ -2007,6 +2201,16 @@ msgstr "Não é possível guardar as definições deste jogo (sem ID de título)
 #: pe/ui/multiplayer.cpp
 msgid "This room uses a different protocol version."
 msgstr "Esta sala usa uma versão de protocolo diferente."
+
+#. Exactly one file; {0} is a size such as 1.2 GB. See '{0} game'.
+#: pe/ui/backup.cpp
+msgid "To back up: {0} in {1} file"
+msgstr "Para copiar: {0} em {1} ficheiro"
+
+#. {0} is a size such as 1.2 GB, {1} how many files (any number but one). See '{0} game'.
+#: pe/ui/backup.cpp
+msgid "To back up: {0} in {1} files"
+msgstr "Para copiar: {0} em {1} ficheiros"
 
 #. ryujinx/, save-import/ and roms/ are folder names (unchanged); {0} is the game's ID.
 #: eden_services.cpp
@@ -2084,6 +2288,11 @@ msgstr "A descompactar"
 msgid "UP"
 msgstr "SUBIR"
 
+#. Button hint in Settings > Apps: install an app's newer release over the one installed. Keep it short.
+#: pe/ui/apps.cpp
+msgid "Update"
+msgstr "Atualizar"
+
 #. Notification title: a newer release of this app is listed (not a game update).
 #: pe/ui/launcher.cpp, pe/ui/update.cpp
 msgid "Update available"
@@ -2119,6 +2328,11 @@ msgstr "Filtro de ampliação"
 #: eden_services.cpp
 msgid "USA"
 msgstr "EUA"
+
+#. {0} is a number from 1 to 8: which of the USB drives connected.
+#: pe/ui/backup.cpp
+msgid "USB drive {0}"
+msgstr "Unidade USB {0}"
 
 #: pe/ui/settings.cpp
 msgid "Use another home screen, library and menu layout."
@@ -2230,6 +2444,15 @@ msgstr "Com os dados guardados desta consola; são sincronizados depois do jogo.
 msgid "with {0}"
 msgstr "com {0}"
 
+#: pe/ui/apps.cpp
+msgid "Without filesystem access Nightshade can't tell which apps are installed."
+msgstr "Sem acesso ao sistema de ficheiros, o Nightshade não consegue saber que aplicações estão instaladas."
+
+#. Filesystem access is what the app asks the console for when it starts (as in 'Without filesystem access Nightshade can't tell which apps are installed.').
+#: pe/ui/backup.cpp
+msgid "Without filesystem access there is nothing to back up."
+msgstr "Sem acesso ao sistema de ficheiros, não há nada para copiar."
+
 #: pe/ui/settings.cpp
 msgid "Write logs at once"
 msgstr "Escrever registos de imediato"
@@ -2261,10 +2484,25 @@ msgstr "Os teus dados guardados são comparados com os do servidor."
 msgid "{0} changed"
 msgstr "{0} alterados"
 
+#. {0} is an app's name, {1} why (English, from the installer).
+#: pe/ui/apps.cpp
+msgid "{0} could not be installed: {1}"
+msgstr "Não foi possível instalar {0}: {1}"
+
+#. {0} is an app's name, {1} why (English, from the launch payload).
+#: pe/ui/apps.cpp
+msgid "{0} could not be opened: {1}"
+msgstr "Não foi possível abrir {0}: {1}"
+
 #. {0} is how many DLC (add-on content) a game has installed.
 #: eden_services.cpp, host/fake_services.cpp
 msgid "{0} DLC"
 msgstr "{0} DLC"
+
+#. {0} is a size such as 61.0 GB: the room left on a USB drive. Keep it short.
+#: pe/ui/backup.cpp
+msgid "{0} free"
+msgstr "{0} livres"
 
 #. Exactly one game. In a language with more than two plural forms, word it so that it reads well with any number (Games: {0}).
 #: pe/ui/browse.cpp, pe/ui/remote.cpp
@@ -2290,10 +2528,30 @@ msgstr "{0} jogos"
 msgid "{0} games installed"
 msgstr "{0} jogos instalados"
 
+#. {0} is a GitHub repository, such as blackbearreloaded/ProsperoTV (unchanged): GitHub now sends requests for it to another account's repository, which Nightshade does not install from.
+#: pe/ui/apps.cpp
+msgid "{0} has moved to another account, so its release is not offered."
+msgstr "{0} foi movido para outra conta, por isso a sua versão não é oferecida."
+
 #. {0} is 60 or 120 (hertz).
 #: pe/ui/game_options.cpp, pe/ui/library.cpp, pe/ui/settings.cpp
 msgid "{0} Hz"
 msgstr "{0} Hz"
+
+#. {0} is an app's name. See 'The PS5 doesn't list {0} yet...' for the homebrew loader.
+#: pe/ui/apps.cpp
+msgid "{0} is installed. The homebrew loader lists it after its next scan or a restart."
+msgstr "{0} está instalada. O carregador de homebrew lista-a após a próxima análise ou um reinício."
+
+#. {0} is a folder whose name ends in .incomplete: the part of a backup that could not be removed.
+#: pe/ui/backup.cpp
+msgid "{0} is left on the drive, marked incomplete: delete it."
+msgstr "{0} ficou na unidade, marcada como incompleta: elimine-a."
+
+#. {0} is an app's name, {1} its new version, such as 01.000.110.
+#: pe/ui/apps.cpp
+msgid "{0} is updated to {1}."
+msgstr "{0} foi atualizada para {1}."
 
 #. Exactly one mod, in the list of what a game comes with (Update 1.2.0, 2 DLC, 1 mod). See '{0} game'.
 #: pe/ui/library.cpp
@@ -2324,6 +2582,11 @@ msgstr "{0} indisponível"
 #: pe/ui/widgets.cpp
 msgid "{0} OF {1}"
 msgstr "{0} DE {1}"
+
+#. Settings > Apps: how many of Nightshade's apps are on the console: 2 of 3 installed.
+#: pe/ui/settings.cpp
+msgid "{0} of {1} installed"
+msgstr "{0} de {1} instaladas"
 
 #. In the same list, when some of the game's mods are switched off: 1 of 2 mods on. Keep it short.
 #: pe/ui/library.cpp

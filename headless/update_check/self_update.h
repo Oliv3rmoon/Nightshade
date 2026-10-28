@@ -91,6 +91,13 @@ extern "C"
      * /download0 for the sequence. Defined in self_update_ps5.c. */
     const self_update_platform *self_update_console(void);
 
+    /* ProsperoEden: sends another payload from the app's folder to the loader as the helper is
+     * sent (app-launch.elf, Nightshade's Apps). 1: channel is open. On the console only. */
+    int self_update_open_payload(const char *path, self_update_channel *channel);
+    /* ProsperoEden: how long such a connection waits for an answer, instead of the helper's
+     * minute. 1: set. On the console only. */
+    int self_update_channel_timeout(const self_update_channel *channel, int milliseconds);
+
     /* ---- 1. Is there an update? ------------------------------------------------------------ */
 
     typedef enum self_update_check_result
@@ -119,6 +126,11 @@ extern "C"
            them, the rest is on the release's page. */
         char notes[16384];
         int notes_truncated;
+        /* ProsperoEden: an install of another app's release (Nightshade's Apps, apps.h): the
+           title ID of the app asking, beside whose folder the helper makes a new one. installed
+           is "none" when the app isn't installed, available "any" when the release names no
+           version. Empty: the app's own update, the kit's conversation unchanged. */
+        char beside[10];
     } self_update_offer;
 
     /* Blocking; call it from a worker thread, once per launch. */
@@ -144,7 +156,11 @@ extern "C"
         SELF_UPDATE_READY,       /* staged: call self_update_apply() or self_update_cancel() */
         SELF_UPDATE_APPLYING,    /* the helper has the go-ahead: close the app now */
         SELF_UPDATE_CANCELLED,
-        SELF_UPDATE_FAILED /* error says why; nothing was changed */
+        SELF_UPDATE_FAILED, /* error says why; nothing was changed */
+        /* ProsperoEden: an install (offer.beside) is done: version and folder say what and where.
+           Once staged an install goes on to APPLYING by itself (it is never READY), and the app
+           stays open. */
+        SELF_UPDATE_INSTALLED
     } self_update_phase;
 
     typedef struct self_update_status
@@ -155,6 +171,8 @@ extern "C"
         double rate;        /* bytes per second, smoothed; 0 until it is known */
         char time_left[32]; /* "about 20 s left"; empty until it is known */
         char error[160];
+        char version[12];   /* ProsperoEden: SELF_UPDATE_INSTALLED, the content version put in place */
+        char folder[256];   /* ... and its folder, when the helper said it (may be empty) */
     } self_update_status;
 
     typedef struct self_update_job
@@ -176,6 +194,8 @@ extern "C"
         uint64_t rate_done;
         double rate;
         self_update_phase rate_phase;
+        char version[12]; /* ProsperoEden: an install's, as self_update_status has them */
+        char folder[256];
     } self_update_job;
 
     /* Starts the download and staging on a thread of its own. 1: started. */

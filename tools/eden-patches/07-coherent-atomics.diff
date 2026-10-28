@@ -1,0 +1,159 @@
+--- a/src/shader_recompiler/backend/glsl/glsl_emit_context.cpp
++++ b/src/shader_recompiler/backend/glsl/glsl_emit_context.cpp
+@@ -468,11 +468,12 @@
+     if (info.storage_buffers_descriptors.empty()) {
+         return;
+     }
++    const std::string_view qualifier{info.uses_storage_atomics ? "coherent " : ""};
+     u32 index{};
+     for (const auto& desc : info.storage_buffers_descriptors) {
+-        header += fmt::format("layout(std430,binding={}) buffer {}_ssbo_{}{{uint {}_ssbo{}[];}};",
+-                              bindings.storage_buffer, stage_name, bindings.storage_buffer,
+-                              stage_name, index);
++        header += fmt::format("layout(std430,binding={}) {}buffer {}_ssbo_{}{{uint {}_ssbo{}[];}};",
++                              bindings.storage_buffer, qualifier, stage_name,
++                              bindings.storage_buffer, stage_name, index);
+         bindings.storage_buffer += desc.count;
+         index += desc.count;
+     }
+--- a/src/shader_recompiler/backend/spirv/spirv_emit_context.cpp
++++ b/src/shader_recompiler/backend/spirv/spirv_emit_context.cpp
+@@ -317,6 +317,11 @@
+         const Id id{ctx.AddGlobalVariable(struct_pointer, spv::StorageClass::StorageBuffer)};
+         ctx.Decorate(id, spv::Decoration::Binding, binding);
+         ctx.Decorate(id, spv::Decoration::DescriptorSet, 0U);
++        if (info.uses_storage_atomics) {
++            // Atomics act at device scope; the shader's plain loads must see what other
++            // workgroups wrote, not a stale copy in a per-CU cache.
++            ctx.Decorate(id, spv::Decoration::Coherent);
++        }
+         ctx.Name(id, fmt::format("ssbo{}", index));
+         if (ctx.profile.supported_spirv >= 0x00010400) {
+             ctx.interfaces.push_back(id);
+@@ -397,8 +402,15 @@
+     ctx.AddLabel(continue_block);
+     const Id word_pointer{is_struct ? ctx.OpAccessChain(element_pointer, base, zero, index)
+                                     : ctx.OpAccessChain(element_pointer, base, index)};
++    // A storage buffer comes in as a pointer parameter, which does not carry the variable's
++    // Coherent decoration to the load: read the word at device scope on every attempt, or a stale
++    // cached copy fails the exchange forever.
++    const auto load_word{[&](Id type) {
++        return is_shared ? ctx.OpLoad(type, word_pointer)
++                         : ctx.OpLoad(type, word_pointer, spv::MemoryAccessMask::Volatile);
++    }};
+     if (value_type.value == ctx.F32[2].value) {
+-        const Id u32_value{ctx.OpLoad(ctx.U32[1], word_pointer)};
++        const Id u32_value{load_word(ctx.U32[1])};
+         const Id value{ctx.OpUnpackHalf2x16(ctx.F32[2], u32_value)};
+         const Id new_value{ctx.OpFunctionCall(value_type, cas_func, value, op_b)};
+         const Id u32_new_value{ctx.OpPackHalf2x16(ctx.U32[1], new_value)};
+@@ -410,7 +422,7 @@
+         ctx.AddLabel(merge_block);
+         ctx.OpReturnValue(ctx.OpUnpackHalf2x16(ctx.F32[2], atomic_res));
+     } else {
+-        const Id value{ctx.OpLoad(memory_type, word_pointer)};
++        const Id value{load_word(memory_type)};
+         const bool matching_type{value_type.value == memory_type.value};
+         const Id bitcast_value{matching_type ? value : ctx.OpBitcast(value_type, value)};
+         const Id cal_res{ctx.OpFunctionCall(value_type, cas_func, bitcast_value, op_b)};
+--- a/src/shader_recompiler/ir_opt/collect_shader_info_pass.cpp
++++ b/src/shader_recompiler/ir_opt/collect_shader_info_pass.cpp
+@@ -434,6 +434,88 @@
+     case IR::Opcode::LoadLocal:
+     case IR::Opcode::WriteLocal:
+         info.uses_local_memory = true;
++        break;
++    default:
++        break;
++    }
++    switch (inst.GetOpcode()) {
++    case IR::Opcode::GlobalAtomicIAdd32:
++    case IR::Opcode::GlobalAtomicSMin32:
++    case IR::Opcode::GlobalAtomicUMin32:
++    case IR::Opcode::GlobalAtomicSMax32:
++    case IR::Opcode::GlobalAtomicUMax32:
++    case IR::Opcode::GlobalAtomicInc32:
++    case IR::Opcode::GlobalAtomicDec32:
++    case IR::Opcode::GlobalAtomicAnd32:
++    case IR::Opcode::GlobalAtomicOr32:
++    case IR::Opcode::GlobalAtomicXor32:
++    case IR::Opcode::GlobalAtomicExchange32:
++    case IR::Opcode::GlobalAtomicCompareExchange32:
++    case IR::Opcode::GlobalAtomicIAdd64:
++    case IR::Opcode::GlobalAtomicSMin64:
++    case IR::Opcode::GlobalAtomicUMin64:
++    case IR::Opcode::GlobalAtomicSMax64:
++    case IR::Opcode::GlobalAtomicUMax64:
++    case IR::Opcode::GlobalAtomicAnd64:
++    case IR::Opcode::GlobalAtomicOr64:
++    case IR::Opcode::GlobalAtomicXor64:
++    case IR::Opcode::GlobalAtomicExchange64:
++    case IR::Opcode::GlobalAtomicCompareExchange64:
++    case IR::Opcode::GlobalAtomicIAdd32x2:
++    case IR::Opcode::GlobalAtomicSMin32x2:
++    case IR::Opcode::GlobalAtomicUMin32x2:
++    case IR::Opcode::GlobalAtomicSMax32x2:
++    case IR::Opcode::GlobalAtomicUMax32x2:
++    case IR::Opcode::GlobalAtomicAnd32x2:
++    case IR::Opcode::GlobalAtomicOr32x2:
++    case IR::Opcode::GlobalAtomicXor32x2:
++    case IR::Opcode::GlobalAtomicExchange32x2:
++    case IR::Opcode::GlobalAtomicAddF32:
++    case IR::Opcode::GlobalAtomicAddF16x2:
++    case IR::Opcode::GlobalAtomicAddF32x2:
++    case IR::Opcode::GlobalAtomicMinF16x2:
++    case IR::Opcode::GlobalAtomicMinF32x2:
++    case IR::Opcode::GlobalAtomicMaxF16x2:
++    case IR::Opcode::GlobalAtomicMaxF32x2:
++    case IR::Opcode::StorageAtomicIAdd32:
++    case IR::Opcode::StorageAtomicSMin32:
++    case IR::Opcode::StorageAtomicUMin32:
++    case IR::Opcode::StorageAtomicSMax32:
++    case IR::Opcode::StorageAtomicUMax32:
++    case IR::Opcode::StorageAtomicInc32:
++    case IR::Opcode::StorageAtomicDec32:
++    case IR::Opcode::StorageAtomicAnd32:
++    case IR::Opcode::StorageAtomicOr32:
++    case IR::Opcode::StorageAtomicXor32:
++    case IR::Opcode::StorageAtomicExchange32:
++    case IR::Opcode::StorageAtomicCompareExchange32:
++    case IR::Opcode::StorageAtomicIAdd64:
++    case IR::Opcode::StorageAtomicSMin64:
++    case IR::Opcode::StorageAtomicUMin64:
++    case IR::Opcode::StorageAtomicSMax64:
++    case IR::Opcode::StorageAtomicUMax64:
++    case IR::Opcode::StorageAtomicAnd64:
++    case IR::Opcode::StorageAtomicOr64:
++    case IR::Opcode::StorageAtomicXor64:
++    case IR::Opcode::StorageAtomicExchange64:
++    case IR::Opcode::StorageAtomicCompareExchange64:
++    case IR::Opcode::StorageAtomicIAdd32x2:
++    case IR::Opcode::StorageAtomicSMin32x2:
++    case IR::Opcode::StorageAtomicUMin32x2:
++    case IR::Opcode::StorageAtomicSMax32x2:
++    case IR::Opcode::StorageAtomicUMax32x2:
++    case IR::Opcode::StorageAtomicAnd32x2:
++    case IR::Opcode::StorageAtomicOr32x2:
++    case IR::Opcode::StorageAtomicXor32x2:
++    case IR::Opcode::StorageAtomicExchange32x2:
++    case IR::Opcode::StorageAtomicAddF32:
++    case IR::Opcode::StorageAtomicAddF16x2:
++    case IR::Opcode::StorageAtomicAddF32x2:
++    case IR::Opcode::StorageAtomicMinF16x2:
++    case IR::Opcode::StorageAtomicMinF32x2:
++    case IR::Opcode::StorageAtomicMaxF16x2:
++    case IR::Opcode::StorageAtomicMaxF32x2:
++        info.uses_storage_atomics = true;
+         break;
+     default:
+         break;
+--- a/src/shader_recompiler/shader_info.h
++++ b/src/shader_recompiler/shader_info.h
+@@ -310,6 +310,7 @@
+     bool uses_atomic_s32_min{};
+     bool uses_atomic_s32_max{};
+     bool uses_int64_bit_atomics{};
++    bool uses_storage_atomics{};
+     bool uses_global_memory{};
+     bool uses_atomic_image_u32{};
+     bool uses_shadow_lod{};
