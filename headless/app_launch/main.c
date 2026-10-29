@@ -16,6 +16,13 @@
  *   app      PSL1, <title ID to open>, <title ID of the app asking>      (three lines)
  *   payload  waiting                              or  fail <reason>
  *
+ * or, to open it with launch arguments (the bridge, headless/bridge, passing on what a home screen
+ * forwarder gave it: --rom <game> and --exit-after-game, headless/forwarded_args.h):
+ *
+ *   app      PSL2, <title ID to open>, <title ID of the app asking>, <how many arguments, 0 to 8>,
+ *            then each argument on a line of its own
+ *   payload  waiting                              or  fail <reason>
+ *
  * Nightshade then closes. The payload waits for it to stop being the app that runs (three looks
  * in a row a quarter of a second apart that find another, within 30 s: Nightshade gives its
  * graphics and sound back first), then opens the title as the foreground
@@ -30,7 +37,18 @@
 #include <unistd.h>
 
 #define LAUNCH_MAGIC "PSL1"
+#define LAUNCH_MAGIC_ARGUMENTS "PSL2"
+/* Launch arguments PSL2 passes on, and the longest (a game's path). */
+#define LAUNCH_MAX_ARGUMENTS 8
+#define LAUNCH_ARGUMENT_SIZE 1024
+/* Where it writes, and the console's records of registered apps; tools/check-apps.py runs this
+ * payload on the host with folders of its own. */
+#ifndef LAUNCH_LOG
 #define LAUNCH_LOG "/data/nightshade/logs/app-launch.log"
+#endif
+#ifndef LAUNCH_USER
+#define LAUNCH_USER "/user"
+#endif
 #define LAUNCH_WAIT_STEP_US 250000
 #define LAUNCH_WAIT_STEPS 120
 /* Looks in a row that must find another app than the asking one before the title is opened. */
@@ -113,12 +131,12 @@ static void running_title(char title[16])
  * Nightshade has closed. */
 static int registered(const char *title)
 {
-    char path[64];
+    char path[512];
     struct stat info;
-    (void)snprintf(path, sizeof(path), "/user/app/%s", title);
+    (void)snprintf(path, sizeof(path), LAUNCH_USER "/app/%s", title);
     if (stat(path, &info) == 0 && S_ISDIR(info.st_mode))
         return 1;
-    (void)snprintf(path, sizeof(path), "/user/appmeta/%s", title);
+    (void)snprintf(path, sizeof(path), LAUNCH_USER "/appmeta/%s", title);
     return stat(path, &info) == 0 && S_ISDIR(info.st_mode);
 }
 
@@ -129,7 +147,12 @@ int main(void)
     char asking[16];
     char first[16];
     char title[16];
-    const char *arguments[] = {NULL};
+    char count_line[8];
+    static char argument_text[LAUNCH_MAX_ARGUMENTS][LAUNCH_ARGUMENT_SIZE];
+    const char *arguments[LAUNCH_MAX_ARGUMENTS + 1] = {NULL};
+    int count = 0;
+    int with_arguments;
+    int index;
     FILE *log;
     int init;
     int foreground;
@@ -140,11 +163,34 @@ int main(void)
     lnc_app_param_t param;
     /* The app closes its end once it has the answer. */
     (void)signal(SIGPIPE, SIG_IGN);
-    if (!read_line(magic, sizeof(magic)) || strcmp(magic, LAUNCH_MAGIC) != 0 || !read_line(target, sizeof(target)) ||
-        !read_line(asking, sizeof(asking)) || !title_id(target) || !title_id(asking) || strcmp(target, asking) == 0)
+    if (!read_line(magic, sizeof(magic)) ||
+        (strcmp(magic, LAUNCH_MAGIC) != 0 && strcmp(magic, LAUNCH_MAGIC_ARGUMENTS) != 0) ||
+        !read_line(target, sizeof(target)) || !read_line(asking, sizeof(asking)) || !title_id(target) ||
+        !title_id(asking) || strcmp(target, asking) == 0)
     {
         say("fail The request was refused\n");
         return 1;
+    }
+    with_arguments = strcmp(magic, LAUNCH_MAGIC_ARGUMENTS) == 0;
+    if (with_arguments)
+    {
+        if (!read_line(count_line, sizeof(count_line)) || count_line[0] < '0' ||
+            count_line[0] > '0' + LAUNCH_MAX_ARGUMENTS || count_line[1] != '\0')
+        {
+            say("fail The request was refused\n");
+            return 1;
+        }
+        count = count_line[0] - '0';
+        for (index = 0; index < count; index++)
+        {
+            if (!read_line(argument_text[index], sizeof(argument_text[index])))
+            {
+                say("fail The request was refused\n");
+                return 1;
+            }
+            arguments[index] = argument_text[index];
+        }
+        arguments[count] = NULL;
     }
     log = fopen(LAUNCH_LOG, "w");
     if (!registered(target))
@@ -178,6 +224,8 @@ int main(void)
                 "waited %d step(s) for %s to go%s, running now: '%s'\n",
                 target, asking, (unsigned)init, user, (unsigned)foreground, first, waited, asking,
                 clear < LAUNCH_CLEAR_LOOKS ? " (it did not)" : "", title);
+        for (index = 0; index < count; index++)
+            fprintf(log, "launch %s: argument %d '%s'\n", target, index, arguments[index]);
         fflush(log);
     }
     param.size = sizeof(param);

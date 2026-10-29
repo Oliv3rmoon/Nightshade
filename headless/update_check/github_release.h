@@ -218,6 +218,15 @@ extern "C"
                                                      github_release_asset *asset,
                                                      github_release_report *report);
 
+    /* ProsperoEden: the same of the release `tag` names (releases/tags/<tag>) instead of the
+     * newest: the bridge (headless/bridge) installs PPSA64448 from the release it came in. That
+     * release may still be a pre-release (a draft is not); its tag must be the one asked for, and a
+     * redirect is not followed. */
+    github_release_reason github_release_tag_asset_check(const self_update_platform *platform,
+                                                         const char *repository, const char *tag,
+                                                         const char *file, github_release_asset *asset,
+                                                         github_release_report *report);
+
 #ifdef __cplusplus
 }
 #endif

@@ -7,7 +7,8 @@ strings.py new <tag>          start headless/prosperoeden/ui/lang/<tag>.po from 
 strings.py check              check every catalog in headless/prosperoeden/ui/lang
 
 The code holds the English text: tr("...") where it is drawn, TR("...") in constant tables (and
-the setting labels of headless/settings_store.h). A catalog is a gettext .po file named after the
+the setting labels of headless/settings_store.h), Say("...") in the bridge (headless/bridge, the
+PPSA99008 app of the release ZIP, which shows its text from the same catalogs). A catalog is a gettext .po file named after the
 PS5 system language's tag (third_party/ps5_system_language.hpp): pt-BR.po, fr-FR.po...
 
 check fails when a catalog
@@ -40,6 +41,8 @@ SETTING_LABELS = ("kResolutionLabels", "kUpscalingFilterLabels", "kAstcTextureLa
 
 LITERALS = r'((?:"(?:[^"\\]|\\.)*"\s*)+)'
 MARKED = re.compile(r"\b(?:tr|TR)\(\s*" + LITERALS)
+BRIDGE = ROOT / "headless/bridge"
+BRIDGE_MARKED = re.compile(r"\b(?:tr|TR|Say)\(\s*" + LITERALS)
 ONE = re.compile(r'"((?:[^"\\]|\\.)*)"')
 
 # What a translator cannot tell from the text alone.
@@ -296,6 +299,11 @@ NOTES = {
     "Copying needs {0}; the console has {1} free. Nothing was changed.": "{0} and {1} are sizes such as 6.4 GB.",
     "The console ran out of space (copying needs about {0}). What was copied was removed.": "{0} is a size such as 6.4 GB.",
     "Not everything could be put back. The details below say where it is.": "After a failure that could not be undone fully; the details are a technical English line under it.",
+    "Nightshade has its own app now": "Headline of the bridge: the small app left on the old home screen tile (ProsperoEden's title ID) after Nightshade moved to a title ID and tile of its own. Nightshade is a name.",
+    "From now on, open Nightshade from its own tile on the home screen. This tile only takes you there.": "Under that headline: the old tile only opens the new Nightshade app (and installs it first when it is missing).",
+    "At its first start Nightshade asks what to do with your ProsperoEden data. Afterwards this tile can be deleted, or used for the official ProsperoEden app again.": "Under that: the new app asks whether to move or copy the data of the ProsperoEden app; the old tile is no longer needed afterwards. ProsperoEden is a name and stays as it is.",
+    "Waiting for the console to list {0}": "The bridge has installed {0} (Nightshade) and waits for the PS5's home screen to list it, which the homebrew loader does after its next scan.",
+    "Opening {0}. This app closes now.": "The bridge opens {0} (Nightshade) and closes itself; 'this app' is the bridge, the old tile.",
 }
 
 
@@ -315,14 +323,21 @@ def marked_text():
     """English text -> the files that use it."""
     found = {}
     sources = sorted(p for pattern in ("*.cpp", "*.hpp", "*.h") for p in LAUNCHER.rglob(pattern))
-    for path in sources:
+    # The bridge (headless/bridge, the PPSA99008 app of the release ZIP) shows its text from the same
+    # catalogs: Say("..."), as tr("...") in the launcher.
+    # (Its preview on a PC, preview.cpp, repeats the screen's texts.)
+    bridge = sorted(p for pattern in ("*.cpp", "*.hpp") for p in BRIDGE.glob(pattern) if p.name != "preview.cpp")
+    for path in sources + bridge:
         source = path.read_text(encoding="utf-8")
         # Comments may quote tr("...") too; drop them.
         source = re.sub(r"//[^\n]*", "", source)
-        for match in MARKED.finditer(source):
+        marked = BRIDGE_MARKED if path.parent == BRIDGE else MARKED
+        where = path.relative_to(LAUNCHER).as_posix() if path.is_relative_to(LAUNCHER) else \
+            path.relative_to(ROOT / "headless").as_posix()
+        for match in marked.finditer(source):
             text = joined(match.group(1))
             if text:
-                found.setdefault(text, []).append(path.relative_to(LAUNCHER).as_posix())
+                found.setdefault(text, []).append(where)
     settings = SETTINGS.read_text(encoding="utf-8")
     for name in SETTING_LABELS:
         table = re.search(name + r"\[\] = \{([^}]*)\}", settings)

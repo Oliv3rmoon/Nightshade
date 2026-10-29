@@ -149,6 +149,11 @@ msgstr "ASTCテクスチャ"
 msgid "Asynchronous shaders"
 msgstr "非同期シェーダー"
 
+#. Under that: the new app asks whether to move or copy the data of the ProsperoEden app; the old tile is no longer needed afterwards. ProsperoEden is a name and stays as it is.
+#: bridge/view.cpp
+msgid "At its first start Nightshade asks what to do with your ProsperoEden data. Afterwards this tile can be deleted, or used for the official ProsperoEden app again."
+msgstr "Nightshadeは初回起動時に、ProsperoEdenのデータをどうするかを尋ねます。その後、このタイルは削除するか、公式のProsperoEdenアプリ用に再び使えます。"
+
 #: pe/ui/library.cpp, pe/ui/settings.cpp
 msgid "Audio"
 msgstr "オーディオ"
@@ -305,6 +310,11 @@ msgstr "コピーには {0} 必要ですが、本体の空きは {1} です。�
 msgid "Copying your data"
 msgstr "データをコピー中"
 
+#. Under that headline: the old tile only opens the new Nightshade app (and installs it first when it is missing).
+#: bridge/view.cpp
+msgid "From now on, open Nightshade from its own tile on the home screen. This tile only takes you there."
+msgstr "これからはホーム画面にあるNightshade専用のタイルから開いてください。このタイルはそこへ案内するだけです。"
+
 #. Under the Copy button. {0} is a folder such as /data/prosperoeden. Settings is the menu's section (use its translation).
 #: pe/ui/migrate.cpp
 msgid "Games and new downloads stay in {0}. You can still choose another game files folder in Settings."
@@ -333,6 +343,11 @@ msgstr "移動には空き容量は不要です。"
 msgid "Moving your data"
 msgstr "データを移動中"
 
+#. Headline of the bridge: the small app left on the old home screen tile (ProsperoEden's title ID) after Nightshade moved to a title ID and tile of its own. Nightshade is a name.
+#: bridge/view.cpp
+msgid "Nightshade has its own app now"
+msgstr "Nightshadeが専用アプリになりました"
+
 #. {0} is Nightshade's folder (/data/nightshade), {1} the ProsperoEden app's (/data/prosperoeden).
 #: pe/ui/migrate.cpp
 msgid "Nightshade now keeps its data in {0}. What you had before is in {1}."
@@ -355,6 +370,11 @@ msgstr "すべてを元に戻せませんでした。下の詳細に場所が書
 #: pe/ui/migrate.cpp
 msgid "Nothing was changed: both folders are as they were."
 msgstr "何も変更されていません：両方のフォルダーは元のままです。"
+
+#. The bridge opens {0} (Nightshade) and closes itself; 'this app' is the bridge, the old tile.
+#: bridge/main.cpp
+msgid "Opening {0}. This app closes now."
+msgstr "{0}を開きます。このアプリを終了します。"
 
 #. Button: Nightshade starts with no data; ProsperoEden's is left as it is.
 #: pe/ui/migrate.cpp
@@ -2485,6 +2505,11 @@ msgstr "Vulkan（推奨）"
 #: pe/ui/pairing.cpp
 msgid "Waiting for the approval  ·  the code works {0} more"
 msgstr "承認を待っています  ·  コードの有効時間は残り{0}"
+
+#. The bridge has installed {0} (Nightshade) and waits for the PS5's home screen to list it, which the homebrew loader does after its next scan.
+#: bridge/main.cpp
+msgid "Waiting for the console to list {0}"
+msgstr "本体に{0}が表示されるのを待っています"
 
 #: pe/ui/remote.cpp
 msgid "Waiting for {0}"

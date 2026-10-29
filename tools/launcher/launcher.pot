@@ -57,12 +57,12 @@ msgid "About Nightshade"
 msgstr ""
 
 #. Time left while downloading; {0} is a number of minutes. Keep it short.
-#: pe/ui/remote.cpp, pe/ui/update.cpp
+#: bridge/view.cpp, pe/ui/remote.cpp, pe/ui/update.cpp
 msgid "About {0} min left"
 msgstr ""
 
 #. Time left while downloading; {0} is a number of seconds. Keep it short.
-#: pe/ui/remote.cpp, pe/ui/update.cpp
+#: bridge/view.cpp, pe/ui/remote.cpp, pe/ui/update.cpp
 msgid "About {0} s left"
 msgstr ""
 
@@ -147,6 +147,11 @@ msgstr ""
 #. A switch. A shader is a small graphics program; keep the word the language's players use for it.
 #: pe/ui/game_options.cpp, pe/ui/settings.cpp
 msgid "Asynchronous shaders"
+msgstr ""
+
+#. Under that: the new app asks whether to move or copy the data of the ProsperoEden app; the old tile is no longer needed afterwards. ProsperoEden is a name and stays as it is.
+#: bridge/view.cpp
+msgid "At its first start Nightshade asks what to do with your ProsperoEden data. Afterwards this tile can be deleted, or used for the official ProsperoEden app again."
 msgstr ""
 
 #: pe/ui/library.cpp, pe/ui/settings.cpp
@@ -341,7 +346,7 @@ msgstr ""
 msgid "Circle"
 msgstr ""
 
-#: pe/ui/launcher.cpp, pe/ui/remote.cpp, pe/ui/update.cpp
+#: bridge/view.cpp, pe/ui/launcher.cpp, pe/ui/remote.cpp, pe/ui/update.cpp
 msgid "Close"
 msgstr ""
 
@@ -610,7 +615,7 @@ msgstr ""
 msgid "Downloading"
 msgstr ""
 
-#: pe/ui/remote.cpp
+#: bridge/main.cpp, pe/ui/remote.cpp
 msgid "Downloading {0}"
 msgstr ""
 
@@ -808,6 +813,11 @@ msgstr ""
 msgid "French (Canada)"
 msgstr ""
 
+#. Under that headline: the old tile only opens the new Nightshade app (and installs it first when it is missing).
+#: bridge/view.cpp
+msgid "From now on, open Nightshade from its own tile on the home screen. This tile only takes you there."
+msgstr ""
+
 #: pe/ui/remote.cpp
 msgid "From {0}"
 msgstr ""
@@ -894,16 +904,16 @@ msgstr ""
 msgid "GETTING STARTED"
 msgstr ""
 
-#: pe/ui/apps.cpp
+#: bridge/view.cpp, pe/ui/apps.cpp
 msgid "GitHub could not be reached."
 msgstr ""
 
 #. GitHub allows an address a number of requests an hour; that number was reached.
-#: pe/ui/apps.cpp
+#: bridge/view.cpp, pe/ui/apps.cpp
 msgid "GitHub is limiting requests. Try again in an hour."
 msgstr ""
 
-#: pe/ui/apps.cpp
+#: bridge/main.cpp, bridge/view.cpp, pe/ui/apps.cpp
 msgid "GitHub's answer could not be read."
 msgstr ""
 
@@ -992,7 +1002,7 @@ msgid "Installed as an image: replace the image to update it."
 msgstr ""
 
 #. Settings > Apps: the new release's files are being put in the app's folder.
-#: pe/ui/apps.cpp
+#: bridge/main.cpp, pe/ui/apps.cpp
 msgid "Installing"
 msgstr ""
 
@@ -1282,6 +1292,11 @@ msgstr ""
 msgid "Nightshade could not get access to the console's storage, so it cannot read your settings, saves and games. Nothing was changed. Close Nightshade and open it again. (Code {0})"
 msgstr ""
 
+#. Headline of the bridge: the small app left on the old home screen tile (ProsperoEden's title ID) after Nightshade moved to a title ID and tile of its own. Nightshade is a name.
+#: bridge/view.cpp
+msgid "Nightshade has its own app now"
+msgstr ""
+
 #. {0} is Nightshade's folder (/data/nightshade), {1} the ProsperoEden app's (/data/prosperoeden).
 #: pe/ui/migrate.cpp
 msgid "Nightshade now keeps its data in {0}. What you had before is in {1}."
@@ -1344,12 +1359,12 @@ msgid "No mods for this game yet. Copy each mod's folder to {0}."
 msgstr ""
 
 #. {0} is a port number, {1} an app's name. The payload loader is the program on the console that starts the homebrew programs sent to it.
-#: pe/ui/apps.cpp
+#: bridge/main.cpp, pe/ui/apps.cpp
 msgid "No payload loader is listening on port {0}, so {1} can't be installed."
 msgstr ""
 
 #. See 'No payload loader is listening on port {0}, so {1} can't be installed.' The PS5's home screen is the console's own, not this menu's.
-#: pe/ui/apps.cpp
+#: bridge/main.cpp, pe/ui/apps.cpp
 msgid "No payload loader is listening on port {0}, so {1} can't be opened from here. Open it from the PS5's home screen."
 msgstr ""
 
@@ -1358,7 +1373,7 @@ msgid "No public rooms are available."
 msgstr ""
 
 #. Settings > Apps: neither the app's own GitHub repository nor the project it is based on has published a release.
-#: pe/ui/apps.cpp
+#: bridge/view.cpp, pe/ui/apps.cpp
 msgid "No release yet."
 msgstr ""
 
@@ -1490,8 +1505,13 @@ msgstr ""
 msgid "Opening {0}. Nightshade closes now."
 msgstr ""
 
+#. The bridge opens {0} (Nightshade) and closes itself; 'this app' is the bridge, the old tile.
+#: bridge/main.cpp
+msgid "Opening {0}. This app closes now."
+msgstr ""
+
 #. {0} is an app's name: Nightshade asks for it to be opened, and closes once that is under way.
-#: pe/ui/apps.cpp
+#: bridge/main.cpp, pe/ui/apps.cpp
 msgid "Opening {0}..."
 msgstr ""
 
@@ -1633,7 +1653,7 @@ msgid "Powered by Eden"
 msgstr ""
 
 #. Update dialog headline while the download starts.
-#: pe/ui/apps.cpp, pe/ui/backup.cpp, pe/ui/remote.cpp, pe/ui/update.cpp
+#: bridge/main.cpp, pe/ui/apps.cpp, pe/ui/backup.cpp, pe/ui/remote.cpp, pe/ui/update.cpp
 msgid "Preparing"
 msgstr ""
 
@@ -2210,22 +2230,22 @@ msgid "The profile's save data syncs with the server from now on."
 msgstr ""
 
 #. {0} is an app's name. The homebrew loader is the tool that puts homebrew apps on the PS5's home screen (ShadowMountPlus, for example).
-#: pe/ui/apps.cpp
+#: bridge/main.cpp, pe/ui/apps.cpp
 msgid "The PS5 doesn't list {0} yet. The homebrew loader lists it after its next scan or a restart."
 msgstr ""
 
 #. {0} is a file name such as PPSA99003.zip; SHA-256 is the name of a checksum (unchanged).
-#: pe/ui/apps.cpp
+#: bridge/view.cpp, pe/ui/apps.cpp
 msgid "The release gives no SHA-256 for {0}, so it is not offered."
 msgstr ""
 
 #. {0} is a file name such as PPSA99003.zip.
-#: pe/ui/apps.cpp
+#: bridge/view.cpp, pe/ui/apps.cpp
 msgid "The release has no {0}."
 msgstr ""
 
 #. See 'The release gives no SHA-256 for {0}, so it is not offered.' Its SHA-256 values disagree or are malformed.
-#: pe/ui/apps.cpp
+#: bridge/view.cpp, pe/ui/apps.cpp
 msgid "The release's SHA-256 for {0} can't be trusted, so it is not offered."
 msgstr ""
 
@@ -2326,7 +2346,7 @@ msgstr ""
 msgid "Tropical dusk, dark green glass and lime."
 msgstr ""
 
-#: pe/ui/pairing.cpp, pe/ui/remote.cpp, pe/ui/save_sync.cpp, pe/ui/update.cpp
+#: bridge/view.cpp, pe/ui/pairing.cpp, pe/ui/remote.cpp, pe/ui/save_sync.cpp, pe/ui/update.cpp
 msgid "Try again"
 msgstr ""
 
@@ -2369,7 +2389,7 @@ msgid "Unnamed mod"
 msgstr ""
 
 #. Update dialog headline while the downloaded release is extracted.
-#: pe/ui/apps.cpp, pe/ui/update.cpp
+#: bridge/main.cpp, pe/ui/apps.cpp, pe/ui/update.cpp
 msgid "Unpacking"
 msgstr ""
 
@@ -2488,6 +2508,11 @@ msgstr ""
 msgid "Waiting for the approval  ·  the code works {0} more"
 msgstr ""
 
+#. The bridge has installed {0} (Nightshade) and waits for the PS5's home screen to list it, which the homebrew loader does after its next scan.
+#: bridge/main.cpp
+msgid "Waiting for the console to list {0}"
+msgstr ""
+
 #: pe/ui/remote.cpp
 msgid "Waiting for {0}"
 msgstr ""
@@ -2592,12 +2617,12 @@ msgid "{0} changed"
 msgstr ""
 
 #. {0} is an app's name, {1} why (English, from the installer).
-#: pe/ui/apps.cpp
+#: bridge/main.cpp, pe/ui/apps.cpp
 msgid "{0} could not be installed: {1}"
 msgstr ""
 
 #. {0} is an app's name, {1} why (English, from the launch payload).
-#: pe/ui/apps.cpp
+#: bridge/main.cpp, pe/ui/apps.cpp
 msgid "{0} could not be opened: {1}"
 msgstr ""
 
@@ -2646,7 +2671,7 @@ msgid "{0} Hz"
 msgstr ""
 
 #. {0} is an app's name. See 'The PS5 doesn't list {0} yet...' for the homebrew loader.
-#: pe/ui/apps.cpp
+#: bridge/main.cpp, pe/ui/apps.cpp
 msgid "{0} is installed. The homebrew loader lists it after its next scan or a restart."
 msgstr ""
 
@@ -2726,7 +2751,7 @@ msgid "{0} · Profile {1}"
 msgstr ""
 
 #. A percentage (a volume): write it as the language does, for example with a space before the sign.
-#: pe/ui/apps.cpp, pe/ui/backup.cpp, pe/ui/game_options.cpp, pe/ui/library.cpp, pe/ui/migrate.cpp, pe/ui/remote.cpp, pe/ui/settings.cpp, pe/ui/update.cpp
+#: bridge/view.cpp, pe/ui/apps.cpp, pe/ui/backup.cpp, pe/ui/game_options.cpp, pe/ui/library.cpp, pe/ui/migrate.cpp, pe/ui/remote.cpp, pe/ui/settings.cpp, pe/ui/update.cpp
 msgid "{0}%"
 msgstr ""
 

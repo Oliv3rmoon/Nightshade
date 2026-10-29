@@ -5,7 +5,9 @@
 // offers, the offer the self-update kit's job installs it from, and the launch payload's
 // conversation (app_launch/main.c).
 #pragma once
+#include <cstddef>
 #include <string>
+#include <vector>
 
 #include "pe/ui/apps_list.hpp"
 #include "update_check/github_release.h"
@@ -66,10 +68,16 @@ bool MakeOffer(const pe::ui::AppListing& app, const Release& release, const Inst
 
 // ---- opening it ----
 
-// The launch payload's conversation, on a connection to it: the title to open and the one asking.
+// The launch payload's conversation, on a connection to it: the title to open and the one asking,
+// and the launch arguments to open it with (PSL2; none: PSL1, as Settings > Apps opens an app).
 // Empty: the payload waits for the asking app to close and then opens the title. Otherwise why
 // not (English).
-std::string AskLaunch(const self_update_channel& channel, const std::string& title, const std::string& asking);
+std::string AskLaunch(const self_update_channel& channel, const std::string& title, const std::string& asking,
+                      const std::vector<std::string>& arguments = {});
+// What PSL2 passes on: at most this many arguments, each shorter than kLaunchArgumentSize bytes and
+// without a line end (app_launch/main.c).
+inline constexpr std::size_t kLaunchArguments = 8;
+inline constexpr std::size_t kLaunchArgumentSize = 1024;
 // What the payload answers for an app the console doesn't list yet (a new one the homebrew loader
 // has not scanned).
 inline constexpr const char* kNotListed = "The console doesn't list the app yet";

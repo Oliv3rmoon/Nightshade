@@ -50,3 +50,8 @@ before. And `self_update_ps5.c` sends any payload from the app's folder
 (`self_update_open_payload`), the launch payload as well as the helper, with a shorter wait for its
 answer when asked (`self_update_channel_timeout`), and `console_download` keeps the address it
 follows per call instead of in one static buffer, since downloads can now run at once.
+
+For the bridge (`headless/bridge`, the PPSA99008 app of the release ZIP), `github_release_tag_asset_check`
+is `github_release_asset_check` of the release a tag names (`releases/tags/<tag>`) instead of the
+newest: the bridge installs Nightshade from the release it came in. That release may still be a
+pre-release, its answer must name that tag, and no redirect is followed.

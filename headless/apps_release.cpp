@@ -196,8 +196,19 @@ bool MakeOffer(const pe::ui::AppListing& app, const Release& release, const Inst
     return offer->sha256[0] != '\0' && self_update_url_allowed(offer->artifact, 0);
 }
 
-std::string AskLaunch(const self_update_channel& channel, const std::string& title, const std::string& asking) {
-    const std::string request = "PSL1\n" + title + "\n" + asking + "\n";
+std::string AskLaunch(const self_update_channel& channel, const std::string& title, const std::string& asking,
+                      const std::vector<std::string>& arguments) {
+    std::string request = (arguments.empty() ? "PSL1\n" : "PSL2\n") + title + "\n" + asking + "\n";
+    if (!arguments.empty()) {
+        if (arguments.size() > kLaunchArguments) return "Too many launch arguments";
+        request += std::to_string(arguments.size()) + "\n";
+        for (const std::string& argument : arguments) {
+            if (argument.size() >= kLaunchArgumentSize || argument.find('\n') != std::string::npos ||
+                argument.find('\0') != std::string::npos)
+                return "A launch argument can't be passed on";
+            request += argument + "\n";
+        }
+    }
     for (std::size_t done = 0; done < request.size();) {
         const long count = channel.send(channel.user, request.data() + done, request.size() - done);
         if (count <= 0) return "The launch payload stopped";

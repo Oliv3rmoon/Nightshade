@@ -849,17 +849,29 @@ static self_update_check_result no_offer(self_update_offer *offer, github_releas
     return reason == GITHUB_RELEASE_NOT_NEWER ? SELF_UPDATE_UP_TO_DATE : SELF_UPDATE_UNKNOWN;
 }
 
-/* releases/latest of `repository` into `answer`, following a renamed repository's redirect.
+/* releases/latest of `repository` into `answer`, following a renamed repository's redirect; with
+ * `tag`, the release that tag names (releases/tags/<tag>), whose address a redirect never leads to
+ * (github_release_api_url_allowed: a renamed repository's newest release alone).
  * GITHUB_RELEASE_NEWER: a 200 answer of *length bytes is there; otherwise why there is none. */
-static github_release_reason fetch_latest(const self_update_platform *platform, const char *repository,
-                                          char *answer, size_t capacity, size_t *length,
-                                          github_release_report *report)
+static github_release_reason fetch_release(const self_update_platform *platform, const char *repository,
+                                           const char *tag, char *answer, size_t capacity, size_t *length,
+                                           github_release_report *report)
 {
     char url[256];
     int status = 0;
     int hop;
-    if (github_release_url(url, sizeof(url), repository) == 0)
-        return GITHUB_RELEASE_BAD_ARGUMENT;
+    if (tag == NULL)
+    {
+        if (github_release_url(url, sizeof(url), repository) == 0)
+            return GITHUB_RELEASE_BAD_ARGUMENT;
+    }
+    else
+    {
+        const int written = snprintf(url, sizeof(url), "%s%s/releases/tags/%s", GITHUB_RELEASE_API, repository, tag);
+        if (!github_release_repository_valid(repository) || !is_file_name(tag, 39) || written <= 0 ||
+            (size_t)written >= sizeof(url))
+            return GITHUB_RELEASE_BAD_ARGUMENT;
+    }
     for (hop = 0;; ++hop)
     {
         const int code = platform->fetch(platform->user, url, answer, capacity, length, &status);
@@ -891,6 +903,13 @@ static github_release_reason fetch_latest(const self_update_platform *platform, 
     if (status != 200)
         return GITHUB_RELEASE_HTTP_STATUS;
     return GITHUB_RELEASE_NEWER;
+}
+
+static github_release_reason fetch_latest(const self_update_platform *platform, const char *repository,
+                                          char *answer, size_t capacity, size_t *length,
+                                          github_release_report *report)
+{
+    return fetch_release(platform, repository, NULL, answer, capacity, length, report);
 }
 
 self_update_check_result github_release_check(const self_update_platform *platform,
@@ -1032,10 +1051,10 @@ static int sha256_digest(const char *text, char out[65])
     return 1;
 }
 
-github_release_reason github_release_asset_check(const self_update_platform *platform,
-                                                 const char *repository, const char *file,
-                                                 github_release_asset *asset,
-                                                 github_release_report *report)
+/* github_release_asset_check, of the newest release (tag NULL) or of the one `tag` names. */
+static github_release_reason asset_check(const self_update_platform *platform, const char *repository,
+                                         const char *tag, const char *file, github_release_asset *asset,
+                                         github_release_report *report)
 {
     github_release_report unused;
     char *answer;
@@ -1058,13 +1077,14 @@ github_release_reason github_release_asset_check(const self_update_platform *pla
     if (asset == NULL)
         return GITHUB_RELEASE_BAD_ARGUMENT;
     memset(asset, 0, sizeof(*asset));
-    if (platform == NULL || !is_file_name(file, 64) || !github_release_repository_valid(repository))
+    if (platform == NULL || !is_file_name(file, 64) || !github_release_repository_valid(repository) ||
+        (tag != NULL && !is_file_name(tag, 39)))
         return asset_reason(report, GITHUB_RELEASE_BAD_ARGUMENT);
     /* Its own memory: the app's update check can be asking at the same time. */
     answer = (char *)malloc(GITHUB_RELEASE_MAX_ANSWER);
     if (answer == NULL)
         return asset_reason(report, GITHUB_RELEASE_NETWORK);
-    reason = fetch_latest(platform, repository, answer, GITHUB_RELEASE_MAX_ANSWER, &length, report);
+    reason = fetch_release(platform, repository, tag, answer, GITHUB_RELEASE_MAX_ANSWER, &length, report);
     /* A renamed repository is followed to its number; where that is now must be the same owner's. */
     if (reason == GITHUB_RELEASE_NEWER && report->redirects > 0 && !same_owner(answer, length, repository))
         reason = GITHUB_RELEASE_OWNER_CHANGED;
@@ -1072,11 +1092,17 @@ github_release_reason github_release_asset_check(const self_update_platform *pla
     if (reason == GITHUB_RELEASE_NEWER &&
         update_check_json_value(answer, length, "assets", &assets, &assets_length) != 1)
         reason = GITHUB_RELEASE_BAD_RESPONSE;
-    if (reason == GITHUB_RELEASE_NEWER && (reason = published(answer, length, "draft")) == GITHUB_RELEASE_NEWER)
+    /* The newest release is never a pre-release; one asked for by its tag may be (a release is
+     * published as one first, .github/workflows/release.yml). */
+    if (reason == GITHUB_RELEASE_NEWER && (reason = published(answer, length, "draft")) == GITHUB_RELEASE_NEWER &&
+        tag == NULL)
         reason = published(answer, length, "prerelease");
     if (reason == GITHUB_RELEASE_NEWER &&
         (found = string_member(answer, length, "tag_name", asset->tag, sizeof(asset->tag))) != 1)
         reason = found == -2 ? GITHUB_RELEASE_BAD_RESPONSE : GITHUB_RELEASE_BAD_TAG;
+    /* The release asked for, and no other. */
+    if (reason == GITHUB_RELEASE_NEWER && tag != NULL && strcmp(asset->tag, tag) != 0)
+        reason = GITHUB_RELEASE_BAD_RESPONSE;
     /* The tag goes into the download's address: letters, digits, '.', '_' and '-'. */
     if (reason == GITHUB_RELEASE_NEWER && !is_file_name(asset->tag, sizeof(asset->tag)))
         reason = GITHUB_RELEASE_BAD_TAG;
@@ -1179,4 +1205,20 @@ github_release_reason github_release_asset_check(const self_update_platform *pla
     }
     (void)snprintf(asset->page, sizeof(asset->page), "https://github.com/%s/releases/tag/%s", repository, asset->tag);
     return asset_reason(report, GITHUB_RELEASE_NEWER);
+}
+
+github_release_reason github_release_asset_check(const self_update_platform *platform,
+                                                 const char *repository, const char *file,
+                                                 github_release_asset *asset,
+                                                 github_release_report *report)
+{
+    return asset_check(platform, repository, NULL, file, asset, report);
+}
+
+github_release_reason github_release_tag_asset_check(const self_update_platform *platform,
+                                                     const char *repository, const char *tag,
+                                                     const char *file, github_release_asset *asset,
+                                                     github_release_report *report)
+{
+    return asset_check(platform, repository, tag, file, asset, report);
 }

@@ -11,6 +11,7 @@
 // usage: eden-apps-check <fixtures/apps> [<folder with PPSA99003.zip, PPSA99002.zip, PPSA98510.zip>]
 //        With the originals' ZIPs (downloaded from their releases), each is installed as well.
 #include "apps_release.h"
+#include "bridge/bridge.h"
 #include "miniz/miniz.h"
 #include "self_update_helper/updater.hpp"
 #include "update_check/self_update_sha256.h"
@@ -663,10 +664,12 @@ void tags()
     expect(Eden::Apps::Decide(installed, false, "") == Offer::none, "no release, nothing to do");
 }
 
-// The launch payload's side of its conversation, on the other end of a socket pair.
+// The launch payload's side of its conversation, on the other end of a socket pair: it reads the
+// request as app_launch/main.c does (PSL1: three lines; PSL2: four, then as many as the fourth says).
 void launching()
 {
-    const auto conversation = [](const char *answer, std::string *heard)
+    const auto conversation = [](const char *answer, std::string *heard, const std::vector<std::string> &arguments = {},
+                                 const char *title = "PPSA99003", const char *asking = "PPSA64448")
     {
         int ends[2];
         if (socketpair(AF_UNIX, SOCK_STREAM, 0, ends) != 0)
@@ -676,7 +679,17 @@ void launching()
             {
                 char buffer[64];
                 std::string got;
-                while (std::count(got.begin(), got.end(), '\n') < 3)
+                const auto lines = [&] { return static_cast<std::size_t>(std::count(got.begin(), got.end(), '\n')); };
+                const auto wanted = [&]() -> std::size_t
+                {
+                    if (got.rfind("PSL2\n", 0) != 0 || lines() < 4)
+                        return 3;
+                    std::size_t at = 0;
+                    for (int line = 0; line < 3; ++line)
+                        at = got.find('\n', at) + 1;
+                    return 4 + static_cast<std::size_t>(std::atoi(got.c_str() + at));
+                };
+                while (lines() < wanted())
                 {
                     const ssize_t count = ::read(ends[1], buffer, sizeof(buffer));
                     if (count <= 0)
@@ -689,7 +702,10 @@ void launching()
             });
         const self_update_channel channel{channel_send, channel_receive, channel_close,
                                           reinterpret_cast<void *>(static_cast<std::intptr_t>(ends[0]))};
-        const std::string result = Eden::Apps::AskLaunch(channel, "PPSA99003", "PPSA64448");
+        const std::string result = Eden::Apps::AskLaunch(channel, title, asking, arguments);
+        // A request refused before it was sent: the payload's side sees the connection end.
+        if (!result.empty() && heard->empty())
+            ::shutdown(ends[0], SHUT_RDWR);
         payload.join();
         ::close(ends[0]);
         return result;
@@ -700,6 +716,170 @@ void launching()
     expect(conversation("fail The console doesn't list the app yet\n", &heard) == Eden::Apps::kNotListed,
            "the launch payload's refusal is told");
     expect(conversation("", &heard) == "The launch payload didn't answer", "a launch payload that doesn't answer");
+    // The bridge passes a forwarder's arguments on (PSL2).
+    const std::vector<std::string> forwarded{"--from=PPSA99008", "--rom", "/data/prosperoeden/roms/My Game/Game.nsp",
+                                             "--exit-after-game"};
+    expect(conversation("waiting\n", &heard, forwarded, "PPSA64448", "PPSA99008").empty() &&
+               heard == "PSL2\nPPSA64448\nPPSA99008\n4\n--from=PPSA99008\n--rom\n"
+                        "/data/prosperoeden/roms/My Game/Game.nsp\n--exit-after-game\n",
+           "launch arguments are passed on, one a line, after how many there are");
+    heard.clear();
+    expect(conversation("waiting\n", &heard, {"--rom", "two\nlines"}, "PPSA64448", "PPSA99008") ==
+                   "A launch argument can't be passed on" && heard.empty(),
+           "an argument with a line end is not sent");
+    heard.clear();
+    expect(conversation("waiting\n", &heard, std::vector<std::string>(9, "x"), "PPSA64448", "PPSA99008") ==
+                   "Too many launch arguments" && heard.empty(),
+           "more arguments than the payload takes are not sent");
+}
+
+// The bridge (bridge/bridge.h): Nightshade installed from the release a PPSA99008 install updated
+// to, whose ZIP holds PPSA64448/ and PPSA99008/, beside the bridge, by the kit and the helper; then
+// opened with what a forwarder gave the bridge.
+std::string two_app_zip(const std::string &version, const std::string &nightshade, const std::string &bridge)
+{
+    mz_zip_archive zip{};
+    mz_zip_writer_init_heap(&zip, 0, 0);
+    const std::vector<std::pair<std::string, std::string>> files = {
+        {"PPSA64448/eboot.bin", nightshade},
+        {"PPSA64448/sce_sys/param.json", param("PPSA64448", version)},
+        {"PPSA64448/ui/fonts/montserrat-medium.pefont", "font"},
+        {"PPSA99008/eboot.bin", bridge},
+        {"PPSA99008/sce_sys/param.json", param("PPSA99008", version)},
+        {"README.md", "readme"}};
+    for (const auto &[name, body] : files)
+        mz_zip_writer_add_mem(&zip, name.c_str(), body.data(), body.size(), MZ_DEFAULT_COMPRESSION);
+    void *buffer = nullptr;
+    std::size_t size = 0;
+    mz_zip_writer_finalize_heap_archive(&zip, &buffer, &size);
+    std::string out(static_cast<const char *>(buffer), size);
+    mz_free(buffer);
+    mz_zip_writer_end(&zip);
+    return out;
+}
+
+void bridge()
+{
+    using namespace Eden::Bridge;
+    expect(ReleaseTag("01.010.004") == "v1.010.004" && ReleaseTag("10.000.000") == "v10.000.000" &&
+               ReleaseZip("01.010.004") == "Nightshade-v1.010.004.zip" && ReleaseTag("1.10.4").empty() &&
+               ReleaseZip("").empty(),
+           "the bridge names its release as make-dist.py does");
+
+    Console console("bridge");
+    // The shipped helper's places (self_update_helper/main.cpp): Nightshade's data folder, never
+    // ProsperoEden's, which the bridge leaves as it is.
+    console.environment.previous = (console.data / "nightshade/previous-version").string();
+    console.environment.launcher_data = (console.data / "nightshade").string();
+    fs::remove_all(console.homebrew / "PPSA64448");
+    write(console.data / "prosperoeden/config/prosperoeden.json", "{\"game_files\": \"/data/prosperoeden\"}");
+    write(console.homebrew / "PPSA99008/eboot.bin", "bridge");
+    write(console.homebrew / "PPSA99008/sce_sys/param.json", param("PPSA99008", "01.010.004"));
+    // The bridge is the app the console runs while it installs.
+    console.environment.running_app = [](std::string &title)
+    {
+        title = "PPSA99008";
+        return true;
+    };
+    Network network;
+    network.console = &console;
+    const std::string zip = two_app_zip("01.010.004", "nightshade 1.010.004", "bridge 1.010.004");
+    const std::string tagged = kApi + std::string{kRepository} + "/releases/tags/v1.010.004";
+    // Published as a pre-release first (.github/workflows/release.yml): asked for by its tag, that is
+    // the release all the same.
+    std::string answer = latest("v1.010.004", {{"Nightshade-v1.010.004.zip", zip.size(), sha256(zip)},
+                                               {"SHA256SUMS", 90, ""}});
+    answer.replace(answer.find("\"prerelease\":false"), 18, "\"prerelease\":true");
+    network.api[tagged] = {200, answer};
+    network.files[file_of(kRepository, "v1.010.004", "SHA256SUMS")] = sha256(zip) + "  Nightshade-v1.010.004.zip\n";
+    network.files[file_of(kRepository, "v1.010.004", "Nightshade-v1.010.004.zip")] = zip;
+    const self_update_platform platform = platform_of(network);
+
+    const Eden::Apps::Release release = Check(&platform, "01.010.004");
+    expect(release.reason == GITHUB_RELEASE_NEWER && release.asset.from_sums == 1 && release.asset.sha256 == sha256(zip) &&
+               std::string{release.asset.url} == file_of(kRepository, "v1.010.004", "Nightshade-v1.010.004.zip"),
+           "the bridge finds its own release by its tag, a pre-release too, with its SHA256SUMS (" +
+               std::string{github_release_reason_text(release.reason)} + ")");
+    expect(!network.asked.empty() && network.asked.front() == tagged, "the bridge asks for releases/tags/<its version>");
+    self_update_offer offer{};
+    expect(MakeOffer(release, "01.010.004", &offer) && std::string{offer.title} == "PPSA64448" &&
+               std::string{offer.installed} == "none" && std::string{offer.available} == "01.010.004" &&
+               std::string{offer.beside} == "PPSA99008",
+           "the bridge's offer: Nightshade at the release's version, beside the bridge");
+    self_update_offer other{};
+    expect(!MakeOffer(release, "01.010.005", &other), "an offer of another version than the bridge's is not made");
+    const self_update_status status = install(platform, offer);
+    network.settle();
+    const fs::path folder = console.homebrew / "PPSA64448";
+    expect(status.phase == SELF_UPDATE_INSTALLED && status.folder == folder.string() &&
+               std::string{status.version} == "01.010.004",
+           "Nightshade is installed from the release that carries the bridge (" + std::string{status.error} + ")");
+    expect(read(folder / "eboot.bin") == "nightshade 1.010.004" &&
+               read(folder / "sce_sys/param.json") == param("PPSA64448", "01.010.004") &&
+               read(folder / "ui/fonts/montserrat-medium.pefont") == "font" && !fs::exists(folder / "PPSA99008") &&
+               !fs::exists(folder / "README.md"),
+           "the install takes PPSA64448/ alone from the two-app ZIP");
+    expect(read(console.homebrew / "PPSA99008/eboot.bin") == "bridge" &&
+               read(console.data / "prosperoeden/config/prosperoeden.json") == "{\"game_files\": \"/data/prosperoeden\"}" &&
+               std::distance(fs::recursive_directory_iterator(console.data / "prosperoeden"),
+                             fs::recursive_directory_iterator{}) == 2 &&
+               !fs::exists(console.data / "self-update"),
+           "the bridge and ProsperoEden's data folder are left as they were, no work folder stays");
+
+    // Opened again before the homebrew loader listed it: the helper says it is there.
+    const self_update_status again = install(platform, offer);
+    network.settle();
+    expect(again.phase == SELF_UPDATE_FAILED && AlreadyInstalled(again.error) && read(folder / "eboot.bin") ==
+                                                                                     "nightshade 1.010.004",
+           "an install found already there is told apart (" + std::string{again.error} + ")");
+    expect(!AlreadyInstalled("The download doesn't match the catalog's listing"), "other refusals are refusals");
+
+    // The answer for another release than the one asked for, and a draft: nothing.
+    network.api[tagged] = {200, latest("v1.010.005", {{"Nightshade-v1.010.004.zip", zip.size(), sha256(zip)}})};
+    expect(Check(&platform, "01.010.004").reason == GITHUB_RELEASE_BAD_RESPONSE, "another release's answer is refused");
+    answer = latest("v1.010.004", {{"Nightshade-v1.010.004.zip", zip.size(), sha256(zip)}});
+    answer.replace(answer.find("\"draft\":false"), 13, "\"draft\":true");
+    network.api[tagged] = {200, answer};
+    expect(Check(&platform, "01.010.004").reason == GITHUB_RELEASE_NOT_PUBLISHED, "a draft is not installed");
+    network.api[tagged] = {404, "{\"message\":\"Not Found\"}"};
+    expect(Check(&platform, "01.010.004").reason == GITHUB_RELEASE_NONE, "no such release");
+    expect(Check(&platform, "1.10.4").reason == GITHUB_RELEASE_BAD_ARGUMENT, "no version, no request");
+
+    // The launch payload's answers, and what is passed on.
+    expect(Classify("") == Opened::closing && Classify(Eden::Apps::kNotListed) == Opened::not_listed &&
+               Classify("The request was refused") == Opened::refused,
+           "the launch payload's answers");
+    const auto parse = [](std::vector<std::string> words)
+    {
+        std::vector<char *> argv;
+        for (std::string &word : words)
+            argv.push_back(word.data());
+        return Eden::ParseForwardedArgs(static_cast<int>(argv.size()), argv.data());
+    };
+    const Eden::ForwardedArgs forwarded = parse({"/app0/eboot.bin", "--rom", "/data/prosperoeden/roms/My Game.nsp",
+                                                 "--exit-after-game"});
+    const std::vector<std::string> passed_on = LaunchArguments(forwarded);
+    expect(passed_on == std::vector<std::string>{"--from=PPSA99008", "--rom", "/data/prosperoeden/roms/My Game.nsp",
+                                                  "--exit-after-game"},
+           "a forwarder's game is passed on with --exit-after-game");
+    std::vector<std::string> with_name = passed_on;
+    with_name.insert(with_name.begin(), "/app0/eboot.bin");
+    const Eden::ForwardedArgs read_again = parse(passed_on);
+    const Eden::ForwardedArgs read_named = parse(with_name);
+    const Eden::ForwardedArgs read_dropped = parse({passed_on.begin() + 1, passed_on.end()});
+    expect(read_again.rom == forwarded.rom && read_again.exit_after_game && read_named.rom == forwarded.rom &&
+               read_named.exit_after_game && read_dropped.rom == forwarded.rom && read_dropped.exit_after_game,
+           "what is passed on reads the same with or without a program name before it, or its first entry");
+    expect(LaunchArguments(parse({"/app0/eboot.bin", "--exit-after-game"})).empty() &&
+               LaunchArguments(parse({"--rom=Game.nsp"})) ==
+                   std::vector<std::string>{"--from=PPSA99008", "--rom", "Game.nsp"},
+           "without a game nothing is passed on; --rom=<game> is passed on");
+    expect(Eden::RebasedPath("/data/prosperoeden/roms/G.nsp", "/data/prosperoeden", "/data/nightshade") ==
+                   "/data/nightshade/roms/G.nsp" &&
+               Eden::RebasedPath("/data/prosperoeden2/roms/G.nsp", "/data/prosperoeden", "/data/nightshade").empty() &&
+               Eden::RebasedPath("/data/prosperoeden", "/data/prosperoeden", "/data/nightshade").empty() &&
+               Eden::RebasedPath("roms/G.nsp", "/data/prosperoeden/", "/data/nightshade/").empty(),
+           "a path inside ProsperoEden's data folder is named inside Nightshade's");
 }
 } // namespace
 
@@ -720,7 +900,8 @@ int main(int argc, char **argv)
     finding();
     tags();
     launching();
-    std::printf("%s apps: %d checks of releases, their checks and installs, finding apps and opening them, %d failed\n",
+    bridge();
+    std::printf("%s apps: %d checks of releases, their checks and installs, finding apps and opening them, the bridge, %d failed\n",
                 failures ? "FAIL" : "PASS", passed + failures, failures);
     return failures ? 1 : 0;
 }
