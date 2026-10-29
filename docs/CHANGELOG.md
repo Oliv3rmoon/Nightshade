@@ -12,6 +12,10 @@ What changed in each release of ProsperoEden, newest first. A release's notes on
 - **The shader cache builds on several threads.** At first start a large game builds its saved pipelines before it plays: TOTK's 13,938 took nine minutes, about 25 a second, as if on one thread. Nightshade now asks for at least 6 builder threads, and `stderr.log` says how many it used (`EDEN_PIPELINE_WORKERS`).
 - **ASTC textures at full quality take four times the memory.** If a large open-world game crashes after a while, set **Settings > Video > ASTC textures** back to the default first.
 
+### Under the hood
+
+- **Built with Belladonna,** Nightshade's own fork of Mihawk's PS5 Mesa (RADV) driver. The driver is the same as before, so the shaders your games already built stay built.
+
 ### Apps
 
 - **Settings > Apps lists the companion apps by their new names:** Physalis (was Nightshade TV), Datura (was Nightshade Stream) and Mandrake (was Nightshade Station). Same apps, same title IDs; their settings stay.
