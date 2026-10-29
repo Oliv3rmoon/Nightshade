@@ -1,0 +1,129 @@
+{
+ "name": "Nightshade own title ID checks",
+ "on": {
+  "push": {
+   "branches": [
+    "test/own-title-id"
+   ]
+  },
+  "workflow_dispatch": {}
+ },
+ "permissions": {
+  "contents": "read"
+ },
+ "jobs": {
+  "host-tests": {
+   "runs-on": "ubuntu-24.04",
+   "timeout-minutes": 150,
+   "defaults": {
+    "run": {
+     "shell": "bash"
+    }
+   },
+   "env": {
+    "XDG_CACHE_HOME": "/tmp/prosperoeden-dev-host-cache",
+    "PROSPEROEDEN_DEPS_CACHE": "/tmp/prosperoeden-dev-downloads",
+    "DEV_HEAD": "7feb44c4f81cbf9970b890becd9bb6e28414882d",
+    "GITHUB_TOKEN": "${{ github.token }}"
+   },
+   "steps": [
+    {
+     "name": "Check out the own title ID commit",
+     "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+     "with": {
+      "ref": "7feb44c4f81cbf9970b890becd9bb6e28414882d",
+      "persist-credentials": false
+     }
+    },
+    {
+     "name": "Record revision",
+     "run": "test \"$(git rev-parse HEAD)\" = \"$DEV_HEAD\"\ngit log -1 --format=fuller\nnproc; free -h; df -h ."
+    },
+    {
+     "name": "Install Linux host tools",
+     "run": "sudo apt-get update\nsudo apt-get install --yes --no-install-recommends build-essential ca-certificates git curl wget unzip zip xz-utils file pkgconf patch bsdextrautils ninja-build ccache nasm rsync bison flex glslang-tools spirv-tools python3 python3-venv python3-pip python3-yaml clang-18 lld-18 llvm-18 libclang-rt-18-dev libexpat1-dev zlib1g-dev libssl-dev libvulkan-dev libudev-dev libasound2-dev libcurl4-openssl-dev nlohmann-json3-dev\ncmake --version\nclang++-18 --version"
+    },
+    {
+     "name": "Run the full Linux host make test suite",
+     "run": "set -o pipefail\nmake test 2>&1 | tee \"$RUNNER_TEMP/make-test.log\""
+    },
+    {
+     "name": "Migration, apps, update helper and strings checks",
+     "if": "always()",
+     "run": "set -o pipefail\npython3 -B tools/check-apps.py 2>&1 | tee \"$RUNNER_TEMP/apps.log\"\npython3 -B tools/check-update-helper.py 2>&1 | tee \"$RUNNER_TEMP/helper.log\"\npython3 -B tools/check-update-check.py 2>&1 | tee \"$RUNNER_TEMP/update-check.log\"\npython3 -B tools/check-migrate.py 2>&1 | tee \"$RUNNER_TEMP/migrate.log\"\npython3 -B tools/launcher/strings.py check 2>&1 | tee \"$RUNNER_TEMP/strings.log\""
+    },
+    {
+     "name": "Preserve logs",
+     "if": "always()",
+     "uses": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+     "with": {
+      "name": "host-logs",
+      "retention-days": 7,
+      "path": "${{ runner.temp }}/*.log"
+     }
+    }
+   ]
+  },
+  "screens": {
+   "runs-on": "ubuntu-24.04",
+   "timeout-minutes": 40,
+   "defaults": {
+    "run": {
+     "shell": "bash"
+    }
+   },
+   "strategy": {
+    "fail-fast": false,
+    "matrix": {
+     "include": [
+      {
+       "theme": "",
+       "what": "Canopy"
+      },
+      {
+       "theme": "nightly",
+       "what": "Nightshade"
+      },
+      {
+       "theme": "slate",
+       "what": "Slate"
+      }
+     ]
+    }
+   },
+   "name": "screens (${{ matrix.what }})",
+   "steps": [
+    {
+     "name": "Check out the own title ID commit",
+     "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+     "with": {
+      "ref": "7feb44c4f81cbf9970b890becd9bb6e28414882d",
+      "persist-credentials": false
+     }
+    },
+    {
+     "name": "Install the preview's tools",
+     "run": "sudo apt-get update\nsudo apt-get install --yes --no-install-recommends build-essential python3 libegl-dev libgl-dev libegl-mesa0 libgl1-mesa-dri libcurl4-openssl-dev libssl-dev nlohmann-json3-dev"
+    },
+    {
+     "name": "Point the preview at the system's nlohmann/json",
+     "run": "mkdir -p /tmp/edensrc/source/.cache/cpm/nlohmann_json/system\nln -s /usr/include /tmp/edensrc/source/.cache/cpm/nlohmann_json/system/single_include\nmkdir -p .local && echo /tmp/edensrc > .local/headless-cache"
+    },
+    {
+     "name": "Draw the launcher's screens",
+     "run": "mkdir -p \"$RUNNER_TEMP/screens\"\nPE_THEME=\"${{ matrix.theme }}\" bash tools/launcher/preview.sh \"$RUNNER_TEMP/screens\" > \"$RUNNER_TEMP/screens/preview.log\" 2>&1 && code=0 || code=$?\ngrep -E '^error|FAIL|cues heard' \"$RUNNER_TEMP/screens/preview.log\" || true\ntail -20 \"$RUNNER_TEMP/screens/preview.log\"\necho \"preview exit: $code\"\nexit $code"
+    },
+    {
+     "name": "Keep the screens",
+     "if": "always()",
+     "uses": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+     "with": {
+      "name": "screens-${{ strategy.job-index }}",
+      "retention-days": 7,
+      "path": "${{ runner.temp }}/screens"
+     }
+    }
+   ]
+  }
+ }
+}
