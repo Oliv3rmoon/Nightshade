@@ -2081,12 +2081,17 @@ private:
 };]=] server_session_source "${server_session_source}")
 string(REPLACE "${request_wait_old}" "    ThreadQueueImplForKServerSessionRequest wait_queue{kernel, request};"
     server_session_source "${server_session_source}")
-string(REPLACE "${request_result_old}" [=[    // Each pass through the scheduler lock lets the core switch away while this thread waits.
+string(REPLACE "${request_result_old}" [=[    // Still waiting: switch this core to what it should run instead (the server may be queued on
+    // it), and come back when the wait ends. A host thread blocks at the scheduler lock instead.
     for (bool reported = false; !wait_queue.Ended(); reported = true) {
         if (!reported && ::Eden::IpcWait::Report(::Eden::IpcWait::RanOn())) {
             LOG_ERROR(IPC, "EDEN_IPC_RAN_ON thread={}", GetCurrentThread(kernel).GetThreadId());
         }
-        { KScopedSchedulerLock sl{kernel}; }
+        if (KScheduler* scheduler = kernel.CurrentScheduler(); scheduler != nullptr) {
+            scheduler->RequestScheduleOnInterrupt(kernel);
+        } else {
+            KScopedSchedulerLock sl{kernel};
+        }
         ::Eden::CpuRelax();
     }
     return GetCurrentThread(kernel).GetWaitResult();
