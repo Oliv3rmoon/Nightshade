@@ -142,12 +142,12 @@ Six presets come with the app:
 | Retro | An old television: colour fringing at the edges, curved scanlines with a phosphor mask, darker corners |
 | Vivid | Warmer, more saturated colour, deeper blacks and brighter whites, a light sharpen |
 
-The presets are files in `/data/prosperoeden/user/post_presets` (`.fxp`; the app writes the six there the first time), built from the effects in `/data/prosperoeden/user/post_shaders` (`.fx`).
+The presets are files in `/data/nightshade/user/post_presets` (`.fxp`; the app writes the six there the first time), built from the effects in `/data/nightshade/user/post_shaders` (`.fx`).
 
 | Folder | What goes in it |
 |---|---|
-| `/data/prosperoeden/user/post_presets/` | Presets (`.fxp`): a name, a description and the chain of effects |
-| `/data/prosperoeden/user/post_shaders/` | ReShade FX effects (`.fx`) and the files they include (`.fxh`) |
+| `/data/nightshade/user/post_presets/` | Presets (`.fxp`): a name, a description and the chain of effects |
+| `/data/nightshade/user/post_shaders/` | ReShade FX effects (`.fx`) and the files they include (`.fxh`) |
 | `roms/<game>/reshade/` | One game's own presets and effects, in its game folder (see [Game files folder](INSTALL.md#game-files-folder)) |
 
 A game's own `reshade/` folder works like both folders at once: its presets (`.fxp`) are offered in that game's settings only, listed first, and the effects it holds (`.fx`, `.fxh`, and textures in `Textures/`) are used for that game, before an effect of the same name in `post_shaders/`. So a game folder can carry a preset made for it together with the effects it needs.
@@ -167,7 +167,7 @@ Frame generation shows, between two pictures a game draws, one that is made up f
 Lossless Scaling's frame generation ([Lossless Scaling](https://store.steampowered.com/app/993090/Lossless_Scaling/)) cannot be included with ProsperoEden: for it you need your own copy of that program.
 
 1. On the PC where Lossless Scaling is installed, find `Lossless.dll` in its folder (with Steam: `steamapps/common/Lossless Scaling`).
-2. Copy it to the console as `/data/prosperoeden/user/lossless/Lossless.dll`.
+2. Copy it to the console as `/data/nightshade/user/lossless/Lossless.dll`.
 3. Set **Frame generation** to on in **Settings > Video**, or for one game: Triangle on the game in the Library, then **Video**. It applies the next time the game starts.
 
 Without the file, the three settings are greyed out and say **Unavailable**.
@@ -216,7 +216,7 @@ One more is in the settings file only, for a game whose graphics break with it: 
 
 ## For testing a game that stops the GPU
 
-A game that stops the GPU freezes the picture, and Nightshade closes. These switches change how the Vulkan renderer runs that game, to find out what makes it go on: they are for testing, not for playing, and most make the game slower. They are in the settings file only, `/data/prosperoeden/config/prosperoeden.json`, as `"gpu_debug"` in the game's entry under `"games"`; there is no menu for them. Leave the game before editing the file; they apply the next time it starts. A switch left out keeps its default, and the OpenGL renderer ignores them all.
+A game that stops the GPU freezes the picture, and Nightshade closes. These switches change how the Vulkan renderer runs that game, to find out what makes it go on: they are for testing, not for playing, and most make the game slower. They are in the settings file only, `/data/nightshade/config/prosperoeden.json`, as `"gpu_debug"` in the game's entry under `"games"`; there is no menu for them. Leave the game before editing the file; they apply the next time it starts. A switch left out keeps its default, and the OpenGL renderer ignores them all.
 
 | In the file | Default | What it does |
 |---|---|---|
@@ -260,7 +260,7 @@ The D-pad, the sticks and the [in-game shortcuts](../README.md#in-game-shortcuts
 
 ## Language and accessibility
 
-The launcher follows the language the PS5 is set to: Arabic, Chinese (simplified and traditional), Czech, Danish, Dutch, Finnish, French, German, Greek, Hungarian, Indonesian, Italian, Japanese, Korean, Norwegian, Polish, Portuguese, Romanian, Russian, Spanish, Swedish, Thai, Turkish, Ukrainian and Vietnamese (with the regional variants the PS5 has for French, Portuguese and Spanish), and English otherwise. Arabic, Chinese, Greek, Japanese, Korean and Thai are drawn with the PS5's own system fonts. Arabic text runs right to left; the screens themselves are not mirrored. To use another one, put a file named `language.txt` holding its tag (for example `en-US` or `pt-BR`) in `/data/homebrew/PPSA99008`. The language *games* use is a separate setting, **Settings > Language**.
+The launcher follows the language the PS5 is set to: Arabic, Chinese (simplified and traditional), Czech, Danish, Dutch, Finnish, French, German, Greek, Hungarian, Indonesian, Italian, Japanese, Korean, Norwegian, Polish, Portuguese, Romanian, Russian, Spanish, Swedish, Thai, Turkish, Ukrainian and Vietnamese (with the regional variants the PS5 has for French, Portuguese and Spanish), and English otherwise. Arabic, Chinese, Greek, Japanese, Korean and Thai are drawn with the PS5's own system fonts. Arabic text runs right to left; the screens themselves are not mirrored. To use another one, put a file named `language.txt` holding its tag (for example `en-US` or `pt-BR`) in `/data/homebrew/PPSA64448`. The language *games* use is a separate setting, **Settings > Language**.
 
 **Settings > Accessibility** has three switches. **Larger text** draws the menu's small text about a third larger. **High contrast** uses solid panels, brighter text and an outlined highlight. **Reduce motion** stops the background drifting and the screens sliding, in the menu and on the loading screen. There is no screen reader.
 

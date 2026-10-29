@@ -23,7 +23,7 @@ for a 13.0.4 installation. API exports alone do not prove game-version compatibi
 ## Install
 
 Close the emulator before copying files. In the selected **Settings > Game files**
-folder (default `/data/prosperoeden`), use:
+folder (default `/data/nightshade`), use:
 
 ```text
 mods/01006A800016E000/Skyline/
@@ -43,7 +43,7 @@ contains optional mods and flags.
 Character packs belong on the emulated SD card:
 
 ```text
-/data/prosperoeden/user/sdmc/ultimate/mods/(Moveset) Infernape/
+/data/nightshade/user/sdmc/ultimate/mods/(Moveset) Infernape/
   config.json
   plugin.nro
   fighter/...
@@ -52,7 +52,7 @@ Character packs belong on the emulated SD card:
 ```
 
 Keep the pack's own `plugin.nro` inside the pack folder. The emulated SD root
-stays under `/data/prosperoeden/user` when Game files is moved to another drive.
+stays under `/data/nightshade/user` when Game files is moved to another drive.
 Infernape uses Lucario's added `c80` slot and requires the companion plugins above;
 a basic costume replacement may need only Skyline and ARCropolis.
 
@@ -68,11 +68,11 @@ python3 tools/stage-smash-mods.py \
   --plugin /path/to/libparam_hook.nro \
   --plugin /path/to/libthe_csk_collection.nro \
   --character '/path/to/(Moveset) Infernape' \
-  --output results/smash-upload/data/prosperoeden
+  --output results/smash-upload/data/nightshade
 ```
 
 Copy the staged `mods/` to the selected Game files folder and `user/sdmc/` to
-`/data/prosperoeden/user/sdmc/`. The manifest records SHA-256 hashes. The helper
+`/data/nightshade/user/sdmc/`. The manifest records SHA-256 hashes. The helper
 checks archive paths and file headers; it does not download mods, choose dependency
 versions, verify licensing, or establish gameplay compatibility.
 

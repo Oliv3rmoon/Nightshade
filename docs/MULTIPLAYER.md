@@ -56,9 +56,9 @@ to the launcher; seamless mid-game reconnection is not supported.
 
 Enable **Settings > Diagnostics > Detailed logging**, then reproduce the room join or
 in-game issue. For multiplayer, the setting takes effect immediately, including before launching
-a game. Collect `/data/prosperoeden/logs/stderr.log`; detailed multiplayer lines have the
+a game. Collect `/data/nightshade/logs/stderr.log`; detailed multiplayer lines have the
 `[ProsperoEden] multiplayer debug:` prefix. Include
-`/data/prosperoeden/user/log/eden_log.txt` for an in-game issue as well. Copy the logs before
+`/data/nightshade/user/log/eden_log.txt` for an in-game issue as well. Copy the logs before
 restarting the app, which starts a new `stderr.log`.
 
 Details include lookup/join stages, connection state, transport errors and a summary at most

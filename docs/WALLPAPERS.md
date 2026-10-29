@@ -11,7 +11,7 @@ The images are read from two folders on the console:
 
 ```
 <game files folder>/wallpapers          # beside keys/, firmware/ and roms/
-/data/prosperoeden/wallpapers
+/data/nightshade/wallpapers
 ```
 
 - **From a PC, without FTP.** The game files folder is the one chosen in **Settings > Game
@@ -19,10 +19,10 @@ The images are read from two folders on the console:
   replace a copy of the app on a USB drive). Make a `wallpapers` folder in it on your PC, put
   the images in it, and copy the folder to the drive as you copy the rest. This folder is read
   first: an image replaced there is the one shown.
-- **Over FTP.** `/data/prosperoeden/wallpapers` works as before. The app creates it when it
+- **Over FTP.** `/data/nightshade/wallpapers` works as before. The app creates it when it
   starts; put images in it over FTP while the app is running.
 
-With the game files folder left at `/data/prosperoeden` (the default) both are the same
+With the game files folder left at `/data/nightshade` (the default) both are the same
 folder. An image whose name is in both folders is listed once and read from the game files
 folder. The settings keep only the name, so a wallpaper chosen before keeps working. When the
 drive that holds the game files folder is not plugged in, its images are not listed, and a

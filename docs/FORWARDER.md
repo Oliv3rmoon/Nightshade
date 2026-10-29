@@ -1,8 +1,9 @@
 # Starting a game from a home screen forwarder
 
 A forwarder is a separate small app with its own home screen tile (its own title ID, icon and
-name). When it is opened, it launches ProsperoEden (`PPSA99008`) with launch arguments, and
-ProsperoEden starts that game directly instead of opening its launcher.
+name). When it is opened, it launches Nightshade (`PPSA64448`) with launch arguments, and
+Nightshade starts that game directly instead of opening its launcher. A forwarder made for an
+earlier Nightshade, which used ProsperoEden's title ID, still launches `PPSA99008`.
 
 ## Arguments
 
@@ -34,7 +35,7 @@ uses it after filesystem access is set up, so `roms/` resolves against the folde
 ## The Library's games: library.json
 
 A forwarder maker can list the games ProsperoEden has, with their names and covers, from
-`/data/prosperoeden/library.json`. ProsperoEden writes it each time its Library is read (when the
+`/data/nightshade/library.json`. ProsperoEden writes it each time its Library is read (when the
 launcher opens, once keys and firmware are set up, and when games are added or deleted), in one
 step, so a reader never sees half of it. It
 holds the games on the console, not those that can only be downloaded from a source.
@@ -42,7 +43,7 @@ holds the games on the console, not those that can only be downloaded from a sou
 ```json
 {
   "version": 1,
-  "app": "PPSA99008",
+  "app": "PPSA64448",
   "game_files": "/mnt/usb0/eden",
   "games": [
     {
@@ -50,7 +51,7 @@ holds the games on the console, not those that can only be downloaded from a sou
       "path": "/mnt/usb0/eden/roms/Mario Kart 8 Deluxe/Mario Kart 8 Deluxe.nsp",
       "title": "Mario Kart 8 Deluxe",
       "title_id": "0100152000022000",
-      "cover": "/data/prosperoeden/covers/1a2b3c4d.tga"
+      "cover": "/data/nightshade/covers/1a2b3c4d.tga"
     }
   ]
 }

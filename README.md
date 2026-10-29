@@ -29,16 +29,24 @@ Every release lists exactly what's in it: see [Releases](https://github.com/Oliv
 
 ## Install
 
-1. Close ProsperoEden (or Nightshade).
-2. Download the ZIP from the [latest release](https://github.com/Oliv3rmoon/Nightshade/releases/latest) and unzip it.
-3. Copy its `PPSA99008` folder over your current one (for example `/data/homebrew/PPSA99008`), replacing the files.
+1. Download the ZIP from the [latest release](https://github.com/Oliv3rmoon/Nightshade/releases/latest) and unzip it.
+2. Copy its `PPSA64448` folder to `/data/homebrew/PPSA64448` (or another folder ShadowMountPlus scans). To update, close Nightshade and copy it over the one you have, replacing the files.
+3. Start **Nightshade**.
 
-It keeps the official app's ID, so it replaces the official app, and your settings, saves, covers, games and forwarders stay as they are (they live in `/data/prosperoeden`). The home screen calls it **Nightshade**. To go back, copy an [official release](https://github.com/Swordpdf/ProsperoEden/releases) over it the same way.
+Nightshade has its own title ID, `PPSA64448`, and its own data folder, `/data/nightshade` (settings, saves, covers, logs). It installs beside the official ProsperoEden app (`PPSA99008`, `/data/prosperoeden`) instead of replacing it, and the two don't touch each other's data.
+
+**Coming from an earlier Nightshade, or from ProsperoEden.** Up to 1.010, Nightshade used ProsperoEden's title ID and its data folder. The first time this version starts and finds `/data/prosperoeden`, it asks once what to do with it:
+
+- **Move** (the default): `/data/prosperoeden` becomes `/data/nightshade`, at once and with your games. The official app no longer sees that data.
+- **Copy**: your settings, keys, firmware, saves and profiles, covers, wallpapers, launchers, mods and the driver's shader cache are copied, so both apps keep working. It needs that much free space and stops with a clear message when there isn't enough. Your games, and new downloads, stay in `/data/prosperoeden`: Nightshade reads them there (its games folder). Choosing another game files folder later in **Settings > Game files** still works, and takes the games with it.
+- **Start fresh**: Nightshade starts empty and leaves `/data/prosperoeden` alone.
+
+Nothing in `/data/prosperoeden` is ever deleted. When it's done, Nightshade starts again with your data in its new place; if a step fails, both folders stay usable and the dialog says so. The details are in [INSTALL.md](docs/INSTALL.md#moving-from-prosperoedens-folder). Forwarders made for the earlier title ID still open `PPSA99008`.
 
 ## Requests, bugs and support
 
 - **Ask for a fix, a feature or a mod for a game:** [open a request](https://github.com/Oliv3rmoon/Nightshade/issues/new/choose), or ask in **[nightly on Discord](https://discord.gg/pSqgRU3YP9)** (#requests).
-- **Bugs in my releases:** open an issue here with the logs from `/data/prosperoeden/logs`.
+- **Bugs in my releases:** open an issue here with the logs from `/data/nightshade/logs`.
 - **If my work helps you,** you can [buy me a coffee](https://buymeacoffee.com/oliv3rmoon). It keeps the fixes coming.
 
 Nightshade is an unofficial release. ProsperoEden is made by BlackBearReloaded and its contributors, on the Eden emulator; neither project endorses Nightshade. Everything below is the official README.
@@ -93,13 +101,13 @@ Local-wireless multiplayer through Eden rooms is new in v1.000.110 and experimen
 - **Optional frame-rate recovery** - some games drop from 30 to 20 FPS when frames are a little late. An advanced [per-game clock adjustment](docs/SETTINGS.md#adaptive-guest-clock) can help those games. It is off by default because it can slow games that pace their frames by the same clock.
 - **120 Hz output** - on a display that shows 120 Hz, games can run on a 120 Hz output: **Refresh rate** in **Settings > Video**, or in one game's settings. A frame that is a little late is then shown 8 ms later instead of 17 ms, and patches for more than 60 FPS need it. The menu stays at 60 Hz.
 - **Frame generation** - between two of a game's own pictures ProsperoEden can show one made up from them, so a 30 FPS game looks like 60: **Frame generation** in **Settings > Video**, or in one game's settings. Two methods: **MihawkGen**, which comes with the app, or Lossless Scaling with your own copy of it; see [Frame generation](docs/SETTINGS.md#frame-generation).
-- **Post-processing (ReShade FX)** - a look drawn over the game's picture: **Post-processing** in **Settings > Video**, or in one game's settings, with the Vulkan renderer. Six presets come with the app (Anime, Cinematic, Clean, Dreamy, Retro, Vivid). Presets of your own (`.fxp`) go in `/data/prosperoeden/user/post_presets/` and the ReShade FX effects they use (`.fx`, with any `.fxh` they include) in `/data/prosperoeden/user/post_shaders/`; a game's own presets and effects go in its game folder's `reshade/`, and are offered for that game only. They are listed after a restart. See [Post-processing](docs/SETTINGS.md#post-processing).
+- **Post-processing (ReShade FX)** - a look drawn over the game's picture: **Post-processing** in **Settings > Video**, or in one game's settings, with the Vulkan renderer. Six presets come with the app (Anime, Cinematic, Clean, Dreamy, Retro, Vivid). Presets of your own (`.fxp`) go in `/data/nightshade/user/post_presets/` and the ReShade FX effects they use (`.fx`, with any `.fxh` they include) in `/data/nightshade/user/post_shaders/`; a game's own presets and effects go in its game folder's `reshade/`, and are offered for that game only. They are listed after a restart. See [Post-processing](docs/SETTINGS.md#post-processing).
 - **Game files anywhere** - keys, firmware, and games can live in any folder the PS5 can read: internal storage, an M.2 or external drive, or a USB device.
 - **Folder browser** - pick the game files folder in **Settings > Game files**. It shows how many keys, firmware files, and games each folder holds. Hold L1/R1 to page quickly.
 - **Library** - your games as covers, with the selected game's details beside them. The home screen has **Continue Playing** and **Recently Played**, which keep working after you move your files.
 - **Launcher** - an animated interface drawn with OpenGL, with sound effects (their level is in **Settings > Audio**) and a loading screen that shows the game's cover while it starts. It opens from the console's own launch picture without a cut: the mark appears over the picture and goes to its place as the menu arrives (any button skips it). Its five sections (Home, Library, Multiplayer, Settings, About) are on a rail at the left: L1 and R1 go from one to the next, and Left from a screen's edge opens the rail. The home screen shows which controllers are connected.
 - **Themes** - the launcher's look is a theme, chosen in **Settings > Theme**. It comes with one, Canopy; [docs/THEMES.md](docs/THEMES.md) says what a theme is made of.
-- **Wallpapers** - an image of your own behind the menu instead of the theme's artwork: PNG or JPEG files (also BMP, GIF, TGA and DDS) in `/data/prosperoeden/wallpapers`, or in `wallpapers/` of the game files folder you copy from a PC, chosen in **Settings > Appearance > Wallpaper**; see [docs/WALLPAPERS.md](docs/WALLPAPERS.md).
+- **Wallpapers** - an image of your own behind the menu instead of the theme's artwork: PNG or JPEG files (also BMP, GIF, TGA and DDS) in `/data/nightshade/wallpapers`, or in `wallpapers/` of the game files folder you copy from a PC, chosen in **Settings > Appearance > Wallpaper**; see [docs/WALLPAPERS.md](docs/WALLPAPERS.md).
 - **Profiles** - everyone who plays has their own save data, settings and recently played games: **Settings > Profiles**; see [Profiles](docs/SETTINGS.md#profiles).
 - **Settings per game** - a game can differ from Settings in its video, performance, audio, controls and language, and has its own Handheld / Docked mode (Triangle in the Library); see [Settings per game](docs/SETTINGS.md#settings-per-game).
 - **Button mapping** - choose which DualSense button presses each of the game's buttons, for every controller, in **Settings > Controls**, or for one game in its settings; see [Button mapping](docs/SETTINGS.md#button-mapping).
@@ -115,7 +123,7 @@ Local-wireless multiplayer through Eden rooms is new in v1.000.110 and experimen
 - **Performance switches** - seven switches that trade accuracy for speed (compiling a game's code ahead, asynchronous shaders, faster GPU, CPU and DMA emulation, and more) in **Settings > Performance**; see [Performance settings](docs/SETTINGS.md#performance-settings).
 - **Shader cache** - shaders compiled in earlier sessions are loaded when a game starts, so an effect stutters only the first time it appears.
 - **In-game shortcuts** - a performance overlay (Touchpad + R1), and Touchpad + L1 to end the game and return to the library. Leaving takes ten seconds at most, also while a game is still loading.
-- **Settings in one place** - a single JSON file under `/data/prosperoeden`, with game volume, mute, and detailed logging options. Logs keep the previous session.
+- **Settings in one place** - a single JSON file under `/data/nightshade`, with game volume, mute, and detailed logging options. Logs keep the previous session.
 - **Speed limit** - **Settings > Performance > Speed limit** (and each game's own) lets a game run at 150%, 200%, 300% or without a limit: a game locked to 30 FPS can reach 60 at 200% when the console has time to spare, and a game timed by its frames plays faster with it; see [Speed limit](docs/SETTINGS.md#speed-limit).
 - **Updates from the menu** - when a newer release is listed on [homebrew.page](https://homebrew.page/ps5), ProsperoEden offers to install it each time it opens; **Skip** keeps the current version, and **Settings > Diagnostics > Update notices** off stops the offer (About still names the newer version); see [Updating](docs/INSTALL.md#updating). A build made with a GitHub repository set (`EDEN_UPDATE_REPOSITORY`, [docs/BUILDING.md](docs/BUILDING.md#make-targets)) checks that repository's releases instead.
 - **Apps** - Nightshade TV, Nightshade Stream and Nightshade Station, got, updated and opened from **Settings > Apps**; see [Apps](#apps).
@@ -130,10 +138,10 @@ Local-wireless multiplayer through Eden rooms is new in v1.000.110 and experimen
 > **Use [ShadowMountPlus 1.7beta4](https://github.com/drakmor/ShadowMountPlus/releases/tag/1.7beta4) or newer.** It mounts ProsperoEden from the folder (or drive) you copy it to, and it also mounts `/data` and USB and extended storage drives into the app's sandbox, so ProsperoEden reaches its data and your game files with nothing else to load. With an older ShadowMountPlus, ProsperoEden falls back to its bundled [Lapy](https://github.com/blackbearreloaded/PS5-Lapy-JB-Daemon) helper (see [Elevation credits](#elevation-credits)).
 
 1. Download and extract the release ZIP.
-2. Copy the included `PPSA99008` folder to `/data/homebrew/PPSA99008` on the PS5 (or to another folder ShadowMountPlus scans, such as `/mnt/usb0/homebrew/PPSA99008`).
+2. Copy the included `PPSA64448` folder to `/data/homebrew/PPSA64448` on the PS5 (or to another folder ShadowMountPlus scans, such as `/mnt/usb0/homebrew/PPSA64448`).
 3. Make sure your jailbreak environment's local ELF loader is listening on TCP port 9021 (most setups have it). [Updates from the menu](docs/INSTALL.md#updating) use it, and with a ShadowMountPlus older than 1.7beta4 ProsperoEden sends its bundled Lapy helper through it.
 4. Put your own legally dumped keys, firmware, and games in a **game files folder** ([its layout](docs/INSTALL.md#game-files-folder)). It can be anywhere the PS5 can read: internal storage, an M.2 or external drive, or a USB device.
-5. Launch **ProsperoEden**, open **Settings > Game files**, browse to that folder and select it. The default is `/data/prosperoeden`.
+5. Launch **ProsperoEden**, open **Settings > Game files**, browse to that folder and select it. The default is `/data/nightshade`.
 6. Close and reopen ProsperoEden, then open **Library**. Setup is checked when the app opens, so reopen it after changing the folder or adding keys or firmware.
 
 ## Apps
@@ -158,7 +166,7 @@ from where.
 - **Get** (Cross on an app that isn't installed) and **Update** (Square, when a newer release is
   out) download the app's release and install it with the same update helper as Nightshade's own
   updates. A new app goes in a folder beside Nightshade's (`/data/homebrew/PPSA99003` next to
-  `/data/homebrew/PPSA99008`); an update replaces the app's files and keeps yours. The homebrew
+  `/data/homebrew/PPSA64448`); an update replaces the app's files and keeps yours. The homebrew
   loader puts a new app on the home screen after its next scan or a restart.
 - **Where the files come from:** the newest release of the app's Nightshade repository, its
   `<title ID>.zip`. Until that repository has a release, the newest release of the project the app
@@ -213,8 +221,8 @@ A report that can be acted on has:
 - the game and its version (and any update or mod in use);
 - the ProsperoEden version, the PS5 model and system software version, and what the console runs (kstuff-lite or etaHEN, ShadowMountPlus version);
 - the renderer, resolution and Performance switches;
-- the debug logs, attached as a ZIP: turn on **Settings > Diagnostics > Detailed logging**, make the problem happen again, then zip `/data/prosperoeden/logs` (after a crash, the crash report and the logs beside it);
-- for a problem at a certain spot in a game, your save data from just before it, attached as a ZIP: Triangle on the game in the Library, **Save data**, **Export a copy**, then zip the folder it writes in `/data/prosperoeden/save-export`. With it the spot can be reached without playing the game up to there.
+- the debug logs, attached as a ZIP: turn on **Settings > Diagnostics > Detailed logging**, make the problem happen again, then zip `/data/nightshade/logs` (after a crash, the crash report and the logs beside it);
+- for a problem at a certain spot in a game, your save data from just before it, attached as a ZIP: Triangle on the game in the Library, **Save data**, **Export a copy**, then zip the folder it writes in `/data/nightshade/save-export`. With it the spot can be reached without playing the game up to there.
 
 **No piracy.** ProsperoEden is for games you own and dumped yourself. Do not ask for, post or link to game files, keys or firmware, here or in any of the project's channels, and do not ask where to find them. Such posts are removed.
 

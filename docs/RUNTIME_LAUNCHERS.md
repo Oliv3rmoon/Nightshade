@@ -10,7 +10,7 @@ The built-in launcher remains available as the recovery interface.
 
 ## Installation and selection
 
-Install a pack as `/data/prosperoeden/launchers/<id>/manifest.json`, with its resources in
+Install a pack as `/data/nightshade/launchers/<id>/manifest.json`, with its resources in
 the same folder. IDs contain lowercase ASCII letters, digits and hyphens, at most 48
 characters. Resources use relative paths. Symbolic links and parent-path traversal are
 rejected.
@@ -27,13 +27,13 @@ which the app sandbox can deny for readable files. Missing or invalid packs show
 reason in the launcher picker and emit `PE_LAUNCHER_DISCOVERY` / `PE_LAUNCHER_SKIPPED`
 diagnostics to stderr. Discovery changes are logged once, without per-frame log spam.
 
-The selection is saved in `/data/prosperoeden/config/launcher.json`. Pack-specific UI
-state is saved in `/data/prosperoeden/config/launcher-state/<id>.json`. The emulator's
+The selection is saved in `/data/nightshade/config/launcher.json`. Pack-specific UI
+state is saved in `/data/nightshade/config/launcher-state/<id>.json`. The emulator's
 profiles, preferences, game files, saves and remote-source configuration keep their
 existing locations. No games or keys belong in a launcher pack.
 
 To recover without a working pack, create the empty file
-`/data/prosperoeden/config/force-builtin-launcher`. Remove it when recovery is complete.
+`/data/nightshade/config/force-builtin-launcher`. Remove it when recovery is complete.
 Script failures also restore the built-in launcher for the current session, preserving
 the pack and its saved selection for repair.
 

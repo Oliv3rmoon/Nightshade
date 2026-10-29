@@ -99,12 +99,12 @@ Keep generated ZIPs and feeds outside the pack folder. Do not put application ex
 ## Storage, limits and recovery
 
 ```text
-/data/prosperoeden/launchers/<id>/                     installed pack
-/data/prosperoeden/config/launcher-state/<id>.json     existing pack state, untouched
-/data/prosperoeden/config/launcher-updates.json        automatic-check preference and timestamps
-/data/prosperoeden/launcher-updates/work/<id>/         temporary staging
-/data/prosperoeden/launcher-updates/backups/<id>/      previous pack version
-/data/prosperoeden/launcher-updates/transactions/      replacement journals
+/data/nightshade/launchers/<id>/                     installed pack
+/data/nightshade/config/launcher-state/<id>.json     existing pack state, untouched
+/data/nightshade/config/launcher-updates.json        automatic-check preference and timestamps
+/data/nightshade/launcher-updates/work/<id>/         temporary staging
+/data/nightshade/launcher-updates/backups/<id>/      previous pack version
+/data/nightshade/launcher-updates/transactions/      replacement journals
 ```
 
 Downloads are bounded to 128 MiB, expanded contents to 256 MiB, individual files to 64 MiB and archives to 4096 entries. Extraction streams to staging files, checks CRCs and SHA-256, and rejects traversal, absolute paths, duplicate entries, symbolic links, special files, encryption and unsupported ZIP methods. Resource paths and Lua source syntax are checked before replacement; fonts and decoded artwork are also validated when the runtime activates the pack.

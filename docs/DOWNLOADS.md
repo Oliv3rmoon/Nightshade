@@ -8,14 +8,14 @@ Download sources and save sync both work with a [RomM](https://github.com/rommap
 
 1. **Put the games on the server.** Games go to RomM's library under `roms/switch/`: a game as one `.nsp` or `.xci` file, or as a folder with the game's file, its updates in `update/` and its DLC in `dlc/`. Then start a scan in RomM (its **Scan** page) so it lists them.
 2. **One RomM user per person.** Each person who plays on the console gets a user of their own in RomM; their save data stays apart on the server.
-3. **Downloads.** In RomM, create a client API token (your profile, **Client API tokens**) with the scopes `platforms.read` and `roms.read`. Write `/data/prosperoeden/config/remote/sources.json` over FTP with the server's address and that token (see [Download sources](#download-sources)), start an FTP server on the console on port 2121 (ftpsrv), and open **Settings > Downloads**: the server and its games show up, and the Library lists them.
+3. **Downloads.** In RomM, create a client API token (your profile, **Client API tokens**) with the scopes `platforms.read` and `roms.read`. Write `/data/nightshade/config/remote/sources.json` over FTP with the server's address and that token (see [Download sources](#download-sources)), start an FTP server on the console on port 2121 (ftpsrv), and open **Settings > Downloads**: the server and its games show up, and the Library lists them.
 4. **Save sync.** Open **Settings > Save sync**, Cross on a profile and choose the server. Scan the QR code with your phone, sign in to RomM as that profile's user and approve the code. From then on the profile's save data is synced before and after each game (see [Save sync](SAVES.md#save-sync)). Pairing uses the server from `sources.json`; without download sources, fill in `save-sync.json` over FTP instead. The save sync does not need the FTP server.
 
 ## Download sources
 
 A download source is a server in your network that has games, such as a [RomM](https://github.com/rommapp/romm) server. Its games show up in the Library without taking any space on the console. A game is downloaded to the game files folder when you want it; from then on it is a game on the console like one you copied there. Nothing is streamed, unless you set a source to stream its games (see [Playing a game where it lies](#playing-a-game-where-it-lies)). **Downloads need an FTP server running on the console** (port 2121, see below): it writes the downloaded files.
 
-- **Set them up.** Make sure an FTP server runs on the console, then save `/data/prosperoeden/config/remote/sources.json` on the console (over FTP, like the keys) and open **Settings > Downloads**, or reopen ProsperoEden. It lists the sources, each with its `"type"`, a `"name"` for the menu and what that type needs (see [RomM](#romm) for a RomM server):
+- **Set them up.** Make sure an FTP server runs on the console, then save `/data/nightshade/config/remote/sources.json` on the console (over FTP, like the keys) and open **Settings > Downloads**, or reopen ProsperoEden. It lists the sources, each with its `"type"`, a `"name"` for the menu and what that type needs (see [RomM](#romm) for a RomM server):
 
   ```json
   { "sources": [
