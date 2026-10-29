@@ -2,6 +2,24 @@
 
 What changed in each release of ProsperoEden, newest first. A release's notes on GitHub are its section here.
 
+## v1.010.003
+
+**Tears of the Kingdom: no more crash when the game's memory runs out, and a much shorter first start.** A tester's TOTK ended 23 minutes in on v1.010.002, when the game took 1.8 GB of new memory within seconds; this release gives the game that memory instead of ending the session. Not confirmed on a console yet: send `/data/prosperoeden/logs` after playing.
+
+### Fixes
+
+- **The game's memory comes first.** Nightshade gives the emulated console its memory as the game writes it. When none was left, the write was refused and the game closed: the graphics caches hold most of the console's memory and free textures only at the end of each frame, too late for a game that loads a big area at once. Now the write waits up to 2 seconds while the caches give memory back (they see none free and free at their hardest), and only then gives up (`EDEN_CRAM` lines in `stderr.log` say when it waited).
+- **The shader cache builds on several threads.** At first start a large game builds its saved pipelines before it plays: TOTK's 13,938 took nine minutes, about 25 a second, as if on one thread. Nightshade now asks for at least 6 builder threads, and `stderr.log` says how many it used (`EDEN_PIPELINE_WORKERS`).
+- **ASTC textures at full quality take four times the memory.** If a large open-world game crashes after a while, set **Settings > Video > ASTC textures** back to the default first.
+
+### Apps
+
+- **Settings > Apps lists the companion apps by their new names:** Physalis (was Nightshade TV), Datura (was Nightshade Stream) and Mandrake (was Nightshade Station). Same apps, same title IDs; their settings stay.
+
+### Install
+
+From 1.005.102 or later, **Update now** applies it. If it doesn't, send `/data/prosperoeden/logs/updater.log`. From an older version, copy this ZIP's `PPSA99008` folder over yours.
+
 ## v1.010.002
 
 **The likely cause of Final Fantasy Resonance stopping the GPU, fixed: draws made from arguments the GPU hadn't finished writing.** Every stop in Oliv3rmoon/Nightshade#1, in the opening scene and after it, came right after draws asking for 27 million to 2 billion copies of a model (one count read as the float 1.0): far more than any game draws, so the GPU ran them until it was reset. Not confirmed on a console yet.
