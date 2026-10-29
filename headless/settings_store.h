@@ -1209,6 +1209,8 @@ inline bool MoveFolders(const std::string& file, std::string_view from, std::str
     }
     if (changes->empty()) return true;
     whole["version"] = 1;
+    // The data folder's config/ (and the data folder) when the copy had none.
+    (void)mkdir(Settings::Folder(Settings::Folder(file)).c_str(), 0777);
     (void)mkdir(Settings::Folder(file).c_str(), 0777);
     if (!Settings::WriteWhole(whole, file)) {
         *error = "could not write " + file;
