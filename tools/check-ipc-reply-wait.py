@@ -30,6 +30,8 @@ if len(sys.argv) > 1:
     assert derived.count('ThreadQueueImplForKServerSessionRequest wait_queue{kernel, request};') == 1
     assert derived.count('const ::Eden::IpcWait::ScopedReply reply{request};') == 1
     assert derived.count('for (bool reported = false; !wait_queue.Ended(); reported = true) {') == 1
+    assert derived.count('return eden_waiter.GetWaitResult();') == 1
+    assert derived.count('KScheduler::SetSchedulerUpdateNeeded(kernel);') == 1
 
 code = r'''
 #include "ipc_wait.h"

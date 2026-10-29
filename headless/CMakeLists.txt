@@ -247,7 +247,9 @@ function(eden_ipc_ring_service var)
     if(at LESS 0)
         message(FATAL_ERROR "Pinned service reply write changed; review the service call record.")
     endif()
-    string(REPLACE "${site}" "${site}        {\n            std::array<u32, 64> eden_reply{};\n            auto& eden_thread = ctx.GetThread();\n            eden_thread.GetOwnerProcess()->GetMemory().ReadBlock(eden_thread.GetTlsAddress(), eden_reply.data(),\n                                                                 sizeof(eden_reply));\n            ::Eden::IpcRing::Record(service_name, eden_thread.GetThreadId(), ctx.GetCommand(),\n                                    static_cast<u32>(ctx.GetCommandType()), eden_reply.data(), eden_reply.size());\n        }\n" source "${source}")
+    # A reply Eden fails to write (a full handle table) leaves the caller its own request: logged.
+    set(written "    if (system.IsPoweredOn()) {\n        if (const Result eden_written = ctx.WriteToOutgoingCommandBuffer(); eden_written.IsError()) {\n            LOG_ERROR(Service, \"EDEN_IPC_REPLY_NOT_WRITTEN service={} command={} result={:#x}\", service_name,\n                      ctx.GetCommand(), eden_written.raw);\n        }\n")
+    string(REPLACE "${site}" "${written}        {\n            std::array<u32, 64> eden_reply{};\n            auto& eden_thread = ctx.GetThread();\n            eden_thread.GetOwnerProcess()->GetMemory().ReadBlock(eden_thread.GetTlsAddress(), eden_reply.data(),\n                                                                 sizeof(eden_reply));\n            ::Eden::IpcRing::Record(service_name, eden_thread.GetThreadId(), ctx.GetCommand(),\n                                    static_cast<u32>(ctx.GetCommandType()), eden_reply.data(), eden_reply.size());\n        }\n" source "${source}")
     set(${var} "#include <array>\n#include \"${EDEN_PORT_DIR}/ipc_ring.h\"\n#include \"core/hle/kernel/k_process.h\"\n#include \"core/memory.h\"\n${source}" PARENT_SCOPE)
 endfunction()
 
@@ -2053,12 +2055,11 @@ public:
 
     void EndWait(KernelCore& kernel, KThread* waiting_thread, Result wait_result) override {
         if (!::Eden::IpcWait::EndsWait(m_request, R_SUCCEEDED(wait_result))) {
-            if (::Eden::IpcWait::Report(::Eden::IpcWait::Refused())) {
-                const KThread* waker = GetCurrentThreadPointer(kernel);
-                LOG_ERROR(IPC, "EDEN_IPC_REFUSED_WAKE thread={} waker={} result={:#x}",
-                          waiting_thread->GetThreadId(), waker ? waker->GetThreadId() : 0,
-                          wait_result.raw);
-            }
+            // Logged by the caller once its wait has ended: this runs under the scheduler lock.
+            const KThread* waker = GetCurrentThreadPointer(kernel);
+            m_refused_waker = waker ? waker->GetThreadId() : 0;
+            m_refused_result = wait_result.raw;
+            ++m_refused;
             return;
         }
         KThreadQueue::EndWait(kernel, waiting_thread, wait_result);
@@ -2075,21 +2076,43 @@ public:
         return m_ended.load(std::memory_order_acquire);
     }
 
+    // Read by the caller after its wait ended (written before m_ended's release).
+    u32 m_refused = 0;
+    u64 m_refused_waker = 0;
+    u32 m_refused_result = 0;
+
 private:
     const KSessionRequest* m_request;
     std::atomic<bool> m_ended{false};
 };]=] server_session_source "${server_session_source}")
-string(REPLACE "${request_wait_old}" "    ThreadQueueImplForKServerSessionRequest wait_queue{kernel, request};"
+string(REPLACE "${request_wait_old}" "    ThreadQueueImplForKServerSessionRequest wait_queue{kernel, request};\n    KThread& eden_waiter = GetCurrentThread(kernel);"
     server_session_source "${server_session_source}")
-string(REPLACE "${request_result_old}" [=[    // Each pass through the scheduler lock lets the core switch away while this thread waits.
+string(REPLACE "${request_result_old}" [=[    // Still waiting: recompute what this core should run (this thread is not runnable) and switch
+    // to it; the wait's end brings this thread back.
     for (bool reported = false; !wait_queue.Ended(); reported = true) {
         if (!reported && ::Eden::IpcWait::Report(::Eden::IpcWait::RanOn())) {
-            LOG_ERROR(IPC, "EDEN_IPC_RAN_ON thread={}", GetCurrentThread(kernel).GetThreadId());
+            KScheduler* scheduler = kernel.CurrentScheduler();
+            KThread& current = GetCurrentThread(kernel);
+            LOG_ERROR(IPC, "EDEN_IPC_RAN_ON thread={} current={} state={} dispatch={} scheduled={}",
+                      eden_waiter.GetThreadId(), current.GetThreadId(),
+                      static_cast<u32>(eden_waiter.GetState()), current.GetDisableDispatchCount(),
+                      scheduler && scheduler->GetSchedulerCurrentThread() ? scheduler->GetSchedulerCurrentThread()->GetThreadId() : 0);
         }
-        { KScopedSchedulerLock sl{kernel}; }
+        {
+            KScopedSchedulerLock sl{kernel};
+            KScheduler::SetSchedulerUpdateNeeded(kernel);
+        }
+        if (KScheduler* scheduler = kernel.CurrentScheduler(); scheduler != nullptr) {
+            scheduler->RequestScheduleOnInterrupt(kernel);
+        }
         ::Eden::CpuRelax();
     }
-    return GetCurrentThread(kernel).GetWaitResult();
+    if (wait_queue.m_refused && ::Eden::IpcWait::Report(::Eden::IpcWait::Refused())) {
+        LOG_ERROR(IPC, "EDEN_IPC_REFUSED_WAKE thread={} waker={} result={:#x} refused={}",
+                  eden_waiter.GetThreadId(), wait_queue.m_refused_waker, wait_queue.m_refused_result,
+                  wait_queue.m_refused);
+    }
+    return eden_waiter.GetWaitResult();
 }]=] server_session_source "${server_session_source}")
 string(REPLACE "${reply_wake_old}" [=[            if (!client_thread->IsTerminationRequested()) {
                 const ::Eden::IpcWait::ScopedReply reply{request};
