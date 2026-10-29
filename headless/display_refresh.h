@@ -19,7 +19,7 @@ inline std::atomic<int> output_height{1080};
 inline std::atomic<int> requested_hz{60};
 // What the renderer's output runs at, in millihertz (59940, 119880); 0 before it opened.
 inline std::atomic<int> output_millihertz{0};
-// The Vulkan driver's display code reads this when it opens the output (tools/patch-radv-wsi.py).
+// Belladonna's display code (wsi_common_videoout.c) reads this when it opens the output.
 inline constexpr const char* kVulkanSwitch = "EDEN_VIDEOOUT_120HZ";
 // After a session at 120 Hz the output goes back to 60 Hz, and the display follows. The next
 // presenter (the launcher's) opens after this long, as the OpenGL SDK does by itself for its own

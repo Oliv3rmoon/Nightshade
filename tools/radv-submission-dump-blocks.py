@@ -1,99 +1,19 @@
-#!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""When a GPU submission stops making progress, say what it carried before the console is gone.
+"""The C of Belladonna's GPU stall report, as tools/check-radv-submission-dump.py compiles it.
 
-The PS5 winsys gives up on a submission whose completion marker has not moved for ten seconds and
-prints only "the GPU has not reached submission N (at M)" (radv_ps5_winsys.c). That names the
-stuck sequence number but nothing about the work: #277 (Nintendo Switch Sports) takes the whole
-console down a few frames in, #236 and #233 (Luigi's Mansion 3, a demo) end in
-VK_ERROR_DEVICE_LOST at a fixed scene, and none of them says what the GPU was running when it
-stopped. No crash report is written when the console itself dies, so the one chance to learn
-anything is this stderr line, flushed before the machine goes.
+Belladonna (tools/deps.json, ps5-mesa) carries the stall report in its commit "When a GPU
+submission stops making progress, say what it carried before the console is gone" (318deb146da).
+These are verbatim copies of the blocks of that commit the check compiles on its own: with
+Belladonna's source next to this repository (../belladonna, or RADV_MESA_SOURCE), the check
+requires each to be in its file exactly as it is here, so what it compiles is Belladonna's code;
+without it, the check compiles these copies. When a pinned Belladonna commit changes one of them,
+copy it here again. BLOCKS, at the end, names the Belladonna file each is in.
 
-This adds a dump at that ten-second point. The winsys already keeps a record of every submission
-still in flight (its sequence number, where its words sit in the ring or a buffer of its own);
-this records a little more for each (its size in dwords, how many AGC submissions it was split
-into, the queue it went to, the waits and signals it carried and the sequence it depends on) and,
-when the wait trips, walks the stuck submission and the ones queued behind it: it decodes their
-PM4, counts the packets, draws, dispatches, GPU waits (WAIT_REG_MEM), indirect and conditional
-packets, checks that each ends with the completion RELEASE_MEM, and lists the last few opcodes.
-A submission that ends without its completion packet, or that carries a GPU wait that never
-signalled, or an indirect/conditional packet, shows up here by name. Everything is behind the
-ten-second branch, so a healthy queue pays only a few field stores per submission, under the
-submit lock it already holds.
-
-Every Final Fantasy Resonance hang (Oliv3rmoon/Nightshade#1) stops in a submission of one shape:
-ten thousand dwords, 348 draws, nine dispatches and 23 WAIT_REG_MEMs, most of them RADV's own
-cache-flush waits on a counter the submission's RELEASE_MEMs count up (radv_cs.c). So the stuck
-submission is now read in depth as well:
-  - each wait it carries (WAIT_REG_MEM, WAIT_ON_CE_COUNTER) and each conditional run (COND_EXEC):
-    the address, reference, mask and compare function, what the CPU reads at that address now
-    when it can (sceKernelQueryMemoryProtection says whether the address is mapped for the CPU;
-    the line is flushed from the CPU cache first, as the marker poll does), and the first wait
-    whose condition does not hold. A wait on a counter that has since moved past it does not
-    hold either; one whose current value a later write in the same submission explains has been
-    passed, so the first wait that is neither is where the GPU stopped;
-  - the last draws and dispatches before that wait (or before the end, when no wait is unmet),
-    with the program each runs: the SPI_SHADER_PGM_LO/HI (PS, VS, ES as the NGG or legacy GS
-    stage, LS as HS) and COMPUTE_PGM_LO/HI values the SET_SH_REG packets set before it, the
-    stages VGT_SHADER_STAGES_EN enables (GFX10.3 offsets, src/amd/registers/gfx103.json);
-  - whose code each of those addresses is: pipeline creation (radv_pipeline.c, through
-    radv_pipeline_report_pso_history, which every graphics and compute pipeline passes) records
-    each shader's GPU range with the pipeline's hash and its VkPipeline handle, and RADV's
-    vertex-input prologs (radv_shader.c) are recorded too, in a fixed ring of 8192 entries with
-    no allocation and no lock. Eden prints the same handle beside its own hashes once per
-    pipeline it builds (headless/pipeline_identity.h, EDEN_PIPELINE on stderr), so stderr names
-    the game's shader the GPU is stuck in.
-
-The threaded recording layer (radv_threaded_layer.c, which #277 points at) is compiled into the
-driver but only runs when RADV_THREADED_RECORDING is set, which ProsperoEden never sets, so it
-records nothing in a shipping build; naming the Vulkan command types would need a change above the
-winsys and is not done here.
-
-Applied to the driver checkout after patch-radv-transfer-split.py; running it again changes
-nothing. tools/check-radv-submission-dump.py compiles the inserted winsys code on its own and runs
-the stuck-submission walk over synthetic command streams.
+Data only: nothing here runs; the check reads the literals.
 """
-from pathlib import Path
-import sys
-import hashlib
 
-fingerprint = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
-if sys.argv[1:2] == ['--digest']:
-    print(fingerprint)
-    raise SystemExit(0)
-if sys.argv[1:2] == ['--check']:
-    stamp = Path(sys.argv[2])
-    raise SystemExit(0 if stamp.is_file() and stamp.read_text().strip() == fingerprint else 1)
-
-root = Path(__file__).resolve().parents[1]
-src = Path(sys.argv[1]) if len(sys.argv) > 1 else root.parent / 'mihawk-vulkan-review/.deps/work/radv-src'
-vulkan = src / 'src/amd/vulkan'
-ps5 = vulkan / 'winsys/ps5'
-changed = False
-
-
-def patch(path, edits):
-    global changed
-    text = path.read_text()
-    new = text
-    for old, replacement, marker in edits:
-        if marker in new:
-            continue  # already patched
-        assert new.count(old) == 1, f'{path.name}: pinned code changed: {old[:60]!r}'
-        new = new.replace(old, replacement)
-    if new != text:
-        path.write_text(new)
-        changed = True
-
-
-# 1. The per-submission record gains the few fields the dump prints, and the winsys header
-#    declares the recorder the submit path calls.
-header_fields_old = '''   uint32_t start;
-   uint32_t end;
-   struct radv_ps5_memory dedicated;
-};'''
-header_fields_new = '''   uint32_t start;
+# The fields struct radv_ps5_in_flight gains (its last members).
+header_fields_new = r'''   uint32_t start;
    uint32_t end;
    struct radv_ps5_memory dedicated;
    /* ProsperoEden (tools/patch-radv-submission-dump.py): what the stall dump prints; filled
@@ -106,23 +26,18 @@ header_fields_new = '''   uint32_t start;
    uint64_t depends;
 };'''
 
-header_decl_old = 'struct radv_ps5_queue *radv_ps5_queue_get(void);\n'
-header_decl_new = ('struct radv_ps5_queue *radv_ps5_queue_get(void);\n'
-                   '/* ProsperoEden: records for the newest in-flight submission what the stall dump needs\n'
-                   ' * (tools/patch-radv-submission-dump.py). Called with the submit lock held. */\n'
-                   'void radv_ps5_record_submission(struct radv_ps5_queue *queue, uint32_t words, uint32_t parts,\n'
-                   '                                uint32_t wait_count, uint32_t signal_count, uint32_t queue_index,\n'
-                   '                                uint64_t depends);\n')
+# The recorder the submit path calls.
+header_decl_new = r'''struct radv_ps5_queue *radv_ps5_queue_get(void);
+/* ProsperoEden: records for the newest in-flight submission what the stall dump needs
+ * (tools/patch-radv-submission-dump.py). Called with the submit lock held. */
+void radv_ps5_record_submission(struct radv_ps5_queue *queue, uint32_t words, uint32_t parts,
+                                uint32_t wait_count, uint32_t signal_count, uint32_t queue_index,
+                                uint64_t depends);
+'''
 
-patch(ps5 / 'radv_ps5_winsys.h', [
-    (header_fields_old, header_fields_new, 'uint32_t words;\n   uint16_t parts;'),
-    (header_decl_old, header_decl_new, 'void radv_ps5_record_submission('),
-])
+# What RADV's pipeline code calls to say where a shader is (after Mihawk's radv_ps5_winsys_heap_usage).
+public_decl_new = r'''void radv_ps5_winsys_heap_usage(uint64_t *pool_bytes, uint64_t *available_bytes, uint64_t *driver_bytes);
 
-# 2. The public winsys header declares what RADV's pipeline code calls to say where a shader is.
-public_decl_old = ('void radv_ps5_winsys_heap_usage(uint64_t *pool_bytes, uint64_t *available_bytes, '
-                   'uint64_t *driver_bytes);\n')
-public_decl_new = public_decl_old + '''
 /* ProsperoEden (tools/patch-radv-submission-dump.py): a shader's code sits at [va, va + bytes) on
  * the GPU, for the stall dump to say whose code a stuck draw or dispatch was running: the stage, the
  * kind of code (RADV_PS5_SHADER_*), the pipeline's hash and its VkPipeline handle (0 for code no
@@ -136,20 +51,7 @@ void radv_ps5_note_shader(uint64_t va, uint32_t bytes, const char *stage, uint32
                           uint64_t pipeline);
 '''
 
-patch(ps5 / 'radv_ps5_winsys_public.h', [
-    (public_decl_old, public_decl_new, 'void radv_ps5_note_shader('),
-])
-
-# 3. The dump itself, the recorder and the shader ring, in the winsys, before the wait that detects
-#    the stall; and the call from inside that wait when it trips.
-winsys_include_old = '#include "sid.h"\n'
-winsys_include_new = ('#include "sid.h"\n'
-                      '#if defined(__PROSPERO__)\n'
-                      '#include <ps5platform/kernel.h> /* ProsperoEden: tools/patch-radv-submission-dump.py */\n'
-                      '#endif\n')
-
-# What the CPU reads at a GPU address the stuck submission waits on. Kept apart from dump_block so
-# the host check can stand in a memory of its own (tools/check-radv-submission-dump.py).
+# What the CPU reads at a GPU address the stuck submission waits on (the check stands in a memory of its own).
 stall_read_block = r'''/* ProsperoEden (tools/patch-radv-submission-dump.py): the 32-bit value at a GPU address, as the
  * CPU reads it now. A buffer's GPU address is its CPU address (radv_ps5_bo.c), but the address may
  * belong to a buffer since freed, so the kernel is asked first whether it is mapped for the CPU;
@@ -180,6 +82,7 @@ radv_ps5_stall_read(uint64_t address, uint32_t *value)
 
 '''
 
+# The dump, the recorder and the shader ring.
 dump_block = r'''/* ProsperoEden (tools/patch-radv-submission-dump.py): when a submission's words stop making
  * progress for RADV_PS5_STALL_NS, say what the stuck submission and the ones queued behind it
  * carry, before the console is gone. Nothing here runs until the ten-second wait trips, but for
@@ -924,37 +827,7 @@ radv_ps5_record_submission(struct radv_ps5_queue *queue, uint32_t words, uint32_
 
 '''
 
-patch(ps5 / 'radv_ps5_winsys.c', [
-    (winsys_include_old, winsys_include_new, '#include <ps5platform/kernel.h> /* ProsperoEden'),
-    ('bool\nradv_ps5_queue_wait_seq(struct radv_ps5_queue *queue, uint64_t seq, uint64_t abs_timeout_ns)\n{\n',
-     stall_read_block + dump_block +
-     'bool\nradv_ps5_queue_wait_seq(struct radv_ps5_queue *queue, uint64_t seq, uint64_t abs_timeout_ns)\n{\n',
-     'radv_ps5_dump_stall(struct radv_ps5_queue *queue'),
-    ('      } else if (now - progress_at > RADV_PS5_STALL_NS) {\n'
-     '         fprintf(stderr, "radv/ps5: the GPU has not reached submission',
-     '      } else if (now - progress_at > RADV_PS5_STALL_NS) {\n'
-     '         radv_ps5_dump_stall(queue, seq, completed); /* ProsperoEden: tools/patch-radv-submission-dump.py */\n'
-     '         fprintf(stderr, "radv/ps5: the GPU has not reached submission',
-     'radv_ps5_dump_stall(queue, seq, completed);'),
-])
-
-# 4. The submit path records the metadata for the submission it just claimed, under the lock.
-patch(ps5 / 'radv_ps5_cs.c', [
-    ('   radv_ps5_note_submission(count, copy_start - claim_start, copy_end - copy_start);\n',
-     '   radv_ps5_record_submission(queue, count, parts, wait_count, signal_count, submit->queue_index, depends);\n'
-     '   radv_ps5_note_submission(count, copy_start - claim_start, copy_end - copy_start);\n',
-     'radv_ps5_record_submission(queue, count, parts'),
-])
-
-# 5. Pipeline creation says where each shader went. Every graphics, graphics library and compute
-#    pipeline RADV creates (the application's and its own meta pipelines) passes
-#    radv_pipeline_report_pso_history once its shaders are uploaded, just before its handle is
-#    returned.
-ps5_includes = ('#if defined(RADV_PS5)\n'
-                '#include "winsys/ps5/radv_ps5_winsys_public.h" /* ProsperoEden: tools/patch-radv-submission-dump.py */\n')
-pipeline_include_old = '#include "vk_shader_module.h"\n'
-pipeline_include_new = pipeline_include_old + ps5_includes + '#include "radv_gs_compute.h"\n#endif\n'
-
+# Pipeline creation says where each shader went.
 pipeline_note_block = r'''#if defined(RADV_PS5)
 /* ProsperoEden (tools/patch-radv-submission-dump.py): where each of the pipeline's shaders sits on
  * the GPU, with the pipeline's hash and handle, so the winsys's stall dump can say whose code a
@@ -996,39 +869,13 @@ radv_ps5_note_pipeline_shaders(struct radv_pipeline *pipeline)
 #endif
 
 '''
-report_old = ('void\nradv_pipeline_report_pso_history(const struct radv_device *device, struct radv_pipeline *pipeline)\n'
-              '{\n')
-report_new = (pipeline_note_block + report_old +
-              '#if defined(RADV_PS5)\n'
-              '   radv_ps5_note_pipeline_shaders(pipeline); /* ProsperoEden: tools/patch-radv-submission-dump.py */\n'
-              '#endif\n')
 
-patch(vulkan / 'radv_pipeline.c', [
-    (pipeline_include_old, pipeline_include_new, '#include "winsys/ps5/radv_ps5_winsys_public.h" /* ProsperoEden'),
-    (report_old, report_new, 'radv_ps5_note_pipeline_shaders(struct radv_pipeline *pipeline)'),
-])
-
-# 6. So do RADV's vertex-input prologs: with dynamic vertex input (which Eden uses) the program a
-#    draw's vertex stage starts at is the prolog, which then jumps to the pipeline's shader.
-shader_include_old = '#include "radv_shader.h"\n'
-shader_include_new = shader_include_old + ps5_includes + '#endif\n'
-prolog_old = '   prolog->nontrivial_divisors = key->nontrivial_divisors;\n'
-prolog_new = (prolog_old +
-              '#if defined(RADV_PS5)\n'
-              '   /* ProsperoEden: tools/patch-radv-submission-dump.py */\n'
-              '   radv_ps5_note_shader(prolog->va, prolog->code_size, "VS prolog",\n'
-              '                        RADV_PS5_SHADER_PROLOG | RADV_PS5_SHADER_INTERNAL, 0, 0);\n'
-              '#endif\n')
-
-patch(vulkan / 'radv_shader.c', [
-    (shader_include_old, shader_include_new, '#include "winsys/ps5/radv_ps5_winsys_public.h" /* ProsperoEden'),
-    (prolog_old, prolog_new, 'radv_ps5_note_shader(prolog->va'),
-])
-
-if changed:
-    # Upstream skips the whole build while its receipt names the pinned revision: set the receipt
-    # aside so the next build compiles the changed files (Ninja keeps every other object).
-    provenance = root.parent / 'mihawk-vulkan-review/.deps/native/radv-release/PROVENANCE.txt'
-    if provenance.exists():
-        provenance.replace(provenance.with_suffix('.base.txt'))
-print(f'RADV submission dump: changed={changed}')
+# Where each block is in Belladonna.
+BLOCKS = {
+    'header_fields_new': 'src/amd/vulkan/winsys/ps5/radv_ps5_winsys.h',
+    'header_decl_new': 'src/amd/vulkan/winsys/ps5/radv_ps5_winsys.h',
+    'public_decl_new': 'src/amd/vulkan/winsys/ps5/radv_ps5_winsys_public.h',
+    'stall_read_block': 'src/amd/vulkan/winsys/ps5/radv_ps5_winsys.c',
+    'dump_block': 'src/amd/vulkan/winsys/ps5/radv_ps5_winsys.c',
+    'pipeline_note_block': 'src/amd/vulkan/radv_pipeline.c',
+}
