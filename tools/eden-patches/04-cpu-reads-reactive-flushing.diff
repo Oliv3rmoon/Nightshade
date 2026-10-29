@@ -1,6 +1,6 @@
 --- a/src/core/memory.cpp
 +++ b/src/core/memory.cpp
-@@ -292,7 +292,7 @@
+@@ -298,7 +298,7 @@ struct Memory::Impl {
          },
          [&](const Common::ProcessAddress current_vaddr, const std::size_t offset, const std::size_t copy_amount, const u8* const ptr) {
              if (!unsafe) {
@@ -9,16 +9,16 @@
              }
              std::memcpy(reinterpret_cast<u8*>(buffer) + offset, ptr, copy_amount);
          });
-@@ -625,7 +625,7 @@
-         if (auto const ptr = GetPointerImpl(addr, [addr]() {
-             LOG_ERROR(HW_Memory, "Unmapped Read{} @ {:#016x}", sizeof(T) * 8, addr);
+@@ -637,7 +637,7 @@ struct Memory::Impl {
+             }
+             ++UnmappedReadFlag();
          }, [&]() {
 -            HandleRasterizerDownload(addr, sizeof(T));
 +            HandleRasterizerReadDownload(addr, sizeof(T));
          }); ptr) [[likely]] {
              // It may be tempting to rewrite this particular section to use "reinterpret_cast";
              // afterall, it's trivially copyable so surely it can be copied ov- Alignment.
-@@ -678,6 +678,16 @@
+@@ -690,6 +690,16 @@ struct Memory::Impl {
          return true;
      }
  

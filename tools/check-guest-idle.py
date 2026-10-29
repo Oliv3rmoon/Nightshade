@@ -42,6 +42,7 @@ inline WallClock g_wall_clock;
 
 idle_code = r'''
 #include "performance.h"
+#include <atomic>
 #include <cassert>
 #include <condition_variable>
 #include <cstdio>
@@ -64,7 +65,7 @@ private:
     std::size_t m_core_index;
     std::mutex m_guard;
     std::condition_variable m_on_interrupt;
-    bool m_is_interrupted{};
+    std::atomic<bool> m_is_interrupted{};
     Interface* m_arm_interface{};
     Thread* m_current_thread{};
 };

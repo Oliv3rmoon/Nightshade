@@ -8,9 +8,10 @@ root = Path(__file__).resolve().parents[1]
 cache = Path((root / '.local/headless-cache').read_text().strip())
 original = (cache / 'source/src/common/cpu_features.cpp').read_text()
 derived = (cache / 'native-local/headless/cpu_features.cpp').read_text()
+# eden-nx2 measures the frequency when it is 0; the build also when it is below 1 GHz.
 expected = original.replace('        } else {\n            caps.tsc_frequency = X64::EstimateRDTSCFrequency();\n        }', '        }').replace(
-    '    if (max_std_fn >= 0x16) {',
-    "    if (caps.invariant_tsc && caps.tsc_frequency < 1'000'000'000ULL) {\n        caps.tsc_frequency = X64::EstimateRDTSCFrequency();\n    }\n\n    if (max_std_fn >= 0x16) {")
+    '    if (caps.invariant_tsc && caps.tsc_frequency == 0) {\n',
+    "    if (caps.invariant_tsc && caps.tsc_frequency < 1'000'000'000ULL) {\n")
 assert derived == expected and derived.count('X64::EstimateRDTSCFrequency()') == 1
 selection = derived[derived.index('    if (max_std_fn >= 0x15) {'):derived.index('    if (max_std_fn >= 0x16) {')]
 code = '''

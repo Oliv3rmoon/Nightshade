@@ -10,7 +10,9 @@ builds on the following projects, each under its own license.
   fetches and pins itself: Dynarmic, Boost, fmt, xbyak, zstd, lz4, Opus, SDL3,
   simpleini, sirit, SPIRV-Headers, Vulkan-Headers, Vulkan-Utility-Libraries,
   Vulkan Memory Allocator, ENet, frozen, cpp-httplib, nlohmann/json, and the time
-  zone data. Each keeps its upstream license.
+  zone data. Each keeps its upstream license. The pinned commit is from Takoroka's
+  **[eden-nx2](https://git.eden-emu.dev/Takoroka/eden-nx2)**, GPL-3.0-or-later: Eden master with
+  experimental support for Switch 2 titles (its `NX2_NOTES.md`; docs/NX2_PORT.md here).
 - **[FFmpeg](https://ffmpeg.org)**, LGPL-2.1-or-later. Built from Eden's pinned
   source with only the H.264, VP8 and VP9 decoders.
 - **[OpenSSL](https://www.openssl.org)**, Apache-2.0, and

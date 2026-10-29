@@ -1,6 +1,6 @@
 --- a/src/shader_recompiler/frontend/maxwell/translate/impl/load_store_local_shared.cpp
 +++ b/src/shader_recompiler/frontend/maxwell/translate/impl/load_store_local_shared.cpp
-@@ -88,10 +88,31 @@
+@@ -88,10 +88,31 @@ IR::U32 ShortOffset(IR::IREmitter& ir, const IR::U32& offset) {
      return ir.BitwiseAnd(ir.ShiftLeftLogical(offset, ir.Imm32(3)), ir.Imm32(16));
  }
  
@@ -35,7 +35,7 @@
  }
  } // Anonymous namespace
  
-@@ -166,14 +187,14 @@
+@@ -166,14 +187,14 @@ void TranslatorVisitor::STL(u64 insn) {
      switch (bit_size) {
      case 8: {
          const IR::U32 bit{ByteOffset(ir, offset)};
@@ -54,7 +54,7 @@
          break;
      }
      case 32:
-@@ -182,9 +203,10 @@
+@@ -182,9 +203,10 @@ void TranslatorVisitor::STL(u64 insn) {
          if (!IR::IsAligned(reg, static_cast<size_t>(bit_size / 32))) {
              throw NotImplementedException("Unaligned source register");
          }

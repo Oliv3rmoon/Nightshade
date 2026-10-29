@@ -22,7 +22,7 @@ scratch=$(cat .local/headless-cache)
 [[ "$(cat "$scratch/owner")" == "$root" ]] || { echo "Build cache $scratch belongs to another checkout" >&2; exit 1; }
 
 eden="$scratch/source"
-eden_archive=eden-67bada77.tar.gz
+eden_archive=eden-50fa86bb.tar.gz
 # A tree unpacked from another archive is the source of another Eden revision: it is unpacked
 # again (Eden's package cache, downloads only, is kept). A tree left from before an update of
 # the pin was built as if it were the new one, and what Eden had changed went unseen.
@@ -35,7 +35,7 @@ if [[ ! -f $eden/CMakeLists.txt || $(cat "$eden/.unpacked-from" 2>/dev/null) != 
     if [[ -d $scratch/source-cache ]]; then mv "$scratch/source-cache" "$eden/.cache"; fi
     printf '%s\n' "$eden_archive" > "$eden/.unpacked-from"
 fi
-printf '%s\n' '67bada77f8a43a90da2e94e89b8e7da73c256989' > "$eden/GIT-COMMIT"
+printf '%s\n' '50fa86bbbc403ad565eb44fcc281f16f77c69e15' > "$eden/GIT-COMMIT"
 printf '%s\n' 'ps5-headless' > "$eden/GIT-REFSPEC"
 # Fixes to Eden's own source (tools/eden-patches, in name order). A later patch can change lines
 # an earlier one changed (08 rewrites some of 06's), so the earlier one no longer reverses on its

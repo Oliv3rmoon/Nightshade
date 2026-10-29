@@ -60,26 +60,41 @@ places (the Ampere lowering feeds Eden's Maxwell translator, where 03 and 06-10 
 ### Derivations
 
 `tools/prepare-vulkan-port.py` and `headless/CMakeLists.txt` (with its `.cmake` includes) copy
-Eden sources and edit them at anchors. Anchors that no longer match (found with a configure-only
-harness and the Python script run against the new tree):
+Eden sources and edit them at anchors. Checked two ways against the new tree: every anchor
+(the Python script run on the patched tree; a configure-only harness that runs the CMake files in
+script mode, PS5 and Linux host branches, and reports every `FATAL_ERROR` instead of the first), and
+every derived file's additions compared with what the same derivation added to the old tree, so an
+unchecked `string(REPLACE)` that silently stopped matching shows up too.
 
-Vulkan (`prepare-vulkan-port.py`):
-- `vk_rasterizer.cpp`: the `DRAWS_TO_DISPATCH` block, `PrepareDraw`'s start (nx2 profiling
-  scopes), `DispatchCompute`'s pipeline lookup (nx2 native-compute throws).
-- `vulkan_memory_allocator.cpp`: `vmaCreateImage` (nx2 retries outside the budget itself and
-  falls back to an unbacked sparse image for huge ones).
-- `vk_graphics_pipeline.cpp`: `FillImageViews` call.
-- `control/scheduler.cpp`: channel lookup under `scheduling_guard`.
+Adapted to eden-nx2's code (same effect as before):
 
-CMake (`headless/CMakeLists.txt`):
-- `texture_cache/util.h` small-vector include: **dropped**, upstream #4386 removed
-  `FixSmallVectorADL` (the heap copy it worked around is gone).
-- `PhysicalCore::Idle`, `KSpinLock::Lock` (nx2 spins before sleeping), `vfs_real.cpp`
-  `MaxOpenFiles` (nx2 row 72), unmapped access log (nx2 quieter logs), `GetPseudoDeviceId`
-  (nx2 row 18), loader file-type and install switches (upstream #4552 NSZ/XCZ), GPU worker
-  shutdown.
+| Where | What changed upstream | Now |
+|---|---|---|
+| `vk_rasterizer.cpp` `FlushWork` | nx2: dispatch every 32 draws (`CHECK_MASK` 31) | the PS5 block replaces it as before (512, dev-settings interval) |
+| `vk_rasterizer.cpp` `PrepareDraw` | nx2 profiling zones, skipped-draw reports | the six timing marks go between nx2's zones |
+| `vk_rasterizer.cpp` `DispatchCompute` | nx2 throws for native (Switch 2) compute without a pipeline | the dispatch probe follows nx2's throw |
+| `vk_graphics_pipeline.cpp` `FillImageViews` | nx2 profiling zone around it | mark after the zone |
+| `vulkan_memory_allocator.cpp` `CreateImage` | nx2 retries outside the budget itself; huge images become unbacked sparse images | its retry is counted and reported like the buffers' (`outside_budget`, pool report on failure) |
+| `control/scheduler.cpp` `Push` | nx2 binds the channel outside the lock (or defers it to the split thread) | lock timer covers lookup and bind |
+| `physical_core.cpp` `Idle` | nx2: `std::atomic<bool>` flag, optional fixed poll `EDEN_NX2_IDLE_SPIN_US` | Nightshade's adaptive poll replaces nx2's (its notes found no gain from the fixed one); atomic member calls instead of `__atomic_*` builtins; `tools/check-guest-idle.py` models the atomic |
+| `k_spin_lock.cpp` | nx2: own spin-then-wait lock (atomic word), 128 pauses | kept, spinning `kernel_spin_iterations` (the PS5-measured count, dev-settings `spins=`) |
+| `vfs_real.cpp` open files | nx2: `MaxOpenFiles()` function for Windows | 512 elsewhere, as before |
+| `memory.cpp` unmapped reads | nx2 samples the read log itself | Nightshade's sampling (`unmapped_log.h`) replaces it |
+| `loader.cpp`, `registered_cache.cpp` | upstream #4552: Eden reads block NCZs, names `.nsz`/`.xcz` as types, rejects solid NCZs | names stay NSP/XCI, `.xcz` updates go to `ProcessXCI` as before, solid NCZs are not rejected (Nightshade reads them, `headless/ncz.h`); Eden's block reader stays behind ours |
+| `cpu_features.cpp` TSC | nx2 measures the TSC when the frequency is 0 | one fallback, Nightshade's rule (below 1 GHz) |
+| `gpu_thread.cpp` shutdown | nx2 stops the split GPU thread after the worker | the PS5 worker's `Stop()` does the same |
 
-(Progress on each is in the log below.)
+Dropped, because upstream now does it:
+
+- `texture_cache/util.h` `<boost/version.hpp>` include: upstream #4386 removed `FixSmallVectorADL`
+  (the heap copy it worked around is gone; two `.inc` files call `FullDownloadCopies` directly).
+- `GetPseudoDeviceId` without control data: nx2 (row 18) seeds it from the program id.
+
+Added for nx2 on the PS5:
+
+- `gpu_split.cpp` (PS5 graphics build): an exception on the split's second thread is recorded as a
+  GPU failure (the session ends with its message, as on the worker) instead of ending the app,
+  and `Stop()` resets the split, because the app runs one session after another.
 
 ## Switch 2 titles on the PS5
 
@@ -123,3 +138,8 @@ CMake (`headless/CMakeLists.txt`):
   `checkouts/eden-nx2`; archive sha256 `54c7b3c5fc6c5eb7fe0c212d7e10f8b8b206f6f0eff3fb758d0922574a295b62`
   (12,028,938 bytes, same on two downloads). Patches rebased (table above). Derivation anchors
   listed (above).
+- 2026-10-29: pin moved (`tools/deps.json`, `UPSTREAM.json`, `prepare-build.sh`,
+  `build-headless-host.sh`; the unpacked tree is `.deps/eden-<commit>/`, and the checks that read
+  it look there). Every derivation applies (table above); local checks that do not need a Linux
+  build pass on the new tree: guest idle, unmapped log, GC scan, loader message, system font, NCZ,
+  TSC fallback, and the other source checks.

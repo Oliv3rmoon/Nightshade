@@ -1,6 +1,6 @@
 --- a/src/core/file_sys/savedata_factory.cpp
 +++ b/src/core/file_sys/savedata_factory.cpp
-@@ -109,8 +109,11 @@
+@@ -105,8 +105,11 @@ std::string SaveDataFactory::GetFullPath(ProgramId program_id, VirtualDir dir,
                                           SaveDataSpaceId space, SaveDataType type, u64 title_id,
                                           u128 user_id, u64 save_id) {
      // According to switchbrew, if a save is of type SaveData and the title id field is 0, it should
