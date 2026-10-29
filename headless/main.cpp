@@ -69,6 +69,7 @@
 #include "../src/fastmem.h"
 #include "crash_report.h"
 #include "prosperoeden/frontend.h"
+#include "migrate.h"
 #include "prosperoeden/version.h"
 extern "C" void ps5_opengl_heap_snapshot(const char*, unsigned);
 extern "C" std::int64_t sceKernelGetDirectMemorySize();
@@ -517,16 +518,6 @@ int main(int argc, char** argv) {
         const Eden::ForwardedArgs forwarded = Eden::ParseForwardedArgs(argc, argv);
         std::string forwarded_game;
         bool forwarded_session = false;
-        if (!forwarded.rom.empty() && last_crash.report.empty()) {
-            const std::string path = Eden::ResolveForwardedRom(forwarded.rom, Eden::GamesPath("roms"));
-            // A game moved into a game folder after its forwarder was made.
-            const std::string moved = path.empty() || Eden::FileExists(path) ?
-                std::string{} : Eden::FindMovedForwardedRom(path, Eden::GamesPath("roms"));
-            if (!path.empty() && Eden::FileExists(path)) forwarded_game = path;
-            else if (!moved.empty()) forwarded_game = moved;
-            else launch_error = "Forwarded game not found: " + (path.empty() ? forwarded.rom : path);
-            Eden::BootTrace::Line("forwarded game: %s", forwarded_game.empty() ? "not found" : "found");
-        }
         // A game that faulted early in its boot is restarted (at most four times per launch).
         std::string relaunch_game;
         unsigned guest_fault_retries = 0;
@@ -569,6 +560,41 @@ int main(int argc, char** argv) {
         Common::Log::Initialize();
         Eden::Multiplayer::SetDetailedLogging(Eden::LoadPreferences().detailed_logging);
         Eden::Multiplayer::RoomClient rooms;
+        // A forwarded game waits for the first start's question about ProsperoEden's data (migrate.h):
+        // its keys, firmware and the game itself may still be in that folder (a forwarder made for a
+        // Nightshade before 1.011 names it, and the bridge, headless/bridge, passes it on). The
+        // launcher asks that question alone; a move or a copy starts the app again with the game's
+        // launch arguments, and Start fresh comes back here.
+        const std::vector<std::string> forwarded_again = Eden::ForwardedArgv(forwarded, "restart");
+        if (!forwarded.rom.empty() && last_crash.report.empty() && Eden::FilesystemAccess() &&
+            Eden::Migrate::Pending({Eden::Migrate::kOldDataDir, Eden::kDataDir, {}}, Eden::Migrate::Native()) ==
+                Eden::Migrate::State::asking) {
+            Eden::BootTrace::Line("forwarded game: the question about ProsperoEden's data first");
+            Eden::Report("forwarded game", "The question about ProsperoEden's data comes first");
+            (void)SelectProsperoEdenGame(rooms, launch_error, &forwarded_again);
+            if (Eden::Migrate::Recorded(Eden::kDataDir) != Eden::Migrate::State::fresh) {
+                Eden::Report("exit", "Launcher closed before the forwarded game");
+                return 0;
+            }
+        }
+        if (!forwarded.rom.empty() && last_crash.report.empty()) {
+            const std::string path = Eden::ResolveForwardedRom(forwarded.rom, Eden::GamesPath("roms"));
+            // A game in ProsperoEden's data folder that the first start moved to Nightshade's.
+            const std::string rebased =
+                path.empty() || Eden::FileExists(path) ||
+                        Eden::Migrate::Recorded(Eden::kDataDir) != Eden::Migrate::State::moved ?
+                    std::string{} :
+                    Eden::RebasedPath(path, Eden::Migrate::kOldDataDir, Eden::kDataDir);
+            const std::string& missing = rebased.empty() ? path : rebased;
+            // A game moved into a game folder after its forwarder was made.
+            const std::string moved = path.empty() || Eden::FileExists(path) ?
+                std::string{} : Eden::FindMovedForwardedRom(missing, Eden::GamesPath("roms"));
+            if (!path.empty() && Eden::FileExists(path)) forwarded_game = path;
+            else if (!rebased.empty() && Eden::FileExists(rebased)) forwarded_game = rebased;
+            else if (!moved.empty()) forwarded_game = moved;
+            else launch_error = "Forwarded game not found: " + (path.empty() ? forwarded.rom : path);
+            Eden::BootTrace::Line("forwarded game: %s", forwarded_game.empty() ? "not found" : "found");
+        }
         for (;;) {
         // The file of a game played before where it lies on its download source, while the stop
         // limit still watches: letting it go waits for its transfer to end.

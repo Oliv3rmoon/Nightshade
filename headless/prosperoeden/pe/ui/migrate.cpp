@@ -112,6 +112,9 @@ void Launcher::update_migration(float dt)
         migration_looked_ = true;
         migration_ = services_.migration();
         migrate_waiting_ = migration_.phase == MigrationPhase::asking;
+        // Opened for the question alone (a forwarded game waits) and there is none: back to the game.
+        if (!migrate_waiting_ && services_.question_only())
+            done_ = true;
     }
     if (migrate_waiting_ && modal_ == Modal::none && modal_shown_ == Modal::none && !transition_.running &&
         selected_game_.empty() && intro_ > 1.2f)
@@ -142,6 +145,9 @@ void Launcher::update_migration(float dt)
             case MigrationPhase::none: // Start fresh: nothing more to ask
                 modal_ = Modal::none;
                 cue(Cue::modal_close);
+                // A forwarded game waited for the answer: it starts now (headless/main.cpp).
+                if (services_.question_only())
+                    done_ = true;
                 return;
             case MigrationPhase::done:
                 migrate_fraction_.target = 1.0f;

@@ -49,6 +49,7 @@
 
 // Starts the app again in a fresh process (src/lifecycle.c); returns only when the system refuses.
 extern "C" int eden_restart_app(void);
+extern "C" int eden_restart_app_with(const char* const* arguments);
 
 namespace {
 
@@ -610,8 +611,9 @@ std::optional<std::int64_t> EdenServices::ask_seed(std::int64_t current, const s
     return Eden::RngSeedFromText(Common::UTF16ToUTF8(answer.text));
 }
 
-EdenServices::EdenServices(std::string launch_error, Eden::Multiplayer::RoomClient& rooms)
-    : rooms_(rooms), launch_error_(std::move(launch_error)) {
+EdenServices::EdenServices(std::string launch_error, Eden::Multiplayer::RoomClient& rooms,
+                           const std::vector<std::string>* question_first)
+    : rooms_(rooms), launch_error_(std::move(launch_error)), question_first_(question_first) {
     // ProsperoEden's data folder, at the first start (migrate.h): asked before anything here writes
     // the settings file. Its games are where its own settings say ("games_folder", else its game
     // files folder), read without writing to its folder.
@@ -985,6 +987,17 @@ void EdenServices::finish_migration() { migrate_->Finish(); }
 // After the move or the copy everything is read again from where it now is: the settings, the game
 // files folder, the Library, the driver's shader cache. A fresh process does that.
 bool EdenServices::restart_app() {
+    // Before a forwarded game, the fresh process is given its launch arguments: the game starts then.
+    if (question_first_ != nullptr && !question_first_->empty()) {
+        Eden::Report("migration", "EDEN_MIGRATE restart with the forwarded game's launch arguments");
+        std::fflush(nullptr);
+        std::vector<const char*> arguments;
+        for (const std::string& argument : *question_first_) arguments.push_back(argument.c_str());
+        arguments.push_back(nullptr);
+        eden_restart_app_with(arguments.data());
+        Eden::Report("migration", "EDEN_MIGRATE restart refused: the app closes instead");
+        return false;
+    }
     Eden::Report("migration", "EDEN_MIGRATE restart");
     std::fflush(nullptr);
     eden_restart_app();

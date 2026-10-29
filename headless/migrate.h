@@ -112,6 +112,9 @@ State Recorded(const std::string& data);
 // data folder has no settings and no record while old_data holds something (logs alone are
 // nothing); the record then says asking. Quick: a few looks at the two folders.
 State Prepare(const Folders& folders, const Platform& platform);
+// What Prepare would say, writing and logging nothing: whether this start asks (main.cpp asks it
+// before a forwarded game, which then waits for the answer).
+State Pending(const Folders& folders, const Platform& platform);
 // Removes the copy an earlier start left unfinished (closed while copying), which can be large: on
 // the worker's thread while the question shows, and before a copy. False when something stays.
 bool Tidy(const Folders& folders, const Platform& platform);

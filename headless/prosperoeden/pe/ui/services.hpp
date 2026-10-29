@@ -1057,6 +1057,12 @@ class Services
     {
         return false;
     }
+    // The launcher is open for that question alone: a home screen forwarder's game waits for the
+    // answer (headless/main.cpp). It closes once Start fresh is chosen, or when there is no question.
+    virtual bool question_only()
+    {
+        return false;
+    }
 
     // ---- images ----
     virtual bool load_image(const std::string &path, gfx::Image *image) = 0;

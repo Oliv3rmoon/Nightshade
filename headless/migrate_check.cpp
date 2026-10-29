@@ -149,6 +149,10 @@ void check_asking() {
         Lab lab("asking");
         make_old(lab.old());
         make_fresh(lab.data());
+        // What main.cpp asks before a forwarded game: the same answer, with nothing written or logged.
+        expect(Eden::Migrate::Pending(lab.folders, lab.platform) == State::asking &&
+                   !fs::exists(lab.data() / Eden::Migrate::kRecord) && !lab.logged("EDEN_MIGRATE ask"),
+               "Pending: it will be asked, and nothing is written");
         expect(Eden::Migrate::Prepare(lab.folders, lab.platform) == State::asking, "ProsperoEden's data: asked");
         expect(Eden::Migrate::Recorded(lab.folders.data) == State::asking, "the record says asking");
         expect(read(lab.data() / Eden::Migrate::kRecord).find("\"from\": \"" + lab.folders.old_data + "\"") != std::string::npos,
@@ -156,6 +160,7 @@ void check_asking() {
         expect(lab.logged("EDEN_MIGRATE ask from="), "the question is logged");
         // Closed without an answer: the settings written meanwhile don't stop it being asked again.
         put(lab.data() / Eden::Migrate::kSettings, "{}");
+        expect(Eden::Migrate::Pending(lab.folders, lab.platform) == State::asking, "Pending: unanswered is still asked");
         expect(Eden::Migrate::Prepare(lab.folders, lab.platform) == State::asking, "unanswered: asked again");
         expect(lab.logged("EDEN_MIGRATE ask again"), "asked again, logged");
     }
@@ -243,6 +248,7 @@ void check_move() {
                                  "EDEN_MIGRATE aside placed", "EDEN_MIGRATE done choice=move"})
             expect(lab.logged(line), std::string{"Move: logged "} + line);
         expect(Eden::Migrate::Prepare(lab.folders, lab.platform) == State::moved, "Move: never asked again");
+        expect(Eden::Migrate::Pending(lab.folders, lab.platform) == State::moved, "Pending: moved is what the record says");
     }
     {
         // Nothing made yet for Nightshade: only the one rename.

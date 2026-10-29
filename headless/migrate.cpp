@@ -536,7 +536,7 @@ bool Tidy(const Folders& folders, const Platform& platform) {
     return removed;
 }
 
-State Prepare(const Folders& folders, const Platform& platform) {
+State Pending(const Folders& folders, const Platform& platform) {
     const std::string data = Trimmed(folders.data), old = Trimmed(folders.old_data);
     const State recorded = Recorded(data);
     if (recorded != State::none && recorded != State::asking) return recorded;
@@ -546,7 +546,13 @@ State Prepare(const Folders& folders, const Platform& platform) {
     const bool something = std::any_of(entries.begin(), entries.end(), [](const Entry& entry) {
         return !entry.name.empty() && entry.name != "." && entry.name != ".." && entry.name != "logs";
     });
-    if (!something) return State::none;
+    return something ? State::asking : State::none;
+}
+
+State Prepare(const Folders& folders, const Platform& platform) {
+    const std::string data = Trimmed(folders.data), old = Trimmed(folders.old_data);
+    const State recorded = Recorded(data);
+    if (Pending(folders, platform) != State::asking) return recorded == State::asking ? State::none : recorded;
     Log(platform, std::string{recorded == State::asking ? "ask again" : "ask"} + " from=" + old + " to=" + data);
     if (recorded != State::asking) (void)Record(data, State::asking, folders, platform);
     return State::asking;

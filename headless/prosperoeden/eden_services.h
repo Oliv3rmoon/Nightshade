@@ -24,7 +24,10 @@
 class EdenServices final : public pe::ui::Services {
 public:
     // launch_error: why the game chosen last time did not start (empty: nothing to report).
-    explicit EdenServices(std::string launch_error, Eden::Multiplayer::RoomClient& rooms);
+    // question_first: the launcher is opened for the first start's question alone, before a forwarded
+    // game (frontend.h); a move or a copy starts the app again with these launch arguments.
+    EdenServices(std::string launch_error, Eden::Multiplayer::RoomClient& rooms,
+                 const std::vector<std::string>* question_first = nullptr);
     // Downloads from the download sources stop while a game runs (the menu is gone then).
     ~EdenServices() override;
 
@@ -61,6 +64,7 @@ public:
     void cancel_migration() override;
     void finish_migration() override;
     bool restart_app() override;
+    bool question_only() override { return question_first_ != nullptr; }
     bool docked(std::uint64_t title_id) override;
     bool set_docked(std::uint64_t title_id, bool docked) override;
     pe::ui::GameSettings game_settings(std::uint64_t title_id) override;
@@ -166,6 +170,7 @@ private:
     Eden::Multiplayer::RoomClient& rooms_;
     int user_ = -1; // the PS5 user in front when the menu opened (negative: unknown)
     std::string launch_error_;
+    const std::vector<std::string>* question_first_ = nullptr;
     std::string setup_; // what is missing from keys and firmware; empty when ready
     std::mutex bridge_; // Eden's metadata reader keeps state between calls: one caller at a time
     // Each game's own folder in roms/ by its title ID, as the Library last found it (issue 168).
