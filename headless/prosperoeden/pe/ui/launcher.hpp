@@ -114,6 +114,7 @@ class Launcher
         cheats,       // a game's cheats, opened from its settings
         apps,         // Settings > Apps: Nightshade's own apps, got, updated and opened (apps.cpp)
         backup,       // Settings > Diagnostics > Back up to USB: the app's data to a USB drive (backup.cpp)
+        migrate,      // the first start: ProsperoEden's data moved, copied or left (migrate.cpp)
     };
     // The update dialog's steps: the offer, installing, stopping it, closing for the helper to
     // finish, and a failure.
@@ -309,6 +310,13 @@ class Launcher
     float notes_window() const;
     float notes_max_scroll() const;
     void draw_notes(Canvas &c, float height);
+
+    // ---- ProsperoEden's data at the first start (migrate.cpp) ----
+    // Asks once there is a question, before anything else (the update offer waits); follows the
+    // move or the copy, and starts the app again once it is done.
+    void update_migration(float dt);
+    void press_migrate(Key key);
+    void draw_migrate(Canvas &c, float open);
 
     // ---- games on download sources (remote.cpp) ----
     // Looks at the queue and the sources a few times a second: the Library reads its list again
@@ -621,6 +629,19 @@ class Launcher
     std::future<std::pair<AppOpen, std::string>> app_open_;
     int app_opening_ = -1;
     float app_closing_ = -1.0f;
+
+    // ProsperoEden's data at the first start (migrate.cpp).
+    MigrationStatus migration_;        // as last looked at
+    bool migration_looked_ = false;    // the services were asked whether there is a question
+    bool migrate_waiting_ = false;     // the question waits for the menu to be free
+    bool migrate_cancelling_ = false;  // a copy is being stopped
+    bool migrate_restarting_ = false;  // done: the app was asked to start again
+    int migrate_choice_ = 0;           // 0 Move, 1 Copy, 2 Start fresh
+    tween::Spring migrate_choice_x_;   // the highlight between the buttons
+    tween::Spring migrate_fraction_;   // a copy's shown share, 0..1
+    float migrate_time_ = 0.0f;        // seconds in this step
+    float migrate_spin_ = 0.0f;        // the waiting arc's turn
+    float migrate_poll_ = 0.0f;
 
     // Settings > Diagnostics > Back up to USB (backup.cpp).
     BackupStatus backup_;           // as last looked at

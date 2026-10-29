@@ -1243,6 +1243,64 @@ void pictures(Stage &s)
         std::fprintf(stderr, "error: opening an app did not close the launcher\n");
         s.ok = false;
     }
+
+    // ProsperoEden's data at the first start of Nightshade's own title ID (migrate.cpp): the
+    // question, each answer explained as it is chosen; a copy under way and done (the app starts
+    // again); a drive that fills up, a move that fails, and Back to the question; Start fresh,
+    // which closes it.
+    const auto migration_ends = [&s] {
+        for (int frame = 0; frame < 1200 && s.services.migration_steps >= 0; ++frame)
+            s.frame();
+        s.wait(0.5f);
+    };
+    s.services.migration_state.phase = pe::ui::MigrationPhase::asking;
+    s.restart(true);
+    s.wait(2.6f);
+    s.shoot("M0-migrate-move");
+    s.press({Key::right});
+    s.wait(0.4f);
+    s.shoot("M1-migrate-copy");
+    s.press({Key::right});
+    s.wait(0.4f);
+    s.shoot("M2-migrate-fresh");
+    s.press({Key::left, Key::cross});
+    s.wait(2.0f);
+    s.shoot("M3-migrate-copying");
+    migration_ends();
+    s.shoot("M4-migrate-copied");
+    s.wait(3.0f);
+    if (s.services.restarts != 1)
+    {
+        std::fprintf(stderr, "error: Nightshade did not start again after the copy\n");
+        s.ok = false;
+    }
+    s.services.migration_state.phase = pe::ui::MigrationPhase::asking;
+    s.services.migration_full = true;
+    s.restart(true);
+    s.wait(2.6f);
+    s.press({Key::right, Key::cross});
+    migration_ends();
+    s.shoot("M5-migrate-no-room");
+    s.services.migration_full = false;
+    s.press({Key::cross}); // Back
+    s.wait(0.4f);
+    s.services.migration_fails = true;
+    s.press({Key::left, Key::cross});
+    migration_ends();
+    s.shoot("M6-migrate-move-failed");
+    s.services.migration_fails = false;
+    s.press({Key::cross});
+    s.wait(0.4f);
+    s.shoot("M7-migrate-asked-again");
+    s.press({Key::right, Key::right, Key::cross});
+    migration_ends();
+    s.wait(0.5f);
+    s.shoot("M8-migrate-fresh-closed");
+    if (s.services.migration_state.phase != pe::ui::MigrationPhase::none || s.services.restarts != 1)
+    {
+        std::fprintf(stderr, "error: Start fresh did not close the question\n");
+        s.ok = false;
+    }
 }
 
 // The first seconds after the app is started, one frame per call of frame().

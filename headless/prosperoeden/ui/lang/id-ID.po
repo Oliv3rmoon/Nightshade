@@ -212,6 +212,15 @@ msgstr "Bilinear"
 msgid "Black and red, clean and dark."
 msgstr "Hitam dan merah, bersih dan gelap."
 
+#: pe/ui/migrate.cpp
+msgid "Both apps keep working: settings, keys, firmware, saves, mods and shader cache are copied. Needs free space for them."
+msgstr "Kedua aplikasi tetap berfungsi: pengaturan, kunci, firmware, data simpanan, mod, dan cache shader disalin. Butuh ruang kosong untuknya."
+
+#. Under the Copy button. {0} is a size such as 6.4 GB.
+#: pe/ui/migrate.cpp
+msgid "Both apps keep working: settings, keys, firmware, saves, mods and shader cache are copied. Needs {0} free."
+msgstr "Kedua aplikasi tetap berfungsi: pengaturan, kunci, firmware, data simpanan, mod, dan cache shader disalin. Butuh {0} ruang kosong."
+
 #: pe/ui/game_options.cpp
 msgid "Bottom left"
 msgstr "Kiri bawah"
@@ -277,6 +286,85 @@ msgstr "Cheat"
 #: pe/ui/library.cpp
 msgid "Cheats folder"
 msgstr "Folder cheat"
+
+#. Button: ProsperoEden's data is copied for Nightshade; the original stays.
+#: pe/ui/migrate.cpp
+msgid "Copy"
+msgstr "Salin"
+
+#: pe/ui/migrate.cpp
+msgid "Copy cancelled"
+msgstr "Penyalinan dibatalkan"
+
+#. {0} and {1} are sizes such as 6.4 GB.
+#: pe/ui/migrate.cpp
+msgid "Copying needs {0}; the console has {1} free. Nothing was changed."
+msgstr "Penyalinan butuh {0}; konsol memiliki {1} kosong. Tidak ada yang diubah."
+
+#: pe/ui/migrate.cpp
+msgid "Copying your data"
+msgstr "Menyalin data Anda"
+
+#. Under the Copy button. {0} is a folder such as /data/prosperoeden. Settings is the menu's section (use its translation).
+#: pe/ui/migrate.cpp
+msgid "Games and new downloads stay in {0}. You can still choose another game files folder in Settings."
+msgstr "Game dan unduhan baru tetap di {0}. Anda tetap bisa memilih folder file game lain di Pengaturan."
+
+#. Under the Move button. {0} is /data/prosperoeden, {1} is /data/nightshade.
+#: pe/ui/migrate.cpp
+msgid "Instant, with your games: {0} becomes {1}. The official ProsperoEden app no longer sees it."
+msgstr "Seketika, termasuk game Anda: {0} menjadi {1}. Aplikasi resmi ProsperoEden tidak lagi melihatnya."
+
+#. After the move or copy; {0} is /data/nightshade. The app then restarts by itself.
+#: pe/ui/migrate.cpp
+msgid "It is now in {0}. Nightshade starts again."
+msgstr "Sekarang ada di {0}. Nightshade dimulai ulang."
+
+#. Button: ProsperoEden's data folder becomes Nightshade's (moved, not copied).
+#: pe/ui/migrate.cpp
+msgid "Move"
+msgstr "Pindahkan"
+
+#: pe/ui/migrate.cpp
+msgid "Moving needs no free space."
+msgstr "Memindahkan tidak butuh ruang kosong."
+
+#: pe/ui/migrate.cpp
+msgid "Moving your data"
+msgstr "Memindahkan data Anda"
+
+#. {0} is Nightshade's folder (/data/nightshade), {1} the ProsperoEden app's (/data/prosperoeden).
+#: pe/ui/migrate.cpp
+msgid "Nightshade now keeps its data in {0}. What you had before is in {1}."
+msgstr "Nightshade kini menyimpan datanya di {0}. Data Anda sebelumnya ada di {1}."
+
+#. Under the Start fresh button. {0} is /data/prosperoeden.
+#: pe/ui/migrate.cpp
+msgid "Nightshade starts empty. {0} stays as it is."
+msgstr "Nightshade mulai dalam keadaan kosong. {0} tetap seperti adanya."
+
+#: pe/ui/migrate.cpp
+msgid "Not enough free space"
+msgstr "Ruang kosong tidak cukup"
+
+#. After a failure that could not be undone fully; the details are a technical English line under it.
+#: pe/ui/migrate.cpp
+msgid "Not everything could be put back. The details below say where it is."
+msgstr "Tidak semuanya bisa dikembalikan. Detail di bawah menunjukkan lokasinya."
+
+#: pe/ui/migrate.cpp
+msgid "Nothing was changed: both folders are as they were."
+msgstr "Tidak ada yang diubah: kedua folder tetap seperti semula."
+
+#. Button: Nightshade starts with no data; ProsperoEden's is left as it is.
+#: pe/ui/migrate.cpp
+msgid "Start fresh"
+msgstr "Mulai baru"
+
+#. {0} is a size such as 6.4 GB.
+#: pe/ui/migrate.cpp
+msgid "The console ran out of space (copying needs about {0}). What was copied was removed."
+msgstr "Ruang konsol habis (penyalinan butuh sekitar {0}). Yang sudah disalin telah dihapus."
 
 #. Names the mod made of the files put straight into a game's mods folder, without a folder of their own.
 #: pe/ui/library.cpp
@@ -2465,6 +2553,18 @@ msgstr "Anda akan ditanya lagi lain kali."
 msgid "You are told again at the next sync."
 msgstr "Anda akan diberi tahu lagi pada sinkronisasi berikutnya."
 
+#: pe/ui/migrate.cpp
+msgid "Your data could not be copied"
+msgstr "Data Anda tidak dapat disalin"
+
+#: pe/ui/migrate.cpp
+msgid "Your data could not be moved"
+msgstr "Data Anda tidak dapat dipindahkan"
+
+#: pe/ui/migrate.cpp
+msgid "Your data is ready"
+msgstr "Data Anda sudah siap"
+
 #. Update dialog: installing the new app version keeps the player's files.
 #: pe/ui/update.cpp
 msgid "Your games, saves and settings are kept."
@@ -2474,6 +2574,11 @@ msgstr "Game, data simpanan, dan pengaturan Anda tetap ada."
 #: pe/ui/home.cpp
 msgid "Your next adventure"
 msgstr "Petualangan Anda berikutnya"
+
+#. Title of the dialog at Nightshade's first start: what the ProsperoEden app kept on this console (settings, saves, games). ProsperoEden is a name and stays as it is.
+#: pe/ui/migrate.cpp
+msgid "Your ProsperoEden data"
+msgstr "Data ProsperoEden Anda"
 
 #: pe/ui/save_sync.cpp
 msgid "Your save data is checked against the server's."

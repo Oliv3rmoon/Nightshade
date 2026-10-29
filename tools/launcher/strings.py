@@ -283,6 +283,19 @@ NOTES = {
     "Without filesystem access there is nothing to back up.": "Filesystem access is what the app asks the console for when it starts (as in 'Without filesystem access Nightshade can't tell which apps are installed.').",
     "Nightshade's data could not be read: {0}": "{0} is why (English, technical).",
     "Images in {0} and in {1}": "Under the Wallpaper list: {0} and {1} are the two folders the images are read from (the game files folder's wallpapers folder, then /data/nightshade/wallpapers).",
+    "Your ProsperoEden data": "Title of the dialog at Nightshade's first start: what the ProsperoEden app kept on this console (settings, saves, games). ProsperoEden is a name and stays as it is.",
+    "Nightshade now keeps its data in {0}. What you had before is in {1}.": "{0} is Nightshade's folder (/data/nightshade), {1} the ProsperoEden app's (/data/prosperoeden).",
+    "Move": "Button: ProsperoEden's data folder becomes Nightshade's (moved, not copied).",
+    "Copy": "Button: ProsperoEden's data is copied for Nightshade; the original stays.",
+    "Start fresh": "Button: Nightshade starts with no data; ProsperoEden's is left as it is.",
+    "Instant, with your games: {0} becomes {1}. The official ProsperoEden app no longer sees it.": "Under the Move button. {0} is /data/prosperoeden, {1} is /data/nightshade.",
+    "Both apps keep working: settings, keys, firmware, saves, mods and shader cache are copied. Needs {0} free.": "Under the Copy button. {0} is a size such as 6.4 GB.",
+    "Games and new downloads stay in {0}. You can still choose another game files folder in Settings.": "Under the Copy button. {0} is a folder such as /data/prosperoeden. Settings is the menu's section (use its translation).",
+    "Nightshade starts empty. {0} stays as it is.": "Under the Start fresh button. {0} is /data/prosperoeden.",
+    "It is now in {0}. Nightshade starts again.": "After the move or copy; {0} is /data/nightshade. The app then restarts by itself.",
+    "Copying needs {0}; the console has {1} free. Nothing was changed.": "{0} and {1} are sizes such as 6.4 GB.",
+    "The console ran out of space (copying needs about {0}). What was copied was removed.": "{0} is a size such as 6.4 GB.",
+    "Not everything could be put back. The details below say where it is.": "After a failure that could not be undone fully; the details are a technical English line under it.",
 }
 
 

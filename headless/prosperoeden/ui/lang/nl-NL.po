@@ -212,6 +212,15 @@ msgstr "Bilineair"
 msgid "Black and red, clean and dark."
 msgstr "Zwart en rood, strak en donker."
 
+#: pe/ui/migrate.cpp
+msgid "Both apps keep working: settings, keys, firmware, saves, mods and shader cache are copied. Needs free space for them."
+msgstr "Beide apps blijven werken: instellingen, sleutels, firmware, opgeslagen gegevens, mods en shadercache worden gekopieerd. Heeft er vrije ruimte voor nodig."
+
+#. Under the Copy button. {0} is a size such as 6.4 GB.
+#: pe/ui/migrate.cpp
+msgid "Both apps keep working: settings, keys, firmware, saves, mods and shader cache are copied. Needs {0} free."
+msgstr "Beide apps blijven werken: instellingen, sleutels, firmware, opgeslagen gegevens, mods en shadercache worden gekopieerd. Heeft {0} vrije ruimte nodig."
+
 #: pe/ui/game_options.cpp
 msgid "Bottom left"
 msgstr "Linksonder"
@@ -277,6 +286,85 @@ msgstr "Cheats"
 #: pe/ui/library.cpp
 msgid "Cheats folder"
 msgstr "Cheatmap"
+
+#. Button: ProsperoEden's data is copied for Nightshade; the original stays.
+#: pe/ui/migrate.cpp
+msgid "Copy"
+msgstr "Kopiëren"
+
+#: pe/ui/migrate.cpp
+msgid "Copy cancelled"
+msgstr "Kopiëren geannuleerd"
+
+#. {0} and {1} are sizes such as 6.4 GB.
+#: pe/ui/migrate.cpp
+msgid "Copying needs {0}; the console has {1} free. Nothing was changed."
+msgstr "Kopiëren heeft {0} nodig; de console heeft {1} vrij. Er is niets gewijzigd."
+
+#: pe/ui/migrate.cpp
+msgid "Copying your data"
+msgstr "Gegevens worden gekopieerd"
+
+#. Under the Copy button. {0} is a folder such as /data/prosperoeden. Settings is the menu's section (use its translation).
+#: pe/ui/migrate.cpp
+msgid "Games and new downloads stay in {0}. You can still choose another game files folder in Settings."
+msgstr "Games en nieuwe downloads blijven in {0}. Je kunt in Instellingen nog steeds een andere map voor gamebestanden kiezen."
+
+#. Under the Move button. {0} is /data/prosperoeden, {1} is /data/nightshade.
+#: pe/ui/migrate.cpp
+msgid "Instant, with your games: {0} becomes {1}. The official ProsperoEden app no longer sees it."
+msgstr "Direct, met je games: {0} wordt {1}. De officiële ProsperoEden-app ziet het niet meer."
+
+#. After the move or copy; {0} is /data/nightshade. The app then restarts by itself.
+#: pe/ui/migrate.cpp
+msgid "It is now in {0}. Nightshade starts again."
+msgstr "Ze staan nu in {0}. Nightshade start opnieuw."
+
+#. Button: ProsperoEden's data folder becomes Nightshade's (moved, not copied).
+#: pe/ui/migrate.cpp
+msgid "Move"
+msgstr "Verplaatsen"
+
+#: pe/ui/migrate.cpp
+msgid "Moving needs no free space."
+msgstr "Verplaatsen heeft geen vrije ruimte nodig."
+
+#: pe/ui/migrate.cpp
+msgid "Moving your data"
+msgstr "Gegevens worden verplaatst"
+
+#. {0} is Nightshade's folder (/data/nightshade), {1} the ProsperoEden app's (/data/prosperoeden).
+#: pe/ui/migrate.cpp
+msgid "Nightshade now keeps its data in {0}. What you had before is in {1}."
+msgstr "Nightshade bewaart zijn gegevens nu in {0}. Wat je eerder had, staat in {1}."
+
+#. Under the Start fresh button. {0} is /data/prosperoeden.
+#: pe/ui/migrate.cpp
+msgid "Nightshade starts empty. {0} stays as it is."
+msgstr "Nightshade begint leeg. {0} blijft zoals het is."
+
+#: pe/ui/migrate.cpp
+msgid "Not enough free space"
+msgstr "Niet genoeg vrije ruimte"
+
+#. After a failure that could not be undone fully; the details are a technical English line under it.
+#: pe/ui/migrate.cpp
+msgid "Not everything could be put back. The details below say where it is."
+msgstr "Niet alles kon worden teruggezet. De details hieronder vertellen waar het staat."
+
+#: pe/ui/migrate.cpp
+msgid "Nothing was changed: both folders are as they were."
+msgstr "Er is niets gewijzigd: beide mappen zijn zoals ze waren."
+
+#. Button: Nightshade starts with no data; ProsperoEden's is left as it is.
+#: pe/ui/migrate.cpp
+msgid "Start fresh"
+msgstr "Opnieuw beginnen"
+
+#. {0} is a size such as 6.4 GB.
+#: pe/ui/migrate.cpp
+msgid "The console ran out of space (copying needs about {0}). What was copied was removed."
+msgstr "De console had geen ruimte meer (kopiëren heeft ongeveer {0} nodig). Wat gekopieerd was, is verwijderd."
 
 #. Names the mod made of the files put straight into a game's mods folder, without a folder of their own.
 #: pe/ui/library.cpp
@@ -2465,6 +2553,18 @@ msgstr "De volgende keer krijg je de vraag opnieuw."
 msgid "You are told again at the next sync."
 msgstr "Bij de volgende synchronisatie krijg je dit opnieuw te zien."
 
+#: pe/ui/migrate.cpp
+msgid "Your data could not be copied"
+msgstr "Je gegevens konden niet worden gekopieerd"
+
+#: pe/ui/migrate.cpp
+msgid "Your data could not be moved"
+msgstr "Je gegevens konden niet worden verplaatst"
+
+#: pe/ui/migrate.cpp
+msgid "Your data is ready"
+msgstr "Je gegevens zijn klaar"
+
 #. Update dialog: installing the new app version keeps the player's files.
 #: pe/ui/update.cpp
 msgid "Your games, saves and settings are kept."
@@ -2474,6 +2574,11 @@ msgstr "Je games, opgeslagen gegevens en instellingen blijven behouden."
 #: pe/ui/home.cpp
 msgid "Your next adventure"
 msgstr "Jouw volgende avontuur"
+
+#. Title of the dialog at Nightshade's first start: what the ProsperoEden app kept on this console (settings, saves, games). ProsperoEden is a name and stays as it is.
+#: pe/ui/migrate.cpp
+msgid "Your ProsperoEden data"
+msgstr "Je ProsperoEden-gegevens"
 
 #: pe/ui/save_sync.cpp
 msgid "Your save data is checked against the server's."

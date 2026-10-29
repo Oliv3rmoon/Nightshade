@@ -379,6 +379,90 @@ class FakeServices : public ui::Services
         backup_state.drive = -1;
     }
 
+    // ProsperoEden's data at the first start (migrate.h): asked when migration_state.phase is asking
+    // (none otherwise, as on a console that has answered). A move or a copy goes a step per look (the
+    // launcher looks ten times a second); migration_fails fails it with both folders as they were,
+    // migration_full fills the drive part way through a copy, and a cancel removes what it wrote.
+    ui::MigrationStatus migration_state = [] {
+        ui::MigrationStatus status;
+        status.from = "/data/prosperoeden";
+        status.to = "/data/nightshade";
+        status.games = "/data/prosperoeden";
+        status.measured = true;
+        status.files = 48211;
+        status.bytes = 6871947674; // 6.4 GB: a large game's shader cache among them
+        return status;
+    }();
+    int migration_steps = -1; // looks since start_migration; -1: none
+    bool migration_fails = false;
+    bool migration_full = false;
+    bool migration_cancelled = false;
+    int restarts = 0;
+    ui::MigrationStatus migration() override
+    {
+        if (migration_steps < 0)
+            return migration_state;
+        const int step = migration_steps++;
+        ui::MigrationStatus status = migration_state;
+        const bool copy = status.choice == ui::MigrationChoice::copy;
+        const int steps = copy ? 40 : 4;
+        if (migration_cancelled)
+            status.phase = ui::MigrationPhase::cancelled;
+        else if (copy && migration_full && step >= 16)
+        {
+            status.phase = ui::MigrationPhase::no_room;
+            status.needed = status.bytes + (64ull << 20);
+        }
+        else if (step < steps)
+        {
+            status.done_bytes = copy ? status.bytes * static_cast<std::uint64_t>(step) / steps : 0;
+            status.done_files = copy ? status.files * static_cast<std::uint64_t>(step) / steps : 0;
+        }
+        else if (migration_fails)
+        {
+            status.phase = ui::MigrationPhase::failed;
+            status.error = "could not rename /data/prosperoeden to /data/nightshade: Device busy";
+        }
+        else
+            status.phase = status.choice == ui::MigrationChoice::fresh ? ui::MigrationPhase::none
+                                                                         : ui::MigrationPhase::done;
+        if (status.phase != ui::MigrationPhase::working)
+        {
+            migration_state = status;
+            migration_steps = -1;
+        }
+        return status;
+    }
+    bool start_migration(ui::MigrationChoice choice, std::string *reason) override
+    {
+        if (migration_state.phase != ui::MigrationPhase::asking)
+        {
+            *reason = "nothing is asked now";
+            return false;
+        }
+        migration_state.phase = ui::MigrationPhase::working;
+        migration_state.choice = choice;
+        migration_steps = 0;
+        migration_cancelled = false;
+        return true;
+    }
+    void cancel_migration() override
+    {
+        migration_cancelled = true;
+    }
+    void finish_migration() override
+    {
+        if (migration_state.phase == ui::MigrationPhase::failed || migration_state.phase == ui::MigrationPhase::no_room ||
+            migration_state.phase == ui::MigrationPhase::cancelled)
+            migration_state.phase = ui::MigrationPhase::asking;
+        migration_state.error.clear();
+    }
+    bool restart_app() override
+    {
+        ++restarts;
+        return true;
+    }
+
     // Game files the preview takes away from the folder, as a player would by deleting them.
     std::vector<std::string> removed;
     bool game_exists(const std::string &file) override

@@ -257,6 +257,8 @@ void Launcher::press(Key key)
         return press_apps(key);
     if (modal_ == Modal::backup)
         return press_backup(key);
+    if (modal_ == Modal::migrate)
+        return press_migrate(key);
     if (modal_ == Modal::save_sync)
         return press_save_sync(key);
     if (modal_ == Modal::sync_setup)
@@ -443,6 +445,8 @@ void Launcher::update(float dt)
         check_games_present();
     }
 
+    // ProsperoEden's data at the first start: asked before anything else.
+    update_migration(dt);
     // A newer release: the update dialog, or a notification when the app cannot install it.
     update_offer(dt);
     update_install(dt);
@@ -819,6 +823,8 @@ void Launcher::draw(gfx::DrawList &list)
             draw_apps(c, opened);
         else if (modal_shown_ == Modal::backup)
             draw_backup(c, opened);
+        else if (modal_shown_ == Modal::migrate)
+            draw_migrate(c, opened);
         else
             draw_dialog(c, modal_shown_, opened);
     }

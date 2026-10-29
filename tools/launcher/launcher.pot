@@ -166,7 +166,7 @@ msgid "Automatic"
 msgstr ""
 
 #. Button hint: go back one screen.
-#: pe/ui/apps.cpp, pe/ui/backup.cpp, pe/ui/browse.cpp, pe/ui/game_options.cpp, pe/ui/library.cpp, pe/ui/multiplayer.cpp, pe/ui/pairing.cpp, pe/ui/profiles.cpp, pe/ui/remote.cpp, pe/ui/save_sync.cpp, pe/ui/settings.cpp, pe/ui/update.cpp
+#: pe/ui/apps.cpp, pe/ui/backup.cpp, pe/ui/browse.cpp, pe/ui/game_options.cpp, pe/ui/library.cpp, pe/ui/migrate.cpp, pe/ui/multiplayer.cpp, pe/ui/pairing.cpp, pe/ui/profiles.cpp, pe/ui/remote.cpp, pe/ui/save_sync.cpp, pe/ui/settings.cpp, pe/ui/update.cpp
 msgid "Back"
 msgstr ""
 
@@ -212,6 +212,15 @@ msgstr ""
 msgid "Black and red, clean and dark."
 msgstr ""
 
+#: pe/ui/migrate.cpp
+msgid "Both apps keep working: settings, keys, firmware, saves, mods and shader cache are copied. Needs free space for them."
+msgstr ""
+
+#. Under the Copy button. {0} is a size such as 6.4 GB.
+#: pe/ui/migrate.cpp
+msgid "Both apps keep working: settings, keys, firmware, saves, mods and shader cache are copied. Needs {0} free."
+msgstr ""
+
 #: pe/ui/game_options.cpp
 msgid "Bottom left"
 msgstr ""
@@ -234,7 +243,7 @@ msgstr ""
 msgid "Button mapping"
 msgstr ""
 
-#: pe/ui/apps.cpp, pe/ui/backup.cpp, pe/ui/pairing.cpp, pe/ui/update.cpp
+#: pe/ui/apps.cpp, pe/ui/backup.cpp, pe/ui/migrate.cpp, pe/ui/pairing.cpp, pe/ui/update.cpp
 msgid "Cancel"
 msgstr ""
 
@@ -242,7 +251,7 @@ msgstr ""
 msgid "Cancel download"
 msgstr ""
 
-#: pe/ui/apps.cpp, pe/ui/backup.cpp, pe/ui/update.cpp
+#: pe/ui/apps.cpp, pe/ui/backup.cpp, pe/ui/migrate.cpp, pe/ui/update.cpp
 msgid "Cancelling"
 msgstr ""
 
@@ -407,9 +416,27 @@ msgstr ""
 msgid "Copies settings, profiles and save data to a USB drive."
 msgstr ""
 
+#. Button: ProsperoEden's data is copied for Nightshade; the original stays.
+#: pe/ui/migrate.cpp
+msgid "Copy"
+msgstr ""
+
+#: pe/ui/migrate.cpp
+msgid "Copy cancelled"
+msgstr ""
+
 #. A backup's files are being copied to the USB drive. Keep it short.
 #: pe/ui/backup.cpp
 msgid "Copying"
+msgstr ""
+
+#. {0} and {1} are sizes such as 6.4 GB.
+#: pe/ui/migrate.cpp
+msgid "Copying needs {0}; the console has {1} free. Nothing was changed."
+msgstr ""
+
+#: pe/ui/migrate.cpp
+msgid "Copying your data"
 msgstr ""
 
 #: pe/ui/settings.cpp
@@ -832,6 +859,11 @@ msgstr ""
 msgid "GAMES"
 msgstr ""
 
+#. Under the Copy button. {0} is a folder such as /data/prosperoeden. Settings is the menu's section (use its translation).
+#: pe/ui/migrate.cpp
+msgid "Games and new downloads stay in {0}. You can still choose another game files folder in Settings."
+msgstr ""
+
 #: pe/ui/remote.cpp, pe/ui/settings.cpp
 msgid "Games on your network, downloaded when you play them."
 msgstr ""
@@ -964,8 +996,18 @@ msgstr ""
 msgid "Installing"
 msgstr ""
 
+#. Under the Move button. {0} is /data/prosperoeden, {1} is /data/nightshade.
+#: pe/ui/migrate.cpp
+msgid "Instant, with your games: {0} becomes {1}. The official ProsperoEden app no longer sees it."
+msgstr ""
+
 #: pe/ui/save_sync.cpp
 msgid "It goes to the server."
+msgstr ""
+
+#. After the move or copy; {0} is /data/nightshade. The app then restarts by itself.
+#: pe/ui/migrate.cpp
+msgid "It is now in {0}. Nightshade starts again."
 msgstr ""
 
 #: pe/ui/save_sync.cpp
@@ -1164,6 +1206,19 @@ msgstr ""
 msgid "Mods"
 msgstr ""
 
+#. Button: ProsperoEden's data folder becomes Nightshade's (moved, not copied).
+#: pe/ui/migrate.cpp
+msgid "Move"
+msgstr ""
+
+#: pe/ui/migrate.cpp
+msgid "Moving needs no free space."
+msgstr ""
+
+#: pe/ui/migrate.cpp
+msgid "Moving your data"
+msgstr ""
+
 #: pe/ui/home.cpp, pe/ui/multiplayer.cpp, pe/ui/shell.cpp
 msgid "Multiplayer"
 msgstr ""
@@ -1181,7 +1236,7 @@ msgid "Muted"
 msgstr ""
 
 #. Button hint: move the highlight.
-#: pe/ui/update.cpp
+#: pe/ui/migrate.cpp, pe/ui/update.cpp
 msgid "Navigate"
 msgstr ""
 
@@ -1225,6 +1280,16 @@ msgstr ""
 
 #: eden_services.cpp
 msgid "Nightshade could not get access to the console's storage, so it cannot read your settings, saves and games. Nothing was changed. Close Nightshade and open it again. (Code {0})"
+msgstr ""
+
+#. {0} is Nightshade's folder (/data/nightshade), {1} the ProsperoEden app's (/data/prosperoeden).
+#: pe/ui/migrate.cpp
+msgid "Nightshade now keeps its data in {0}. What you had before is in {1}."
+msgstr ""
+
+#. Under the Start fresh button. {0} is /data/prosperoeden.
+#: pe/ui/migrate.cpp
+msgid "Nightshade starts empty. {0} stays as it is."
 msgstr ""
 
 #: eden_services.cpp, host/fake_services.cpp
@@ -1331,9 +1396,18 @@ msgstr ""
 msgid "Not connected yet"
 msgstr ""
 
+#: pe/ui/migrate.cpp
+msgid "Not enough free space"
+msgstr ""
+
 #. {0} and {1} are sizes such as 1.2 GB.
 #: pe/ui/backup.cpp
 msgid "Not enough room on the drive: the backup needs {0}, {1} is free."
+msgstr ""
+
+#. After a failure that could not be undone fully; the details are a technical English line under it.
+#: pe/ui/migrate.cpp
+msgid "Not everything could be put back. The details below say where it is."
 msgstr ""
 
 #. Settings > Apps: the app is not on the console.
@@ -1368,6 +1442,10 @@ msgstr ""
 #. Short status at the right of the Save data row.
 #: pe/ui/library.cpp
 msgid "Nothing to import"
+msgstr ""
+
+#: pe/ui/migrate.cpp
+msgid "Nothing was changed: both folders are as they were."
 msgstr ""
 
 #. After a backup that was cancelled or failed: what it had written was removed.
@@ -1866,7 +1944,7 @@ msgid "Sections"
 msgstr ""
 
 #. Button hint: choose the highlighted item (not the Select button).
-#: pe/ui/backup.cpp, pe/ui/game_options.cpp, pe/ui/home.cpp, pe/ui/library.cpp, pe/ui/multiplayer.cpp, pe/ui/pairing.cpp, pe/ui/remote.cpp, pe/ui/save_sync.cpp, pe/ui/settings.cpp, pe/ui/update.cpp
+#: pe/ui/backup.cpp, pe/ui/game_options.cpp, pe/ui/home.cpp, pe/ui/library.cpp, pe/ui/migrate.cpp, pe/ui/multiplayer.cpp, pe/ui/pairing.cpp, pe/ui/remote.cpp, pe/ui/save_sync.cpp, pe/ui/settings.cpp, pe/ui/update.cpp
 msgid "Select"
 msgstr ""
 
@@ -1990,6 +2068,11 @@ msgstr ""
 msgid "Start any game once before importing a save."
 msgstr ""
 
+#. Button: Nightshade starts with no data; ProsperoEden's is left as it is.
+#: pe/ui/migrate.cpp
+msgid "Start fresh"
+msgstr ""
+
 #. Shown over a game's cover while it starts.
 #: pe/ui/launcher.cpp
 msgid "STARTING"
@@ -2048,6 +2131,11 @@ msgstr ""
 #. {0} is why (English, technical). A sentence saying what was left on the drive follows it.
 #: pe/ui/backup.cpp
 msgid "The backup failed: {0}"
+msgstr ""
+
+#. {0} is a size such as 6.4 GB.
+#: pe/ui/migrate.cpp
+msgid "The console ran out of space (copying needs about {0}). What was copied was removed."
 msgstr ""
 
 #: pe/ui/remote.cpp
@@ -2467,6 +2555,18 @@ msgstr ""
 msgid "You are told again at the next sync."
 msgstr ""
 
+#: pe/ui/migrate.cpp
+msgid "Your data could not be copied"
+msgstr ""
+
+#: pe/ui/migrate.cpp
+msgid "Your data could not be moved"
+msgstr ""
+
+#: pe/ui/migrate.cpp
+msgid "Your data is ready"
+msgstr ""
+
 #. Update dialog: installing the new app version keeps the player's files.
 #: pe/ui/update.cpp
 msgid "Your games, saves and settings are kept."
@@ -2475,6 +2575,11 @@ msgstr ""
 #. Headline when no game has been played yet.
 #: pe/ui/home.cpp
 msgid "Your next adventure"
+msgstr ""
+
+#. Title of the dialog at Nightshade's first start: what the ProsperoEden app kept on this console (settings, saves, games). ProsperoEden is a name and stays as it is.
+#: pe/ui/migrate.cpp
+msgid "Your ProsperoEden data"
 msgstr ""
 
 #: pe/ui/save_sync.cpp
@@ -2621,7 +2726,7 @@ msgid "{0} · Profile {1}"
 msgstr ""
 
 #. A percentage (a volume): write it as the language does, for example with a space before the sign.
-#: pe/ui/apps.cpp, pe/ui/backup.cpp, pe/ui/game_options.cpp, pe/ui/library.cpp, pe/ui/remote.cpp, pe/ui/settings.cpp, pe/ui/update.cpp
+#: pe/ui/apps.cpp, pe/ui/backup.cpp, pe/ui/game_options.cpp, pe/ui/library.cpp, pe/ui/migrate.cpp, pe/ui/remote.cpp, pe/ui/settings.cpp, pe/ui/update.cpp
 msgid "{0}%"
 msgstr ""
 
