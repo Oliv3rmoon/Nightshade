@@ -9,6 +9,7 @@ What changed in each release of ProsperoEden, newest first. A release's notes on
 ### Fixes
 
 - **The game's memory comes first.** Nightshade gives the emulated console its memory as the game writes it. When none was left, the write was refused and the game closed: the graphics caches hold most of the console's memory and free textures only at the end of each frame, too late for a game that loads a big area at once. Now the write waits up to 2 seconds while the caches give memory back (they see none free and free at their hardest), and only then gives up (`EDEN_CRAM` lines in `stderr.log` say when it waited).
+- **1 GiB kept free for the game's own memory.** The graphics caches now treat 1 GiB less as free than there is, so they give textures back sooner and a game that loads a big area at once (its own memory and the area's textures together) has room. A second TOTK crash, 79 minutes in with ASTC textures compressed, came from exactly that.
 - **The shader cache builds on several threads.** At first start a large game builds its saved pipelines before it plays: TOTK's 13,938 took nine minutes, about 25 a second, as if on one thread. Nightshade now asks for at least 6 builder threads, and `stderr.log` says how many it used (`EDEN_PIPELINE_WORKERS`).
 - **ASTC textures at full quality take four times the memory.** If a large open-world game crashes after a while, set **Settings > Video > ASTC textures** back to the default first.
 

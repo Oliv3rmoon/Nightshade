@@ -467,6 +467,14 @@ extern "C" std::int32_t sceKernelDirectMemoryQuery(std::int64_t, int, DirectMemo
 #ifdef PS5_NATIVE
 // The largest free block of direct memory is what the next graphics allocation needs. Looked at
 // again every 100 ms; called on the GPU thread by the texture collector (KeepDirtyTextures).
+//
+// The guest's memory is taken only where it writes (src/guest_memory_service.inc), and a large
+// open-world game wrote 0.5 to 1.8 GB of it within seconds while it streamed in the textures of
+// the same new area: both went for the pool at once, the caches free at the end of a frame, and
+// the guest's next write found 1 MiB left (Tears of the Kingdom, 23 and 79 minutes in). So the
+// caches see 1 GiB less free than there is and give memory back that much sooner; the guest's
+// writes take it from the headroom (and wait for the caches when even that is gone).
+constexpr std::size_t kGuestReserve = std::size_t{1} << 30;
 static std::atomic<unsigned long long> largest_free_block{0};
 static void RefreshFreeMemory() {
     static std::atomic<long long> checked_ns{0};
@@ -478,8 +486,10 @@ static void RefreshFreeMemory() {
     std::size_t largest = 0;
     const std::int64_t total = sceKernelGetDirectMemorySize();
     const bool known = total > 0 && sceKernelAvailableDirectMemorySize(0, total, 0x4000, &start, &largest) == 0;
-    largest_free_block.store(known ? largest : 0, std::memory_order_relaxed);
-    graphics_memory_short.store(!known || largest < kShortMemory, std::memory_order_relaxed);
+    // Headroom kept for the guest's own memory (kGuestReserve): the caches see that much less free.
+    const std::size_t usable = known && largest > kGuestReserve ? largest - kGuestReserve : 0;
+    largest_free_block.store(known ? (usable != 0 ? usable : 1) : 0, std::memory_order_relaxed);
+    graphics_memory_short.store(!known || usable < kShortMemory, std::memory_order_relaxed);
 }
 // A write to the guest's memory waiting for a block (src/guest_memory_service.inc, WaitForBlock):
 // the game's own memory comes first, so while one waits the caches see memory short and none free,
