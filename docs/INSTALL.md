@@ -109,6 +109,50 @@ This is the only place it keeps them. If ProsperoEden cannot get access to the c
 
 Keys, firmware and games that an early version kept inside the app's folder (`assets/`) are moved to `/data/nightshade` the first time this version starts, so that replacing the app cannot remove them.
 
+## Coming from a Nightshade before its own title ID
+
+Every Nightshade up to 1.010 ran under ProsperoEden's title ID, `PPSA99008`, in the folder you
+installed it to (usually `/data/homebrew/PPSA99008`). Such an install can't update itself to
+`PPSA64448`: its update helper only takes a folder of its own title. So every release ZIP carries two
+apps: Nightshade as `PPSA64448/`, and a small **bridge** as `PPSA99008/`, at the same version (the
+bridge has no emulator: `headless/bridge`, built by `tools/build-bridge.sh`).
+
+**What happens on an old install.** Its update offer (**Update now**, from 1.005.102 on) takes
+`PPSA99008/` from the ZIP, as every update did: the old tile is now the bridge. Your data in
+`/data/prosperoeden` is not touched by the update or by the bridge. The next time you open the old
+tile, it shows "Nightshade has its own app now" and:
+
+1. asks the launch payload (`app-launch.elf`, as **Settings > Apps** opens an app) to open
+   `PPSA64448`, and closes;
+2. when the console doesn't list `PPSA64448` yet, installs it first, the way **Settings > Apps**
+   installs an app: the same release's ZIP from GitHub (`releases/tags/<its version>`), checked
+   against the release's `SHA256SUMS`, unpacked by the update helper in a new folder beside its own
+   (`/data/homebrew/PPSA64448` beside `/data/homebrew/PPSA99008`);
+3. waits for the homebrew loader (ShadowMountPlus) to list it (up to five minutes; a restart of the
+   console lists it too), then opens it as in 1.
+
+The new app's first start asks what to do with `/data/prosperoeden` (see the next section). From then
+on, open Nightshade from its own tile. The bridge needs the payload loader on port 9021 and a network;
+it says what failed on its screen and offers **Try again** (Cross) and **Close** (Circle). It has no
+filesystem access of its own, so its log is in its sandbox (`/download0/nightshade-bridge.log`), and
+in a language the launcher's own font can't draw (Japanese, Korean, Chinese, Thai, Arabic, Greek) its
+screen is in English. The payloads it sends write `/data/nightshade/logs/updater.log` and
+`app-launch.log` once that folder exists.
+
+**Forwarders made for the old title ID** keep working: they open the bridge with `--rom` (and
+`--exit-after-game`), and the bridge passes them on to `PPSA64448`. When that is Nightshade's first
+start, the question about ProsperoEden's data comes first; after **Move** or **Copy** Nightshade
+starts again with the forwarder's game, and after **Start fresh** the game starts at once. A game a
+forwarder names inside `/data/prosperoeden` is found in `/data/nightshade` after a move.
+
+**Afterwards the old tile can go.** Once Nightshade opens from its own tile, delete the old one (and
+its folder, `/data/homebrew/PPSA99008`), or use it for the official ProsperoEden app again: copy
+ProsperoEden's own release over that folder. Keep it while you use forwarders made for the old title
+ID, or make them again for `PPSA64448`.
+
+To move over by hand instead: copy the release ZIP's `PPSA64448` folder to `/data/homebrew/PPSA64448`
+and start it from its tile once the homebrew loader lists it.
+
 ## Moving from ProsperoEden's folder
 
 Up to 1.010, Nightshade ran under the official app's title ID (`PPSA99008`) and kept everything in

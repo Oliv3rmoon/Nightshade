@@ -3,7 +3,10 @@
 A forwarder is a separate small app with its own home screen tile (its own title ID, icon and
 name). When it is opened, it launches Nightshade (`PPSA64448`) with launch arguments, and
 Nightshade starts that game directly instead of opening its launcher. A forwarder made for an
-earlier Nightshade, which used ProsperoEden's title ID, still launches `PPSA99008`.
+earlier Nightshade, which used ProsperoEden's title ID, still launches `PPSA99008`: once that install
+has updated, it is the bridge (`headless/bridge`), which opens `PPSA64448` with the same `--rom`
+and `--exit-after-game` (installing it first when it is missing; see
+[INSTALL.md](INSTALL.md#coming-from-a-nightshade-before-its-own-title-id)).
 
 ## Arguments
 
@@ -28,6 +31,11 @@ uses it after filesystem access is set up, so `roms/` resolves against the folde
   launcher opens and shows `Forwarded game not found: <path>`.
 - After a crash, ProsperoEden restarts without arguments and shows the crash notice; the
   forwarded game is not started again.
+- At Nightshade's first start, while it hasn't asked what to do with ProsperoEden's data folder
+  (`/data/prosperoeden`, [INSTALL.md](INSTALL.md#moving-from-prosperoedens-folder)), it asks that
+  first. After **Move** or **Copy** it starts again with the forwarder's arguments, and after
+  **Start fresh** the game starts at once. A game named inside `/data/prosperoeden` is looked for in
+  `/data/nightshade` after a move.
 - Arguments only reach a new ProsperoEden process. If ProsperoEden is already running, the
   system brings it to the front and `main` does not run again; a forwarder should close it
   first.

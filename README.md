@@ -41,7 +41,9 @@ Nightshade has its own title ID, `PPSA64448`, and its own data folder, `/data/ni
 - **Copy**: your settings, keys, firmware, saves and profiles, covers, wallpapers, launchers, mods and the driver's shader cache are copied, so both apps keep working. It needs that much free space and stops with a clear message when there isn't enough. Your games, and new downloads, stay in `/data/prosperoeden`: Nightshade reads them there (its games folder). Choosing another game files folder later in **Settings > Game files** still works, and takes the games with it.
 - **Start fresh**: Nightshade starts empty and leaves `/data/prosperoeden` alone.
 
-Nothing in `/data/prosperoeden` is ever deleted. When it's done, Nightshade starts again with your data in its new place; if a step fails, both folders stay usable and the dialog says so. The details are in [INSTALL.md](docs/INSTALL.md#moving-from-prosperoedens-folder). Forwarders made for the earlier title ID still open `PPSA99008`.
+Nothing in `/data/prosperoeden` is ever deleted. When it's done, Nightshade starts again with your data in its new place; if a step fails, both folders stay usable and the dialog says so. The details are in [INSTALL.md](docs/INSTALL.md#moving-from-prosperoedens-folder).
+
+An earlier Nightshade's **Update now** brings the old tile (`PPSA99008`) to a small bridge: opened, it installs Nightshade's own app from the same release when it isn't there yet and opens it. Forwarders made for the earlier title ID keep working through it. Afterwards the old tile can be deleted, or used for the official ProsperoEden app again ([details](docs/INSTALL.md#coming-from-a-nightshade-before-its-own-title-id)).
 
 ## Requests, bugs and support
 

@@ -2,6 +2,21 @@
 
 What changed in each release of ProsperoEden, newest first. A release's notes on GitHub are its section here.
 
+## vNEXT
+
+**Nightshade has its own app now, and an earlier install moves over by itself.** Nightshade runs under its own title ID, `PPSA64448`, with its own data folder, `/data/nightshade`, beside the official ProsperoEden app (`PPSA99008`, `/data/prosperoeden`) instead of in its place. An install of an earlier Nightshade updates as usual and then brings you to the new app.
+
+### Moving over
+
+- **Update now turns the old tile into a bridge.** The release ZIP carries Nightshade as `PPSA64448/` and a small bridge as `PPSA99008/`, so an earlier Nightshade's own update takes the bridge. Opened, the old tile says "Nightshade has its own app now", installs Nightshade's own app from the same release when the console doesn't list it yet (the ZIP from GitHub, checked against the release's `SHA256SUMS`, put beside the old folder by the update helper, as **Settings > Apps** installs an app), waits for the homebrew loader to list it, and opens it. When something fails, it says what, with **Try again** and **Close**. It leaves `/data/prosperoeden` alone. See [INSTALL.md](INSTALL.md#coming-from-a-nightshade-before-its-own-title-id).
+- **Your data comes along at the first start.** The first time Nightshade starts and finds `/data/prosperoeden`, it asks once: **Move** it (at once, with your games), **Copy** it (both apps keep working; your games stay where they are) or **Start fresh**. Nothing in `/data/prosperoeden` is ever deleted. See [INSTALL.md](INSTALL.md#moving-from-prosperoedens-folder).
+- **Forwarders made for the old title ID keep working.** The bridge passes `--rom` and `--exit-after-game` on to the new app. When that is its first start, the question about your data comes first, and the game starts after it: once Nightshade has started again after **Move** or **Copy**, at once after **Start fresh**. A forwarder's game inside `/data/prosperoeden` is found in `/data/nightshade` after a move.
+- **Afterwards the old tile can go.** Delete it, or use it for the official ProsperoEden app again; keep it while you use forwarders made for the old title ID.
+
+### Install
+
+From 1.005.102 or later, **Update now** applies it: then open the old tile once. If it doesn't, send `/data/prosperoeden/logs/updater.log`. By hand, copy this ZIP's `PPSA64448` folder to `/data/homebrew/PPSA64448` and open Nightshade from its new tile once the homebrew loader lists it.
+
 ## v1.010.002
 
 **The likely cause of Final Fantasy Resonance stopping the GPU, fixed: draws made from arguments the GPU hadn't finished writing.** Every stop in Oliv3rmoon/Nightshade#1, in the opening scene and after it, came right after draws asking for 27 million to 2 billion copies of a model (one count read as the float 1.0): far more than any game draws, so the GPU ran them until it was reset. Not confirmed on a console yet.

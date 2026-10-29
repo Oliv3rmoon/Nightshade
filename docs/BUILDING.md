@@ -10,7 +10,13 @@ The first run fetches every dependency at its pinned revision, builds the RADV d
 Eden for the PS5, and writes the release files to `dist/`:
 
 - `Nightshade-vX.Y.Z.zip`: the `PPSA64448` folder to copy to `/data/homebrew/PPSA64448` (Nightshade's
-  own title ID, set in `sce_sys/param.json`; its data folder is `/data/nightshade`, `headless/storage_paths.h`);
+  own title ID, set in `sce_sys/param.json`; its data folder is `/data/nightshade`, `headless/storage_paths.h`),
+  and the bridge as `PPSA99008/`: the small app an install made before Nightshade had its own title ID
+  updates itself to, which installs and opens `PPSA64448` ([INSTALL.md](INSTALL.md#coming-from-a-nightshade-before-its-own-title-id)).
+  `tools/build-bridge.sh` builds it from a few of Nightshade's sources (`headless/bridge`, the update
+  kit, the launcher's font and catalogs) after the app, with the same toolchain and none of the emulator,
+  at the app's version; `headless/check_package.py --bridge` checks it, `tools/check-bridge.py` its screen
+  on the host;
 - `SHA256SUMS` (the ZIP's checksum) and `release-notes.md`.
 
 The app package includes an exact-title one-shot helper built from the pinned upstream
@@ -39,7 +45,7 @@ already exists: the dependencies, this checkout's build cache in
 | Target | What it does |
 |---|---|
 | `make` / `make release` | Release files in `dist/` |
-| `make package` | Only the app folder, `build/release/PPSA64448` |
+| `make package` | Only the app folders, `build/release/PPSA64448` and the bridge's, `build/release/PPSA99008` |
 | `make install PS5_HOST=<address>` | Copy `build/release/PPSA64448` to a console over FTP (close ProsperoEden first) |
 | `make dev DEV_TITLE=<title ID>` | Development build, `build/dev/PPSA64448` (or `EDEN_DEV_PACKAGE_DIR`): profiling counters, `dev-settings.txt` switches, boots the given title |
 | `make test` | Host (Linux) build of the emulator and its test suites |
@@ -230,8 +236,9 @@ downloads. To replace it, start the workflow on `main` by hand with "snapshot" t
 dependencies are reused instead of fetched) for a build on your own machine.
 
 - **Pull request** (by itself, at every push to it) and **manual run** (Actions > Release build >
-  Run workflow): builds the release files, checks the ZIP (intact, `eboot.bin` present, every
-  entry stored as 0777) and keeps `dist/` (the ZIP, `SHA256SUMS` and `release-notes.md`) as a
+  Run workflow): builds the release files, checks the ZIP (`tools/ci/check-release-zip.py`: intact,
+  `PPSA64448/` and `PPSA99008/` with their `eboot.bin` at the same version, every entry stored as
+  0777) and keeps `dist/` (the ZIP, `SHA256SUMS` and `release-notes.md`) as a
   7-day artifact. Nothing is published. A push to
   `main` builds nothing; `main` is built the same way every night, to keep the caches a
   release's build starts from. The artifact is `ProsperoEden`; for
