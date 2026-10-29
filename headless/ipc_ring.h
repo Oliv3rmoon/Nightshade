@@ -75,10 +75,14 @@ inline void Record(std::string_view service, std::uint64_t thread, std::uint32_t
 }
 
 // The recorded calls, oldest first, one line each; those of breaking_thread are marked.
+// ms_before_break is each call's age when the dump began: a call recorded after the game had
+// already moved on shows a smaller age than the calls it made after it.
 template <typename Line>
 inline void Dump(std::uint64_t breaking_thread, Line&& line) {
     std::array<Entry, kEntries> entries;
     std::uint32_t count;
+    const auto dump_ns = static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count());
     {
         const std::lock_guard guard{Lock()};
         entries = Entries();
@@ -88,14 +92,15 @@ inline void Dump(std::uint64_t breaking_thread, Line&& line) {
     const std::uint64_t last_ns = count ? entries[(count - 1) % kEntries].when_ns : 0;
     for (std::uint32_t n = first; n < count; ++n) {
         const Entry& entry = entries[n % kEntries];
-        char text[224];
+        char text[256];
         std::snprintf(text, sizeof(text),
                       "EDEN_IPC_RING #%u %s thread=%llu ms_before_last=%.1f service=%s command=%u type=%u "
-                      "sfco_at=%d result=0x%x header=%08x:%08x",
+                      "sfco_at=%d result=0x%x header=%08x:%08x ms_before_break=%.1f",
                       entry.sequence, entry.thread == breaking_thread ? "BREAKING" : "other",
                       static_cast<unsigned long long>(entry.thread),
                       static_cast<double>(last_ns - entry.when_ns) / 1e6, entry.service, entry.command,
-                      entry.type, entry.magic_at, entry.result, entry.header[0], entry.header[1]);
+                      entry.type, entry.magic_at, entry.result, entry.header[0], entry.header[1],
+                      static_cast<double>(dump_ns - entry.when_ns) / 1e6);
         line(text);
     }
 }

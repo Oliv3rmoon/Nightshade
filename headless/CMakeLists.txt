@@ -2030,6 +2030,78 @@ list(REMOVE_ITEM core_sources hle/kernel/k_thread.cpp)
 list(APPEND core_sources "${PORT_BUILD_DIR}/k_thread.cpp")
 set_property(TARGET core PROPERTY SOURCES "${core_sources}")
 
+# A synchronous request waits for its reply (headless/ipc_wait.h). Pinned Eden ends the caller's
+# wait on any wake that reports success, and a caller that runs on before the reply is written
+# reads its own request back: the game stops with 2010-0212. Only the request's reply, or a
+# failure, ends the wait now; a refused wake is logged with the thread that sent it, and a caller
+# found running before its wait ended waits for it (EDEN_IPC_REFUSED_WAKE, EDEN_IPC_RAN_ON).
+file(READ "${PROJECT_SOURCE_DIR}/src/core/hle/kernel/k_server_session.cpp" server_session_source)
+set(request_queue_old "using ThreadQueueImplForKServerSessionRequest = KThreadQueue;")
+set(request_wait_old "    ThreadQueueImplForKServerSessionRequest wait_queue{kernel};")
+set(request_result_old "    return GetCurrentThread(kernel).GetWaitResult();\n}")
+set(reply_wake_old "            if (!client_thread->IsTerminationRequested()) {\n                client_thread->EndWait(kernel, client_result);\n            }")
+foreach(pinned IN ITEMS request_queue_old request_wait_old request_result_old reply_wake_old)
+    string(FIND "${server_session_source}" "${${pinned}}" pinned_at)
+    if(pinned_at LESS 0)
+        message(FATAL_ERROR "Pinned KServerSession request wait changed (${pinned}); review headless/ipc_wait.h.")
+    endif()
+endforeach()
+string(REPLACE "${request_queue_old}" [=[class ThreadQueueImplForKServerSessionRequest final : public KThreadQueue {
+public:
+    ThreadQueueImplForKServerSessionRequest(KernelCore& kernel, const KSessionRequest* request)
+        : KThreadQueue(kernel), m_request(request) {}
+
+    void EndWait(KernelCore& kernel, KThread* waiting_thread, Result wait_result) override {
+        if (!::Eden::IpcWait::EndsWait(m_request, R_SUCCEEDED(wait_result))) {
+            if (::Eden::IpcWait::Report(::Eden::IpcWait::Refused())) {
+                const KThread* waker = GetCurrentThreadPointer(kernel);
+                LOG_ERROR(IPC, "EDEN_IPC_REFUSED_WAKE thread={} waker={} result={:#x}",
+                          waiting_thread->GetThreadId(), waker ? waker->GetThreadId() : 0,
+                          wait_result.raw);
+            }
+            return;
+        }
+        KThreadQueue::EndWait(kernel, waiting_thread, wait_result);
+        m_ended.store(true, std::memory_order_release);
+    }
+
+    void CancelWait(KernelCore& kernel, KThread* waiting_thread, Result wait_result,
+                    bool cancel_timer_task) override {
+        KThreadQueue::CancelWait(kernel, waiting_thread, wait_result, cancel_timer_task);
+        m_ended.store(true, std::memory_order_release);
+    }
+
+    bool Ended() const {
+        return m_ended.load(std::memory_order_acquire);
+    }
+
+private:
+    const KSessionRequest* m_request;
+    std::atomic<bool> m_ended{false};
+};]=] server_session_source "${server_session_source}")
+string(REPLACE "${request_wait_old}" "    ThreadQueueImplForKServerSessionRequest wait_queue{kernel, request};"
+    server_session_source "${server_session_source}")
+string(REPLACE "${request_result_old}" [=[    // Each pass through the scheduler lock lets the core switch away while this thread waits.
+    for (bool reported = false; !wait_queue.Ended(); reported = true) {
+        if (!reported && ::Eden::IpcWait::Report(::Eden::IpcWait::RanOn())) {
+            LOG_ERROR(IPC, "EDEN_IPC_RAN_ON thread={}", GetCurrentThread(kernel).GetThreadId());
+        }
+        { KScopedSchedulerLock sl{kernel}; }
+        ::Eden::CpuRelax();
+    }
+    return GetCurrentThread(kernel).GetWaitResult();
+}]=] server_session_source "${server_session_source}")
+string(REPLACE "${reply_wake_old}" [=[            if (!client_thread->IsTerminationRequested()) {
+                const ::Eden::IpcWait::ScopedReply reply{request};
+                client_thread->EndWait(kernel, client_result);
+            }]=] server_session_source "${server_session_source}")
+write_derived("${PORT_BUILD_DIR}/k_server_session.cpp"
+    "#include <atomic>\n#include \"${EDEN_PORT_DIR}/ipc_wait.h\"\n#include \"${EDEN_PORT_DIR}/kernel_spin_lock.h\"\n${server_session_source}")
+get_target_property(core_sources core SOURCES)
+list(REMOVE_ITEM core_sources hle/kernel/k_server_session.cpp)
+list(APPEND core_sources "${PORT_BUILD_DIR}/k_server_session.cpp")
+set_property(TARGET core PROPERTY SOURCES "${core_sources}")
+
 # Game exit: the application's page table frees every physical page it maps (~1 s for a 4 GiB
 # game) although the kernel shutdown that finalizes it recreates the memory manager at the next
 # initialization. Skip those frees during a kernel shutdown; an in-game process exit (applets)
