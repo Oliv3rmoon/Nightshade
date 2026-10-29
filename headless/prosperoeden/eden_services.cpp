@@ -47,6 +47,9 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+// Starts the app again in a fresh process (src/lifecycle.c); returns only when the system refuses.
+extern "C" int eden_restart_app(void);
+
 namespace {
 
 using pe::fill;
@@ -609,6 +612,25 @@ std::optional<std::int64_t> EdenServices::ask_seed(std::int64_t current, const s
 
 EdenServices::EdenServices(std::string launch_error, Eden::Multiplayer::RoomClient& rooms)
     : rooms_(rooms), launch_error_(std::move(launch_error)) {
+    // ProsperoEden's data folder, at the first start (migrate.h): asked before anything here writes
+    // the settings file. Its games are where its own settings say ("games_folder", else its game
+    // files folder), read without writing to its folder.
+    {
+        Eden::Migrate::Setup migrate;
+        migrate.folders.old_data = Eden::Migrate::kOldDataDir;
+        migrate.folders.data = Eden::kDataDir;
+        const std::string old_settings = std::string{Eden::Migrate::kOldDataDir} + "/" + Eden::Migrate::kSettings;
+        std::string games = Eden::SavedFolderOf(old_settings, "games_folder");
+        if (games.empty()) games = Eden::SavedFolderOf(old_settings, "game_files");
+        migrate.folders.games = games.empty() ? std::string{Eden::Migrate::kOldDataDir} : games;
+        migrate.access = Eden::FilesystemAccess();
+        migrate.platform = Eden::Migrate::Native();
+        migrate.platform.settings = [](const std::string& file, const Eden::Migrate::Rewrite& rewrite, std::string* changes,
+                                       std::string* error) {
+            return Eden::MoveFolders(file, rewrite.from, rewrite.to, rewrite.games, changes, error);
+        };
+        migrate_ = std::make_unique<Eden::Migrate::Worker>(std::move(migrate));
+    }
     (void)mkdir(Eden::ConfigDir().c_str(), 0777);
     // The folder the wallpapers are put in (docs/WALLPAPERS.md), so it exists to be filled.
     (void)mkdir(Eden::WallpapersDir().c_str(), 0777);
@@ -952,6 +974,23 @@ bool EdenServices::start_backup(int drive, std::string* reason) { return backup_
 void EdenServices::cancel_backup() { backup_->Cancel(); }
 
 void EdenServices::finish_backup() { backup_->Finish(); }
+
+pe::ui::MigrationStatus EdenServices::migration() { return migrate_->Status(); }
+bool EdenServices::start_migration(pe::ui::MigrationChoice choice, std::string* reason) {
+    return migrate_->Start(choice, reason);
+}
+void EdenServices::cancel_migration() { migrate_->Cancel(); }
+void EdenServices::finish_migration() { migrate_->Finish(); }
+
+// After the move or the copy everything is read again from where it now is: the settings, the game
+// files folder, the Library, the driver's shader cache. A fresh process does that.
+bool EdenServices::restart_app() {
+    Eden::Report("migration", "EDEN_MIGRATE restart");
+    std::fflush(nullptr);
+    eden_restart_app();
+    Eden::Report("migration", "EDEN_MIGRATE restart refused: the app closes instead");
+    return false;
+}
 
 std::vector<pe::ui::Profile> EdenServices::profiles() {
     const auto who = Eden::Profiles::Resolve(user_);

@@ -1133,12 +1133,88 @@ inline std::string LoadSavedGamesDir(const std::string& file = SettingsFile()) {
     return ValidAssetsDir(value) ? value : std::string{};
 }
 
+// The games folder the move from ProsperoEden set where the games stayed (migrate.h, MoveFolders):
+// beside "games_folder" at the top of the file, with the same value while it is that one.
+inline constexpr const char* kMigratedGamesKey = "games_folder_migrated";
+
 inline bool SaveAssetsDir(std::string_view directory, const std::string& file = SettingsFile()) {
     if (!ValidAssetsDir(directory)) return false;
     Settings::Json document = Settings::Load(file);
+    const std::string before = Settings::String(document, Settings::Json::json_pointer("/game_files"));
     document["version"] = 1;
     document["game_files"] = std::string(directory);
-    return Settings::Write(document, file);
+    if (!Settings::Write(document, file)) return false;
+    // Another game files folder takes the games along again when the games folder is the one the
+    // move from ProsperoEden set: the games are then in its roms/ as before that.
+    Settings::Json whole = Settings::LoadWhole(file);
+    if (!whole.contains(kMigratedGamesKey) || directory == (before.empty() ? std::string{kDefaultAssetsDir} : before))
+        return true;
+    if (whole.contains("games_folder") && whole["games_folder"] == whole[kMigratedGamesKey]) whole.erase("games_folder");
+    whole.erase(kMigratedGamesKey);
+    return Settings::WriteWhole(whole, file);
+}
+
+// A folder another app's settings file names at its top ("game_files", "games_folder"), read
+// without writing anything (ProsperoEden's, for migrate.h); empty when it names none.
+inline std::string SavedFolderOf(const std::string& file, const char* key) {
+    std::string text;
+    if (!Settings::ReadFile(file, text)) return {};
+    const Settings::Json document = Settings::Json::parse(text, nullptr, false);
+    if (!document.is_object() || !document.contains(key) || !document[key].is_string()) return {};
+    const std::string value = document[key].get<std::string>();
+    return ValidAssetsDir(value) ? value : std::string{};
+}
+
+// The settings file of a data folder that moved, or was copied, from `from` to `to` (migrate.h): a
+// game files folder or games folder it names inside `from` is named inside `to` instead. With
+// `games` set (a copy, whose games stayed in `from`) the games folder is set to it and remembered
+// as the one the move set (kMigratedGamesKey), so that choosing another game files folder later
+// takes the games along again (SaveAssetsDir). A file that can't be read as settings is left as it
+// is. What changed, for the log, in *changes.
+inline bool MoveFolders(const std::string& file, std::string_view from, std::string_view to, const std::string& games,
+                        std::string* changes, std::string* error) {
+    changes->clear();
+    std::string text;
+    Settings::Json whole = Settings::Json::object();
+    if (Settings::ReadFile(file, text)) {
+        whole = Settings::Json::parse(text, nullptr, false);
+        if (!whole.is_object()) {
+            *changes = "unreadable, left as it is";
+            return true;
+        }
+    }
+    const auto moved = [&](const std::string& path) {
+        if (path == from) return std::string(to);
+        if (path.size() > from.size() && path.compare(0, from.size(), from) == 0 && path[from.size()] == '/')
+            return std::string(to) + path.substr(from.size());
+        return path;
+    };
+    for (const char* key : {"game_files", "games_folder"}) {
+        if (!games.empty() && std::string_view{key} == "games_folder") continue;
+        if (!whole.contains(key) || !whole[key].is_string()) continue;
+        const std::string before = whole[key].get<std::string>();
+        if (const std::string after = moved(before); after != before) {
+            whole[key] = after;
+            *changes += std::string{changes->empty() ? "" : " "} + key + "=" + after;
+        }
+    }
+    if (!games.empty()) {
+        if (!ValidAssetsDir(games)) {
+            *error = "not a folder: " + games;
+            return false;
+        }
+        whole["games_folder"] = games;
+        whole[kMigratedGamesKey] = games;
+        *changes += std::string{changes->empty() ? "" : " "} + "games_folder=" + games;
+    }
+    if (changes->empty()) return true;
+    whole["version"] = 1;
+    (void)mkdir(Settings::Folder(file).c_str(), 0777);
+    if (!Settings::WriteWhole(whole, file)) {
+        *error = "could not write " + file;
+        return false;
+    }
+    return true;
 }
 
 inline Multiplayer::Connection LoadRoomConnection(const std::string& file = SettingsFile()) {

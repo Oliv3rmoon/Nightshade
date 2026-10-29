@@ -169,6 +169,43 @@ struct BackupStatus
     std::uint64_t free = 0;
 };
 
+// Moving from ProsperoEden (headless/migrate.h): the first start of Nightshade's own title ID asks
+// once what becomes of ProsperoEden's data folder.
+enum class MigrationChoice : std::uint8_t
+{
+    move,  // the folder becomes Nightshade's, at once, the games too
+    copy,  // all but the games and the logs copied: both apps keep working
+    fresh, // nothing is taken
+};
+enum class MigrationPhase : std::uint8_t
+{
+    none,      // nothing to ask: no ProsperoEden data, or it was answered on an earlier start
+    asking,    // Move, Copy or Start fresh
+    working,   // moving, or copying (done_files and done_bytes of files and bytes)
+    done,      // moved or copied: Nightshade starts again with it (Services::restart_app)
+    cancelled, // a copy was cancelled and what it wrote removed; until finish_migration
+    failed,    // until finish_migration
+    no_room,   // a copy without room: before anything was written (room_known), or it filled up
+};
+struct MigrationStatus
+{
+    MigrationPhase phase = MigrationPhase::none;
+    MigrationChoice choice = MigrationChoice::move; // what was chosen (working and after)
+    std::string from;        // /data/prosperoeden
+    std::string to;          // /data/nightshade
+    std::string games;       // where a copy leaves the games (empty: they are not in from)
+    bool measured = false;   // files and bytes are known: what a copy copies
+    std::uint64_t files = 0;
+    std::uint64_t bytes = 0;
+    std::uint64_t done_files = 0;
+    std::uint64_t done_bytes = 0;
+    std::string error;       // failed, no_room: why (English)
+    bool intact = true;      // failed: both folders are as they were
+    bool room_known = false; // no_room before anything was written: what it needs and has
+    std::uint64_t needed = 0;
+    std::uint64_t free = 0;
+};
+
 // A game file in the games folder.
 struct Game
 {
@@ -995,6 +1032,30 @@ class Services
     }
     virtual void finish_backup()
     {
+    }
+
+    // ---- moving from ProsperoEden (headless/migrate.h): asked once, at the first start ----
+    // Where it stands; the answer (false: it could not begin, and reason says why, in English); a
+    // copy stopped (what it wrote is removed); and after a cancel or a failure, back to the question.
+    virtual MigrationStatus migration()
+    {
+        return {};
+    }
+    virtual bool start_migration(MigrationChoice, std::string *)
+    {
+        return false;
+    }
+    virtual void cancel_migration()
+    {
+    }
+    virtual void finish_migration()
+    {
+    }
+    // After a move or a copy: the app starts again, with its data where it now is. False: the
+    // system refused, and the launcher closes the app instead.
+    virtual bool restart_app()
+    {
+        return false;
     }
 
     // ---- images ----

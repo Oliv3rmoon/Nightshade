@@ -30,6 +30,64 @@ static void CheckGameNames() {
     std::puts("Game names: text or not, and look-alike characters as plain letters PASS");
 }
 
+// The settings of a data folder moved or copied from ProsperoEden's (migrate.h): the folders it
+// names inside the old one are named inside the new one, a copy's games folder stays where the games
+// are, and choosing another game files folder later takes the games along again.
+static void CheckMovedFolders() {
+    char directory[] = "/tmp/eden-moved-XXXXXX";
+    assert(mkdtemp(directory));
+    const std::string root = directory;
+    std::string changes, error;
+    // A move: the game files folder and a games folder inside the old folder, one elsewhere kept.
+    const std::string moved = root + "/moved/config/prosperoeden.json";
+    std::filesystem::create_directories(root + "/moved/config");
+    { std::ofstream(moved) << R"({"version":1,"game_files":"/data/prosperoeden","games_folder":"/data/prosperoeden/games","audio":{"volume":30}})"; }
+    assert(Eden::MoveFolders(moved, "/data/prosperoeden", "/data/nightshade", {}, &changes, &error));
+    assert(changes == "game_files=/data/nightshade games_folder=/data/nightshade/games");
+    assert(Eden::LoadSavedAssetsDir(moved) == "/data/nightshade" && Eden::LoadSavedGamesDir(moved) == "/data/nightshade/games");
+    assert(Eden::LoadPreferences(moved).volume == 30);
+    { std::ofstream(moved) << R"({"version":1,"game_files":"/data/prosperoeden-old","games_folder":"/mnt/usb0/games"})"; }
+    assert(Eden::MoveFolders(moved, "/data/prosperoeden", "/data/nightshade", {}, &changes, &error) && changes.empty());
+    assert(Eden::LoadSavedAssetsDir(moved) == "/data/prosperoeden-old" && Eden::LoadSavedGamesDir(moved) == "/mnt/usb0/games");
+    // No settings file and nothing to set: none is written. A damaged one is left as it is.
+    const std::string none = root + "/none/config/prosperoeden.json";
+    assert(Eden::MoveFolders(none, "/data/prosperoeden", "/data/nightshade", {}, &changes, &error) && changes.empty());
+    assert(!std::filesystem::exists(none));
+    { std::ofstream(moved) << "{ not json"; }
+    assert(Eden::MoveFolders(moved, "/data/prosperoeden", "/data/nightshade", "/data/prosperoeden", &changes, &error));
+    assert(changes == "unreadable, left as it is" && Read(moved) == "{ not json");
+    // A copy: the games stayed, so the games folder is the old folder, made even without a file.
+    assert(Eden::MoveFolders(none, "/data/prosperoeden", "/data/nightshade", "/data/prosperoeden", &changes, &error));
+    assert(changes == "games_folder=/data/prosperoeden" && Eden::LoadSavedGamesDir(none) == "/data/prosperoeden");
+    assert(Eden::LoadSavedAssetsDir(none).empty());
+    const std::string copied = root + "/copied/config/prosperoeden.json";
+    std::filesystem::create_directories(root + "/copied/config");
+    { std::ofstream(copied) << R"({"version":1,"game_files":"/data/prosperoeden/eden"})"; }
+    assert(Eden::MoveFolders(copied, "/data/prosperoeden", "/data/nightshade", "/data/prosperoeden/eden", &changes, &error));
+    assert(changes == "game_files=/data/nightshade/eden games_folder=/data/prosperoeden/eden");
+    assert(Eden::LoadSavedAssetsDir(copied) == "/data/nightshade/eden" &&
+           Eden::LoadSavedGamesDir(copied) == "/data/prosperoeden/eden");
+    assert(!Eden::MoveFolders(copied, "/data/prosperoeden", "/data/nightshade", "games", &changes, &error));
+    // The same game files folder chosen again keeps the games where they are; another one takes them along.
+    assert(Eden::SaveAssetsDir("/data/nightshade/eden", copied) && Eden::LoadSavedGamesDir(copied) == "/data/prosperoeden/eden");
+    assert(Eden::SaveAssetsDir("/mnt/usb0/eden", copied) && Eden::LoadSavedGamesDir(copied).empty());
+    assert(Read(copied).find(Eden::kMigratedGamesKey) == std::string::npos);
+    // A games folder set by hand afterwards is not the move's: another game files folder keeps it.
+    assert(Eden::MoveFolders(none, "/data/prosperoeden", "/data/nightshade", "/data/prosperoeden", &changes, &error));
+    {
+        auto whole = Eden::Settings::LoadWhole(none);
+        whole["games_folder"] = "/mnt/usb1/games";
+        assert(Eden::Settings::WriteWhole(whole, none));
+    }
+    assert(Eden::SaveAssetsDir("/mnt/usb0/eden", none) && Eden::LoadSavedGamesDir(none) == "/mnt/usb1/games");
+    // ProsperoEden's own file, read without being written.
+    { std::ofstream(moved) << R"({"game_files":"/mnt/ext1/eden","games_folder":"../x"})"; }
+    assert(Eden::SavedFolderOf(moved, "game_files") == "/mnt/ext1/eden" && Eden::SavedFolderOf(moved, "games_folder").empty());
+    assert(Eden::SavedFolderOf(root + "/missing.json", "game_files").empty());
+    std::filesystem::remove_all(root);
+    std::puts("Moved and copied data folders: their game files and games folders PASS");
+}
+
 int main() {
     CheckGameNames();
     char directory[] = "/tmp/eden-settings-XXXXXX";
@@ -751,6 +809,7 @@ int main() {
         document.erase("games_folder");
         assert(Eden::Settings::Write(document, file) && Eden::LoadSavedGamesDir(file).empty());
     }
+    CheckMovedFolders();
 
     // Everything saved so far survives in one document.
     assert(Eden::LoadPreferences(file).volume == 40 && Eden::LoadLastGame(file) == "Sample Quest [id].nsp");

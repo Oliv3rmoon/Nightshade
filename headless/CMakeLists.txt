@@ -3522,6 +3522,7 @@ endif()
         if(EDEN_PS5_OPENGL)
             set(launcher_sources
                 "${EDEN_PORT_DIR}/multiplayer_directory.cpp"
+                "${EDEN_PORT_DIR}/migrate.cpp"
                 "${launcher_dir}/frontend.cpp"
                 "${launcher_dir}/eden_services.cpp"
                 "${launcher_dir}/pe/audio/mixer.cpp"

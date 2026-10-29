@@ -4,6 +4,7 @@
 #pragma once
 
 #include "backup.h"
+#include "migrate.h"
 #include "mods.h"
 #include "pe/ui/services.hpp"
 #include "remote/remote.h"
@@ -55,6 +56,11 @@ public:
     bool start_backup(int drive, std::string* reason) override;
     void cancel_backup() override;
     void finish_backup() override;
+    pe::ui::MigrationStatus migration() override;
+    bool start_migration(pe::ui::MigrationChoice choice, std::string* reason) override;
+    void cancel_migration() override;
+    void finish_migration() override;
+    bool restart_app() override;
     bool docked(std::uint64_t title_id) override;
     bool set_docked(std::uint64_t title_id, bool docked) override;
     pe::ui::GameSettings game_settings(std::uint64_t title_id) override;
@@ -201,4 +207,8 @@ private:
     // Settings > Diagnostics > Back up to USB (backup.h), on a thread of its own; a backup that runs
     // when the menu goes stops, and what it wrote is removed.
     std::unique_ptr<Eden::Backup::Worker> backup_;
+
+    // The move from ProsperoEden's data folder (migrate.h): asked at the first start; a copy that
+    // runs when the menu goes stops, and what it wrote is removed.
+    std::unique_ptr<Eden::Migrate::Worker> migrate_;
 };
