@@ -528,13 +528,16 @@ bool Record(const std::string& data, State state, const Folders& folders, const 
     return true;
 }
 
+bool Tidy(const Folders& folders, const Platform& platform) {
+    const std::string staging = Trimmed(folders.data) + kIncomplete;
+    if (!Exists(staging)) return true;
+    const bool removed = RemoveTree(platform, staging);
+    Log(platform, "leftover path=" + staging + " removed=" + (removed ? "1" : "0"));
+    return removed;
+}
+
 State Prepare(const Folders& folders, const Platform& platform) {
     const std::string data = Trimmed(folders.data), old = Trimmed(folders.old_data);
-    // A copy an earlier start did not finish (it was closed while copying) is of no use.
-    if (const std::string staging = data + kIncomplete; Exists(staging)) {
-        const bool removed = RemoveTree(platform, staging);
-        Log(platform, "leftover path=" + staging + " removed=" + (removed ? "1" : "0"));
-    }
     const State recorded = Recorded(data);
     if (recorded != State::none && recorded != State::asking) return recorded;
     if (recorded == State::none && IsFile(data + "/" + kSettings)) return State::none; // Nightshade's own
@@ -665,6 +668,7 @@ void Worker::Begin(std::function<void()> work) {
 }
 
 void Worker::Look() {
+    (void)Tidy(setup_.folders, setup_.platform);
     Plan plan;
     std::string problem;
     const bool measured = Measure(setup_.folders.old_data, Excluded(setup_.folders), setup_.platform, stop_, &plan, &problem);

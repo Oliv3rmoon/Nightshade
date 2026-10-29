@@ -164,11 +164,14 @@ void check_asking() {
         make_old(lab.old());
         put(lab.data() / Eden::Migrate::kSettings, "{}");
         expect(Eden::Migrate::Prepare(lab.folders, lab.platform) == State::none, "Nightshade's own settings: nothing asked");
-        // A copy an earlier start left unfinished goes.
+        // A copy an earlier start left unfinished goes, but not on the start's own thread.
         put(fs::path(lab.folders.data + Eden::Migrate::kIncomplete) / "user/a", "half");
         (void)Eden::Migrate::Prepare(lab.folders, lab.platform);
-        expect(!fs::exists(lab.folders.data + Eden::Migrate::kIncomplete), "an unfinished copy is removed at the start");
+        expect(fs::exists(lab.folders.data + Eden::Migrate::kIncomplete), "Prepare leaves an unfinished copy alone");
+        expect(Eden::Migrate::Tidy(lab.folders, lab.platform) && !fs::exists(lab.folders.data + Eden::Migrate::kIncomplete),
+               "Tidy removes an unfinished copy");
         expect(lab.logged("EDEN_MIGRATE leftover path="), "and that is logged");
+        expect(Eden::Migrate::Tidy(lab.folders, lab.platform), "Tidy with nothing to remove");
     }
     {
         Lab lab("answered");
@@ -499,12 +502,14 @@ void check_worker() {
         Lab lab("worker-copy");
         make_old(lab.old());
         make_fresh(lab.data());
+        put(fs::path(lab.folders.data + Eden::Migrate::kIncomplete) / "user/a", "half");
         Eden::Migrate::Worker worker({lab.folders, true, lab.platform});
         auto status = worker.Status();
         expect(status.phase == Phase::asking && status.from == lab.folders.old_data && status.to == lab.folders.data &&
                    status.games == lab.folders.old_data,
                "worker: asks, naming both folders and where a copy leaves the games");
         expect(wait_for([&] { return worker.Status().measured; }), "worker: measures what a copy copies");
+        expect(!fs::exists(lab.folders.data + Eden::Migrate::kIncomplete), "worker: an unfinished copy removed on its thread");
         status = worker.Status();
         expect(status.files == 51 && status.bytes > 0, "worker: 51 files to copy");
         std::string reason;

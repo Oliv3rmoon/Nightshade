@@ -110,8 +110,11 @@ Platform Native();
 State Recorded(const std::string& data);
 // At the start, before anything writes the settings file: the record's state, or asking when the
 // data folder has no settings and no record while old_data holds something (logs alone are
-// nothing); the record then says asking. A copy left unfinished by an earlier start is removed.
+// nothing); the record then says asking. Quick: a few looks at the two folders.
 State Prepare(const Folders& folders, const Platform& platform);
+// Removes the copy an earlier start left unfinished (closed while copying), which can be large: on
+// the worker's thread while the question shows, and before a copy. False when something stays.
+bool Tidy(const Folders& folders, const Platform& platform);
 // Writes the record (true when written).
 bool Record(const std::string& data, State state, const Folders& folders, const Platform& platform,
             const std::string& games_folder = {});
