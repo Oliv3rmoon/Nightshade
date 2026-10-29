@@ -2,6 +2,24 @@
 
 What changed in each release of ProsperoEden, newest first. A release's notes on GitHub are its section here.
 
+## v1.010.002
+
+**The likely cause of Final Fantasy Resonance stopping the GPU, fixed: draws made from arguments the GPU hadn't finished writing.** Every stop in Oliv3rmoon/Nightshade#1, in the opening scene and after it, came right after draws asking for 27 million to 2 billion copies of a model (one count read as the float 1.0): far more than any game draws, so the GPU ran them until it was reset. Not confirmed on a console yet.
+
+### Fixes
+
+- **Draw arguments the GPU wrote are read once its newest write is in memory.** Some games have the GPU work out how many copies of a model to draw. Eden marks memory the GPU wrote so it fetches it before the CPU reads it, but a fetch that finished could clear the mark of a range the GPU had written again since, and Eden then took the older contents as current. Such a range now stays marked until its newest contents arrive (Eden patch 11). The `submit_sync` switch made this rarer by waiting for the GPU after every submission; it is no longer needed for it.
+- **Arguments that came from GPU memory are read again before use at every accuracy level**, not only at High.
+- **A draw that can't be real is dropped instead of stopping the GPU.** If a draw the CPU makes from such arguments still asks for more than about 4 billion vertices after they are read again, Nightshade skips it and says so in `stderr.log` (`EDEN_INDIRECT_DRAW_DROPPED`).
+
+### For testing a game that stops the GPU
+
+- **The stall report shows an indirect draw's arguments** (its count and copies, and how many draws a multi draw makes), read from memory, so a stop on a draw the GPU makes itself shows whether its arguments were wrong too.
+
+### Install
+
+From 1.005.102 or later, **Update now** applies it. If it doesn't, send `/data/prosperoeden/logs/updater.log`. From an older version, copy this ZIP's `PPSA99008` folder over yours.
+
 ## v1.010.001
 
 **Closer to the GPU stop in Final Fantasy Resonance: shaders read memory the way the game asks, switches to test a game that stops the GPU, and a stall report that names the shader.** Final Fantasy Resonance still stops in its opening scene on v1.010.000 (Oliv3rmoon/Nightshade#1); this release gives the next test runs what they need to find where, and one more fix that may be it. Not confirmed on a console yet.
