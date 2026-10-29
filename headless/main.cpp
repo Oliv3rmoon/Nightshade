@@ -1704,6 +1704,9 @@ int main(int argc, char** argv) {
 #endif
                 Eden::Loading::Set(Eden::Loading::Step::game);
                 Eden::BootTrace::Line("loading the game");
+                // Until the shader cache is built, pipeline builders may use every CPU: the guest
+                // has not started (performance.h pipeline_startup).
+                Eden::Performance::pipeline_startup.store(true, std::memory_order_release);
                 Core::SystemResultStatus loaded;
                 try {
                     loaded = system.Load(window, guest, params);
@@ -1847,6 +1850,8 @@ int main(int argc, char** argv) {
                     std::fflush(stdout);
                 }
 #endif
+                // The guest starts now: builders go back to the spare CPUs as they next build.
+                Eden::Performance::pipeline_startup.store(false, std::memory_order_release);
 #ifndef PS5_NATIVE
                 if (devices) Eden::Mock::BeginGuestCycle();
 #endif

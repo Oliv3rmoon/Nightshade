@@ -289,14 +289,34 @@ void CheckWorkerTopology() {
         worker_topology_ready, count, worker_cpus[0], worker_cpus[1], worker_cpus[2], worker_cpus[3], worker_cpus[4],
         static_cast<int>(measured));
 }
+thread_local bool pipeline_builder = false;      // this thread builds pipelines
+thread_local bool pipeline_builder_settled = false; // and is on the spare CPUs
 void PlaceSecondary(const char* name) {
     if (!placement_secondary.load(std::memory_order_relaxed) || !secondary_cpus) return;
+    const bool builder = std::strcmp(name, "VkPipelineBuilder") == 0;
+    if (builder) pipeline_builder = true;
+    if (builder && pipeline_startup.load(std::memory_order_acquire) && topology_allowed_valid) {
+        // Every CPU the app has, while the cache is built before the guest runs.
+        const int result = cpuset_setaffinity(CPU_LEVEL_WHICH, CPU_WHICH_TID, -1, 8, &topology_allowed);
+        unsigned long long all = 0;
+        for (unsigned cpu = 0; cpu < 64; ++cpu)
+            if (CPU_ISSET(cpu, &topology_allowed)) all |= 1ULL << cpu;
+        if (secondary_reports.fetch_add(1, std::memory_order_relaxed) < 64)
+            std::printf("EDEN_WORKER_PLACED name=%s mask=%llx error=%d startup=1\n", name, all, result ? errno : 0);
+        if (result == 0) return;
+    }
+    if (builder) pipeline_builder_settled = true;
     cpuset_t mask{};
     for (unsigned cpu = 0; cpu < 64; ++cpu)
         if (secondary_cpus & (1ULL << cpu)) CPU_SET(cpu, &mask);
     const int result = cpuset_setaffinity(CPU_LEVEL_WHICH, CPU_WHICH_TID, -1, 8, &mask);
     if (secondary_reports.fetch_add(1, std::memory_order_relaxed) < 64)
         std::printf("EDEN_WORKER_PLACED name=%s mask=%llx error=%d\n", name, secondary_cpus, result ? errno : 0);
+}
+void SettlePipelineBuilderImpl() {
+    if (!pipeline_builder || pipeline_builder_settled || pipeline_startup.load(std::memory_order_acquire)) return;
+    PlaceSecondary("VkPipelineBuilder");
+    pipeline_builder_settled = true;
 }
 void PinWorker(unsigned index, cpuset_t& affinity) {
     if (!worker_topology_ready || index >= worker_cpus.size() ||
@@ -1444,6 +1464,14 @@ void PlatformChecks() {
     }
     std::fflush(stdout);
 }
+// performance.h SettlePipelineBuilder: a pipeline builder placed on every CPU while the shader
+// cache was built goes back to the spare CPUs once the game runs. Other threads are untouched.
+void SettlePipelineBuilder() {
+#ifdef PS5_NATIVE
+    SettlePipelineBuilderImpl();
+#endif
+}
+
 } // namespace Eden::Performance
 
 // dynarmic A64 hooks (weak there): whole-cache evacuations and block compilation time.

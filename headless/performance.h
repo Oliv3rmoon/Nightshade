@@ -528,6 +528,14 @@ inline std::size_t PipelineWorkers(std::size_t upstream) {
     }
     return chosen;
 }
+// While a game's shader cache is built at start (headless/main.cpp), the threads that build
+// pipelines may run on every CPU the app has: the guest's cores and the GPU thread's are idle
+// until the game starts. Outside that time they keep to the spare CPUs (PlaceSecondary), as every
+// background worker does. A large game's 14,000 cached pipelines took 208 to 552 s on the spare
+// CPUs alone. SettlePipelineBuilder, called where a pipeline starts to build, moves a builder
+// placed during the start back to the spare CPUs once the game runs; other threads are untouched.
+inline std::atomic<bool> pipeline_startup{false};
+void SettlePipelineBuilder();
 // Signal the guest vsync first and compose 1.5 ms later, so a frame the game queues in response
 // to the vsync is latched at that same vsync (dev-settings compose_delay_us=N overrides it).
 inline std::atomic<int> compose_delay_us{1500};
