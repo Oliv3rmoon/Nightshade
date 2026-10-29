@@ -854,10 +854,10 @@ msgstr "독일어"
 msgid "Get"
 msgstr "받기"
 
-#. Settings > Apps: what it is for. Nightshade TV, Stream and Station are the apps' names (unchanged).
+#. Settings > Apps: what it is for. Physalis, Datura and Mandrake are the apps' names (unchanged).
 #: pe/ui/apps.cpp, pe/ui/settings.cpp
-msgid "Get, update and open Nightshade TV, Stream and Station."
-msgstr "Nightshade TV, Stream, Station을 받고 업데이트하고 엽니다."
+msgid "Get, update and open Physalis, Datura and Mandrake."
+msgstr "Physalis, Datura, Mandrake를 받고 업데이트하고 엽니다."
 
 #: pe/ui/browse.cpp
 msgid "GETTING STARTED"
@@ -1114,7 +1114,7 @@ msgstr "라이브러리"
 msgid "Linked"
 msgstr "연결됨"
 
-#. Settings > Apps: what the Nightshade TV app is. IPTV is a kind of TV service delivered over the internet (unchanged).
+#. Settings > Apps: what the Physalis app is. IPTV is a kind of TV service delivered over the internet (unchanged).
 #: pe/ui/apps_list.hpp
 msgid "Live TV, films and series from your IPTV provider."
 msgstr "IPTV 제공업체의 실시간 TV, 영화, 시리즈."
@@ -1484,12 +1484,12 @@ msgstr "그래도 플레이"
 msgid "Play as"
 msgstr "이 프로필로"
 
-#. Settings > Apps: what the Nightshade Stream app is. Moonlight is the name of the game streaming client (unchanged).
+#. Settings > Apps: what the Datura app is. Moonlight is the name of the game streaming client (unchanged).
 #: pe/ui/apps_list.hpp
 msgid "Play games streamed from your PC with Moonlight."
 msgstr "Moonlight로 PC에서 스트리밍되는 게임을 플레이합니다."
 
-#. Settings > Apps: what the Nightshade Station app is. PS1 is the first PlayStation, SwanStation the emulator's name (both unchanged).
+#. Settings > Apps: what the Mandrake app is. PS1 is the first PlayStation, SwanStation the emulator's name (both unchanged).
 #: pe/ui/apps_list.hpp
 msgid "Play PS1 games with the SwanStation emulator."
 msgstr "SwanStation 에뮬레이터로 PS1 게임을 플레이합니다."
@@ -1696,7 +1696,7 @@ msgstr "보통"
 msgid "Release {0} of the original project, {1}"
 msgstr "원래 프로젝트의 릴리스 {0}, {1}"
 
-#. {0} is a release's name, such as v1.000.090 or 01.000.110; {1} a GitHub repository, such as Oliv3rmoon/Nightshade-TV (both unchanged).
+#. {0} is a release's name, such as v1.000.090 or 01.000.110; {1} a GitHub repository, such as Oliv3rmoon/Physalis (both unchanged).
 #: pe/ui/apps.cpp
 msgid "Release {0}, from {1}"
 msgstr "릴리스 {0}, 출처 {1}"

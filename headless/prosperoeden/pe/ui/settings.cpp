@@ -521,7 +521,7 @@ void Launcher::draw_settings(Canvas &c)
             about = tr("Choose a theme or change the launcher layout.");
             break;
         case kApps:
-            about = tr("Get, update and open Nightshade TV, Stream and Station.");
+            about = tr("Get, update and open Physalis, Datura and Mandrake.");
             break;
         default:
             break;
