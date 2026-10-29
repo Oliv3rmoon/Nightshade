@@ -311,7 +311,7 @@ void good_zip()
     network.console = &console;
     const pe::ui::AppListing &tv = app("PPSA99003");
     const std::string zip = release_zip("PPSA99003", "01.000.090", "tv");
-    // Nightshade TV has no release yet (404); ProsperoTV's lists PPSA99003.zip with SHA256SUMS and
+    // Physalis has no release yet (404); ProsperoTV's lists PPSA99003.zip with SHA256SUMS and
     // a digest that agree.
     network.api[latest_of(tv.repository)] = {404, "{\"message\":\"Not Found\"}"};
     network.api[latest_of(tv.fallback)] = {
@@ -481,29 +481,32 @@ void redirects(const fs::path &fixtures)
     const pe::ui::AppListing &tv = app("PPSA99003");
     const std::string moved = "https://api.github.com/repositories/42/releases/latest";
     const std::string zip = release_zip("PPSA99003", "01.001.000", "tv");
-    network.api[latest_of(tv.repository)] = {301, "{\"message\":\"Moved Permanently\",\"url\":\"" + moved + "\"}"};
-    network.api[moved] = {200, latest("01.001.000", {{"PPSA99003.zip", zip.size(), sha256(zip)}},
-                                      "oliv3rmoon/Nightshade-Television")};
+    // A Nightshade that still asks for the app by the name it had before it was renamed
+    // (Oliv3rmoon/Nightshade-TV, now Oliv3rmoon/Physalis): GitHub answers with a redirect to the
+    // same repository under its new name.
+    const pe::ui::AppListing before{"Nightshade TV", tv.title, "Oliv3rmoon/Nightshade-TV", tv.fallback, tv.asset, "", tv.icon};
+    network.api[latest_of(before.repository)] = {301, "{\"message\":\"Moved Permanently\",\"url\":\"" + moved + "\"}"};
+    network.api[moved] = {200, latest("01.001.000", {{"PPSA99003.zip", zip.size(), sha256(zip)}}, tv.repository)};
     const self_update_platform platform = platform_of(network);
-    const Eden::Apps::Release renamed = Eden::Apps::Check(&platform, tv);
+    const Eden::Apps::Release renamed = Eden::Apps::Check(&platform, before);
     expect(renamed.reason == GITHUB_RELEASE_NEWER && !renamed.fallback && renamed.report.redirects == 1,
            "a repository renamed by its owner is followed");
     network.api[moved] = {200, latest("01.001.000", {{"PPSA99003.zip", zip.size(), sha256(zip)}},
-                                      "someone-else/Nightshade-TV")};
+                                      "someone-else/Physalis")};
     network.asked.clear();
-    const Eden::Apps::Release elsewhere = Eden::Apps::Check(&platform, tv);
+    const Eden::Apps::Release elsewhere = Eden::Apps::Check(&platform, before);
     self_update_offer offer{};
     expect(elsewhere.reason == GITHUB_RELEASE_OWNER_CHANGED && !elsewhere.fallback &&
-               !Eden::Apps::MakeOffer(tv, elsewhere, {}, "PPSA99008", &offer) &&
-               network.asked == std::vector<std::string>{latest_of(tv.repository), moved},
+               !Eden::Apps::MakeOffer(before, elsewhere, {}, "PPSA99008", &offer) &&
+               network.asked == std::vector<std::string>{latest_of(before.repository), moved},
            "a redirect to another account is refused, and nothing more is asked");
     network.api[moved] = {200, latest("01.001.000", {{"PPSA99003.zip", zip.size(), sha256(zip)}})};
-    expect(Eden::Apps::Check(&platform, tv).reason == GITHUB_RELEASE_OWNER_CHANGED,
+    expect(Eden::Apps::Check(&platform, before).reason == GITHUB_RELEASE_OWNER_CHANGED,
            "a redirect whose answer doesn't say where the release is is refused");
 
     // As GitHub answers today for a list that names blackbearreloaded/ProsperoTV, which moved to
     // ThatGuyKalvin's account.
-    const pe::ui::AppListing old{"Nightshade TV", "PPSA99003", "Oliv3rmoon/Nightshade-TV", "blackbearreloaded/ProsperoTV",
+    const pe::ui::AppListing old{"Physalis", "PPSA99003", "Oliv3rmoon/Physalis", "blackbearreloaded/ProsperoTV",
                                  "PPSA99003.zip", "", pe::ui::AppIcon::tv};
     Network github;
     github.api[latest_of(old.repository)] = {404, "{\"message\":\"Not Found\"}"};
@@ -528,17 +531,18 @@ void redirects(const fs::path &fixtures)
     expect(Eden::Apps::Check(&none, tv).reason == GITHUB_RELEASE_SUMS_MALFORMED,
            "SHA256SUMS of no size: nothing is offered");
 
-    // Nightshade TV's own first release, as GitHub gave it.
+    // Physalis's own first release (published as Nightshade TV), as GitHub gives it under the
+    // repository's new name.
     Network own;
-    own.api[latest_of(tv.repository)] = {200, read(fixtures / "Nightshade-TV-latest.json")};
-    own.files[file_of(tv.repository, "01.001.000", "SHA256SUMS")] = read(fixtures / "Nightshade-TV-SHA256SUMS");
+    own.api[latest_of(tv.repository)] = {200, read(fixtures / "Physalis-latest.json")};
+    own.files[file_of(tv.repository, "01.001.000", "SHA256SUMS")] = read(fixtures / "Physalis-SHA256SUMS");
     const self_update_platform ours = platform_of(own);
     const Eden::Apps::Release first = Eden::Apps::Check(&ours, tv);
     expect(first.reason == GITHUB_RELEASE_NEWER && !first.fallback && std::string{first.asset.tag} == "01.001.000" &&
                first.asset.from_sums == 1 &&
                std::string{first.asset.sha256} == "dd810b47475d604faf01917f0631712c04607ebeffc0adfc539c2f905f00acd9" &&
                std::string{first.asset.url} == file_of(tv.repository, "01.001.000", "PPSA99003.zip"),
-           "Nightshade TV's own release 01.001.000 is offered from its repository");
+           "Physalis's own release 01.001.000 is offered from its repository");
 }
 
 // ---- the originals' releases, as GitHub answered for them ---------------------------------------

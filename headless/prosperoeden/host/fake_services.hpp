@@ -206,8 +206,8 @@ class FakeServices : public ui::Services
     {
         update_steps = -1;
     }
-    // Settings > Apps: Nightshade TV installed and current, Nightshade Stream installed with a
-    // newer release of the original project, Nightshade Station not installed with a release of
+    // Settings > Apps: Physalis installed and current, Datura installed with a
+    // newer release of the original project, Mandrake not installed with a release of
     // its own. An install goes through its phases a step per look (the launcher looks four times a
     // second); app_fails ends it in a failure. app_open says what opening one comes to.
     std::vector<ui::AppState> app_list = [] {
@@ -217,7 +217,7 @@ class FakeServices : public ui::Services
         list[0].installed = "01.000.090";
         list[0].offer = ui::AppOffer::current;
         list[0].release = "v1.000.090";
-        list[0].repository = "Oliv3rmoon/Nightshade-TV";
+        list[0].repository = "Oliv3rmoon/Physalis";
         list[0].size = 42353289;
         list[1].installed = "01.000.100";
         list[1].offer = ui::AppOffer::update;
@@ -227,7 +227,7 @@ class FakeServices : public ui::Services
         list[1].size = 36520955;
         list[2].offer = ui::AppOffer::get;
         list[2].release = "v1.005.009";
-        list[2].repository = "Oliv3rmoon/Nightshade-Station";
+        list[2].repository = "Oliv3rmoon/Mandrake";
         list[2].size = 18267896;
         return list;
     }();

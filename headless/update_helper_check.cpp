@@ -311,7 +311,7 @@ void other_apps()
         app.install = true;
         app.archive = release_zip("PPSA99003", "01.000.090", "tv program");
         const int result = console.talk(app, install_request("PPSA99003", "none", "01.000.090", app.archive,
-                                                             sha256(app.archive), "Nightshade TV"));
+                                                             sha256(app.archive), "Physalis"));
         const fs::path folder = console.homebrew / "PPSA99003";
         expect(result == 0, "a new app is installed");
         expect(app.last() == "installed 01.000.090 " + folder.string(), "a new app: the helper says where");
@@ -323,7 +323,7 @@ void other_apps()
         expect(read(console.homebrew / "PPSA99008/eboot.bin") == "old program of PPSA99008",
                "a new app leaves Nightshade as it was");
         expect(console.notices.size() == 1 &&
-                   console.notices[0] == "Nightshade TV 01.000.090 was installed. The homebrew loader lists it "
+                   console.notices[0] == "Physalis 01.000.090 was installed. The homebrew loader lists it "
                                          "after its next scan or a restart.",
                "a new app: its notification");
         expect(console.no_work_left(), "a new app leaves no work folder");
@@ -333,7 +333,7 @@ void other_apps()
         again.install = true;
         again.archive = app.archive;
         expect(console.talk(again, install_request("PPSA99003", "none", "01.000.090", again.archive,
-                                                   sha256(again.archive), "Nightshade TV")) == 1 &&
+                                                   sha256(again.archive), "Physalis")) == 1 &&
                    again.last() == "fail The app is already installed in " + folder.string(),
                "an app already installed is not installed again as a new one");
     }
@@ -346,14 +346,14 @@ void other_apps()
         app.install = true;
         app.archive = release_zip("PPSA99002", "01.000.110", "stream program");
         const int result = console.talk(app, install_request("PPSA99002", "01.000.100", "01.000.110", app.archive,
-                                                             sha256(app.archive), "Nightshade Stream"));
+                                                             sha256(app.archive), "Datura"));
         expect(result == 0 && app.last() == "installed 01.000.110 " + folder.string(), "an installed app is updated");
         expect(read(folder / "eboot.bin") == "stream program" && read(folder / "language.txt") == "de-DE",
                "an updated app: its files replaced, the player's kept");
         expect(read(console.data / "prosperoeden/previous-version/PPSA99002-backup/eboot.bin") ==
                    "old program of PPSA99002",
                "an updated app: the version it replaced is kept");
-        expect(console.notices.size() == 1 && console.notices[0] == "Nightshade Stream was updated to 01.000.110.",
+        expect(console.notices.size() == 1 && console.notices[0] == "Datura was updated to 01.000.110.",
                "an updated app: its notification");
 
         // A release that names no version ("1.5.9"): the app's own param.json says it.
@@ -361,7 +361,7 @@ void other_apps()
         any.install = true;
         any.archive = release_zip("PPSA99002", "01.000.111", "stream program 2");
         expect(console.talk(any, install_request("PPSA99002", "01.000.110", "any", any.archive, sha256(any.archive),
-                                                 "Nightshade Stream")) == 0 &&
+                                                 "Datura")) == 0 &&
                    any.last() == "installed 01.000.111 " + folder.string(),
                "a release that names no version installs the version its ZIP holds");
 
@@ -370,7 +370,7 @@ void other_apps()
         stale.install = true;
         stale.archive = release_zip("PPSA99002", "01.000.120", "stream program 3");
         expect(console.talk(stale, install_request("PPSA99002", "01.000.100", "01.000.120", stale.archive,
-                                                   sha256(stale.archive), "Nightshade Stream")) == 1 &&
+                                                   sha256(stale.archive), "Datura")) == 1 &&
                    stale.last() == "fail The installed app isn't the version that was asked about" &&
                    read(folder / "eboot.bin") == "stream program 2",
                "an app whose installed version changed is not updated");
@@ -382,7 +382,7 @@ void other_apps()
         app.install = true;
         app.archive = release_zip("PPSA98510", "01.005.009", "station program");
         const int result = console.talk(app, install_request("PPSA98510", "none", "any", app.archive,
-                                                             std::string(64, '0'), "Nightshade Station"));
+                                                             std::string(64, '0'), "Mandrake"));
         expect(result == 1 && app.last() == "fail The download doesn't match the catalog's listing",
                "a download whose SHA-256 is not the one announced is refused");
         expect(!fs::exists(console.homebrew / "PPSA98510") && console.no_work_left() && console.notices.empty(),
@@ -393,7 +393,7 @@ void other_apps()
         other.install = true;
         other.archive = release_zip("PPSA99003", "01.000.090", "tv program");
         expect(console.talk(other, install_request("PPSA98510", "none", "any", other.archive, sha256(other.archive),
-                                                   "Nightshade Station")) == 1 &&
+                                                   "Mandrake")) == 1 &&
                    !fs::exists(console.homebrew / "PPSA98510"),
                "a ZIP of another title is not installed");
 
@@ -403,7 +403,7 @@ void other_apps()
         blocked.install = true;
         blocked.archive = app.archive;
         expect(console.talk(blocked, install_request("PPSA98510", "none", "any", blocked.archive,
-                                                     sha256(blocked.archive), "Nightshade Station")) == 1 &&
+                                                     sha256(blocked.archive), "Mandrake")) == 1 &&
                    blocked.last() ==
                        "fail A folder that isn't the app is in the way: " + (console.homebrew / "PPSA98510").string() &&
                    read(console.homebrew / "PPSA98510/notes.txt") == "mine",
@@ -416,7 +416,7 @@ void other_apps()
         cancelled.apply = false;
         cancelled.archive = app.archive;
         expect(console.talk(cancelled, install_request("PPSA98510", "none", "any", cancelled.archive,
-                                                       sha256(cancelled.archive), "Nightshade Station")) == 1 &&
+                                                       sha256(cancelled.archive), "Mandrake")) == 1 &&
                    !fs::exists(console.homebrew / "PPSA98510") && console.no_work_left(),
                "a cancelled install leaves nothing behind");
 
@@ -426,7 +426,7 @@ void other_apps()
         oddly.install = true;
         oddly.archive = release_zip("PPSA98510", "1.5.9", "station program");
         expect(console.talk(oddly, install_request("PPSA98510", "none", "any", oddly.archive, sha256(oddly.archive),
-                                                   "Nightshade Station")) == 1 &&
+                                                   "Mandrake")) == 1 &&
                    oddly.last() == "fail The download isn't the app and version the release names" &&
                    !fs::exists(console.homebrew / "PPSA98510"),
                "a ZIP whose version isn't a content version is not installed");
@@ -441,7 +441,7 @@ void other_apps()
             asked.install = true;
             asked.archive = app.archive;
             expect(console.talk(asked, install_request("PPSA98510", "none", "any", asked.archive,
-                                                       sha256(asked.archive), "Nightshade Station")) == 1 &&
+                                                       sha256(asked.archive), "Mandrake")) == 1 &&
                        asked.last() == "fail " + why && !fs::exists(console.homebrew / "PPSA98510") &&
                        console.no_work_left(),
                    what);
@@ -465,7 +465,7 @@ void other_apps()
         leftover.install = true;
         leftover.archive = app.archive;
         expect(console.talk(leftover, install_request("PPSA98510", "none", "any", leftover.archive,
-                                                      sha256(leftover.archive), "Nightshade Station")) == 0 &&
+                                                      sha256(leftover.archive), "Mandrake")) == 0 &&
                    read(console.homebrew / "PPSA98510/eboot.bin") == "station program",
                "an app closed with its sandbox left behind is installed");
         fs::remove_all(console.base / "sandbox/PPSA98510_000");

@@ -854,10 +854,10 @@ msgstr "Němčina"
 msgid "Get"
 msgstr "Získat"
 
-#. Settings > Apps: what it is for. Nightshade TV, Stream and Station are the apps' names (unchanged).
+#. Settings > Apps: what it is for. Physalis, Datura and Mandrake are the apps' names (unchanged).
 #: pe/ui/apps.cpp, pe/ui/settings.cpp
-msgid "Get, update and open Nightshade TV, Stream and Station."
-msgstr "Získej, aktualizuj a otevři Nightshade TV, Stream a Station."
+msgid "Get, update and open Physalis, Datura and Mandrake."
+msgstr "Získej, aktualizuj a otevři Physalis, Datura a Mandrake."
 
 #: pe/ui/browse.cpp
 msgid "GETTING STARTED"
@@ -1114,7 +1114,7 @@ msgstr "Knihovna"
 msgid "Linked"
 msgstr "Propojeno"
 
-#. Settings > Apps: what the Nightshade TV app is. IPTV is a kind of TV service delivered over the internet (unchanged).
+#. Settings > Apps: what the Physalis app is. IPTV is a kind of TV service delivered over the internet (unchanged).
 #: pe/ui/apps_list.hpp
 msgid "Live TV, films and series from your IPTV provider."
 msgstr "Živé vysílání, filmy a seriály od tvého poskytovatele IPTV."
@@ -1484,12 +1484,12 @@ msgstr "Přesto hrát"
 msgid "Play as"
 msgstr "Hrát jako"
 
-#. Settings > Apps: what the Nightshade Stream app is. Moonlight is the name of the game streaming client (unchanged).
+#. Settings > Apps: what the Datura app is. Moonlight is the name of the game streaming client (unchanged).
 #: pe/ui/apps_list.hpp
 msgid "Play games streamed from your PC with Moonlight."
 msgstr "Hraj hry streamované z tvého PC přes Moonlight."
 
-#. Settings > Apps: what the Nightshade Station app is. PS1 is the first PlayStation, SwanStation the emulator's name (both unchanged).
+#. Settings > Apps: what the Mandrake app is. PS1 is the first PlayStation, SwanStation the emulator's name (both unchanged).
 #: pe/ui/apps_list.hpp
 msgid "Play PS1 games with the SwanStation emulator."
 msgstr "Hraj hry z PS1 v emulátoru SwanStation."
@@ -1696,7 +1696,7 @@ msgstr "Běžné"
 msgid "Release {0} of the original project, {1}"
 msgstr "Vydání {0} původního projektu, {1}"
 
-#. {0} is a release's name, such as v1.000.090 or 01.000.110; {1} a GitHub repository, such as Oliv3rmoon/Nightshade-TV (both unchanged).
+#. {0} is a release's name, such as v1.000.090 or 01.000.110; {1} a GitHub repository, such as Oliv3rmoon/Physalis (both unchanged).
 #: pe/ui/apps.cpp
 msgid "Release {0}, from {1}"
 msgstr "Vydání {0} z {1}"

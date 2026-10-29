@@ -854,10 +854,10 @@ msgstr "Alemán"
 msgid "Get"
 msgstr "Obtener"
 
-#. Settings > Apps: what it is for. Nightshade TV, Stream and Station are the apps' names (unchanged).
+#. Settings > Apps: what it is for. Physalis, Datura and Mandrake are the apps' names (unchanged).
 #: pe/ui/apps.cpp, pe/ui/settings.cpp
-msgid "Get, update and open Nightshade TV, Stream and Station."
-msgstr "Obtén, actualiza y abre Nightshade TV, Stream y Station."
+msgid "Get, update and open Physalis, Datura and Mandrake."
+msgstr "Obtén, actualiza y abre Physalis, Datura y Mandrake."
 
 #: pe/ui/browse.cpp
 msgid "GETTING STARTED"
@@ -1114,7 +1114,7 @@ msgstr "Biblioteca"
 msgid "Linked"
 msgstr "Vinculado"
 
-#. Settings > Apps: what the Nightshade TV app is. IPTV is a kind of TV service delivered over the internet (unchanged).
+#. Settings > Apps: what the Physalis app is. IPTV is a kind of TV service delivered over the internet (unchanged).
 #: pe/ui/apps_list.hpp
 msgid "Live TV, films and series from your IPTV provider."
 msgstr "TV en vivo, películas y series de tu proveedor de IPTV."
@@ -1484,12 +1484,12 @@ msgstr "Jugar de todos modos"
 msgid "Play as"
 msgstr "Jugar como"
 
-#. Settings > Apps: what the Nightshade Stream app is. Moonlight is the name of the game streaming client (unchanged).
+#. Settings > Apps: what the Datura app is. Moonlight is the name of the game streaming client (unchanged).
 #: pe/ui/apps_list.hpp
 msgid "Play games streamed from your PC with Moonlight."
 msgstr "Juega juegos transmitidos desde tu PC con Moonlight."
 
-#. Settings > Apps: what the Nightshade Station app is. PS1 is the first PlayStation, SwanStation the emulator's name (both unchanged).
+#. Settings > Apps: what the Mandrake app is. PS1 is the first PlayStation, SwanStation the emulator's name (both unchanged).
 #: pe/ui/apps_list.hpp
 msgid "Play PS1 games with the SwanStation emulator."
 msgstr "Juega juegos de PS1 con el emulador SwanStation."
@@ -1696,7 +1696,7 @@ msgstr "Normal"
 msgid "Release {0} of the original project, {1}"
 msgstr "Versión {0} del proyecto original, {1}"
 
-#. {0} is a release's name, such as v1.000.090 or 01.000.110; {1} a GitHub repository, such as Oliv3rmoon/Nightshade-TV (both unchanged).
+#. {0} is a release's name, such as v1.000.090 or 01.000.110; {1} a GitHub repository, such as Oliv3rmoon/Physalis (both unchanged).
 #: pe/ui/apps.cpp
 msgid "Release {0}, from {1}"
 msgstr "Versión {0}, de {1}"
