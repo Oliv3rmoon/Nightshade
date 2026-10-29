@@ -1,22 +1,23 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""The submission-dump patch: its stamp, its build wiring, its generated code, and what it prints.
+"""Belladonna's GPU stall report: its code, what it prints, and Eden's side of it.
 
+The driver, Belladonna (tools/deps.json, ps5-mesa), carries the stall dump in its winsys. Its C is
+taken from Belladonna's source when that is here (RADV_MESA_SOURCE, or ../belladonna): each block
+tools/radv-submission-dump-blocks.py keeps must be in its Belladonna file exactly as kept, so what
+compiles below is Belladonna's code. Without Belladonna's source the kept copy compiles, with a note.
 Checked without a console or a full Mesa build:
-  1. The digest stamp round-trips and a changed patch invalidates a cached driver.
-  2. prepare-build.sh and build-radv-dependencies.sh carry its check and its digest, in order, and
-     prepare-vulkan-port.py has Eden print each pipeline's hashes beside its VkPipeline handle.
-  3. The C the patch inserts into the winsys compiles on its own, against a minimal shim of the
-     winsys types and the PM4 and register macros it uses (the values of src/amd/common/sid.h and
-     the GFX10.3 register database), the console's memory read included.
+  1. prepare-vulkan-port.py has Eden print each pipeline's hashes beside its VkPipeline handle.
+  2. With Belladonna's source: the shim's values below against its src/amd/common/sid.h and
+     src/amd/registers/gfx103.json, and the calls into the dump where the driver makes them (the
+     stall wait, the submit path, pipeline creation and the vertex-input prologs).
+  3. The dump's C compiles on its own, against a minimal shim of the winsys types and the PM4 and
+     register macros it uses (the values of src/amd/common/sid.h and the GFX10.3 register
+     database), the console's memory read included.
   4. The stall dump over synthetic command streams: the waits with what memory holds now, the first
      unmet one, the draws and dispatches before it with their program addresses, and the pipelines
-     that code belongs to (recorded by the code the patch puts into radv_pipeline.c), line by line.
+     that code belongs to (recorded by the code Belladonna puts into radv_pipeline.c), line by line.
   5. Eden's EDEN_PIPELINE line (headless/pipeline_identity.h) prints a handle as the dump does.
-  6. With the pinned Mesa checkout (RADV_MESA_SOURCE, or ../mihawk-mesa-review when it exists): the
-     shim's values against sid.h and src/amd/registers/gfx103.json, and the patch applied to a copy
-     of the files it touches, after patch-radv-transfer-split.py, twice: the second run changes
-     nothing.
 Steps 3 to 5 need a C and a C++ compiler on PATH (cc, c++); without one they are skipped with a note.
 """
 from pathlib import Path
@@ -30,59 +31,34 @@ import sys
 import tempfile
 
 root = Path(__file__).resolve().parents[1]
-patch = root / 'tools/patch-radv-submission-dump.py'
+kept = root / 'tools/radv-submission-dump-blocks.py'
+notes = []
 
-# 1. Stamp semantics.
-with tempfile.TemporaryDirectory() as folder:
-    stamp = Path(folder) / 'stamp'
-
-    def valid(tool=patch):
-        return subprocess.run([sys.executable, str(tool), '--check', str(stamp)]).returncode == 0
-
-    assert not valid()
-    stamp.write_bytes(subprocess.check_output([sys.executable, str(patch), '--digest']))
-    assert valid()
-    changed = Path(folder) / 'patch.py'
-    changed.write_text(patch.read_text() + '\n# changed patch implementation\n')
-    assert not valid(changed)
-    stamp.write_text('old digest\n')
-    assert not valid()
-
-# 2. Build wiring.
-prepare = (root / 'tools/prepare-build.sh').read_text()
-build = (root / 'tools/build-radv-dependencies.sh').read_text()
-assert 'patch-radv-submission-dump.py --check "$radv_release/EDEN_SUBMISSION_DUMP_SHA256"' in prepare
-assert 'patch-radv-submission-dump.py" --digest > "$vulkan/.deps/native/radv-release/EDEN_SUBMISSION_DUMP_SHA256"' in build
-# Built (the last build-radv invocation), then stamped, like every other adaptation.
-assert build.index('EDEN_SUBMISSION_DUMP_SHA256') > build.rindex('build-radv.sh')
-# Applied after the transfer-split patch it builds on.
-assert build.index('patch-radv-submission-dump.py') > build.index('patch-radv-transfer-split.py')
+# 1. Eden's side: each pipeline's hashes beside its handle.
 port = (root / 'tools/prepare-vulkan-port.py').read_text()
 assert "'::Eden::PipelineIdentity::Graphics(*pipeline, key.Hash(), key.unique_hashes);'" in port
 assert "'::Eden::PipelineIdentity::Compute(*pipeline, shader_hash);'" in port
 assert '#include "pipeline_identity.h"' in port
 assert (root / 'headless/pipeline_identity.h').is_file()
 
-# The inserted C, read out of the patch's string literals (and sums of them) without running its
-# file edits.
-tree = ast.parse(patch.read_text())
-literals = {}
-
-
-def evaluate(value):
-    if isinstance(value, ast.BinOp) and isinstance(value.op, ast.Add):
-        return evaluate(value.left) + evaluate(value.right)
-    if isinstance(value, ast.Name):
-        return literals[value.id]
-    return ast.literal_eval(value)
-
-
-for node in tree.body:
-    if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
-        try:
-            literals[node.targets[0].id] = evaluate(node.value)
-        except (ValueError, TypeError, KeyError):
-            pass
+# The dump's C: the kept copy's literals, read without running anything.
+literals = {node.targets[0].id: ast.literal_eval(node.value) for node in ast.parse(kept.read_text()).body
+            if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)}
+blocks = literals['BLOCKS']
+mesa = Path(os.environ.get('RADV_MESA_SOURCE') or root.parent / 'belladonna')
+if not (mesa / 'src/amd/common/sid.h').is_file():
+    mesa = None
+    notes.append(f'no Belladonna source at {os.environ.get("RADV_MESA_SOURCE") or root.parent / "belladonna"}: '
+                 'compiled the copy in tools/radv-submission-dump-blocks.py, and skipped the sid.h and register '
+                 'comparison and the call sites')
+else:
+    # Each block from its Belladonna file, where it must be exactly once and as kept.
+    for name, relative in blocks.items():
+        text = (mesa / relative).read_text()
+        assert text.count(literals[name]) == 1, \
+            f'{name}: {relative} in {mesa} does not have it as tools/radv-submission-dump-blocks.py keeps it'
+        start = text.index(literals[name])
+        literals[name] = text[start:start + len(literals[name])]
 header_fields_new = literals['header_fields_new']
 header_decl_new = literals['header_decl_new']
 public_decl_new = literals['public_decl_new']
@@ -91,7 +67,7 @@ dump_block = literals['dump_block']
 pipeline_note_block = literals['pipeline_note_block']
 
 # The PM4 encoding and the GFX10.3 registers the dump decodes (src/amd/common/sid.h, the generated
-# amdgfxregs.h); step 6 compares them with the pinned Mesa when it is here.
+# amdgfxregs.h); step 2 compares them with Belladonna's when it is here.
 PKT3 = {
     'PKT3_NOP': 0x10, 'PKT3_DISPATCH_DIRECT': 0x15, 'PKT3_DISPATCH_INDIRECT': 0x16, 'PKT3_COND_EXEC': 0x22,
     'PKT3_DRAW_INDIRECT': 0x24, 'PKT3_DRAW_INDEX_INDIRECT': 0x25, 'PKT3_DRAW_INDEX_2': 0x27,
@@ -115,7 +91,37 @@ STAGES_EN = {'HS_EN': (2, 1), 'ES_EN': (3, 2), 'GS_EN': (5, 1), 'PRIMGEN_EN': (1
 
 cc = shutil.which('cc') or shutil.which('clang') or shutil.which('gcc')
 cxx = shutil.which('c++') or shutil.which('clang++') or shutil.which('g++')
-notes = []
+
+# 2. Against Belladonna's source, when it is here: the values above, and the calls into the dump.
+if mesa:
+    sid = (mesa / 'src/amd/common/sid.h').read_text()
+    for name, value in {**PKT3, **OFFSETS}.items():
+        found = re.search(rf'^#define\s+{name}\s+(0x[0-9A-Fa-f]+)\b', sid, re.M)
+        assert found and int(found.group(1), 16) == value, f'{name}: sid.h has {found and found.group(1)}'
+    gfx103 = json.loads((mesa / 'src/amd/registers/gfx103.json').read_text())
+    at = {m['name']: m['map']['at'] for m in gfx103['register_mappings']}
+    for name, value in REGS.items():
+        register = name.split('_', 2)[2]
+        assert at.get(register) == value, f'{name}: gfx103.json has {at.get(register)}'
+    fields = {f['name']: f['bits'] for f in gfx103['register_types']['VGT_SHADER_STAGES_EN']['fields']}
+    for name, (shift, bits) in STAGES_EN.items():
+        assert fields[name] == [shift, shift + bits - 1], f'VGT_SHADER_STAGES_EN.{name}: {fields[name]}'
+    calls = {
+        # The wait that detects the stall dumps first; the dump walks each record it keeps.
+        'src/amd/vulkan/winsys/ps5/radv_ps5_winsys.c': ['         radv_ps5_dump_stall(queue, seq, completed);',
+                                                        'radv_ps5_dump_stuck(words, count, record->seq);'],
+        # The submit path records what the dump prints, under the submit lock.
+        'src/amd/vulkan/winsys/ps5/radv_ps5_cs.c': [
+            '   radv_ps5_record_submission(queue, count, parts, wait_count, signal_count, submit->queue_index, depends);\n'
+            '   radv_ps5_note_submission('],
+        # Every pipeline says where its shaders are, and so does every vertex-input prolog.
+        'src/amd/vulkan/radv_pipeline.c': ['   radv_ps5_note_pipeline_shaders(pipeline);'],
+        'src/amd/vulkan/radv_shader.c': ['   radv_ps5_note_shader(prolog->va, prolog->code_size, "VS prolog",'],
+    }
+    for relative, needles in calls.items():
+        text = (mesa / relative).read_text()
+        for needle in needles:
+            assert text.count(needle) == 1, f'{relative}: {needle.strip()!r} found {text.count(needle)} times'
 
 prologue = '\n'.join([
     '#include <stdint.h>', '#include <stdio.h>', '#include <string.h>', '#include <stdbool.h>',
@@ -528,56 +534,8 @@ int main() {
         ], eden
         assert re.fullmatch(r'vk=0x[0-9a-f]+', 'vk=' + handles['a']), handles
 
-# 6. Against the pinned Mesa, when it is here.
-mesa = Path(os.environ.get('RADV_MESA_SOURCE') or root.parent / 'mihawk-mesa-review')
-if not (mesa / 'src/amd/common/sid.h').is_file():
-    notes.append(f'no pinned Mesa at {mesa}: skipped the sid.h and register comparison and the twice-applied patch')
-else:
-    sid = (mesa / 'src/amd/common/sid.h').read_text()
-    for name, value in {**PKT3, **OFFSETS}.items():
-        found = re.search(rf'^#define\s+{name}\s+(0x[0-9A-Fa-f]+)\b', sid, re.M)
-        assert found and int(found.group(1), 16) == value, f'{name}: sid.h has {found and found.group(1)}'
-    gfx103 = json.loads((mesa / 'src/amd/registers/gfx103.json').read_text())
-    at = {m['name']: m['map']['at'] for m in gfx103['register_mappings']}
-    for name, value in REGS.items():
-        register = name.split('_', 2)[2]
-        assert at.get(register) == value, f'{name}: gfx103.json has {at.get(register)}'
-    fields = {f['name']: f['bits'] for f in gfx103['register_types']['VGT_SHADER_STAGES_EN']['fields']}
-    for name, (shift, bits) in STAGES_EN.items():
-        assert fields[name] == [shift, shift + bits - 1], f'VGT_SHADER_STAGES_EN.{name}: {fields[name]}'
-    touched = ['src/amd/vulkan/radv_cmd_buffer.c', 'src/amd/vulkan/meta/radv_meta_buffer.c',
-               'src/amd/vulkan/meta/radv_meta_copy.c', 'src/amd/vulkan/radv_pipeline.c',
-               'src/amd/vulkan/radv_shader.c', 'src/amd/vulkan/winsys/ps5/radv_ps5_winsys.h',
-               'src/amd/vulkan/winsys/ps5/radv_ps5_winsys_public.h', 'src/amd/vulkan/winsys/ps5/radv_ps5_winsys.c',
-               'src/amd/vulkan/winsys/ps5/radv_ps5_cs.c']
-    with tempfile.TemporaryDirectory() as folder:
-        # The patches run from a copy of tools/, so the driver receipt they set aside when they change
-        # something (../mihawk-vulkan-review) is not this machine's.
-        tools = Path(folder) / 'repo/tools'
-        tools.mkdir(parents=True)
-        for name in ('patch-radv-transfer-split.py', 'patch-radv-submission-dump.py'):
-            shutil.copyfile(root / 'tools' / name, tools / name)
-        tree = Path(folder) / 'radv-src'
-        for relative in touched:
-            (tree / relative).parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(mesa / relative, tree / relative)
-
-        def apply():
-            for name in ('patch-radv-transfer-split.py', 'patch-radv-submission-dump.py'):
-                out = subprocess.run([sys.executable, '-B', str(tools / name), str(tree)], capture_output=True,
-                                     text=True, check=True).stdout
-            return {relative: (tree / relative).read_text() for relative in touched}, out
-
-        first, out = apply()
-        assert 'changed=True' in out, out
-        second, out = apply()
-        assert 'changed=False' in out and second == first, 'a second run changed the driver source'
-        winsys = first['src/amd/vulkan/winsys/ps5/radv_ps5_winsys.c']
-        assert winsys.count('radv_ps5_dump_stuck(words, count, record->seq);') == 1
-        assert first['src/amd/vulkan/radv_pipeline.c'].count('   radv_ps5_note_pipeline_shaders(pipeline);') == 1
-        assert first['src/amd/vulkan/radv_shader.c'].count('radv_ps5_note_shader(prolog->va') == 1
-
 for note in notes:
     print(f'note: {note}')
-print('PASS: stamp, build wiring, the inserted winsys code compiles in isolation, and the stall dump names the '
-      'first unmet wait, the work before it and the pipelines it runs' + (' (with skips)' if notes else ''))
+print('PASS: ' + ('Belladonna\'s' if mesa else 'the kept copy of the') + ' stall dump code compiles in isolation, '
+      'and the stall dump names the first unmet wait, the work before it and the pipelines it runs'
+      + (' (with skips)' if notes else ''))

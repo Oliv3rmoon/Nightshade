@@ -117,8 +117,7 @@ if __name__ == '__main__':
             if frontend.get('vulkan_driver', 'CUSTOM') == 'RADV':
                 paths += [ROOT / 'build/radv-isolated' / name for name in
                           ('libvulkan_radeon.ps5.a', 'manifest.json', 'symbols.map')]
-                paths += [ROOT / '../mihawk-vulkan-review/.deps/native/radv-release' / name
-                          for name in ('PROVENANCE.txt', 'EDEN_WSI_SHA256')]
+                paths += [ROOT / '../mihawk-vulkan-review/.deps/native/radv-release/PROVENANCE.txt']
                 paths += [ROOT / '../mihawk-vulkan-review/.deps/native/ps5-payload-sdk/target/lib/libps5platform.a']
             else:
                 paths += [ROOT / 'build/vulkan-isolated' / name for name in
