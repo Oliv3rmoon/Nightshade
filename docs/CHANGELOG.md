@@ -2,6 +2,18 @@
 
 What changed in each release of ProsperoEden, newest first. A release's notes on GitHub are its section here.
 
+## v1.010.004
+
+**Faster starts for games with a big shader cache.** Every start of a large game builds its saved pipelines before it plays: Tears of the Kingdom's 14,000 took 552 s at a first start and 208 s at later ones. Not measured on a console yet: `stderr.log` has the new times.
+
+### Fixes
+
+- **The shader cache builds on every CPU at start.** Eden builds pipelines on 15 threads, but every background thread is placed on the console's five spare CPUs, so the builders shared five while the game's own cores and the GPU thread's sat idle before the game began. While the cache is built they may now use every CPU the app has (`EDEN_WORKER_PLACED name=VkPipelineBuilder ... startup=1` in `stderr.log`), and once the game runs each goes back to the spare CPUs, so play is as before.
+
+### Install
+
+From 1.005.102 or later, **Update now** applies it. If it doesn't, send `/data/prosperoeden/logs/updater.log`. From an older version, copy this ZIP's `PPSA99008` folder over yours.
+
 ## v1.010.003
 
 **Tears of the Kingdom: no more crash when the game's memory runs out.** A tester's TOTK ended 23 minutes in on v1.010.002, when the game took 1.8 GB of new memory within seconds; this release gives the game that memory instead of ending the session. Not confirmed on a console yet: send `/data/prosperoeden/logs` after playing.
