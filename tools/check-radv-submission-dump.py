@@ -100,7 +100,7 @@ PKT3 = {
     'PKT3_WAIT_REG_MEM': 0x3C, 'PKT3_INDIRECT_BUFFER': 0x3F, 'PKT3_PFP_SYNC_ME': 0x42, 'PKT3_COND_WRITE': 0x45,
     'PKT3_EVENT_WRITE': 0x46, 'PKT3_RELEASE_MEM': 0x49, 'PKT3_DMA_DATA': 0x50, 'PKT3_ACQUIRE_MEM': 0x58,
     'PKT3_SET_CONTEXT_REG': 0x69, 'PKT3_SET_SH_REG': 0x76, 'PKT3_WAIT_ON_CE_COUNTER': 0x86,
-    'PKT3_SET_SH_REG_INDEX': 0x9B, 'PKT3_NUM_INSTANCES': 0x2F,
+    'PKT3_SET_SH_REG_INDEX': 0x9B, 'PKT3_NUM_INSTANCES': 0x2F, 'PKT3_SET_BASE': 0x11,
 }
 OFFSETS = {'SI_SH_REG_OFFSET': 0x0000B000, 'SI_CONTEXT_REG_OFFSET': 0x00028000}
 REGS = {
@@ -244,6 +244,7 @@ A_VS, A_FS, B_CS, PROLOG, D_VS, D_FS, D2_VS, E_CS, LOOSE_CS, STALE_HS = (
     0x200100000, 0x200100400, 0x200200000, 0x200300000, 0x200400000, 0x200400800, 0x200410000, 0x200500000,
     0x200600000, 0x200700000)
 F2, GS_MAIN = 0x200030000, 0x200800000
+ARGS, ARG_COUNT = 0x200040000, 0x200050000  # indirect draw arguments, and a multi draw's count
 RELEASE_MEM_HEADER = pkt3_header(PKT3['PKT3_RELEASE_MEM'], 7)
 
 # The shape of a Final Fantasy Resonance hang: cache-flush waits on a counter the submission's
@@ -272,7 +273,11 @@ s1.program('R_00B020_SPI_SHADER_PGM_LO_PS', D_FS)
 s1.pkt('PKT3_NUM_INSTANCES', [7])
 s1.pkt('PKT3_DRAW_INDEX_AUTO', [3, 2], 'draw2')
 s1.nop_pad()
+s1.pkt('PKT3_SET_BASE', [1, ARGS & 0xffffffff, ARGS >> 32])
+# Arguments the GPU had not written when the CPU made them: instances read as the float 1.0.
 s1.pkt('PKT3_DRAW_INDIRECT', [0, 4, 5, 2], 'draw3')
+s1.pkt('PKT3_DRAW_INDEX_INDIRECT_MULTI', [0x14, 0, 0, 1 << 30, 4, ARG_COUNT & 0xffffffff, ARG_COUNT >> 32, 20, 0],
+       'draw4')
 s1.set_sh(REGS['R_00B830_COMPUTE_PGM_LO'], LOOSE_CS >> 8, index=True)
 s1.pkt('PKT3_DISPATCH_INDIRECT', [0x40, 1], 'dispatch2')
 s1.release_mem(FENCE, 3)
@@ -302,7 +307,8 @@ s2.set_sh(REGS['R_00B830_COMPUTE_PGM_LO'], GS_MAIN >> 8)
 s2.pkt('PKT3_DISPATCH_DIRECT', [4, 1, 1, 1], 'dispatch2')
 s2.release_mem(MARKER, 9)
 
-memory = {FENCE: 2, COND: 0, F2: 1, MARKER: 4}
+memory = {FENCE: 2, COND: 0, F2: 1, MARKER: 4, ARGS: 3, ARGS + 4: 0x3f800000, ARGS + 0x14: 192, ARGS + 0x18: 2,
+          ARG_COUNT: 3}
 
 
 def c_array(name, words):
@@ -429,16 +435,19 @@ else:
         'radv/ps5 stall:   seq 4 done   dwords=8 agc_ibs=1 queue=0 waits=0 signals=0 depends=0 ring packets=1 draws=0'
         ' dispatches=0 gpu_waits=0 indirect=0 cond=0 completion=ok last: RELEASE_MEM',
         f'radv/ps5 stall:   seq 5 STUCK  dwords={w1_words} agc_ibs=1 queue=0 waits=0 signals=1 depends=0 dedicated'
-        f' packets={s1.packets} draws=3 dispatches=3 gpu_waits=6 indirect=2 cond=1 completion=ok last:'
+        f' packets={s1.packets} draws=4 dispatches=3 gpu_waits=6 indirect=3 cond=1 completion=ok last:'
         ' WAIT_ON_CE_COUNTER EVENT_WRITE RELEASE_MEM WAIT_REG_MEM PFP_SYNC_ME RELEASE_MEM',
         'radv/ps5 stall:   seq 6 queued dwords=8',
         f'radv/ps5 stall: seq 5 stops at wait 4 of 7, dword {a1["wait4"]}: WAIT_REG_MEM mem 0x{FENCE:x} & 0xffffffff'
         ' == 0x00000003, now 0x00000002',
-        f'radv/ps5 stall: the last draws and dispatches before dword {a1["wait4"]} (3 draws, 2 dispatches before it):',
+        f'radv/ps5 stall: the last draws and dispatches before dword {a1["wait4"]} (4 draws, 2 dispatches before it):',
         f'radv/ps5 stall:   draw 1 at dword {a1["draw1"]} DRAW_INDEX_2 count 36: GS 0x{A_VS:x} PS 0x{A_FS:x}',
         f'radv/ps5 stall:   dispatch 1 at dword {a1["dispatch1"]} DISPATCH_DIRECT 8x8x1 groups: CS 0x{B_CS:x}',
         f'radv/ps5 stall:   draw 2 at dword {a1["draw2"]} DRAW_INDEX_AUTO count 3 x7 instances: GS 0x{PROLOG:x} PS 0x{D_FS:x}',
-        f'radv/ps5 stall:   draw 3 at dword {a1["draw3"]} DRAW_INDIRECT: GS 0x{PROLOG:x} PS 0x{D_FS:x}',
+        f'radv/ps5 stall:   draw 3 at dword {a1["draw3"]} DRAW_INDIRECT args count 3 x1065353216 instances:'
+        f' GS 0x{PROLOG:x} PS 0x{D_FS:x}',
+        f'radv/ps5 stall:   draw 4 at dword {a1["draw4"]} DRAW_INDEX_INDIRECT_MULTI args count 192 x2 instances,'
+        f' the first of 3 draws: GS 0x{PROLOG:x} PS 0x{D_FS:x}',
         f'radv/ps5 stall:   dispatch 2 at dword {a1["dispatch2"]} DISPATCH_INDIRECT: CS 0x{LOOSE_CS:x}',
         f'radv/ps5 stall: GS 0x{A_VS:x} = pipeline a1a1a1a1a1a1a1a1 vk={handles["a"]} (graphics VS)',
         f'radv/ps5 stall: PS 0x{A_FS:x} = pipeline a1a1a1a1a1a1a1a1 vk={handles["a"]} (graphics FS)',

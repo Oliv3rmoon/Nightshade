@@ -480,9 +480,13 @@ struct radv_ps5_stall_work {
    uint64_t address[RADV_PS5_STAGES];
    /* How much work it asked for: a direct dispatch's groups in x, y and z; a direct draw's vertex or
     * index count, and its instances when a NUM_INSTANCES before it in this submission set them (0:
-    * not known here). An indirect one's are in memory, so none. */
+    * not known here). An indirect draw's are in memory: its first draw's count and instances as the
+    * CPU reads them now (args_read), and for a multi draw how many draws it makes (draws, 0: one). */
    uint32_t size[3];
    uint32_t instances;
+   bool args_read;
+   bool args_unreadable;
+   uint32_t draws;
 };
 
 /* The packet at words[i] (i < count): its opcode and its length in dwords (a type-2 filler is one
@@ -698,6 +702,7 @@ radv_ps5_dump_stuck(const uint32_t *words, uint32_t count, uint64_t seq)
     *    packets before it left the program address registers. */
    uint32_t lo[RADV_PS5_STAGES] = {0}, hi[RADV_PS5_STAGES] = {0};
    uint32_t stages = 0, draw_total = 0, dispatch_total = 0, instances = 0;
+   uint64_t indirect_base = 0; /* SET_BASE 1: where an indirect draw's data_offset points into */
    bool stages_known = false;
    for (at = 0; at < stop && radv_ps5_stall_packet(words, count, at, &op, &n); at += n) {
       const uint32_t *const body = words + at + 1;
@@ -718,6 +723,8 @@ radv_ps5_dump_stuck(const uint32_t *words, uint32_t count, uint64_t seq)
          }
       } else if (op == PKT3_NUM_INSTANCES && body_dw >= 1) {
          instances = body[0];
+      } else if (op == PKT3_SET_BASE && body_dw >= 3 && (body[0] & 0xf) == 1) {
+         indirect_base = body[1] | ((uint64_t)body[2] << 32);
       } else if (radv_ps5_pkt3_is_draw(op) || op == PKT3_DISPATCH_DIRECT || op == PKT3_DISPATCH_INDIRECT) {
          const bool draw = radv_ps5_pkt3_is_draw(op);
          const uint32_t ordinal = draw ? ++draw_total : ++dispatch_total;
@@ -740,6 +747,27 @@ radv_ps5_dump_stuck(const uint32_t *words, uint32_t count, uint64_t seq)
             else if (op == PKT3_DRAW_INDEX_OFFSET_2 && body_dw >= 3)
                slot->size[0] = body[2];
             slot->instances = instances;
+            /* DRAW_(INDEX_)INDIRECT(_MULTI): data_offset first; a multi draw then has its most draws
+             * at body[4], and the address of its count at body[5..6] when COUNT_INDIRECT_ENABLE (bit
+             * 30 of body[3]) is set. The first draw's arguments open with its count and instances. */
+            const bool indirect = op == PKT3_DRAW_INDIRECT || op == PKT3_DRAW_INDEX_INDIRECT ||
+                                  op == PKT3_DRAW_INDIRECT_MULTI || op == PKT3_DRAW_INDEX_INDIRECT_MULTI;
+            if (indirect && indirect_base && body_dw >= 1) {
+               const uint64_t args = indirect_base + body[0];
+               slot->instances = 0;
+               slot->args_read = radv_ps5_stall_read(args, &slot->size[0]) &&
+                                 radv_ps5_stall_read(args + 4, &slot->instances);
+               slot->args_unreadable = !slot->args_read;
+               if (slot->args_read && (op == PKT3_DRAW_INDIRECT_MULTI || op == PKT3_DRAW_INDEX_INDIRECT_MULTI) &&
+                   body_dw >= 7) {
+                  slot->draws = body[4];
+                  const uint64_t count_va = body[5] | ((uint64_t)body[6] << 32);
+                  uint32_t draw_count;
+                  if ((body[3] & (1u << 30)) && count_va && radv_ps5_stall_read(count_va, &draw_count) &&
+                      draw_count < slot->draws)
+                     slot->draws = draw_count;
+               }
+            }
          }
          for (unsigned s = 0; s < RADV_PS5_STAGES; s++) {
             const bool runs = draw ? s != RADV_PS5_STAGE_CS && radv_ps5_stall_stage_runs(s, stages_known, stages)
@@ -789,9 +817,15 @@ radv_ps5_dump_stuck(const uint32_t *words, uint32_t count, uint64_t seq)
               radv_ps5_pkt3_name(item->op));
       if (!draw && item->op == PKT3_DISPATCH_DIRECT)
          fprintf(stderr, " %ux%ux%u groups", item->size[0], item->size[1], item->size[2]);
+      else if (draw && item->args_read) {
+         fprintf(stderr, " args count %u x%u instances", item->size[0], item->instances);
+         if (item->draws > 1)
+            fprintf(stderr, ", the first of %u draws", item->draws);
+      } else if (draw && item->args_unreadable)
+         fprintf(stderr, " args unreadable");
       else if (draw && item->size[0])
          fprintf(stderr, " count %u", item->size[0]);
-      if (draw && item->size[0] && item->instances)
+      if (draw && !item->args_read && item->size[0] && item->instances)
          fprintf(stderr, " x%u instances", item->instances);
       fprintf(stderr, ":");
       bool any = false;

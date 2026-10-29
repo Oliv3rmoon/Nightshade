@@ -1,0 +1,137 @@
+--- a/src/video_core/buffer_cache/buffer_cache.h
++++ b/src/video_core/buffer_cache/buffer_cache.h
+@@ -701,7 +701,19 @@
+                                            end - start);
+         });
+         async_downloads.Subtract(device_addr, copy.size, [&](DAddr start, DAddr end) {
+-            gpu_modified_ranges.Subtract(start, end - start);
++            // Guest memory now holds what the GPU had written when this download was recorded.
++            // A range the GPU wrote again since then (still uncommitted) stays GPU-modified, or
++            // the next commit would skip it and CPU reads would take this older copy as current.
++            Common::RangeSet<DAddr> settled;
++            settled.Add(start, end - start);
++            uncommitted_gpu_modified_ranges.ForEachInRange(
++                start, end - start,
++                [&](DAddr rewritten_start, DAddr rewritten_end) {
++                    settled.Subtract(rewritten_start, rewritten_end - rewritten_start);
++                });
++            settled.ForEach([&](DAddr settled_start, DAddr settled_end) {
++                gpu_modified_ranges.Subtract(settled_start, settled_end - settled_start);
++            });
+         });
+     }
+     async_buffers_death_ring.emplace_back(*async_buffer);
+--- a/src/video_core/engines/maxwell_3d.cpp
++++ b/src/video_core/engines/maxwell_3d.cpp
+@@ -223,9 +223,8 @@
+ }
+ 
+ void Maxwell3D::RefreshParametersImpl() {
+-    if (!Settings::IsGPULevelHigh()) {
+-        return;
+-    }
++    // Only reached when a parameter came from memory the GPU wrote (current_macro_dirty), and the
++    // values read with the command list may be older than that write at any accuracy level.
+     size_t current_index = 0;
+     for (auto& segment : macro_segments) {
+         if (segment.first == 0) {
+--- a/src/video_core/engines/maxwell_3d.h
++++ b/src/video_core/engines/maxwell_3d.h
+@@ -3180,6 +3180,11 @@
+         return current_macro_dirty;
+     }
+ 
++    /// Reads every parameter that came from memory again through the caches, dirty or not.
++    void ForceRefreshParameters() {
++        RefreshParametersImpl();
++    }
++
+     u32 GetMaxCurrentVertices();
+ 
+     size_t EstimateIndexBufferSize();
+--- a/src/video_core/macro.cpp
++++ b/src/video_core/macro.cpp
+@@ -4,6 +4,8 @@
+ // SPDX-FileCopyrightText: Copyright 2020 yuzu Emulator Project
+ // SPDX-License-Identifier: GPL-2.0-or-later
+ 
++#include <atomic>
++#include <cstdio>
+ #include <cstring>
+ #include <fstream>
+ #include <optional>
+@@ -62,6 +64,23 @@
+     }
+ }
+ 
++// An indirect draw the CPU makes from its parameters, asking for more than 2^32 vertices
++// (count x instances), is not a real draw: no Switch game draws that many in one call, and the
++// host GPU would run it until it is reset. Such parameters are memory read before the GPU's write
++// to it arrived. They are read once more through the caches, and the draw is dropped if they
++// still say so.
++bool IsDrawImplausible(u32 count, u32 instance_count) {
++    return u64(count) * u64(instance_count) > (u64(1) << 32);
++}
++
++void ReportDroppedDraw(const char* macro, u32 count, u32 instance_count) {
++    static std::atomic<u32> reports{0};
++    if (reports.fetch_add(1, std::memory_order_relaxed) < 16) {
++        std::fprintf(stderr, "EDEN_INDIRECT_DRAW_DROPPED macro=%s count=%u instances=%u\n", macro,
++                     count, instance_count);
++    }
++}
++
+ } // Anonymous namespace
+ 
+ void HLE_DrawArraysIndirect::Execute(Core::System& system, Engines::Maxwell3D& maxwell3d, std::span<const u32> parameters, [[maybe_unused]] u32 method) {
+@@ -101,6 +120,14 @@
+         }
+     };
+     maxwell3d.RefreshParameters();
++    if (IsDrawImplausible(parameters[1], maxwell3d.GetRegisterValue(0xD1B) & parameters[2])) {
++        maxwell3d.ForceRefreshParameters();
++        if (IsDrawImplausible(parameters[1], maxwell3d.GetRegisterValue(0xD1B) & parameters[2])) {
++            ReportDroppedDraw("DrawArraysIndirect", parameters[1],
++                              maxwell3d.GetRegisterValue(0xD1B) & parameters[2]);
++            return;
++        }
++    }
+     const u32 instance_count = (maxwell3d.GetRegisterValue(0xD1B) & parameters[2]);
+     auto topology = Maxwell3D::Regs::PrimitiveTopology(parameters[0]);
+     const u32 vertex_first = parameters[3];
+@@ -163,6 +190,14 @@
+ }
+ void HLE_DrawIndexedIndirect::Fallback(Core::System& system, Engines::Maxwell3D& maxwell3d, std::span<const u32> parameters) {
+     maxwell3d.RefreshParameters();
++    if (IsDrawImplausible(parameters[1], maxwell3d.GetRegisterValue(0xD1B) & parameters[2])) {
++        maxwell3d.ForceRefreshParameters();
++        if (IsDrawImplausible(parameters[1], maxwell3d.GetRegisterValue(0xD1B) & parameters[2])) {
++            ReportDroppedDraw("DrawIndexedIndirect", parameters[1],
++                              maxwell3d.GetRegisterValue(0xD1B) & parameters[2]);
++            return;
++        }
++    }
+     const u32 instance_count = (maxwell3d.GetRegisterValue(0xD1B) & parameters[2]);
+     const u32 element_base = parameters[4];
+     const u32 base_instance = parameters[5];
+@@ -254,8 +289,20 @@
+     const std::size_t first_draw = start_indirect;
+     const std::size_t effective_draws = end_indirect - start_indirect;
+     const std::size_t last_draw = start_indirect + (std::min)(effective_draws, max_draws);
++    bool refreshed = false;
+     for (std::size_t index = first_draw; index < last_draw; index++) {
+         const std::size_t base = index * indirect_words + 5;
++        if (IsDrawImplausible(parameters[base], parameters[base + 1])) {
++            if (!refreshed) {
++                maxwell3d.ForceRefreshParameters();
++                refreshed = true;
++            }
++            if (IsDrawImplausible(parameters[base], parameters[base + 1])) {
++                ReportDroppedDraw("MultiDrawIndexedIndirectCount", parameters[base],
++                                  parameters[base + 1]);
++                continue;
++            }
++        }
+         const u32 base_vertex = parameters[base + 3];
+         const u32 base_instance = parameters[base + 4];
+         maxwell3d.regs.vertex_id_base = base_vertex;
