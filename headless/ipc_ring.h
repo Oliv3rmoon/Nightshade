@@ -100,7 +100,7 @@ inline void Dump(std::uint64_t breaking_thread, Line&& line) {
                       static_cast<unsigned long long>(entry.thread),
                       static_cast<double>(last_ns - entry.when_ns) / 1e6, entry.service, entry.command,
                       entry.type, entry.magic_at, entry.result, entry.header[0], entry.header[1],
-                      static_cast<double>(dump_ns - entry.when_ns) / 1e6);
+                      static_cast<double>(static_cast<std::int64_t>(dump_ns - entry.when_ns)) / 1e6);
         line(text);
     }
 }
