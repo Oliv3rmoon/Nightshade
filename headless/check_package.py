@@ -53,7 +53,7 @@ def check():
     assert {p.relative_to(APP).as_posix() for p in APP.rglob('*') if p.is_file()} == REQUIRED
     assert all(not (APP / p).is_symlink() and (APP / p).stat().st_size for p in REQUIRED)
     param = json.loads((APP / 'sce_sys/param.json').read_text())
-    assert param['titleId'] == 'PPSA64448' and param['contentId'].endswith('PROSPEROEDEN0001')
+    assert param['titleId'] == 'PPSA64448' and param['contentId'].endswith('NIGHTSHADE000001')
     assert param['localizedParameters']['en-US']['titleName'] == 'Nightshade'
     assert param['pubtools']['loudnessSnd0'] == '-28.00'
     lapy = json.loads((APP / 'lapy-manifest.json').read_text())

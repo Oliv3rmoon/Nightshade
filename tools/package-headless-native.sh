@@ -89,7 +89,7 @@ if game:
     assert (app / 'assets/keys/prod.keys').is_file()
 value = json.loads((app / 'sce_sys/param.json').read_text())
 assert (value['titleId'], value['conceptId']) == ('PPSA64448', '64448')
-assert value['contentId'] == 'UP9000-PPSA64448_00-PROSPEROEDEN0001'
+assert value['contentId'] == 'UP9000-PPSA64448_00-NIGHTSHADE000001'
 assert value['localizedParameters']['en-US']['titleName'] == 'Nightshade'
 assert value['pubtools']['loudnessSnd0'] == '-28.00'
 # The app version has one home, sce_sys/param.json: the program was built with the same value.
