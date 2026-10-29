@@ -109,7 +109,7 @@ const std::map<std::string, std::string> kKept = {
 };
 const std::vector<std::string> kLeftOut = {
     "cache/radv/index",       "covers/0a1b2c3d.tga",        "logs/stderr.log",
-    "previous-version/PPSA99008-backup/eboot.bin",          "user/cache/nsz/game.nca",
+    "previous-version/PPSA64448-backup/eboot.bin",          "user/cache/nsz/game.nca",
     "user/cache/native-opengl/shader.bin",                  "user/shader/vulkan/0100A00000001000.bin",
     "user/log/eden_log.txt",  "user/crash_dumps/dump.dmp",  "user/dump/romfs.bin",
     "roms/Game/game.nsp",     "updates/game update.nsp",    ".remote-downloads/part.nsp",
@@ -117,7 +117,7 @@ const std::vector<std::string> kLeftOut = {
 
 fs::path make_data(const fs::path &base)
 {
-    const fs::path data = base / "data/prosperoeden";
+    const fs::path data = base / "data/nightshade";
     for (const auto &[path, text] : kKept)
         write(data / path, text);
     for (const std::string &path : kLeftOut)
@@ -164,16 +164,16 @@ void excluded()
     const std::vector<std::string> base = {".remote-downloads", "cache",      "covers",           "logs",
                                            "previous-version",  "roms",       "updates",          "user/cache",
                                            "user/crash_dumps",  "user/dump",  "user/log",         "user/shader"};
-    expect(Excluded("/data/prosperoeden", "/data/prosperoeden") == base,
+    expect(Excluded("/data/nightshade", "/data/nightshade") == base,
            "caches, logs, covers, the previous version and the games are left out, sorted");
-    expect(Excluded("/data/prosperoeden", "/mnt/usb0/games") == base, "a games folder on a drive adds nothing");
+    expect(Excluded("/data/nightshade", "/mnt/usb0/games") == base, "a games folder on a drive adds nothing");
     std::vector<std::string> inside = base;
     for (const char *path : {"eden/.remote-downloads", "eden/roms", "eden/updates"})
         inside.push_back(path);
     std::sort(inside.begin(), inside.end());
-    expect(Excluded("/data/prosperoeden/", "/data/prosperoeden/eden/") == inside,
+    expect(Excluded("/data/nightshade/", "/data/nightshade/eden/") == inside,
            "a games folder inside the data folder has its games and downloads left out too");
-    expect(Excluded("/data/prosperoeden", "/data/prosperoeden-games") == base,
+    expect(Excluded("/data/nightshade", "/data/nightshade-games") == base,
            "a folder beside the data folder is not inside it");
 }
 

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Where ProsperoEden keeps things. With filesystem access (elevation/elevation.hpp, requested
 // first thing in main) the app uses real console paths:
-//   app folder     the install location, normally /data/homebrew/PPSA99008
-//   data           /data/prosperoeden: config/ (prosperoeden.json), logs/, covers/, user/,
+//   app folder     the install location, normally /data/homebrew/PPSA64448
+//   data           /data/nightshade: config/ (prosperoeden.json), logs/, covers/, user/,
 //                  wallpapers/ (docs/WALLPAPERS.md)
 // Without it (no resident service or local elfldr, or the request failed) the app has no data:
 // it reads the app folder as /app0, keeps only its logs in /download0, and the launcher says
@@ -16,9 +16,9 @@
 #include <sys/stat.h>
 
 namespace Eden {
-inline constexpr const char* kDataDir = "/data/prosperoeden";
-inline constexpr const char* kDefaultAssetsDir = "/data/prosperoeden";
-inline constexpr const char* kInstallDir = "/data/homebrew/PPSA99008";
+inline constexpr const char* kDataDir = "/data/nightshade";
+inline constexpr const char* kDefaultAssetsDir = "/data/nightshade";
+inline constexpr const char* kInstallDir = "/data/homebrew/PPSA64448";
 
 // Filesystem access requested at startup: -1 not requested, 0 granted, otherwise the
 // elevation::Status that refused it.
@@ -39,7 +39,7 @@ inline bool DirectoryExists(const std::string& path) {
 
 // Where the PS5 mounts the app it runs, whatever the source: a folder anywhere ShadowMountPlus
 // scans (/data, ext or USB drives, its manual list) or an image.
-inline constexpr const char* kMountedAppDir = "/system_ex/app/PPSA99008";
+inline constexpr const char* kMountedAppDir = "/system_ex/app/PPSA64448";
 
 // The app's own files (eboot, ui/, development markers): /app0 while it is still mounted (some
 // kinds of filesystem access keep it), else the PS5's mount of the running app, else the usual
@@ -48,7 +48,7 @@ inline constexpr const char* kMountedAppDir = "/system_ex/app/PPSA99008";
 inline const std::string& AppDir() {
     static const std::string directory = [] {
         if (!FilesystemAccess()) return std::string{"/app0"};
-        for (const char* candidate : {"/app0", kMountedAppDir, kInstallDir, "/mnt/sandbox/PPSA99008_000/app0"})
+        for (const char* candidate : {"/app0", kMountedAppDir, kInstallDir, "/mnt/sandbox/PPSA64448_000/app0"})
             if (FileExists(std::string{candidate} + "/eboot.bin")) return std::string{candidate};
         return std::string{kInstallDir};
     }();

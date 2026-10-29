@@ -7,7 +7,7 @@ Builds tools/launcher/test-launcher-update-compat.cpp with the helper's updater,
 code, the kit's JSON reader and miniz, and runs it: the launcher compatibility checks, the bounded
 JSON readers, and the wait for the app to close before its files are replaced (wait_for_close: a
 sandbox the system leaves behind once the app's connection has ended, Swordpdf/ProsperoEden#232).
-Also checks that the helper writes its log to /data/prosperoeden/logs/updater.log.
+Also checks that the helper writes its log to /data/nightshade/logs/updater.log.
 
 Then headless/update_helper_check.cpp, the helper's whole conversation in a console made in the
 temporary folder: the app's own update, and another app installed or updated (Nightshade's Apps).
@@ -17,7 +17,7 @@ import os, subprocess, sys, tempfile
 
 root = Path(__file__).resolve().parents[1]
 helper = root / 'headless/self_update_helper'
-assert '"/data/prosperoeden/logs/updater.log"' in (helper / 'main.cpp').read_text()
+assert '"/data/nightshade/logs/updater.log"' in (helper / 'main.cpp').read_text()
 assert 'wait_for_close(' in (helper / 'updater.cpp').read_text()
 
 cc = os.environ.get('CC', 'cc')

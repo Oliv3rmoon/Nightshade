@@ -942,7 +942,7 @@ void EdenServices::finish_app() { Eden::Apps::Finish(); }
 
 pe::ui::AppOpen EdenServices::open_app(int app, std::string* reason) { return Eden::Apps::Open(app, reason); }
 
-// Settings > Diagnostics > Back up to USB (backup.h): /data/prosperoeden to a USB drive.
+// Settings > Diagnostics > Back up to USB (backup.h): /data/nightshade to a USB drive.
 void EdenServices::refresh_backup() { backup_->Refresh(); }
 
 pe::ui::BackupStatus EdenServices::backup_status() { return backup_->Status(); }

@@ -93,8 +93,8 @@ body:
       label: "Save data and debug logs"
       description: |
         Drag two ZIP files here; they let us go to the spot and see what the app did.
-        - **Save data** of the game, from just before the problem: Triangle on the game in the Library, **Save data**, **Export a copy**, then zip the folder it writes in `/data/prosperoeden/save-export`.
-        - **Debug logs**: turn on **Settings > Diagnostics > Detailed logging**, make the problem happen again, then zip `/data/prosperoeden/logs` (after a crash, the crash report and the logs beside it).
+        - **Save data** of the game, from just before the problem: Triangle on the game in the Library, **Save data**, **Export a copy**, then zip the folder it writes in `/data/nightshade/save-export`.
+        - **Debug logs**: turn on **Settings > Diagnostics > Detailed logging**, make the problem happen again, then zip `/data/nightshade/logs` (after a crash, the crash report and the logs beside it).
     validations:
       required: false
   - type: checkboxes

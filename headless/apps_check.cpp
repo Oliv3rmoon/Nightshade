@@ -130,8 +130,8 @@ struct Console
         fs::create_directories(data / "prosperoeden");
         fs::create_directories(base / "sandbox");
         fs::create_directories(user);
-        write(homebrew / "PPSA99008/eboot.bin", "nightshade");
-        write(homebrew / "PPSA99008/sce_sys/param.json", param("PPSA99008", "01.010.000"));
+        write(homebrew / "PPSA64448/eboot.bin", "nightshade");
+        write(homebrew / "PPSA64448/sce_sys/param.json", param("PPSA64448", "01.010.000"));
         environment.roots = {homebrew.string()};
         environment.drives = {data.string()};
         environment.sandboxes = (base / "sandbox").string();
@@ -144,7 +144,7 @@ struct Console
         // Nightshade is the app the console runs while it asks.
         environment.running_app = [](std::string &title)
         {
-            title = "PPSA99008";
+            title = "PPSA64448";
             return true;
         };
     }
@@ -330,14 +330,14 @@ void good_zip()
            "the download's address is made from the repository, the tag and the file");
 
     const Eden::Apps::Installed none = Eden::Apps::Find("PPSA99003", console.user.string(),
-                                                        (console.homebrew / "PPSA99008").string(),
+                                                        (console.homebrew / "PPSA64448").string(),
                                                         console.homebrew.string());
     expect(none.folder.empty() && Eden::Apps::Decide(none, true, "01.000.090") == Eden::Apps::Offer::get,
            "an app not installed is offered");
     self_update_offer offer{};
-    expect(Eden::Apps::MakeOffer(tv, release, none, "PPSA99008", &offer) &&
+    expect(Eden::Apps::MakeOffer(tv, release, none, "PPSA64448", &offer) &&
                std::string{offer.installed} == "none" && std::string{offer.available} == "01.000.090" &&
-               std::string{offer.beside} == "PPSA99008",
+               std::string{offer.beside} == "PPSA64448",
            "a new app's offer");
     const self_update_status status = install(platform, offer);
     network.settle();
@@ -348,7 +348,7 @@ void good_zip()
     expect(read(folder / "eboot.bin") == "tv" && !fs::exists(console.data / "self-update"),
            "a good ZIP's app is beside Nightshade, and no work folder is left");
     const Eden::Apps::Installed found = Eden::Apps::Find("PPSA99003", console.user.string(),
-                                                         (console.homebrew / "PPSA99008").string(),
+                                                         (console.homebrew / "PPSA64448").string(),
                                                          console.homebrew.string());
     expect(found.folder == folder.string() && found.version == "01.000.090" &&
                Eden::Apps::Decide(found, true, "01.000.090") == Eden::Apps::Offer::current,
@@ -364,7 +364,7 @@ void good_zip()
     expect(Eden::Apps::Decide(found, update.reason == GITHUB_RELEASE_NEWER, update.asset.tag) ==
                Eden::Apps::Offer::update,
            "a newer release is offered as an update");
-    expect(Eden::Apps::MakeOffer(tv, update, found, "PPSA99008", &offer) &&
+    expect(Eden::Apps::MakeOffer(tv, update, found, "PPSA64448", &offer) &&
                std::string{offer.installed} == "01.000.090",
            "an update's offer names the version installed");
     const self_update_status updated = install(platform, offer);
@@ -391,7 +391,7 @@ void wrong_hash()
     expect(release.reason == GITHUB_RELEASE_NEWER && !release.fallback && release.asset.sha256 == other,
            "its own repository's release is offered");
     self_update_offer offer{};
-    expect(Eden::Apps::MakeOffer(stream, release, {}, "PPSA99008", &offer) &&
+    expect(Eden::Apps::MakeOffer(stream, release, {}, "PPSA64448", &offer) &&
                std::string{offer.available} == "01.000.110",
            "a tag as make-dist.py writes it names its version");
     const self_update_status status = install(platform, offer);
@@ -427,7 +427,7 @@ void missing_hash()
     const self_update_platform platform = platform_of(network);
     const Eden::Apps::Release release = Eden::Apps::Check(&platform, station);
     self_update_offer offer{};
-    expect(release.reason == GITHUB_RELEASE_NO_HASH && !Eden::Apps::MakeOffer(station, release, {}, "PPSA99008", &offer),
+    expect(release.reason == GITHUB_RELEASE_NO_HASH && !Eden::Apps::MakeOffer(station, release, {}, "PPSA64448", &offer),
            "a release with neither SHA256SUMS nor a digest is not offered");
     expect(Eden::Apps::Decide({}, release.reason == GITHUB_RELEASE_NEWER, release.asset.tag) == Eden::Apps::Offer::none,
            "nothing is offered for it");
@@ -437,7 +437,7 @@ void missing_hash()
     const Eden::Apps::Release digest = Eden::Apps::Check(&platform, station);
     expect(digest.reason == GITHUB_RELEASE_NEWER && digest.asset.from_sums == 0 && digest.asset.sha256 == sha256(zip),
            "GitHub's digest stands in for a missing SHA256SUMS");
-    expect(Eden::Apps::MakeOffer(station, digest, {}, "PPSA99008", &offer) && std::string{offer.available} == "any",
+    expect(Eden::Apps::MakeOffer(station, digest, {}, "PPSA64448", &offer) && std::string{offer.available} == "any",
            "a likely version is not one the helper is held to");
     const self_update_status status = install(platform, offer);
     expect(status.phase == SELF_UPDATE_INSTALLED && std::string{status.version} == "01.005.009" &&
@@ -457,7 +457,7 @@ void missing_release()
     expect(release.reason == GITHUB_RELEASE_NONE && release.fallback &&
                network.asked == std::vector<std::string>{latest_of(tv.repository), latest_of(tv.fallback)},
            "with no release anywhere both repositories are asked, nothing more");
-    expect(!Eden::Apps::MakeOffer(tv, release, {}, "PPSA99008", &offer), "a missing release is nothing to install");
+    expect(!Eden::Apps::MakeOffer(tv, release, {}, "PPSA64448", &offer), "a missing release is nothing to install");
 
     // A release of its own without the ZIP: the project it is based on is not asked instead.
     network.asked.clear();
@@ -494,7 +494,7 @@ void redirects(const fs::path &fixtures)
     const Eden::Apps::Release elsewhere = Eden::Apps::Check(&platform, tv);
     self_update_offer offer{};
     expect(elsewhere.reason == GITHUB_RELEASE_OWNER_CHANGED && !elsewhere.fallback &&
-               !Eden::Apps::MakeOffer(tv, elsewhere, {}, "PPSA99008", &offer) &&
+               !Eden::Apps::MakeOffer(tv, elsewhere, {}, "PPSA64448", &offer) &&
                network.asked == std::vector<std::string>{latest_of(tv.repository), moved},
            "a redirect to another account is refused, and nothing more is asked");
     network.api[moved] = {200, latest("01.001.000", {{"PPSA99003.zip", zip.size(), sha256(zip)}})};
@@ -582,7 +582,7 @@ void originals(const fs::path &fixtures, const fs::path &zips)
         network.console = &console;
         network.files[file_of(listing.fallback, original.tag, std::string{original.title} + ".zip")] = read(zip);
         self_update_offer offer{};
-        const bool offered = Eden::Apps::MakeOffer(listing, release, {}, "PPSA99008", &offer);
+        const bool offered = Eden::Apps::MakeOffer(listing, release, {}, "PPSA64448", &offer);
         const self_update_status status = offered ? install(platform, offer) : self_update_status{};
         std::string title, version;
         expect(status.phase == SELF_UPDATE_INSTALLED &&
@@ -603,14 +603,14 @@ void finding()
     Console console("find");
     const std::string user = console.user.string(), homebrew = console.homebrew.string();
     // Nightshade's own folder: ShadowMountPlus's record of it, else the usual one.
-    expect(Eden::Apps::OwnFolder("PPSA99008", user, (console.homebrew / "PPSA99008").string()) ==
-               (console.homebrew / "PPSA99008").string(),
+    expect(Eden::Apps::OwnFolder("PPSA64448", user, (console.homebrew / "PPSA64448").string()) ==
+               (console.homebrew / "PPSA64448").string(),
            "Nightshade's folder, with no record of ShadowMountPlus's");
     const fs::path usb = console.base / "usb0/homebrew";
-    write(usb / "PPSA99008/sce_sys/param.json", param("PPSA99008", "01.010.000"));
-    write(console.user / "app/PPSA99008/mount.lnk", (usb / "PPSA99008").string() + "\n");
-    const std::string own = Eden::Apps::OwnFolder("PPSA99008", user, (console.homebrew / "PPSA99008").string());
-    expect(own == (usb / "PPSA99008").string(), "Nightshade's folder, where ShadowMountPlus mounted it from");
+    write(usb / "PPSA64448/sce_sys/param.json", param("PPSA64448", "01.010.000"));
+    write(console.user / "app/PPSA64448/mount.lnk", (usb / "PPSA64448").string() + "\n");
+    const std::string own = Eden::Apps::OwnFolder("PPSA64448", user, (console.homebrew / "PPSA64448").string());
+    expect(own == (usb / "PPSA64448").string(), "Nightshade's folder, where ShadowMountPlus mounted it from");
     // An app beside it under another name; one in /data/homebrew; one ShadowMountPlus recorded.
     write(usb / "ProsperoLight/sce_sys/param.json", param("PPSA99002", "01.000.100"));
     write(console.homebrew / "PPSA99003/sce_sys/param.json", param("PPSA99003", "01.000.080"));
@@ -689,13 +689,13 @@ void launching()
             });
         const self_update_channel channel{channel_send, channel_receive, channel_close,
                                           reinterpret_cast<void *>(static_cast<std::intptr_t>(ends[0]))};
-        const std::string result = Eden::Apps::AskLaunch(channel, "PPSA99003", "PPSA99008");
+        const std::string result = Eden::Apps::AskLaunch(channel, "PPSA99003", "PPSA64448");
         payload.join();
         ::close(ends[0]);
         return result;
     };
     std::string heard;
-    expect(conversation("waiting\n", &heard).empty() && heard == "PSL1\nPPSA99003\nPPSA99008\n",
+    expect(conversation("waiting\n", &heard).empty() && heard == "PSL1\nPPSA99003\nPPSA64448\n",
            "the launch payload is asked for the title and told who asks");
     expect(conversation("fail The console doesn't list the app yet\n", &heard) == Eden::Apps::kNotListed,
            "the launch payload's refusal is told");

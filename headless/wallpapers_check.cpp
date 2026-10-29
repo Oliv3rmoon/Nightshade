@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright 2026 Oliv3rmoon
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Host check of the wallpaper folders (wallpapers.h): the game files folder's wallpapers/ and
-// /data/prosperoeden/wallpapers, made in the temporary folder. Which folders are read and in which
+// /data/nightshade/wallpapers, made in the temporary folder. Which folders are read and in which
 // order, an image in either or both listed once, a folder that isn't there, and the file a chosen
 // name is read from.
 //
@@ -75,17 +75,17 @@ std::string names(const std::vector<Eden::Wallpapers::Image> &images)
 void folders()
 {
     using Eden::Wallpapers::Folders;
-    const std::string data = "/data/prosperoeden/wallpapers";
+    const std::string data = "/data/nightshade/wallpapers";
     // The default: the game files folder is the data folder, so one folder.
-    expect(Folders("/data/prosperoeden", data) == std::vector<std::string>{data},
-           "the game files folder at /data/prosperoeden reads one folder");
-    expect(Folders("/data/prosperoeden/", data + "/") == std::vector<std::string>{data},
+    expect(Folders("/data/nightshade", data) == std::vector<std::string>{data},
+           "the game files folder at /data/nightshade reads one folder");
+    expect(Folders("/data/nightshade/", data + "/") == std::vector<std::string>{data},
            "a trailing slash is the same folder");
     // A game files folder on a USB drive: its wallpapers/ first, then the data folder's.
     expect(Folders("/mnt/usb0/assets", data) == std::vector<std::string>{"/mnt/usb0/assets/wallpapers", data},
            "a game files folder on a USB drive is read first, then the data folder");
-    expect(Folders("/mnt/usb0/homebrew/PPSA99008/assets", data) ==
-               std::vector<std::string>{"/mnt/usb0/homebrew/PPSA99008/assets/wallpapers", data},
+    expect(Folders("/mnt/usb0/homebrew/PPSA64448/assets", data) ==
+               std::vector<std::string>{"/mnt/usb0/homebrew/PPSA64448/assets/wallpapers", data},
            "the app folder's assets/, when it is the game files folder, is read first");
     expect(Folders("/", data) == std::vector<std::string>{"/wallpapers", data}, "a game files folder at / is /wallpapers");
     expect(Folders("", data) == std::vector<std::string>{data}, "without a game files folder, the data folder alone");
@@ -93,7 +93,7 @@ void folders()
 
 void listing(const fs::path &base)
 {
-    const fs::path assets = base / "usb0/assets", data = base / "data/prosperoeden";
+    const fs::path assets = base / "usb0/assets", data = base / "data/nightshade";
     const std::string usb = Eden::Wallpapers::In(assets.string());
     const std::string own = (data / "wallpapers").string();
     const std::vector<std::string> both = Eden::Wallpapers::Folders(assets.string(), own);

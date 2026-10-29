@@ -3,8 +3,8 @@
 // The images Settings > Appearance > Wallpaper lists (docs/WALLPAPERS.md), from two folders:
 // wallpapers/ in the game files folder, the folder with keys/, firmware/ and roms/ that a player
 // who runs the app from a USB drive copies over from a PC (the "assets" folder of upstream
-// request 263), and /data/prosperoeden/wallpapers, filled over FTP. With the game files folder
-// left at /data/prosperoeden (the default) the two are one folder.
+// request 263), and /data/nightshade/wallpapers, filled over FTP. With the game files folder
+// left at /data/nightshade (the default) the two are one folder.
 //
 // The settings keep a wallpaper by its file name alone (settings_store.h, ValidWallpaperName), so
 // a name is one entry however many folders have it: the game files folder's copy, so that an

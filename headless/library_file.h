@@ -41,7 +41,7 @@ inline std::string Text(const std::string& game_files, const std::vector<Game>& 
         list.push_back(std::move(entry));
     }
     const nlohmann::json document{
-        {"version", kVersion}, {"app", "PPSA99008"}, {"game_files", game_files}, {"games", std::move(list)}};
+        {"version", kVersion}, {"app", "PPSA64448"}, {"game_files", game_files}, {"games", std::move(list)}};
     // Names may hold any character a file name can; invalid UTF-8 is replaced, never refused.
     return document.dump(2, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
 }

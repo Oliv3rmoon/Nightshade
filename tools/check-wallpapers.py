@@ -5,7 +5,7 @@
 
 Builds the check under the address and undefined-behaviour sanitizers, warnings as errors, and runs
 it in the temporary folder: the game files folder's wallpapers/ (the folder copied over USB) and
-/data/prosperoeden/wallpapers, an image in either or both, a folder that isn't there.
+/data/nightshade/wallpapers, an image in either or both, a folder that isn't there.
 
 usage: tools/check-wallpapers.py
 CXX names another compiler.

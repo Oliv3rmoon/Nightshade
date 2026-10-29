@@ -228,7 +228,7 @@ std::vector<std::string> Excluded(const std::string& data, const std::string& ga
                               "user/cache",      "user/shader", "user/log",  "user/crash_dumps",
                               "user/dump",       "roms",        "updates",   ".remote-downloads"};
     // The games folder, when it is inside the data folder somewhere else (a game files folder of
-    // /data/prosperoeden/eden, say): its games and downloads too.
+    // /data/nightshade/eden, say): its games and downloads too.
     std::string inside = games;
     while (inside.size() > 1 && inside.back() == '/') inside.pop_back();
     std::string top = data;

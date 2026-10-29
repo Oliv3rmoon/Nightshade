@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright 2026 Oliv3rmoon
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Settings > Diagnostics > Back up to USB (upstream request 157): the app's data folder,
-// /data/prosperoeden (settings, profiles, every save, the keys and firmware when the game files
+// /data/nightshade (settings, profiles, every save, the keys and firmware when the game files
 // folder is there), copied file by file to a USB drive as it is, without what the app makes again
 // by itself (Excluded). It goes to <drive>/nightshade-backup/<YYYYMMDD-HHMMSS>/, with backup.json
 // (the app's version, the date, how many files and bytes) and SHA256SUMS (sha256sum's format)
@@ -131,7 +131,7 @@ Result Run(const std::string& data, const Plan& plan, const std::string& drive, 
 
 // ---- Settings > Diagnostics > Back up to USB (EdenServices) ----
 struct Setup {
-    std::string data;                // /data/prosperoeden
+    std::string data;                // /data/nightshade
     std::string games;               // the games folder (assets_dir.h, GamesDir)
     std::vector<std::string> drives; // UsbDrives()
     std::string version;

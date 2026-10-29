@@ -282,7 +282,7 @@ NOTES = {
     "No USB drive is connected. Connect one formatted as exFAT or FAT32.": "exFAT and FAT32 are names of disk formats (unchanged).",
     "Without filesystem access there is nothing to back up.": "Filesystem access is what the app asks the console for when it starts (as in 'Without filesystem access Nightshade can't tell which apps are installed.').",
     "Nightshade's data could not be read: {0}": "{0} is why (English, technical).",
-    "Images in {0} and in {1}": "Under the Wallpaper list: {0} and {1} are the two folders the images are read from (the game files folder's wallpapers folder, then /data/prosperoeden/wallpapers).",
+    "Images in {0} and in {1}": "Under the Wallpaper list: {0} and {1} are the two folders the images are read from (the game files folder's wallpapers folder, then /data/nightshade/wallpapers).",
 }
 
 

@@ -25,7 +25,7 @@ update_check_result Decide(const std::string& json, const char* installed) {
 }
 
 std::string Answer(const char* status, const char* content_version, const char* version) {
-    std::string json = std::string("{\"title_id\":\"PPSA99008\",\"status\":\"") + status + "\",\"content_version\":";
+    std::string json = std::string("{\"title_id\":\"PPSA64448\",\"status\":\"") + status + "\",\"content_version\":";
     json += content_version ? std::string("\"") + content_version + "\"" : std::string("null");
     json += std::string(",\"version\":\"") + version + "\",\"page\":\"https://homebrew.page/ps5/prosperoeden\"}";
     return json;
@@ -294,7 +294,7 @@ const self_update_platform kPlatform = {Fetch, Download, Verify, OpenHelper, Loa
 self_update_check_result Check(const char* repository, const char* installed, self_update_offer* offer,
                                github_release_report* report) {
     network.asked.clear();
-    return self_update_check_from(&kPlatform, repository, "Nightshade", "PPSA99008", installed, offer, report);
+    return self_update_check_from(&kPlatform, repository, "Nightshade", "PPSA64448", installed, offer, report);
 }
 
 void Serve(int status, const std::string& body) {
@@ -590,7 +590,7 @@ void GitHubCheck() {
     assert(report.reason == GITHUB_RELEASE_NEWER && report.http_status == 200 && std::strcmp(report.tag, "v1.005.100") == 0 &&
            std::strcmp(report.zip, "Nightshade-v1.005.100.zip") == 0 && report.redirects == 0);
     assert((network.asked == std::vector<std::string>{kApi, kSums}));
-    assert(std::strcmp(offer.title, "PPSA99008") == 0 && std::strcmp(offer.name, "Nightshade") == 0);
+    assert(std::strcmp(offer.title, "PPSA64448") == 0 && std::strcmp(offer.name, "Nightshade") == 0);
     assert(std::strcmp(offer.installed, "01.005.000") == 0 && std::strcmp(offer.available, "01.005.100") == 0);
     assert(std::strcmp(offer.version, "v1.005.100") == 0 && std::strcmp(offer.artifact, kZip) == 0);
     assert(std::strcmp(offer.sha256, kDigest) == 0 && offer.size == 42651073);
@@ -696,7 +696,7 @@ void GitHubCheck() {
     assert(Check("Oliv3rmoon", "01.005.000", &offer, &report) == SELF_UPDATE_UNKNOWN &&
            report.reason == GITHUB_RELEASE_BAD_ARGUMENT && network.asked.empty());
     assert(Check(kRepository, "development", &offer, &report) == SELF_UPDATE_UNKNOWN && network.asked.empty());
-    assert(self_update_check_from(&kPlatform, kRepository, "ProsperoEden", "../PPSA99008", "01.005.000", &offer,
+    assert(self_update_check_from(&kPlatform, kRepository, "ProsperoEden", "../PPSA64448", "01.005.000", &offer,
                                   &report) == SELF_UPDATE_UNKNOWN);
 }
 
@@ -863,7 +863,7 @@ void CatalogUnchanged() {
             network.answers["https://homebrew.page/api/v1/manifest.sig"] = {200, std::string(64, 's')};
         }
         network.asked.clear();
-        const self_update_check_result expected = self_update_check(&kPlatform, "PPSA99008", "01.005.000", &direct);
+        const self_update_check_result expected = self_update_check(&kPlatform, "PPSA64448", "01.005.000", &direct);
         const std::vector<std::string> catalog = network.asked;
         assert(!catalog.empty() && catalog[0] == "https://homebrew.page/api/v1/manifest.json");
         assert(expected == (signed_manifest ? SELF_UPDATE_UNTRUSTED : SELF_UPDATE_UNKNOWN));
@@ -895,9 +895,9 @@ int main(int argc, char** argv) {
 
     // The request names the title and nothing else.
     char url[96];
-    assert(update_check_url(url, sizeof(url), "PPSA99008") != 0);
-    assert(std::strcmp(url, "https://homebrew.page/api/v1/apps/PPSA99008.json") == 0);
-    assert(update_check_url(url, sizeof(url), "../PPSA99008") == 0);
+    assert(update_check_url(url, sizeof(url), "PPSA64448") != 0);
+    assert(std::strcmp(url, "https://homebrew.page/api/v1/apps/PPSA64448.json") == 0);
+    assert(update_check_url(url, sizeof(url), "../PPSA64448") == 0);
 
     // A newer release is listed: its name is what the notification shows.
     update_check_result result = Decide(Answer("available", "01.000.050", "v1.000.050"), "01.000.040");

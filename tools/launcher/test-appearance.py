@@ -17,7 +17,7 @@ with tempfile.TemporaryDirectory(prefix='pe-appearance-') as temporary:
                  'key down 30', 'key down 30', 'key cross 30', 'appearance',
                  'key circle 30', 'key up 30', 'key cross 30', 'key cross 30',
                  'key cross 30', 'appearance', 'select builtin', 'appearance',
-                 'crash /data/prosperoeden/logs/crash-20261015-120000.txt', 'appearance']
+                 'crash /data/nightshade/logs/crash-20261015-120000.txt', 'appearance']
     if len(sys.argv) > 2:
         capture = Path(sys.argv[2]).resolve()
         commands.insert(commands.index('appearance') + 1, 'capture '+str(capture.with_name('accents.png')))

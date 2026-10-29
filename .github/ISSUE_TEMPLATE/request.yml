@@ -46,7 +46,7 @@ body:
     id: logs
     attributes:
       label: "Logs"
-      description: "For a crash or a game problem: attach /data/prosperoeden/logs/stderr.log and /data/prosperoeden/user/log/eden_log.txt from right after it happened"
+      description: "For a crash or a game problem: attach /data/nightshade/logs/stderr.log and /data/nightshade/user/log/eden_log.txt from right after it happened"
   - type: input
     id: system
     attributes:

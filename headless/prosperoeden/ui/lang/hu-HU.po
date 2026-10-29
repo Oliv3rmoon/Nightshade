@@ -924,7 +924,7 @@ msgstr "A játékok megjelenítése és skálázása a TV-re."
 msgid "Images in this folder: {0}"
 msgstr "Képek ebben a mappában: {0}"
 
-#. Under the Wallpaper list: {0} and {1} are the two folders the images are read from (the game files folder's wallpapers folder, then /data/prosperoeden/wallpapers).
+#. Under the Wallpaper list: {0} and {1} are the two folders the images are read from (the game files folder's wallpapers folder, then /data/nightshade/wallpapers).
 #: pe/ui/settings.cpp
 msgid "Images in {0} and in {1}"
 msgstr "Képek ezekben a mappákban: {0} és {1}"

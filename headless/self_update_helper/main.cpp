@@ -64,8 +64,8 @@ int main()
     environment.space = free_space;
     environment.notify = notify;
     // The version an update replaces stays here until the next update.
-    environment.previous = "/data/prosperoeden/previous-version";
-    environment.launcher_data = "/data/prosperoeden";
+    environment.previous = "/data/nightshade/previous-version";
+    environment.launcher_data = "/data/nightshade";
     // ProsperoEden: for an install of another app (Nightshade's Apps): which big app runs now, read
     // as Mihawk's PS5 RetroArch forwarder reads it. libSceSystemService is loaded and its two
     // functions looked up here, the first time an install asks, not linked: the helper imports
@@ -103,9 +103,9 @@ int main()
         title = id;
         return true;
     };
-    // ProsperoEden: the kernel log, and /data/prosperoeden/logs/updater.log (the last update's
+    // ProsperoEden: the kernel log, and /data/nightshade/logs/updater.log (the last update's
     // lines, for a player to send: the kernel log is out of reach for most).
-    static std::FILE *file = std::fopen("/data/prosperoeden/logs/updater.log", "w");
+    static std::FILE *file = std::fopen("/data/nightshade/logs/updater.log", "w");
     environment.log = [](const std::string &line)
     {
         (void)klog_puts(("[self-update] " + line).c_str());

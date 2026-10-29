@@ -163,7 +163,7 @@ public:
 
 #ifdef PS5_NATIVE
 // First start with filesystem access: copy what the sandbox kept (settings, covers, Eden's saves
-// and caches) into /data/prosperoeden. Only folders that do not exist yet are filled, and the
+// and caches) into /data/nightshade. Only folders that do not exist yet are filled, and the
 // sandbox copy stays, so an older ProsperoEden still finds its data.
 // dev-settings jit_table_check=on: the JIT's direct page table (headless/jit-page-table.cmake) must
 // hold, for every page, the pointer of Eden's entry, or 0 where the entry is marked or empty. A
@@ -194,7 +194,7 @@ public:
 }
 
 static void MigrateSandboxData() {
-    const std::filesystem::path sandbox{"/mnt/sandbox/PPSA99008_000/download0"};
+    const std::filesystem::path sandbox{"/mnt/sandbox/PPSA64448_000/download0"};
     const std::pair<std::filesystem::path, std::string> moves[] = {
         {sandbox / "eden-headless-g7/user", Eden::UserDir()},
         {sandbox / "prosperoeden/covers", Eden::CoversDir()},
@@ -222,10 +222,10 @@ static void MigrateSandboxData() {
 
 #ifdef PS5_NATIVE
 // Game files an early version kept inside the app's folder (assets/ with keys, firmware and
-// roms) move to /data/prosperoeden, where replacing the app cannot take them away: an update
+// roms) move to /data/nightshade, where replacing the app cannot take them away: an update
 // that replaces the whole folder left the app without its keys and games. Both are on /data, so
 // it is a rename of each folder. Nothing moves unless all of it can: a folder chosen in Settings,
-// or anything already in /data/prosperoeden, leaves everything where it is.
+// or anything already in /data/nightshade, leaves everything where it is.
 static void MoveGameFilesOutOfTheApp() {
     const std::string from = std::string{Eden::kInstallDir} + "/assets", to = Eden::kDefaultAssetsDir;
     const std::string saved = Eden::LoadSavedAssetsDir();
@@ -378,7 +378,7 @@ int main(int argc, char** argv) {
         Eden::Crash::Install(Eden::LogsDir(), crash_version.c_str(), last_crash.restarted);
         Eden::BootTrace::Ready(Eden::LogsDir(), Eden::FilesystemAccess());
         Eden::BootTrace::Line("logs and crash handler ready (%s)", Eden::LogsDir().c_str());
-        for (const char* folder : {"/app0", Eden::kMountedAppDir, Eden::kInstallDir, "/mnt/sandbox/PPSA99008_000/app0"})
+        for (const char* folder : {"/app0", Eden::kMountedAppDir, Eden::kInstallDir, "/mnt/sandbox/PPSA64448_000/app0"})
             Eden::BootTrace::Line("app folder candidate %s: eboot %s, font %s", folder,
                                   Eden::FileExists(std::string{folder} + "/eboot.bin") ? "yes" : "no",
                                   Eden::FileExists(std::string{folder} + "/ui/fonts/montserrat-medium.pefont") ? "yes" : "no");

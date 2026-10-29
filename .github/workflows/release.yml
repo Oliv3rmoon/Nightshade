@@ -238,10 +238,10 @@ jobs:
           with zipfile.ZipFile(archive) as z:
               assert z.testzip() is None, "damaged entry"
               names = z.namelist()
-              assert "PPSA99008/eboot.bin" in names, "no eboot.bin"
+              assert "PPSA64448/eboot.bin" in names, "no eboot.bin"
               wrong = [i.filename for i in z.infolist() if (i.external_attr >> 16) & 0o777 != 0o777]
               assert not wrong, f"entries not stored as 0777: {wrong[:3]}"
-              version = json.loads(z.read("PPSA99008/sce_sys/param.json"))["contentVersion"]
+              version = json.loads(z.read("PPSA64448/sce_sys/param.json"))["contentVersion"]
               assert archive == f"Nightshade-v{version.removeprefix('0')}.zip", (archive, version)
               print(f"{archive}: {len(names)} entries, all 0777, version {version}")
           PY

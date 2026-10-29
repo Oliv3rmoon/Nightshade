@@ -46,7 +46,7 @@ bool job_told = false;  // its end is in the log, and the app was looked for aga
 const std::string& OwnTitle() {
     static const std::string title = [] {
         std::string id, version;
-        return ReadParam(AppFile("sce_sys/param.json"), &id, &version) ? id : std::string{"PPSA99008"};
+        return ReadParam(AppFile("sce_sys/param.json"), &id, &version) ? id : std::string{"PPSA64448"};
     }();
     return title;
 }

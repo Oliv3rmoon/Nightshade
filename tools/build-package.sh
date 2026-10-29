@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Builds the PS5 app and its PPSA99008 folder (after make prepare).
-#   tools/build-package.sh release   build/release/PPSA99008, the configuration that ships
-#   tools/build-package.sh dev ID    build/dev/PPSA99008 (EDEN_DEV_PACKAGE_DIR) with the development switches
+# Builds the PS5 app and its PPSA64448 folder (after make prepare).
+#   tools/build-package.sh release   build/release/PPSA64448, the configuration that ships
+#   tools/build-package.sh dev ID    build/dev/PPSA64448 (EDEN_DEV_PACKAGE_DIR) with the development switches
 #                                    (profiling counters, dev-settings.txt A/B switches) that
 #                                    boots title ID on launch
 set -euo pipefail
@@ -16,7 +16,7 @@ export EDEN_PS5_VULKAN=ON EDEN_VULKAN_DRIVER=RADV
 case $mode in
 release)
     export EDEN_DEV_VULKAN=OFF EDEN_DEV_ROM_ID= EDEN_DEV_PROFILE=OFF EDEN_DEV_WAIT_CALLERS=OFF
-    export EDEN_PACKAGE_DIR="$root/build/release/PPSA99008"
+    export EDEN_PACKAGE_DIR="$root/build/release/PPSA64448"
     ;;
 dev)
     title=${2:?a development build boots one title: tools/build-package.sh dev TITLE_ID}
@@ -26,7 +26,7 @@ dev)
     export EDEN_DEV_WAIT_CALLERS=ON
     # The release-configuration source checks do not apply to development instrumentation.
     export EDEN_SKIP_SOURCE_CHECKS=1
-    export EDEN_PACKAGE_DIR="${EDEN_DEV_PACKAGE_DIR:-$root/build/dev/PPSA99008}"
+    export EDEN_PACKAGE_DIR="${EDEN_DEV_PACKAGE_DIR:-$root/build/dev/PPSA64448}"
     ;;
 *)
     echo "usage: tools/build-package.sh release|dev TITLE_ID" >&2

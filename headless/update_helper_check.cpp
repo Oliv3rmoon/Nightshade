@@ -219,7 +219,7 @@ struct Console
         // Nightshade is the app the console runs while it asks.
         environment.running_app = [](std::string &title)
         {
-            title = "PPSA99008";
+            title = "PPSA64448";
             return true;
         };
     }
@@ -260,7 +260,7 @@ std::vector<std::string> install_request(const std::string &title, const std::st
                                          const std::string &digest, const std::string &name)
 {
     return {"PSU1", "install", title, installed, available, std::to_string(archive.size()), digest, name,
-            available == "any" ? "1.5.9" : available, "PPSA99008"};
+            available == "any" ? "1.5.9" : available, "PPSA64448"};
 }
 
 // Nightshade's own update, as every version has asked for it: staged, applied once the app is
@@ -268,19 +268,19 @@ std::vector<std::string> install_request(const std::string &title, const std::st
 void own_update()
 {
     Console console("own");
-    const fs::path folder = console.homebrew / "PPSA99008";
-    console.app("PPSA99008", "01.005.100", folder);
+    const fs::path folder = console.homebrew / "PPSA64448";
+    console.app("PPSA64448", "01.005.100", folder);
     App &app = new_app();
-    app.archive = release_zip("PPSA99008", "01.005.101", "new program");
-    const int result = console.talk(app, {"PSU1", "update", "PPSA99008", "01.005.100", "01.005.101",
+    app.archive = release_zip("PPSA64448", "01.005.101", "new program");
+    const int result = console.talk(app, {"PSU1", "update", "PPSA64448", "01.005.100", "01.005.101",
                                           std::to_string(app.archive.size()), sha256(app.archive), "Nightshade",
                                           "v1.005.101"});
     expect(result == 0, "the app's own update ends well");
     expect(app.said("ready") && app.said("staged") && app.said("applying"), "the app's own update: ready, staged, applying");
     expect(read(folder / "eboot.bin") == "new program", "the app's own update replaces its program");
-    expect(read(folder / "sce_sys/param.json") == param("PPSA99008", "01.005.101"), "the app's own update: its new param.json");
+    expect(read(folder / "sce_sys/param.json") == param("PPSA64448", "01.005.101"), "the app's own update: its new param.json");
     expect(read(folder / "language.txt") == "de-DE", "the app's own update keeps the player's files");
-    expect(read(console.data / "prosperoeden/previous-version/PPSA99008-backup/eboot.bin") == "old program of PPSA99008",
+    expect(read(console.data / "prosperoeden/previous-version/PPSA64448-backup/eboot.bin") == "old program of PPSA64448",
            "the app's own update keeps the version it replaced");
     expect(console.notices.size() == 1 && console.notices[0] == "Nightshade was updated to v1.005.101. Open it again.",
            "the app's own update: its notification");
@@ -288,15 +288,15 @@ void own_update()
 
     // A wrong digest: nothing changes.
     Console wrong("own-wrong");
-    wrong.app("PPSA99008", "01.005.100", wrong.homebrew / "PPSA99008");
+    wrong.app("PPSA64448", "01.005.100", wrong.homebrew / "PPSA64448");
     App &refused = new_app();
     refused.archive = app.archive;
-    const int failed = wrong.talk(refused, {"PSU1", "update", "PPSA99008", "01.005.100", "01.005.101",
+    const int failed = wrong.talk(refused, {"PSU1", "update", "PPSA64448", "01.005.100", "01.005.101",
                                             std::to_string(refused.archive.size()), std::string(64, 'a'),
                                             "Nightshade", "v1.005.101"});
     expect(failed == 1 && refused.last() == "fail The download doesn't match the catalog's listing",
            "the app's own update refuses a download that isn't the one listed");
-    expect(read(wrong.homebrew / "PPSA99008/eboot.bin") == "old program of PPSA99008" && wrong.no_work_left(),
+    expect(read(wrong.homebrew / "PPSA64448/eboot.bin") == "old program of PPSA64448" && wrong.no_work_left(),
            "the app's own update changes nothing then");
 }
 
@@ -306,7 +306,7 @@ void other_apps()
 {
     {
         Console console("fresh");
-        console.app("PPSA99008", "01.010.000", console.homebrew / "PPSA99008");
+        console.app("PPSA64448", "01.010.000", console.homebrew / "PPSA64448");
         App &app = new_app();
         app.install = true;
         app.archive = release_zip("PPSA99003", "01.000.090", "tv program");
@@ -320,7 +320,7 @@ void other_apps()
                "a new app's folder is beside Nightshade's");
         expect((fs::status(folder / "eboot.bin").permissions() & fs::perms::all) == fs::perms::all,
                "a new app's files can be run by everyone");
-        expect(read(console.homebrew / "PPSA99008/eboot.bin") == "old program of PPSA99008",
+        expect(read(console.homebrew / "PPSA64448/eboot.bin") == "old program of PPSA64448",
                "a new app leaves Nightshade as it was");
         expect(console.notices.size() == 1 &&
                    console.notices[0] == "Nightshade TV 01.000.090 was installed. The homebrew loader lists it "
@@ -339,7 +339,7 @@ void other_apps()
     }
     {
         Console console("update");
-        console.app("PPSA99008", "01.010.000", console.homebrew / "PPSA99008");
+        console.app("PPSA64448", "01.010.000", console.homebrew / "PPSA64448");
         const fs::path folder = console.homebrew / "PPSA99002";
         console.app("PPSA99002", "01.000.100", folder);
         App &app = new_app();
@@ -377,7 +377,7 @@ void other_apps()
     }
     {
         Console console("wrong");
-        console.app("PPSA99008", "01.010.000", console.homebrew / "PPSA99008");
+        console.app("PPSA64448", "01.010.000", console.homebrew / "PPSA64448");
         App &app = new_app();
         app.install = true;
         app.archive = release_zip("PPSA98510", "01.005.009", "station program");
@@ -455,7 +455,7 @@ void other_apps()
                 "nothing is installed with no way to ask which app runs");
         console.environment.running_app = [](std::string &title)
         {
-            title = "PPSA99008";
+            title = "PPSA64448";
             return true;
         };
         // A closed app's sandbox the system kept until a restart (Swordpdf/ProsperoEden#232) is no
@@ -474,8 +474,8 @@ void other_apps()
         // Nightshade's own title is never installed this way (its own update checks more).
         App &own = new_app();
         own.install = true;
-        own.archive = release_zip("PPSA99008", "01.010.001", "new program");
-        expect(console.talk(own, install_request("PPSA99008", "01.010.000", "01.010.001", own.archive,
+        own.archive = release_zip("PPSA64448", "01.010.001", "new program");
+        expect(console.talk(own, install_request("PPSA64448", "01.010.000", "01.010.001", own.archive,
                                                  sha256(own.archive), "Nightshade")) == 1 &&
                    own.last() == "fail The request was refused",
                "the asking app's own title is refused");

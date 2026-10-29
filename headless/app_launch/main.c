@@ -20,7 +20,7 @@
  * in a row a quarter of a second apart that find another, within 30 s: Nightshade gives its
  * graphics and sound back first), then opens the title as the foreground
  * user with sceLncUtilLaunchApp and, when that refuses, sceSystemServiceLaunchApp. Each step is
- * written to /data/prosperoeden/logs/app-launch.log.
+ * written to /data/nightshade/logs/app-launch.log.
  */
 #include <signal.h>
 #include <stdint.h>
@@ -30,7 +30,7 @@
 #include <unistd.h>
 
 #define LAUNCH_MAGIC "PSL1"
-#define LAUNCH_LOG "/data/prosperoeden/logs/app-launch.log"
+#define LAUNCH_LOG "/data/nightshade/logs/app-launch.log"
 #define LAUNCH_WAIT_STEP_US 250000
 #define LAUNCH_WAIT_STEPS 120
 /* Looks in a row that must find another app than the asking one before the title is opened. */

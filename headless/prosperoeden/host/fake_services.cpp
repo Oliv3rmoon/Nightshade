@@ -226,8 +226,8 @@ ui::Home FakeServices::home()
         home.status = fill(tr("Setup required: {0} Open Settings, Game files to choose the folder that "
                               "holds your keys, firmware and roms folders (or add the files to {1}), "
                               "then reopen Nightshade."),
-                           {fill(tr("Missing or empty keys/prod.keys in {0}."), {"/data/prosperoeden"}),
-                            "/data/prosperoeden"});
+                           {fill(tr("Missing or empty keys/prod.keys in {0}."), {"/data/nightshade"}),
+                            "/data/nightshade"});
     else if (!crash_report.empty())
     {
         home.status = fill(tr("Nightshade stopped because of an error. A report was saved to {0}."), {crash_report});
@@ -236,7 +236,7 @@ ui::Home FakeServices::home()
     else if (!launch_error.empty())
     {
         home.status = fill(tr("Game could not start: {0} Details: {1}"),
-                           {launch_error, "/data/prosperoeden/logs/stderr.log"});
+                           {launch_error, "/data/nightshade/logs/stderr.log"});
         home.launch_failed = true;
     }
     if (has_history && setup_ready)
@@ -338,7 +338,7 @@ std::string FakeServices::setup_details()
     return setup_ready ?
                tr("Keys and firmware: startup checks passed. Game-specific compatibility is checked at "
                   "launch.") :
-               fill(tr("Missing or empty keys/prod.keys in {0}."), {"/data/prosperoeden"});
+               fill(tr("Missing or empty keys/prod.keys in {0}."), {"/data/nightshade"});
 }
 
 std::vector<std::string> FakeServices::wallpapers()
@@ -374,7 +374,7 @@ bool FakeServices::folders(const std::string &directory, std::vector<std::string
         *names = {"data", "mnt", "user"};
     else if (directory == "/data")
         *names = {"homebrew", "prosperoeden"};
-    else if (directory == "/data/prosperoeden")
+    else if (directory == "/data/nightshade")
         *names = {"config", "covers", "logs"};
     return true;
 }
@@ -483,7 +483,7 @@ namespace pe::host
 ui::Sources FakeServices::sources()
 {
     ui::Sources sources;
-    sources.setup_file = "/data/prosperoeden/config/remote/sources.json";
+    sources.setup_file = "/data/nightshade/config/remote/sources.json";
     sources.generation = generation_;
     if (!has_server)
         return sources;
@@ -680,7 +680,7 @@ void FakeServices::played(const std::string &name)
 ui::SaveSyncSetup FakeServices::save_sync_setup()
 {
     ui::SaveSyncSetup setup;
-    setup.file = "/data/prosperoeden/config/remote/save-sync.json";
+    setup.file = "/data/nightshade/config/remote/save-sync.json";
     const char *names[] = {"Player 1", "Kids"};
     for (int i = 0; i < 2; ++i)
     {

@@ -3093,7 +3093,7 @@ if(PS5_NATIVE)
         "#elif defined(PS5_NATIVE)\n        eden_path = Eden::UserDir();\n        eden_path_cache = eden_path / CACHE_DIR;\n        eden_path_config = eden_path / CONFIG_DIR;\n#else\n        eden_path = GetCurrentDir() / PORTABLE_DIR;" paths_source "${paths_source}")
     string(REPLACE "#else\n        // In Ryujinx's infinite wisdom"
         "#elif defined(PS5_NATIVE)\n        GenerateLegacyPath(EmuPath::RyujinxDir, eden_path / RYUJINX_DIR);\n#else\n        // In Ryujinx's infinite wisdom" paths_source "${paths_source}")
-    # Eden's user folder follows the storage layout (storage_paths.h: /data/prosperoeden/user with
+    # Eden's user folder follows the storage layout (storage_paths.h: /data/nightshade/user with
     # filesystem access, the sandbox's download0 without).
     set(paths_source "#include \"${EDEN_PORT_DIR}/storage_paths.h\"
 ${paths_source}")
