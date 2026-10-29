@@ -454,6 +454,7 @@ extern "C" void ps5_opengl_heap_snapshot(const char* phase, unsigned iteration);
 extern "C" unsigned eden_heap_arenas_created(void) __attribute__((weak));
 extern "C" std::size_t eden_heap_committed(void) __attribute__((weak));
 extern "C" std::size_t eden_heap_large_held(unsigned* blocks) __attribute__((weak));
+extern "C" unsigned eden_guest_memory_wanted(void) __attribute__((weak));
 #ifdef PS5_NATIVE
 extern "C" std::int64_t sceKernelGetDirectMemorySize();
 extern "C" std::int32_t sceKernelAvailableDirectMemorySize(std::int64_t, std::int64_t, std::size_t, std::int64_t*,
@@ -480,15 +481,27 @@ static void RefreshFreeMemory() {
     largest_free_block.store(known ? largest : 0, std::memory_order_relaxed);
     graphics_memory_short.store(!known || largest < kShortMemory, std::memory_order_relaxed);
 }
+// A write to the guest's memory waiting for a block (src/guest_memory_service.inc, WaitForBlock):
+// the game's own memory comes first, so while one waits the caches see memory short and none free,
+// and the texture collector evicts at its hardest until the write has its block.
+static bool GuestMemoryWanted() {
+    return eden_guest_memory_wanted && eden_guest_memory_wanted() != 0;
+}
 static bool GraphicsMemoryShort() {
+    if (GuestMemoryWanted()) return true;
     RefreshFreeMemory();
     return graphics_memory_short.load(std::memory_order_relaxed);
 }
 // What the caches' "memory in use" is measured against (performance.h, graphics_memory_free).
 static unsigned long long GraphicsMemoryFree() {
+    if (GuestMemoryWanted()) return 1; // not 0: the caches read 0 as "not known"
     RefreshFreeMemory();
     return largest_free_block.load(std::memory_order_relaxed);
 }
+// Pipeline builders (performance.h PipelineWorkers): the console's eight cores run the guest's
+// cores and the GPU thread too, but at start, while the cache is built, they are free.
+[[maybe_unused]] static const bool pipeline_workers_set =
+    (pipeline_workers_min.store(6, std::memory_order_relaxed), true);
 [[maybe_unused]] static const bool graphics_memory_probe_installed =
     (graphics_memory_probe.store(&GraphicsMemoryShort, std::memory_order_relaxed),
      graphics_memory_free.store(&GraphicsMemoryFree, std::memory_order_relaxed), true);

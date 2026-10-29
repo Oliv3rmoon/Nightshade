@@ -511,6 +511,23 @@ inline bool KeepDirtyTextures() {
     const auto probe = graphics_memory_probe.load(std::memory_order_relaxed);
     return !probe || !probe();
 }
+// Threads that build pipelines (the Vulkan pipeline cache, GetTotalPipelineWorkers, through
+// tools/prepare-vulkan-port.py). Eden takes the processor count less one. On the console a large
+// game's 13,938 cached pipelines were built at about 25 a second at start: nine minutes before it
+// could be played, as one thread would. So the console build asks for at least
+// pipeline_workers_min (performance.cpp); a processor count above it still wins. The first call
+// says what it chose (EDEN_PIPELINE_WORKERS), so a log shows what the console reported.
+inline std::atomic<std::size_t> pipeline_workers_min{0};
+inline std::size_t PipelineWorkers(std::size_t upstream) {
+    const std::size_t minimum = pipeline_workers_min.load(std::memory_order_relaxed);
+    const std::size_t chosen = upstream < minimum ? minimum : upstream;
+    static std::atomic<bool> reported{false};
+    if (!reported.exchange(true, std::memory_order_relaxed)) {
+        std::printf("EDEN_PIPELINE_WORKERS processors_less_one=%zu minimum=%zu chosen=%zu\n", upstream, minimum,
+                    chosen);
+    }
+    return chosen;
+}
 // Signal the guest vsync first and compose 1.5 ms later, so a frame the game queues in response
 // to the vsync is latched at that same vsync (dev-settings compose_delay_us=N overrides it).
 inline std::atomic<int> compose_delay_us{1500};
