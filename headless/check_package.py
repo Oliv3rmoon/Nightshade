@@ -87,7 +87,47 @@ def check():
     return needed
 
 
+# The bridge (headless/bridge, tools/build-bridge.sh): the PPSA99008 app beside the app in the
+# release ZIP, for the installs made before Nightshade had its own title ID.
+BRIDGE = Path(os.environ.get('EDEN_BRIDGE_DIR', ROOT / 'build/release/PPSA99008')).resolve()
+BRIDGE_OUT = ROOT / 'build/bridge'
+
+
+def check_bridge():
+    assert BRIDGE.is_relative_to(ROOT / 'build') and BRIDGE.name == 'PPSA99008', BRIDGE
+    catalogs = {'ui/lang/' + p.name for p in (ROOT / 'headless/prosperoeden/ui/lang').glob('*.po')}
+    required = {'eboot.bin', 'sce_module/libc.prx', 'sce_sys/param.json', 'sce_sys/icon0.png', 'self-updater.elf',
+                'app-launch.elf', 'launcher-runtime.json', 'ui/fonts/montserrat-medium.pefont'} | catalogs
+    present = {p.relative_to(BRIDGE).as_posix() for p in BRIDGE.rglob('*') if p.is_file()}
+    assert present == required, f'missing {sorted(required - present)}, unexpected {sorted(present - required)}'
+    assert all(not (BRIDGE / p).is_symlink() and (BRIDGE / p).stat().st_size for p in required)
+    param = json.loads((BRIDGE / 'sce_sys/param.json').read_text())
+    app = json.loads((ROOT / 'sce_sys/param.json').read_text())
+    assert param['titleId'] == 'PPSA99008' and param['conceptId'] == '99008', param['titleId']
+    assert param['contentId'] == 'UP9000-PPSA99008_00-PROSPEROEDEN0001', param['contentId']
+    # The old installs' helper takes it at the version their app was offered: the release's.
+    assert param['contentVersion'] == app['contentVersion'], (param['contentVersion'], app['contentVersion'])
+    # The payloads are the app's own, built once (tools/package-headless-native.sh).
+    for name in ('self-updater.elf', 'app-launch.elf'):
+        assert digest(BRIDGE / name) == digest(APP / name), f'{name} is not the app\'s'
+    runpy.run_path(str(ROOT / 'tools/load_alignment.py'))['check_load_alignment']((BRIDGE / 'eboot.bin').read_bytes())
+    imports = (BRIDGE_OUT / 'imports.txt').read_text()
+    needed = set(imports.split('NeededLibraries [', 1)[1].split(']', 1)[0].split())
+    # VideoOut, the controller, the system's services, the network: nothing of the GPU's.
+    assert {'libSceVideoOut.sprx', 'libScePad.sprx', 'libSceSystemService.sprx', 'libSceUserService.sprx',
+            'libSceNet.sprx', 'libkernel.sprx'} <= needed, sorted(needed)
+    assert needed <= {'libSceVideoOut.sprx', 'libScePad.sprx', 'libSceSystemService.sprx', 'libSceUserService.sprx',
+                      'libSceNet.sprx', 'libkernel.sprx', 'libSceLibcInternal.sprx'}, sorted(needed)
+    for symbol in imports.split('Symbol {')[1:]:
+        assert not ('Binding: Weak' in symbol and 'Section: Undefined' in symbol), symbol
+    assert 'integrity: valid' in (BRIDGE_OUT / 'fself-inspection.txt').read_text()
+    print(f'Bridge package inventory ({len(required)} files), version {param["contentVersion"]}, alignment and imports PASS')
+
+
 if __name__ == '__main__':
+    if sys.argv[1:] == ['--bridge']:
+        check_bridge()
+        sys.exit(0)
     needed = check()
     if sys.argv[1:] == ['--freeze']:
         paths = [APP / p for p in sorted(REQUIRED)]

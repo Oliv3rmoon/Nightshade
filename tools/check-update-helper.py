@@ -11,9 +11,14 @@ Also checks that the helper writes its log to /data/nightshade/logs/updater.log.
 
 Then headless/update_helper_check.cpp, the helper's whole conversation in a console made in the
 temporary folder: the app's own update, and another app installed or updated (Nightshade's Apps).
+
+Last, the release ZIP that carries the bridge (PPSA64448/ and PPSA99008/, tools/ci/make-dist.py)
+with each helper Nightshade has released (fixtures/update-helper/released.json): the compatibility
+test's --release-layout part built with that helper's own sources, so that what an install of
+1.005.102 to 1.010.003 does with the ZIP is what that code does, not what today's helper would.
 """
 from pathlib import Path
-import os, subprocess, sys, tempfile
+import hashlib, json, os, subprocess, sys, tempfile
 
 root = Path(__file__).resolve().parents[1]
 helper = root / 'headless/self_update_helper'
@@ -42,11 +47,58 @@ with tempfile.TemporaryDirectory() as scratch:
                     *objects, '-pthread', '-o', str(binary)], check=True)
     cases = scratch / 'cases'
     cases.mkdir()
-    result = subprocess.run([str(binary), str(cases)], capture_output=True, text=True)
+    result = subprocess.run([str(binary), str(cases)], capture_output=True, text=True, timeout=300)
     sys.stdout.write(result.stdout)
     sys.stderr.write(result.stderr)
     if result.returncode != 0:
         sys.exit(result.returncode)
+
+    # The helpers Nightshade has released, each from its own sources.
+    def blob(data):
+        return hashlib.sha1(b'blob %d\0' % len(data) + data).hexdigest()
+    released = json.loads((root / 'fixtures/update-helper/released.json').read_text())
+    for name, helper_release in released['helpers'].items():
+        where = scratch / f'released-{name}'
+        (where / 'miniz').mkdir(parents=True)
+        for path, expected in helper_release['files'].items():
+            kept = root / 'fixtures/update-helper' / name / Path(path).name
+            current = root / path
+            if kept.is_file():
+                data = kept.read_bytes()
+            elif current.is_file() and blob(current.read_bytes()) == expected:
+                data = current.read_bytes()
+            else:
+                found = subprocess.run(['git', '-C', str(root), 'cat-file', 'blob', expected], capture_output=True)
+                if found.returncode != 0:
+                    sys.exit(f'{path} of the helper {name} ({expected}) is neither in {kept.parent} nor the one in the '
+                             f'tree: put its released copy there (git show {helper_release["releases"][-1]}:{path})')
+                data = found.stdout
+            if blob(data) != expected:
+                sys.exit(f'{path} of the helper {name} is not the released one ({blob(data)}, released {expected})')
+            target = where / 'miniz' if path.startswith('third_party/miniz/') else where
+            (target / Path(path).name).write_bytes(data)
+        built = []
+        for source in ('update_check', 'self_update_sha256'):
+            out = where / f'{source}.o'
+            subprocess.run([cc, '-std=c11', '-O1', '-DUPDATE_CHECK_NO_NETWORK', f'-I{where}', '-c', str(where / f'{source}.c'),
+                            '-o', str(out)], check=True)
+            built.append(str(out))
+        for source in ('miniz', 'miniz_tdef', 'miniz_tinfl', 'miniz_zip'):
+            out = where / f'{source}.o'
+            subprocess.run([cc, '-O1', '-w', f'-I{where / "miniz"}', '-c', str(where / 'miniz' / f'{source}.c'), '-o', str(out)],
+                           check=True)
+            built.append(str(out))
+        binary = where / 'release-layout-check'
+        subprocess.run([cxx, '-std=c++20', '-O1', '-w', f'-I{where}', str(root / 'tools/launcher/test-launcher-update-compat.cpp'),
+                        str(where / 'updater.cpp'), str(where / 'files.cpp'), str(where / 'archive.cpp'), *built, '-pthread',
+                        '-o', str(binary)], check=True)
+        cases = where / 'cases'
+        cases.mkdir()
+        result = subprocess.run([str(binary), str(cases), '--release-layout'], capture_output=True, text=True, timeout=300)
+        sys.stdout.write(f'helper {name} (released in {", ".join(helper_release["releases"])}): {result.stdout}')
+        sys.stderr.write(result.stderr)
+        if result.returncode != 0:
+            sys.exit(result.returncode)
     conversation = scratch / 'update-helper-conversation'
     subprocess.run([cxx, '-std=c++20', '-O1', '-Wall', '-Wextra', '-Werror', f'-I{root / "headless"}', f'-I{helper}',
                     f'-I{root / "headless/update_check"}', f'-I{root / "third_party"}',

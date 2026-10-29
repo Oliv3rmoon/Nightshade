@@ -257,10 +257,11 @@ struct Console
 
 std::vector<std::string> install_request(const std::string &title, const std::string &installed,
                                          const std::string &available, const std::string &archive,
-                                         const std::string &digest, const std::string &name)
+                                         const std::string &digest, const std::string &name,
+                                         const std::string &asking = "PPSA64448")
 {
     return {"PSU1", "install", title, installed, available, std::to_string(archive.size()), digest, name,
-            available == "any" ? "1.5.9" : available, "PPSA64448"};
+            available == "any" ? "1.5.9" : available, asking};
 }
 
 // Nightshade's own update, as every version has asked for it: staged, applied once the app is
@@ -470,6 +471,42 @@ void other_apps()
                "an app closed with its sandbox left behind is installed");
         fs::remove_all(console.base / "sandbox/PPSA98510_000");
         fs::remove_all(console.homebrew / "PPSA98510");
+
+        // The bridge (PPSA99008, bridge/bridge.h) installs Nightshade beside itself from the release ZIP
+        // that carries them both (tools/ci/make-dist.py): PPSA64448/ alone is taken.
+        {
+            Console bridge("bridge");
+            bridge.environment.running_app = [](std::string &title)
+            {
+                title = "PPSA99008";
+                return true;
+            };
+            bridge.app("PPSA99008", "01.010.004", bridge.homebrew / "PPSA99008");
+            mz_zip_archive zip{};
+            mz_zip_writer_init_heap(&zip, 0, 0);
+            for (const auto &[name, body] : std::vector<std::pair<std::string, std::string>>{
+                     {"PPSA64448/eboot.bin", "nightshade"},
+                     {"PPSA64448/sce_sys/param.json", param("PPSA64448", "01.010.004")},
+                     {"PPSA99008/eboot.bin", "bridge"},
+                     {"PPSA99008/sce_sys/param.json", param("PPSA99008", "01.010.004")},
+                     {"README.md", "readme"}})
+                mz_zip_writer_add_mem(&zip, name.c_str(), body.data(), body.size(), MZ_DEFAULT_COMPRESSION);
+            void *buffer = nullptr;
+            std::size_t size = 0;
+            mz_zip_writer_finalize_heap_archive(&zip, &buffer, &size);
+            App &both = new_app();
+            both.install = true;
+            both.archive.assign(static_cast<const char *>(buffer), size);
+            mz_free(buffer);
+            mz_zip_writer_end(&zip);
+            const fs::path folder = bridge.homebrew / "PPSA64448";
+            expect(bridge.talk(both, install_request("PPSA64448", "none", "01.010.004", both.archive,
+                                                     sha256(both.archive), "Nightshade", "PPSA99008")) == 0 &&
+                       both.last() == "installed 01.010.004 " + folder.string() &&
+                       read(folder / "eboot.bin") == "nightshade" && !fs::exists(folder / "README.md") &&
+                       read(bridge.homebrew / "PPSA99008/eboot.bin") == "old program of PPSA99008",
+                   "the bridge installs PPSA64448/ of the two-app release beside itself, and is left as it was");
+        }
 
         // Nightshade's own title is never installed this way (its own update checks more).
         App &own = new_app();

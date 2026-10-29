@@ -226,26 +226,16 @@ jobs:
         run: test -f "dist/Nightshade-${GITHUB_REF_NAME}.zip"
 
       # tools/ci/make-dist.py writes every entry as 0777 (the console only starts an app whose
-      # files are open to all); this looks at the finished file once more.
+      # files are open to all); this looks at the finished file once more: the app as PPSA64448/,
+      # the bridge for installs made before Nightshade had its own title ID as PPSA99008/, both at
+      # the version the ZIP is named after (tools/ci/check-release-zip.py).
       - name: Check the ZIP and its checksum
         run: |
           set -euo pipefail
-          cd dist
-          python3 - Nightshade-v*.zip <<'PY'
-          import json, sys, zipfile
-          assert len(sys.argv) == 2, f"expected one ZIP: {sys.argv[1:]}"
-          archive = sys.argv[1]
-          with zipfile.ZipFile(archive) as z:
-              assert z.testzip() is None, "damaged entry"
-              names = z.namelist()
-              assert "PPSA64448/eboot.bin" in names, "no eboot.bin"
-              wrong = [i.filename for i in z.infolist() if (i.external_attr >> 16) & 0o777 != 0o777]
-              assert not wrong, f"entries not stored as 0777: {wrong[:3]}"
-              version = json.loads(z.read("PPSA64448/sce_sys/param.json"))["contentVersion"]
-              assert archive == f"Nightshade-v{version.removeprefix('0')}.zip", (archive, version)
-              print(f"{archive}: {len(names)} entries, all 0777, version {version}")
-          PY
-          sha256sum -c SHA256SUMS
+          zips=(dist/Nightshade-v*.zip)
+          [[ ${#zips[@]} == 1 ]] || { echo "expected one ZIP: ${zips[*]}"; exit 1; }
+          python3 -B tools/ci/check-release-zip.py "${zips[0]}"
+          (cd dist && sha256sum -c SHA256SUMS)
 
       # Signed provenance: this ZIP was built by this workflow from this commit. Anyone can check a
       # downloaded copy with `gh attestation verify <file> -R <owner>/<repo>`. For a tag and a manual

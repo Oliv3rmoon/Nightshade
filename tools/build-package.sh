@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Builds the PS5 app and its PPSA64448 folder (after make prepare).
-#   tools/build-package.sh release   build/release/PPSA64448, the configuration that ships
+#   tools/build-package.sh release   build/release/PPSA64448, the configuration that ships, and the
+#                                    bridge beside it, build/release/PPSA99008 (tools/build-bridge.sh)
 #   tools/build-package.sh dev ID    build/dev/PPSA64448 (EDEN_DEV_PACKAGE_DIR) with the development switches
 #                                    (profiling counters, dev-settings.txt A/B switches) that
 #                                    boots title ID on launch
@@ -44,6 +45,11 @@ rm -rf "$EDEN_PACKAGE_DIR"
 bash tools/package-headless-native.sh --integration
 if [[ $mode == release ]]; then
     python3 -B headless/check_package.py --check
+    # The bridge for the installs made before Nightshade had its own title ID (headless/bridge): the
+    # release ZIP's PPSA99008/ (tools/ci/make-dist.py).
+    echo "== Bridge $root/build/release/PPSA99008"
+    bash tools/build-bridge.sh "$root/build/release/PPSA99008"
+    EDEN_BRIDGE_DIR="$root/build/release/PPSA99008" python3 -B headless/check_package.py --bridge
 elif [[ -f CANDIDATE.json ]]; then
     # Development layout: the console runner verifies this receipt before every run.
     python3 -B headless/check_package.py --freeze

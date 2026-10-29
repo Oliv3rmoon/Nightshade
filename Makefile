@@ -19,6 +19,9 @@ PS5_PORT ?= 2121
 
 PYTHON := python3 -B
 RELEASE_APP := build/release/PPSA64448
+# The bridge for installs made before Nightshade had its own title ID (headless/bridge), PPSA99008/
+# of the release ZIP beside the app.
+RELEASE_BRIDGE := build/release/PPSA99008
 
 .PHONY: help release package dev prepare deps deps-status toolchain test install clean distclean
 
@@ -33,9 +36,9 @@ help: ## List the targets and variables
 	@echo '  PS5_HOST=$(PS5_HOST) PS5_PORT=$(PS5_PORT)  console for make install'
 
 release: package ## Release files in dist/: ZIP, SHA256SUMS, release notes (default)
-	$(PYTHON) tools/ci/make-dist.py $(RELEASE_APP)
+	$(PYTHON) tools/ci/make-dist.py $(RELEASE_APP) $(RELEASE_BRIDGE)
 
-package: prepare ## Build the app as released: build/release/PPSA64448
+package: prepare ## Build the app as released, and its bridge: build/release/PPSA64448, build/release/PPSA99008
 	bash tools/build-package.sh release
 
 dev: prepare ## Development build that boots DEV_TITLE: build/dev/PPSA64448

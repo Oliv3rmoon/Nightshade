@@ -1,0 +1,69 @@
+{
+ "about": "The self-update helpers Nightshade has released, as git blob hashes of the sources the host check builds them from (tools/check-update-helper.py). Every release named shipped that helper: an install of it updates with that code. A file is taken from fixtures/update-helper/<helper>/ when it is there, else from the working tree or the repository while its blob hash is the one recorded. When a source changes, put its released copy there (git show <release>:<path>).",
+ "helpers": {
+  "1.005.102": {
+   "releases": [
+    "v1.005.102",
+    "v1.005.103",
+    "v1.005.104",
+    "v1.005.105"
+   ],
+   "commit": "4b482655f728e0185e603661ad739c60dabab360",
+   "files": {
+    "headless/self_update_helper/updater.cpp": "784d41bfdca90feba995d999b80069217b43a680",
+    "headless/self_update_helper/updater.hpp": "8713c61311223a5a6918b94b52a5f75524c73717",
+    "headless/self_update_helper/files.cpp": "77296bf947e362562d6b652c4f50ce408e1ee724",
+    "headless/self_update_helper/files.hpp": "3800ba8e02634c8a6adb1cfe07a8736adcc1833a",
+    "headless/self_update_helper/archive.cpp": "0b582c97b10e621e0ab461afe344e62888d13614",
+    "headless/self_update_helper/archive.hpp": "5bd49a68f92ae6a3ba69b486a6ae9ee2936ed66f",
+    "headless/update_check/self_update_protocol.h": "7ea77aa7c89f5f43fd29d58594111c908dd6c181",
+    "headless/update_check/update_check.c": "cda5601e4a8e51940bbbe7501289adbd82ff8269",
+    "headless/update_check/update_check.h": "e95f6d2ac7304c660212e538a2b6b1a5a1b63222",
+    "headless/update_check/self_update_sha256.c": "3b8f03475d2e52a61a3daf65ac577efaa70dcfb1",
+    "headless/update_check/self_update_sha256.h": "b44806ef0109f1019ac428fe9c84ee33440887f8",
+    "third_party/miniz/miniz.c": "1968d62b8f99b897cbe639a422c7775d3271b9a8",
+    "third_party/miniz/miniz.h": "2f86380ad42f6aa9ae3a90bd50bf1928431a351f",
+    "third_party/miniz/miniz_common.h": "b2825ef0ae2d56d0ac146c7194d4d2ecec179ce3",
+    "third_party/miniz/miniz_export.h": "01019ca72db8cd5ef8829158c33d5fad1708904c",
+    "third_party/miniz/miniz_tdef.c": "b7ea63a25ee93ddeedeb74cc1d1597c7bb6706cd",
+    "third_party/miniz/miniz_tdef.h": "6ce6938244b5c0745771970bb1345b1c43522cb4",
+    "third_party/miniz/miniz_tinfl.c": "f7c8815eab1fc08aacea784fa212fe2f86b81798",
+    "third_party/miniz/miniz_tinfl.h": "10215573cfcf6bbbbd9ce5561f14decb4513affd",
+    "third_party/miniz/miniz_zip.c": "2c09a1139dfeaed6aa06b0f73f832cae66a8d071",
+    "third_party/miniz/miniz_zip.h": "876d84442a092f9da21b45c3560087716be34309"
+   }
+  },
+  "1.010.003": {
+   "releases": [
+    "v1.010.000",
+    "v1.010.001",
+    "v1.010.002",
+    "v1.010.003"
+   ],
+   "commit": "cb8af5acf341b794764eff0b4872e745692d58b8",
+   "files": {
+    "headless/self_update_helper/updater.cpp": "7b4f490a0bc7f44112771711545988d78f992c87",
+    "headless/self_update_helper/updater.hpp": "298528594f3b0d71f5393fc3cbf1655aeece8904",
+    "headless/self_update_helper/files.cpp": "11ad9612e8c2a2586f549b5bb80a80bdba9bad58",
+    "headless/self_update_helper/files.hpp": "84f274254aac8121f839440dd7beccbe4f9c4f6d",
+    "headless/self_update_helper/archive.cpp": "0b582c97b10e621e0ab461afe344e62888d13614",
+    "headless/self_update_helper/archive.hpp": "5bd49a68f92ae6a3ba69b486a6ae9ee2936ed66f",
+    "headless/update_check/self_update_protocol.h": "d1678fad753fe3530766924581c04668d71eab98",
+    "headless/update_check/update_check.c": "cda5601e4a8e51940bbbe7501289adbd82ff8269",
+    "headless/update_check/update_check.h": "e95f6d2ac7304c660212e538a2b6b1a5a1b63222",
+    "headless/update_check/self_update_sha256.c": "3b8f03475d2e52a61a3daf65ac577efaa70dcfb1",
+    "headless/update_check/self_update_sha256.h": "b44806ef0109f1019ac428fe9c84ee33440887f8",
+    "third_party/miniz/miniz.c": "1968d62b8f99b897cbe639a422c7775d3271b9a8",
+    "third_party/miniz/miniz.h": "2f86380ad42f6aa9ae3a90bd50bf1928431a351f",
+    "third_party/miniz/miniz_common.h": "b2825ef0ae2d56d0ac146c7194d4d2ecec179ce3",
+    "third_party/miniz/miniz_export.h": "01019ca72db8cd5ef8829158c33d5fad1708904c",
+    "third_party/miniz/miniz_tdef.c": "b7ea63a25ee93ddeedeb74cc1d1597c7bb6706cd",
+    "third_party/miniz/miniz_tdef.h": "6ce6938244b5c0745771970bb1345b1c43522cb4",
+    "third_party/miniz/miniz_tinfl.c": "f7c8815eab1fc08aacea784fa212fe2f86b81798",
+    "third_party/miniz/miniz_tinfl.h": "10215573cfcf6bbbbd9ce5561f14decb4513affd",
+    "third_party/miniz/miniz_zip.c": "2c09a1139dfeaed6aa06b0f73f832cae66a8d071",
+    "third_party/miniz/miniz_zip.h": "876d84442a092f9da21b45c3560087716be34309"
+   }
+  }
+ }
+}

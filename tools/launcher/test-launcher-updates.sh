@@ -29,11 +29,17 @@ for name in update_check self_update_sha256; do
     "$cc" -std=c11 -O2 -DUPDATE_CHECK_NO_NETWORK -I"$root/headless/update_check" \
         -c "$root/headless/update_check/$name.c" -o "$build/obj/compat_$name.o"
 done
+for name in miniz miniz_tdef miniz_tinfl miniz_zip; do
+    "$cc" -O2 -w -I"$root/third_party/miniz" -c "$root/third_party/miniz/$name.c" -o "$build/obj/compat_$name.o"
+done
 "$cxx" -std=c++20 -O2 -ffunction-sections -fdata-sections \
-    -I"$root/headless/self_update_helper" -I"$root/headless/update_check" \
+    -I"$root/headless/self_update_helper" -I"$root/headless/update_check" -I"$root/third_party" \
     "$root/tools/launcher/test-launcher-update-compat.cpp" \
     "$root/headless/self_update_helper/updater.cpp" "$root/headless/self_update_helper/files.cpp" \
+    "$root/headless/self_update_helper/archive.cpp" \
     "$build/obj/compat_update_check.o" "$build/obj/compat_self_update_sha256.o" \
+    "$build/obj/compat_miniz.o" "$build/obj/compat_miniz_tdef.o" "$build/obj/compat_miniz_tinfl.o" \
+    "$build/obj/compat_miniz_zip.o" \
     -Wl,--gc-sections -pthread -o "$build/test-compat"
 case_directory=$(mktemp -d "$build/compat.XXXXXX")
 trap 'python3 -c "import shutil,sys; shutil.rmtree(sys.argv[1])" "$case_directory"' EXIT
