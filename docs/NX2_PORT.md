@@ -53,6 +53,7 @@ Rebased with git onto `50fa86bbbc` (each patch a commit on `67bada77`, then `git
 | 09 LDG cache ops | applies |
 | 10 coherent storage | applies |
 | 11 GPU-written draw args | include conflict in `macro.cpp` (nx2 added `<array>`, `<cstdlib>`, `<unordered_set>`): merged |
+| 12 Switch 2 only optimizations (new) | eden-nx2 drops same-value 3D register writes and defers the cache invalidation of inline uploads for every title; measured only with Switch 2 titles, both now wait for a Switch 2 driver (`Tegra::g_nx2_ampere`), so Switch 1 games keep Eden's behaviour |
 
 None is dropped: upstream fixed none of them in the 28 commits, and nx2's own changes are in other
 places (the Ampere lowering feeds Eden's Maxwell translator, where 03 and 06-10 work).
@@ -93,8 +94,18 @@ Dropped, because upstream now does it:
 Added for nx2 on the PS5:
 
 - `gpu_split.cpp` (PS5 graphics build): an exception on the split's second thread is recorded as a
-  GPU failure (the session ends with its message, as on the worker) instead of ending the app,
-  and `Stop()` resets the split, because the app runs one session after another.
+  GPU failure (the session ends with its message, as on the worker) instead of ending the app;
+  `Stop()` resets the split, because the app runs one session after another; `EDEN_NX2_SPLIT` is
+  read once per session (a game's own setting), not once per run.
+- `textures/workers.cpp`: Eden's transcode thread count (half the hardware threads) instead of
+  eden-nx2's quarter, which was measured on a PC with Switch 2 titles; Switch 1 games decode ASTC
+  on these threads on the console.
+- `physical_core.cpp`: a static assertion that every emulated core has its own idle poll.
+
+Checks adapted to eden-nx2 (they read the derived files): `check-guest-idle.py` (atomic flag),
+`check-tsc-fallback.py` (one fallback), `check-native-gpu-thread.py` (two push sites, the split's
+stop), `check-gpu-sync-stop.py` (DrainBack), `check-gc-scan.py`, `check-loader-message.py`,
+`check-streamed-game.py`, `check-system-font-mod.py` (the unpacked tree's new name).
 
 ## Switch 2 titles on the PS5
 

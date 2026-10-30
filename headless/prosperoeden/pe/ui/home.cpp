@@ -511,9 +511,18 @@ void Launcher::draw_home(Canvas &c)
                         return;
                     ax += chip(c, w, ax, y + 22.0f, tone, room) + 10.0f;
                 };
+                // A Switch 2 title is played by experimental support (docs/NX2_PORT.md): said first.
+                if (game->switch2)
+                    add_chip(tr("Switch 2: experimental"), Tone::warning);
                 add_chip(game->addons_short.empty() ? game->addons : game->addons_short, Tone::plain);
                 add_chip(game->language, game->language_note.empty() ? Tone::plain : Tone::warning);
                 y += 56.0f;
+                if (game->switch2)
+                {
+                    notice(c, tr("Expect crashes, missing graphics and low frame rates."), cx,
+                           baseline(y, 26.0f, 18.0f), 18.0f, t.warning, cw, true);
+                    y += 30.0f;
+                }
                 if (!game->language_note.empty())
                 {
                     notice(c, game->language_note, cx, baseline(y, 26.0f, 18.0f), 18.0f, t.warning, cw, false);

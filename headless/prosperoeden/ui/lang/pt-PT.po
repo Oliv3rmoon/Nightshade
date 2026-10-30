@@ -279,12 +279,12 @@ msgid "Cheats folder"
 msgstr "Pasta de batotas"
 
 #. Warning in a Switch 2 game's details: what experimental support means for playing it.
-#: pe/ui/library.cpp
+#: pe/ui/home.cpp, pe/ui/library.cpp
 msgid "Expect crashes, missing graphics and low frame rates."
 msgstr "Conte com falhas, gráficos em falta e uma taxa de fotogramas baixa."
 
 #. Tag in a game's details: the game is a Nintendo Switch 2 title, played by experimental support. Switch 2 is a product name and stays as it is.
-#: pe/ui/library.cpp
+#: pe/ui/home.cpp, pe/ui/library.cpp
 msgid "Switch 2: experimental"
 msgstr "Switch 2: experimental"
 
