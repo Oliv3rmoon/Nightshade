@@ -1,5 +1,5 @@
 {
- "name": "Nightshade 1.010.004 checks",
+ "name": "Nightshade 1.010.004 memory report checks",
  "on": {
   "push": {
    "branches": [
@@ -23,7 +23,7 @@
    "env": {
     "XDG_CACHE_HOME": "/tmp/prosperoeden-dev-host-cache",
     "PROSPEROEDEN_DEPS_CACHE": "/tmp/prosperoeden-dev-downloads",
-    "DEV_HEAD": "73794d2533a35fca2e7f86030f8e464137edab15",
+    "DEV_HEAD": "c207a6eceb794e2264e0b14bff784eb06f80fa22",
     "GITHUB_TOKEN": "${{ github.token }}"
    },
    "steps": [
@@ -31,7 +31,7 @@
      "name": "Check out the release commit",
      "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
      "with": {
-      "ref": "73794d2533a35fca2e7f86030f8e464137edab15",
+      "ref": "c207a6eceb794e2264e0b14bff784eb06f80fa22",
       "persist-credentials": false
      }
     },
