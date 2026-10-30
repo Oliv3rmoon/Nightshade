@@ -1,0 +1,77 @@
+{
+ "name": "Nightshade launcher encore screens",
+ "on": {
+  "push": {
+   "branches": [
+    "test/launcher-encore"
+   ]
+  },
+  "workflow_dispatch": {}
+ },
+ "permissions": {
+  "contents": "read"
+ },
+ "jobs": {
+  "screens": {
+   "runs-on": "ubuntu-24.04",
+   "timeout-minutes": 40,
+   "defaults": {
+    "run": {
+     "shell": "bash"
+    }
+   },
+   "strategy": {
+    "fail-fast": false,
+    "matrix": {
+     "include": [
+      {
+       "theme": "",
+       "what": "Canopy"
+      },
+      {
+       "theme": "nightly",
+       "what": "Nightshade"
+      },
+      {
+       "theme": "slate",
+       "what": "Slate"
+      }
+     ]
+    }
+   },
+   "name": "screens (${{ matrix.what }})",
+   "steps": [
+    {
+     "name": "Check out the release commit",
+     "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+     "with": {
+      "ref": "a676f056d4c7d7300e2a145e8ce488e0c73900d2",
+      "persist-credentials": false
+     }
+    },
+    {
+     "name": "Install the preview's tools",
+     "run": "sudo apt-get update\nsudo apt-get install --yes --no-install-recommends build-essential python3 libegl-dev libgl-dev libegl-mesa0 libgl1-mesa-dri libcurl4-openssl-dev libssl-dev nlohmann-json3-dev"
+    },
+    {
+     "name": "Point the preview at the system's nlohmann/json",
+     "run": "mkdir -p /tmp/edensrc/source/.cache/cpm/nlohmann_json/system\nln -s /usr/include /tmp/edensrc/source/.cache/cpm/nlohmann_json/system/single_include\nmkdir -p .local && echo /tmp/edensrc > .local/headless-cache"
+    },
+    {
+     "name": "Draw the launcher's screens",
+     "run": "mkdir -p \"$RUNNER_TEMP/screens\"\nPE_THEME=\"${{ matrix.theme }}\" bash tools/launcher/preview.sh \"$RUNNER_TEMP/screens\" > \"$RUNNER_TEMP/screens/preview.log\" 2>&1 && code=0 || code=$?\ngrep -E '^error|FAIL|cues heard' \"$RUNNER_TEMP/screens/preview.log\" || true\ntail -20 \"$RUNNER_TEMP/screens/preview.log\"\necho \"preview exit: $code\"\nexit $code"
+    },
+    {
+     "name": "Keep the screens",
+     "if": "always()",
+     "uses": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+     "with": {
+      "name": "screens-${{ strategy.job-index }}",
+      "retention-days": 7,
+      "path": "${{ runner.temp }}/screens"
+     }
+    }
+   ]
+  }
+ }
+}
