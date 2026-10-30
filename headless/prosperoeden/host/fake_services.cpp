@@ -38,7 +38,8 @@ constexpr Sample kSamples[] = {
     {"Starfall Odyssey", "NSP", "6.4 GB", "1.2.0", 2, "English (US)", "", 0x1b2a6b, 0x40b3c8, 0xffd166, true},
     {"Moss & Lantern", "XCI", "2.1 GB", "", 0, "English (US)", "", 0x16402f, 0x7bc86c, 0xf4e285},
     {"Kart Carnival Deluxe", "NSP", "7.8 GB", "3.0.1", 48, "English (US)", "", 0xb3261e, 0xffb238, 0xffffff},
-    {"Tiny Harbor", "NSP", "512.0 MB", "", 0, "English (US)", "", 0x256d8f, 0x9bd8e6, 0xfff3d6},
+    // A Switch 2 title, held as its ExeFS and RomFS folders (game_files.h).
+    {"Tiny Harbor", "Switch 2", "11.6 GB", "", 0, "English (US)", "", 0x256d8f, 0x9bd8e6, 0xfff3d6},
     {"Echoes of the Valley", "XCI", "14.2 GB", "1.1.0", 0, "Spanish",
      "Portuguese (Brazil)", 0x3b1f5e, 0xc77dff, 0xffe0f5, true},
     {"Pocket Rally Turbo", "NSP", "1.9 GB", "", 0, "English (US)", "", 0x202020, 0xe85d04, 0xf8f9fa},
@@ -48,8 +49,6 @@ constexpr Sample kSamples[] = {
     {"Neon Drifters", "NSP", "5.2 GB", "1.0.3", 0, "English (US)", "", 0x10002b, 0x7b2cbf, 0x5ef2ff},
     {"Caf\xC3\xA9 Nocturne", "NSP", "2.7 GB", "", 0, "French", "", 0x2b1d0e, 0xa9713c, 0xf6e7cb},
     {"Sky Shepherds", "XCI", "4.4 GB", "", 3, "English (US)", "", 0x457b9d, 0xa8dadc, 0xf1faee, true},
-    // A Switch 2 title held as its ExeFS and RomFS folders (game_files.h), with no cover of its own.
-    {"Lumen Drift", "Switch 2", "11.6 GB", "", 0, "English (US)", "", 0x0b132b, 0x3a506b, 0x5bc0be},
 };
 
 void put_pixel(std::vector<std::uint8_t> &pixels, int size, int x, int y, float r, float g, float b)
