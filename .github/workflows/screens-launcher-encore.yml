@@ -3,7 +3,7 @@
  "on": {
   "push": {
    "branches": [
-    "test/launcher-encore"
+    "test/1.010.007"
    ]
   },
   "workflow_dispatch": {}
@@ -45,7 +45,7 @@
      "name": "Check out the release commit",
      "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
      "with": {
-      "ref": "d40b8ad2b60a4f5c3a06e4ad0eea15199052b3e5",
+      "ref": "5f59a76990ac5ba9a1f2786313cb8c751394507c",
       "persist-credentials": false
      }
     },
