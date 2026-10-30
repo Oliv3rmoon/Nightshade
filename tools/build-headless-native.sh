@@ -135,6 +135,7 @@ if [[ "$graphics" == ON ]]; then
             "$scratch/native-local/headless/vulkan_staging_buffer_pool.cpp"
         python3 -B "$root/tools/check-texture-evictions.py" "$scratch/source/src" \
             "$scratch/native-local/headless/vulkan-cache/video_core/texture_cache/texture_cache.h"
+        python3 -B "$root/tools/check-shader-start.py" "$scratch/native-local/headless"
     fi
 fi
 

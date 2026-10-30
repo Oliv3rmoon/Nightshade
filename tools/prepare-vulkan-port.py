@@ -1107,10 +1107,53 @@ adapt('src/video_core/vulkan_common/vulkan_wrapper.h', 'include/video_core/vulka
                      file, line, operation, static_cast<int>(result));
         throw Exception(result);'''),
 ])
+# While a cached pipeline is built (headless/shader_start.h), the driver is asked how it made it
+# (VkPipelineCreationFeedback: found in the pipeline cache Eden gives it, vulkan_pipelines.bin, or
+# not, and its own time for it), and the call is timed. Other pipelines are created as before.
+eden_driver_feedback = '''namespace {
+template <typename CreateInfo, typename Create>
+VkResult EdenCreatePipeline(const CreateInfo& ci, Create&& create) {
+    if (!::Eden::ShaderStart::counting) {
+        return create(ci);
+    }
+    VkPipelineCreationFeedback feedback{};
+    const VkPipelineCreationFeedbackCreateInfo feedback_ci{
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_CREATION_FEEDBACK_CREATE_INFO,
+        .pNext = ci.pNext,
+        .pPipelineCreationFeedback = &feedback,
+        .pipelineStageCreationFeedbackCount = 0,
+        .pPipelineStageCreationFeedbacks = nullptr,
+    };
+    const bool asked = ::Eden::ShaderStart::feedback.load(std::memory_order_relaxed);
+    CreateInfo with_feedback = ci;
+    if (asked) {
+        with_feedback.pNext = &feedback_ci;
+    }
+    const long long start = ::Eden::ShaderStart::Now();
+    const VkResult result = create(with_feedback);
+    const bool valid = asked && (feedback.flags & VK_PIPELINE_CREATION_FEEDBACK_VALID_BIT) != 0;
+    ::Eden::ShaderStart::NoteDriver(
+        ::Eden::ShaderStart::Now() - start, valid,
+        (feedback.flags & VK_PIPELINE_CREATION_FEEDBACK_APPLICATION_PIPELINE_CACHE_HIT_BIT) != 0,
+        feedback.duration);
+    return result;
+}
+} // Anonymous namespace
+
+Pipeline Device::CreateGraphicsPipeline('''
 adapt('src/video_core/vulkan_common/vulkan_wrapper.cpp', 'vulkan_wrapper.cpp', [
-    ('#include "video_core/vulkan_common/vulkan_wrapper.h"', '#include "video_core/vulkan_common/vulkan_wrapper.h"\n#include "performance.h"'),
-    ('auto const result = dld->vkCreateGraphicsPipelines(', 'auto timer = Eden::Performance::VulkanTimer(0);\n    auto const result = dld->vkCreateGraphicsPipelines('),
-    ('Check(dld->vkCreateComputePipelines(', 'auto timer = Eden::Performance::VulkanTimer(1);\n    Check(dld->vkCreateComputePipelines('),
+    ('#include "video_core/vulkan_common/vulkan_wrapper.h"', '#include "video_core/vulkan_common/vulkan_wrapper.h"\n#include "performance.h"\n#include "shader_start.h"'),
+    ('Pipeline Device::CreateGraphicsPipeline(', eden_driver_feedback),
+    ('auto const result = dld->vkCreateGraphicsPipelines(handle, cache, 1, &ci, nullptr, &object);',
+     'auto timer = Eden::Performance::VulkanTimer(0);\n'
+     '    auto const result = EdenCreatePipeline(ci, [&](const VkGraphicsPipelineCreateInfo& info) {\n'
+     '        return dld->vkCreateGraphicsPipelines(handle, cache, 1, &info, nullptr, &object);\n'
+     '    });'),
+    ('Check(dld->vkCreateComputePipelines(handle, cache, 1, &ci, nullptr, &object));',
+     'auto timer = Eden::Performance::VulkanTimer(1);\n'
+     '    Check(EdenCreatePipeline(ci, [&](const VkComputePipelineCreateInfo& info) {\n'
+     '        return dld->vkCreateComputePipelines(handle, cache, 1, &info, nullptr, &object);\n'
+     '    }));'),
 ])
 download_source = (source / 'src/video_core/texture_cache/texture_cache.h').read_text()
 download_begin = download_source.index('void TextureCache<P>::DownloadMemory(DAddr cpu_addr, size_t size)')
@@ -1406,12 +1449,31 @@ for name in ('vk_graphics_pipeline', 'vk_compute_pipeline'):
                 if name == 'vk_graphics_pipeline' else
                 '::Eden::PipelineIdentity::Compute(*pipeline, shader_hash);')
     anchors = [
-        ('#include <algorithm>', '#include <algorithm>\n#include "performance.h"\n#include "pipeline_identity.h"'),
+        ('#include <algorithm>', '#include <algorithm>\n#include "performance.h"\n#include "pipeline_identity.h"\n'
+                                 '#include "shader_start.h"'),
         ('            std::unique_lock lock{build_mutex};',
          '            auto timer = Eden::Performance::VulkanTimer(16);\n            std::unique_lock lock{build_mutex};'),
         ('            pipeline_statistics->Collect(device, *pipeline);\n        }\n',
          '            pipeline_statistics->Collect(device, *pipeline);\n        }\n        ' + identity + '\n'),
     ]
+    # The shader cache's report (headless/shader_start.h): the descriptor set and pipeline layouts
+    # and the update template, made before the pipeline itself.
+    if name == 'vk_graphics_pipeline':
+        anchors += [
+            ('      descriptor_buffer_ring{descriptor_buffer_ring_}, spv_modules{std::move(stages)} {\n',
+             '      descriptor_buffer_ring{descriptor_buffer_ring_}, spv_modules{std::move(stages)} {\n'
+             '    ::Eden::ShaderStart::Clock eden_layout{::Eden::ShaderStart::layout};\n'),
+            ('    auto func{[this, shader_notify, &render_pass_cache, pipeline_statistics] {',
+             '    eden_layout.Stop();\n    auto func{[this, shader_notify, &render_pass_cache, pipeline_statistics] {'),
+        ]
+    else:
+        anchors += [
+            ('      shader_hash{shader_hash_}, spv_module(std::move(spv_module_)) {\n',
+             '      shader_hash{shader_hash_}, spv_module(std::move(spv_module_)) {\n'
+             '    ::Eden::ShaderStart::Clock eden_layout{::Eden::ShaderStart::layout};\n'),
+            ('    auto func{[this, shader_notify, pipeline_statistics] {',
+             '    eden_layout.Stop();\n    auto func{[this, shader_notify, pipeline_statistics] {'),
+        ]
     if name == 'vk_graphics_pipeline':
         anchors += configure_phases
     adapt(f'src/video_core/renderer_vulkan/{name}.cpp', name + '_cost.cpp', anchors)
@@ -1585,8 +1647,12 @@ for expression, index, count in (
 ):
     if shader_source.count(expression) != count:
         raise RuntimeError(f'Shader cost anchor changed: {expression}')
+    # The same stages for the shader cache's own report (headless/shader_start.h), which counts
+    # only builds of cached pipelines and is always on.
+    stage = {21: 'ir', 22: 'spirv', 23: 'shader_module'}.get(index)
+    start = f'::Eden::ShaderStart::Clock start_cost{{::Eden::ShaderStart::{stage}}}; ' if stage else ''
     shader_source = shader_source.replace(expression,
-        f'([&] {{ auto cost = Eden::Performance::VulkanTimer({index}); '
+        f'([&] {{ auto cost = Eden::Performance::VulkanTimer({index}); {start}'
         f'return {expression}; }}())')
 for statement in (
     'Shader::Maxwell::Flow::CFG cfg(env, pools.flow_block, cfg_offset, index == 0);',
@@ -1596,8 +1662,9 @@ for statement in (
     if shader_source.count(statement) != expected:
         raise RuntimeError(f'Shader CFG anchor changed: {statement}')
     shader_source = shader_source.replace(statement,
-        'auto cfg_cost = Eden::Performance::VulkanTimer(20);\n        ' + statement +
-        '\n        cfg_cost.reset();')
+        'auto cfg_cost = Eden::Performance::VulkanTimer(20);\n        '
+        '::Eden::ShaderStart::Clock cfg_start_cost{::Eden::ShaderStart::cfg};\n        ' + statement +
+        '\n        cfg_cost.reset();\n        cfg_start_cost.Stop();')
 for old, new in shader_costs:
     if shader_source.count(old) != 1:
         raise RuntimeError(f'Shader pipeline anchor changed: {old[:60]}')
@@ -1735,6 +1802,329 @@ for signature in (
     if shader_source.count(signature) != 1:
         raise RuntimeError(f'Pipeline builder settle anchor changed: {signature[:50]}')
     shader_source = shader_source.replace(signature, signature + '    ::Eden::Performance::SettlePipelineBuilder();\n')
+# The shader cache's load (headless/shader_start.h). Read at a start and built before the game
+# began, a large game's cache took 200 s at every start (Tears of the Kingdom, 16,000 pipelines).
+# Now, unless the settings say otherwise ("background_shader_cache"), the game starts as soon as its
+# graphics are ready and the cache is read and built behind it: the GPU thread takes each pipeline
+# from the load once it is built, and builds one it needs before then itself, as it builds any new
+# one (the load then leaves it out). The file is read as the builders need entries, a few per
+# builder ahead, not all at once (the whole file was queued: the heap grew by 1.9 GB during Tears
+# of the Kingdom's start, and it keeps what it grows by). A pipeline the GPU thread makes
+# while the file is still being read is saved once the reading has ended, and only if the file
+# does not have it. Leaving the game stops the load: the reader returns at its next entry, builds
+# not begun are skipped, and the cache waits for the builds in progress before it goes. Every
+# load, finished or stopped, leaves EDEN_SHADER_START lines in stderr.log: where its time went.
+loader_registry = '''namespace {
+// The load of one PipelineCache's shader cache: what its reader, its builders and its GPU thread
+// share (headless/shader_start.h), found by the cache it loads for.
+using EdenLoader = ::Eden::ShaderStart::Loader<GraphicsPipelineCacheKey, GraphicsPipeline,
+                                               ComputePipelineCacheKey, ComputePipeline,
+                                               Common::UniqueFunction<void>>;
+struct EdenLoad {
+    std::shared_ptr<EdenLoader> loader;
+    std::unique_ptr<PipelineStatistics> statistics;
+    long long read_wait_ns = 0;  // the reader's waits for room among the builds (its thread only)
+    std::jthread reader;         // while the game plays; joined before the load is destroyed
+};
+std::mutex eden_loads_mutex;
+std::unordered_map<const void*, std::unique_ptr<EdenLoad>> eden_loads;
+std::atomic<unsigned> eden_loads_alive{0};
+
+std::shared_ptr<EdenLoader> EdenLoaderOf(const void* cache) {
+    if (eden_loads_alive.load(std::memory_order_acquire) == 0) {
+        return {};
+    }
+    std::scoped_lock lock{eden_loads_mutex};
+    const auto found = eden_loads.find(cache);
+    return found == eden_loads.end() ? nullptr : found->second->loader;
+}
+
+// Stops a cache's load and waits for it to end: the reader returns at its next entry, builds not
+// begun end at once, and each builder finishes the one it is on; what was built and not taken is
+// destroyed. Before the cache goes, and before it loads another game's cache.
+void EdenStopLoad(const void* cache) {
+    std::unique_ptr<EdenLoad> load;
+    {
+        std::scoped_lock lock{eden_loads_mutex};
+        const auto found = eden_loads.find(cache);
+        if (found == eden_loads.end()) {
+            return;
+        }
+        load = std::move(found->second);
+        eden_loads.erase(found);
+        eden_loads_alive.fetch_sub(1, std::memory_order_release);
+    }
+    load->loader->Stop();
+    if (load->reader.joinable()) {
+        load->reader.join();
+    }
+    load->loader->WaitIdle();
+    (void)load->loader->TakeAll();
+}
+
+// A pipeline the GPU thread made, saved to the cache file unless the file has it already.
+void EdenSave(const void* cache, Common::ThreadWorker& thread, u64 hash, bool compute,
+              Common::UniqueFunction<void> save) {
+    if (const auto loader = EdenLoaderOf(cache)) {
+        if (auto now = loader->Save(hash, compute, std::move(save))) {
+            thread.QueueWork(std::move(*now));
+        }
+        return;
+    }
+    thread.QueueWork(std::move(save));
+}
+
+// One admitted entry's build has ended, however it ended.
+struct EdenBuildDone {
+    EdenLoader& loader;
+    ~EdenBuildDone() {
+        loader.Done();
+    }
+};
+} // Anonymous namespace
+
+PipelineCache::~PipelineCache() {
+    // The shader cache's load first: its builders and reader use what follows.
+    EdenStopLoad(this);
+'''
+
+def loader_body(filter_block):
+    return '''    // Where the start's time goes (headless/shader_start.h): the files' sizes and the driver
+    // cache's load here, every build's stages, and EDEN_SHADER_START lines in stderr.log at the end.
+    const long long eden_start = ::Eden::ShaderStart::Now();
+    const auto eden_heap = ::Eden::ShaderStart::HeapMark::Take();
+    ::Eden::ShaderStart::Reset();
+    ::Eden::ShaderStart::Summary eden_summary;
+    eden_summary.background = ::Eden::ShaderStart::background.load(std::memory_order_relaxed);
+    std::error_code eden_size_error;
+    eden_summary.file_bytes = std::filesystem::file_size(pipeline_cache_filename, eden_size_error);
+    if (eden_size_error) {
+        eden_summary.file_bytes = 0;
+    }
+    if (use_vulkan_pipeline_cache) {
+        vulkan_pipeline_cache_filename = base_dir / "vulkan_pipelines.bin";
+        eden_summary.driver_cache_bytes =
+            std::filesystem::file_size(vulkan_pipeline_cache_filename, eden_size_error);
+        if (eden_size_error) {
+            eden_summary.driver_cache_bytes = 0;
+        }
+        const long long eden_driver_start = ::Eden::ShaderStart::Now();
+        vulkan_pipeline_cache =
+            LoadVulkanPipelineCache(vulkan_pipeline_cache_filename, CACHE_VERSION);
+        eden_summary.driver_cache_load_ns = ::Eden::ShaderStart::Now() - eden_driver_start;
+    }
+
+    // Built on the workers as the file is read, at most a few entries per worker ahead.
+    eden_summary.workers =
+        device.HasBrokenParallelShaderCompiling() ? 1ULL : GetTotalPipelineWorkers();
+    auto eden_new_load = std::make_unique<EdenLoad>();
+    eden_new_load->loader = std::make_shared<EdenLoader>(
+        eden_summary.workers * (eden_summary.background ? 2 : 4), eden_summary.file_bytes);
+    if (device.IsKhrPipelineExecutablePropertiesEnabled()) {
+        eden_new_load->statistics = std::make_unique<PipelineStatistics>(device);
+    }
+    const std::shared_ptr<EdenLoader> loader = eden_new_load->loader;
+    PipelineStatistics* const statistics = eden_new_load->statistics.get();
+    EdenLoad* const load = eden_new_load.get();
+    {
+        std::scoped_lock lock{eden_loads_mutex};
+        eden_loads[this] = std::move(eden_new_load);
+        eden_loads_alive.fetch_add(1, std::memory_order_release);
+    }
+
+    auto load_compute{[this, loader, statistics, load](std::ifstream& file, FileEnvironment env) {
+        ComputePipelineCacheKey key;
+        file.read(reinterpret_cast<char*>(&key), sizeof(key));
+        const u64 hash = key.Hash();
+        loader->Note(hash, true, static_cast<u64>(file.tellg()));
+        if (!loader->Admit(true, &load->read_wait_ns)) {
+            return;
+        }
+        workers.QueueWork([this, loader, statistics, key, hash, env_ = std::move(env)]() mutable {
+            const EdenBuildDone done{*loader};
+            const ::Eden::ShaderStart::Job timing;
+            if (!loader->Wanted(hash, true)) {
+                return;
+            }
+            ShaderPools pools;
+            auto pipeline{CreateComputePipeline(pools, key, env_, statistics, false)};
+            pipeline = loader->OfferCompute(key, hash, std::move(pipeline));
+        });
+    }};
+    auto load_graphics{[this, loader, statistics, load](std::ifstream& file,
+                                                        std::vector<FileEnvironment> envs) {
+        GraphicsPipelineCacheKey key;
+        file.read(reinterpret_cast<char*>(&key), sizeof(key));
+        const u64 hash = key.Hash();
+        loader->Note(hash, false, static_cast<u64>(file.tellg()));
+
+''' + filter_block + '''        if (!loader->Admit(false, &load->read_wait_ns)) {
+            return;
+        }
+        workers.QueueWork([this, loader, statistics, key, hash, envs_ = std::move(envs)]() mutable {
+            const EdenBuildDone done{*loader};
+            const ::Eden::ShaderStart::Job timing;
+            if (!loader->Wanted(hash, false)) {
+                return;
+            }
+            ShaderPools pools;
+            boost::container::static_vector<Shader::Environment*, 5> env_ptrs;
+            for (auto& env : envs_) {
+                env_ptrs.push_back(&env);
+            }
+            auto pipeline{CreateGraphicsPipeline(pools, key, MakeSpan(env_ptrs), statistics, false)};
+            pipeline = loader->OfferGraphics(key, hash, std::move(pipeline));
+        });
+    }};
+
+    // Reads the file and waits for the builds: on this thread before the game starts, or on a
+    // thread of its own while the game plays.
+    auto read_and_build = [this, loader, statistics, load, eden_start, eden_heap, eden_summary,
+                           load_compute = std::move(load_compute),
+                           load_graphics = std::move(load_graphics)]() mutable {
+        ::Eden::ShaderStart::Summary summary = eden_summary;
+        const long long read_start = ::Eden::ShaderStart::Now();
+        VideoCommon::LoadPipelines(loader->StopToken(), pipeline_cache_filename, CACHE_VERSION,
+                                   std::move(load_compute), std::move(load_graphics));
+        summary.read_wait_ns = load->read_wait_ns;
+        summary.read_ns = ::Eden::ShaderStart::Now() - read_start - summary.read_wait_ns;
+        for (auto& save : loader->FinishReading(!loader->Stopping())) {
+            serialization_thread.QueueWork(std::move(save));
+        }
+        const auto read = loader->GetCounts();
+        LOG_INFO(Render_Vulkan, "Total Pipeline Count: {}", read.graphics + read.compute);
+        const bool built = loader->WaitBuilt(std::chrono::seconds{5}, [&] {
+            if (!summary.background) {
+                return;
+            }
+            const auto counts = loader->GetCounts();
+            const long long seconds = (::Eden::ShaderStart::Now() - eden_start) / 1'000'000'000LL;
+            ::Eden::Report("loader",
+                           fmt::format("Shader cache: {} of {} pipelines built while the game runs ({} s)",
+                                       counts.finished, counts.graphics + counts.compute, seconds)
+                               .c_str());
+        });
+        if (built && statistics) {
+            statistics->Report();
+        }
+        if (built && use_vulkan_pipeline_cache) {
+            if (summary.background) {
+                // The driver's cache with what the build added. While the game runs its own
+                // flushes write the same file, on the serialization thread: so does this one.
+                serialization_thread.QueueWork([this] {
+                    SerializeVulkanPipelineCache(vulkan_pipeline_cache_filename, vulkan_pipeline_cache,
+                                                 CACHE_VERSION);
+                    size_t size = 0;
+                    vulkan_pipeline_cache.Read(&size, nullptr);
+                    last_cache_size.store(size, std::memory_order_relaxed);
+                });
+            } else {
+                const long long save_start = ::Eden::ShaderStart::Now();
+                SerializeVulkanPipelineCache(vulkan_pipeline_cache_filename, vulkan_pipeline_cache,
+                                             CACHE_VERSION);
+                size_t size = 0;
+                vulkan_pipeline_cache.Read(&size, nullptr);
+                last_cache_size.store(size, std::memory_order_relaxed);
+                last_flush = std::chrono::steady_clock::now();
+                summary.save_ns = ::Eden::ShaderStart::Now() - save_start;
+            }
+        }
+        const auto counts = loader->GetCounts();
+        summary.stopped = !built;
+        summary.graphics = counts.graphics;
+        summary.compute = counts.compute;
+        summary.pipelines = counts.graphics + counts.compute;
+        summary.kept = counts.kept;
+        summary.gpu_built = counts.gpu_built;
+        summary.taken = counts.taken;
+        summary.wall_ns = ::Eden::ShaderStart::Now() - eden_start;
+        ::Eden::ShaderStart::Report(stderr, summary, eden_heap);
+        ::Eden::ShaderStart::SetProgress({});
+        if (summary.background) {
+            ::Eden::Report("loader",
+                           fmt::format("Shader cache ready: {} pipelines in {} ms, built while the game ran{}",
+                                       summary.pipelines, summary.wall_ns / 1'000'000,
+                                       built ? "" : " (stopped: the game was left first)")
+                               .c_str());
+        }
+    };
+
+    if (eden_summary.background) {
+        load->reader = std::jthread(std::move(read_and_build));
+        return;
+    }
+    // Before the game starts: progress for the loading screen, and the caller's stop.
+    loader->SetCallback([&callback](size_t built, size_t total) {
+        callback(VideoCore::LoadCallbackStage::Build, built, total);
+    });
+    {
+        const std::stop_callback stop_with_caller{stop_loading, [loader] { loader->Stop(); }};
+        read_and_build();
+    }
+    loader->SetCallback({});
+    // What was built goes to the caches now, while the GPU thread asks for none yet.
+    auto [graphics_built, compute_built] = loader->TakeAll();
+    for (auto& [built_key, pipeline] : graphics_built) {
+        graphics_cache.emplace(built_key, std::move(pipeline));
+    }
+    for (auto& [built_key, pipeline] : compute_built) {
+        compute_cache.emplace(built_key, std::move(pipeline));
+    }
+    EdenStopLoad(this);
+}
+'''
+
+load_begin = shader_source.index('void PipelineCache::LoadDiskResources(u64 title_id, std::stop_token stop_loading,')
+load_end = shader_source.index('void PipelineCache::QueueVulkanPipelineCacheFlush() {')
+load_source = shader_source[load_begin:load_end]
+title_check = '    if (title_id == 0) {\n        return;\n    }\n'
+tail_begin = load_source.index('    if (use_vulkan_pipeline_cache) {\n        vulkan_pipeline_cache_filename = base_dir / "vulkan_pipelines.bin";')
+filter_begin = load_source.index('        if ((key.state.extended_dynamic_state != 0) !=')
+filter_end = load_source.index('        workers.QueueWork([this, key, envs_ = std::move(envs), &state, &callback]() mutable {')
+if (load_source.count(title_check) != 1 or not load_source.endswith('    if (state.statistics) {\n        state.statistics->Report();\n    }\n}\n\n')
+        or not tail_begin < filter_begin < filter_end):
+    raise RuntimeError('Shader cache load anchors changed')
+load_source = (load_source[:tail_begin].replace(title_check, title_check + '    EdenStopLoad(this);\n') +
+               loader_body(load_source[filter_begin:filter_end]) + '\n')
+shader_source = shader_source[:load_begin] + load_source + shader_source[load_end:]
+for old, new in (
+    ('PipelineCache::~PipelineCache() {\n', loader_registry),
+    # The GPU thread: a pipeline the load built, else its own.
+    ('    if (is_new) {\n        pipeline = CreateGraphicsPipeline();\n    }\n',
+     '    if (is_new) {\n'
+     '        if (const auto loader = EdenLoaderOf(this)) {\n'
+     '            pipeline = loader->TakeGraphics(graphics_key, graphics_key.Hash());\n'
+     '        }\n'
+     '        if (!pipeline) {\n'
+     '            pipeline = CreateGraphicsPipeline();\n'
+     '        }\n'
+     '    }\n'),
+    ('    if (is_new) {\n        pipeline = CreateComputePipeline(key, shader);\n    }\n',
+     '    if (is_new) {\n'
+     '        if (const auto loader = EdenLoaderOf(this)) {\n'
+     '            pipeline = loader->TakeCompute(key, key.Hash());\n'
+     '        }\n'
+     '        if (!pipeline) {\n'
+     '            pipeline = CreateComputePipeline(key, shader);\n'
+     '        }\n'
+     '    }\n'),
+    # Its saves, once it is known whether the file has them.
+    ('    serialization_thread.QueueWork([this, key = graphics_key, envs = std::move(environments.envs)] {\n',
+     '    EdenSave(this, serialization_thread, graphics_key.Hash(), false,\n'
+     '             [this, key = graphics_key, envs = std::move(environments.envs)] {\n'),
+    ('    serialization_thread.QueueWork([this, key, env_ = std::move(env)] {\n',
+     '    EdenSave(this, serialization_thread, key.Hash(), true, [this, key, env_ = std::move(env)] {\n'),
+    # Whether the driver can say how it made a pipeline (pipeline creation feedback, Vulkan 1.3).
+    ('    LOG_INFO(Render_Vulkan, "DynamicState setting value: {}", u32(Settings::values.dyna_state.GetValue()));\n',
+     '    ::Eden::ShaderStart::feedback.store(device.ApiVersion() >= VK_API_VERSION_1_3,\n'
+     '                                        std::memory_order_relaxed);\n'
+     '    LOG_INFO(Render_Vulkan, "DynamicState setting value: {}", u32(Settings::values.dyna_state.GetValue()));\n'),
+    ('#include "dev_vulkan.h"\n#include "diagnostics.h"',
+     '#include "dev_vulkan.h"\n#include "diagnostics.h"\n#include "shader_start.h"\n#include <unordered_map>'),
+):
+    if shader_source.count(old) != 1:
+        raise RuntimeError(f'Shader cache load anchor changed: {old[:60]}')
+    shader_source = shader_source.replace(old, new)
 shader_output = output / 'vk_pipeline_cache_cost.cpp'
 if not shader_output.exists() or shader_output.read_text() != shader_source:
     shader_output.write_text(shader_source)

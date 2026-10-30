@@ -389,6 +389,19 @@ int main() {
     speed = Eden::LoadPerformance(racer, by_hand);
     assert(!speed.skip_invalidation && !speed.reactive_flushing);
     assert(Eden::LoadPerformance(quest, by_hand).skip_invalidation && Eden::LoadPerformance(quest, by_hand).reactive_flushing);
+    // The shader cache built while the game plays ("background_shader_cache", the file's alone): on
+    // unless the file says otherwise, a title's own value before the general one, and kept when the
+    // general values are saved from what was loaded (as the launcher's Settings > Performance does).
+    assert(Eden::LoadPerformance(racer, by_hand).background_shader_cache);
+    std::ofstream(by_hand) << R"({"performance": {"background_shader_cache": false},
+        "games": {"0100000000010000": {"performance": {"background_shader_cache": true}}}})";
+    assert(Eden::LoadPerformance(racer, by_hand).background_shader_cache);
+    assert(!Eden::LoadPerformance(quest, by_hand).background_shader_cache);
+    speed = Eden::LoadPerformance(0, by_hand);
+    speed.fast_gpu = true;
+    assert(Eden::SavePerformance(0, speed, by_hand));
+    assert(!Eden::LoadPerformance(quest, by_hand).background_shader_cache && Eden::LoadPerformance(quest, by_hand).fast_gpu);
+    assert(Read(by_hand).find("\"background_shader_cache\": false") != std::string::npos);
     // Console memory ("performance/memory_layout", settings_store.h): the Switch's own 4 GiB unless
     // named, a title's own value before the general one, and a name that is not one of the three
     // reads as if it were absent. The launcher's game settings write the switches by name, so a

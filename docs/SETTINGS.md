@@ -28,6 +28,16 @@ A game can have its own values: in its settings, **Performance** (see [Settings 
 }
 ```
 
+### The shader cache while the game plays
+
+A game's start builds the pipelines it saved in earlier sessions (its shader cache): Tears of the Kingdom has about 16,000, which took 200 seconds at every start. With the Vulkan renderer the game now starts as soon as its graphics are ready, and the cache is read and built while it plays, on the spare CPUs. Until a pipeline is built, the game builds it itself when it needs it, as it does any new one: with **Asynchronous shaders** on, what uses it is missing for a moment; with them off, the game pauses for it. `stderr.log` says `Shader cache: the game starts now` at the start, how far the build is every 5 seconds, and `Shader cache ready: ... built while the game ran` at the end.
+
+It is in the settings file only, on unless switched off there, for every game or one: `"background_shader_cache": false` in `"performance"` (or in the game's own) builds the whole cache before the game starts, as before. Leaving the game while it loads stops that build too. The launch report says `shader cache while playing on` or `off`. The OpenGL renderer always builds it before the game starts.
+
+```json
+{ "games": { "<the game's title ID>": { "performance": { "background_shader_cache": false } } } }
+```
+
 The accuracy switches help only where a game is held back by what they relax. In the scene they were measured in on the console, a large game standing at its frame rate limit, switching all of them on changed neither the frame rate nor how busy the emulated processor and the graphics thread were. Leave them off unless a game runs under its frame rate, and switch them back off if its graphics go wrong.
 
 Resolution, the upscaling filter, the renderer and the refresh rate, which change speed too, are in **Settings > Video** and in a game's own settings.
