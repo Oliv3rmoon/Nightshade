@@ -84,9 +84,15 @@ for case in ('layout == 1 ? Settings::MemoryLayout::Memory_6Gb',
 assert 'Memory layout: ' in release  # the session says which one it uses
 # The layout chosen, except for a game that stops with more memory than its console's and runs
 # without a mod (memory_layout_guard.h): decided once the game's mods are known, and only then set.
-guard = release.index('const int layout = Eden::MemoryLayoutGuard::Layout(title, speed.memory_layout, mods_on,')
+guard = release.index(': Eden::MemoryLayoutGuard::Layout(title, speed.memory_layout, mods_on,')
 assert release.index('const auto& mods_off = switched.mods_off;') < guard < layout
 assert release.count('Settings::values.memory_layout_mode =\n') == 1
+# Both are for Switch 1 games: a Switch 2 title (eden-nx2) gets its 12 GiB there, in the one place
+# the layout is set, and the guard (a Switch 1 title ID) is not asked about it.
+assert 'const int layout = switch2 ? speed.memory_layout\n' in release[:guard]
+assert release[layout:layout + 600].index('switch2 ? Settings::MemoryLayout::Memory_12Gb') < \
+    release[layout:layout + 600].index('layout == 1 ? Settings::MemoryLayout::Memory_6Gb')
+assert release.count('Settings::MemoryLayout::Memory_12Gb') == 1
 guard_header = (root / 'headless/memory_layout_guard.h').read_text()
 assert '0x0100F2C0115B6000, // The Legend of Zelda: Tears of the Kingdom' in guard_header
 assert 'inline constexpr const char* kMemoryLayoutKeys[] = {"4Gb", "6Gb", "8Gb"};' in store

@@ -16,6 +16,10 @@
 // mapped. The console's 4 GiB is what the game was made for: a game here that runs without mods is
 // given that, whatever Memory says, and the launch log says so. With a mod on, the mod may need the
 // memory, and the layout chosen stands.
+//
+// Switch 1 games only. A Switch 2 title (eden-nx2, docs/NX2_PORT.md) always gets eden-nx2's 12 GiB
+// layout and is not asked about here (headless/main.cpp), even when its ExeFS carries a listed
+// Switch 1 program ID.
 #pragma once
 #include <cstdint>
 

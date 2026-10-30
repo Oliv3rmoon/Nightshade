@@ -1428,13 +1428,13 @@ int main(int argc, char** argv) {
                          Eden::BackendName(backend));
             // A Switch 2 title (experimental, docs/NX2_PORT.md) starts with eden-nx2's own choices,
             // which its "switch2" settings change (settings_store.h): the 12 GiB memory layout its
-            // heap is sized from (backed where it is written: src/guest_memory_service.inc), Eden's
-            // lowest GPU accuracy (the split GPU thread needs it), no reactive flushing, ASTC
-            // decoded on the GPU (and kept as BC1/BC3 when textures are compressed), and the split
-            // GPU thread. The Performance settings above do not change these.
+            // heap is sized from (backed where it is written: src/guest_memory_service.inc; set with
+            // the other layouts below, once the mods are known), Eden's lowest GPU accuracy (the
+            // split GPU thread needs it), no reactive flushing, ASTC decoded on the GPU (and kept as
+            // BC1/BC3 when textures are compressed), and the split GPU thread. The Performance
+            // settings above do not change these.
             if (switch2) {
                 const Eden::Switch2Settings nx2 = Eden::LoadSwitch2(game_title);
-                Settings::values.memory_layout_mode = Settings::MemoryLayout::Memory_12Gb;
                 const auto accuracy = nx2.exact_gpu ? Settings::GpuAccuracy::High : Settings::GpuAccuracy::Low;
                 Settings::values.gpu_accuracy.SetValue(accuracy);
                 Settings::values.current_gpu_accuracy = accuracy;
@@ -1497,21 +1497,27 @@ int main(int argc, char** argv) {
             Eden::Report("launch", ("Mods: " + mods).c_str());
             {
                 // The layout chosen, except for a game that stops with more memory than its
-                // console's and runs without a mod that may need it (memory_layout_guard.h).
+                // console's and runs without a mod that may need it (memory_layout_guard.h). Both
+                // are for Switch 1 games: a Switch 2 title gets eden-nx2's 12 GiB whatever Memory
+                // says, and the guard, which goes by a Switch 1 title ID, is not asked about it (a
+                // Switch 2 edition's ExeFS may carry the Switch 1 game's program ID).
                 const bool mods_on = std::any_of(all_mods.begin(), all_mods.end(), [&](const Eden::Mods::Mod& mod) {
                     return !Eden::Mods::CheatsOnly(mod) &&
                            std::find(mods_off.begin(), mods_off.end(), mod.name) == mods_off.end();
                 });
-                const int layout = Eden::MemoryLayoutGuard::Layout(title, speed.memory_layout, mods_on,
-                                                                   dev_layout_guard_off);
+                const int layout = switch2 ? speed.memory_layout
+                                           : Eden::MemoryLayoutGuard::Layout(title, speed.memory_layout, mods_on,
+                                                                             dev_layout_guard_off);
                 Settings::values.memory_layout_mode =
-                    layout == 1 ? Settings::MemoryLayout::Memory_6Gb
+                    switch2 ? Settings::MemoryLayout::Memory_12Gb
+                    : layout == 1 ? Settings::MemoryLayout::Memory_6Gb
                     : layout == 2 ? Settings::MemoryLayout::Memory_8Gb
                                   : Settings::MemoryLayout::Memory_4Gb;
                 Eden::Report("launch",
-                             ("Memory layout: " + std::string{Eden::kMemoryLayoutKeys[layout]} + " (" +
-                              std::to_string(Eden::kMemoryLayoutGib[layout]) + " GiB)" +
-                              (layout != speed.memory_layout
+                             ((switch2 ? std::string{"Memory layout: 12Gb (12 GiB), eden-nx2's for a Switch 2 title"}
+                                       : "Memory layout: " + std::string{Eden::kMemoryLayoutKeys[layout]} + " (" +
+                                             std::to_string(Eden::kMemoryLayoutGib[layout]) + " GiB)") +
+                              (!switch2 && layout != speed.memory_layout
                                    ? std::string{", not the "} + Eden::kMemoryLayoutKeys[speed.memory_layout] +
                                          " chosen: this game without mods stops with more than its console's"
                                    : std::string{}) +
