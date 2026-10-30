@@ -209,3 +209,17 @@ Nobody here has a Switch 2 dump or keys; the first console runs are the testers'
   it look there). Every derivation applies (table above); local checks that do not need a Linux
   build pass on the new tree: guest idle, unmapped log, GC scan, loader message, system font, NCZ,
   TSC fallback, and the other source checks.
+- 2026-10-30: first CI on the pin move (63e4561). Linux host suite (`make test`, launcher
+  screens): **green**, <https://github.com/Oliv3rmoon/Nightshade/actions/runs/40975918356>; the
+  archive came from git.eden-emu.dev on the runner. PS5 build:
+  <https://github.com/Oliv3rmoon/Nightshade/actions/runs/40975862255> compiled and linked Eden
+  (eden-nx2) and the app for the console with no compile error, then stopped at
+  `check-native-gpu-thread.py`, which expected one dispatch site in the GPU worker (eden-nx2 has
+  two); the check follows eden-nx2 since c1154bf.
+- 2026-10-30: Switch 2 host support (79f2ba0), settings and path tests, the checks of the generated
+  GPU worker (c1154bf: also `check-gpu-sync-stop.py`'s DrainBack, `check-load-failure.py`), the
+  preview's Switch 2 sample (45bc4a5: an added sample moved the tour's game positions, so an
+  existing one became the Switch 2 title). Locally (macOS, x86-64 syntax checks against the patched
+  tree): the derived Vulkan files, `gpu_split.cpp`, `physical_core.cpp`, `k_spin_lock.cpp`,
+  `gpu_thread.cpp`, `metadata_bridge.cpp`, `eden_services.cpp`, `library.cpp` and the host path of
+  `main.cpp` compile.
