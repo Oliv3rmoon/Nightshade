@@ -111,6 +111,10 @@ void Launcher::open_game_settings_from_home(const std::string &file)
 
 void Launcher::press_home(Key key)
 {
+    // Quick settings need the game in the list: the list is read as the launcher opens, and Options
+    // pressed before that ends waits for it, as the Library does.
+    if (key == Key::options && !games_loaded_)
+        finish_scan(true);
     const bool ready = home_.setup_ready;
     const bool minimal = th().minimal_home;
     const int count = static_cast<int>(games_.size());
