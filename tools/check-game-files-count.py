@@ -78,6 +78,31 @@ int main(int, char** argv) {
     Touch(roms / "Series" / "Part 1" / "Part 1.nsp");
     fs::create_directories(roms / "Odd" / "Folder.nsp");
     assert(CountGames(roms.string()) == 5);
+    // Homebrew is one game each, directly in roms/ and in any folder of it (roms/homebrew/).
+    Touch(roms / "Tool.nro");
+    Touch(roms / "homebrew" / "One.nro");
+    Touch(roms / "homebrew" / "Two.NRO");
+    Touch(roms / "homebrew" / "notes.txt");
+    assert(CountGames(roms.string()) == 8);
+    // The advanced files: an NSO, NAX or KIP directly in roms/ is one each, its NCAs one together
+    // (an NSP unpacked there); a game folder with any, or with an unpacked ExeFS, is one game.
+    Touch(roms / "Program.nso");
+    Touch(roms / "Process.kip");
+    Touch(roms / "0123456789abcdef0123456789abcdef.nax");
+    Touch(roms / "aaaa.nca");
+    Touch(roms / "bbbb.nca");
+    assert(CountGames(roms.string()) == 12);
+    Touch(roms / "Unpacked" / "1111.nca");
+    Touch(roms / "Unpacked" / "2222.nca");
+    Touch(roms / "Unpacked" / "3333.cnmt.nca");
+    Touch(roms / "ExeFS" / "main");
+    Touch(roms / "ExeFS" / "main.npdm");
+    Touch(roms / "Half" / "main");  // no main.npdm: not an ExeFS
+    assert(CountGames(roms.string()) == 14);
+    // The Library's names: "<folder>/main" for an ExeFS, never main alone or deeper.
+    assert(Eden::ValidRomPath("ExeFS/main") && Eden::ValidRomPath("Tool.nro") && Eden::ValidRomPath("a/b.nca"));
+    assert(!Eden::ValidRomPath("main") && !Eden::ValidRomPath("../main") && !Eden::ValidRomPath(".x/main") &&
+           !Eden::ValidRomPath("a/b/main") && !Eden::ValidRomPath("a/mai") && !Eden::ValidRomPath("a/x.txt"));
     std::puts("game files count: PASS");
 }
 '''
@@ -87,4 +112,5 @@ with tempfile.TemporaryDirectory() as tmp:
                     '-I' + str(root / 'headless'), '-x', 'c++', '-',
                     '-o', str(exe)], input=code, text=True, check=True)
     subprocess.run([str(exe), tmp], check=True)
-print('Game files count: PASS Settings > Game files counts the games in game folders, one each')
+print('Game files count: PASS Settings > Game files counts the games in game folders, one each, homebrew one '
+      'each, and the advanced files by their names (an unpacked NSP or ExeFS as one game)')

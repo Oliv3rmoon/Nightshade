@@ -11,6 +11,15 @@ builds on the following projects, each under its own license.
   simpleini, sirit, SPIRV-Headers, Vulkan-Headers, Vulkan-Utility-Libraries,
   Vulkan Memory Allocator, ENet, frozen, cpp-httplib, nlohmann/json, and the time
   zone data. Each keeps its upstream license.
+- **[zbic](https://github.com/kinnay/zbic)** by Yannik Marchand (kinnay), one of the packages
+  Eden's build fetches at the commit Eden pins: Atmosphère's ZBIC variant of zstd 1.5.7
+  (`src/zstd.c`, `zstd.h`, `zstd_errors.h`). The binary interpolative coding of its entropy tables
+  is the [Atmosphère-NX](https://github.com/Atmosphere-NX/Atmosphere) project's; the zstd files are
+  Meta Platforms' and, as their headers state, licensed under the BSD license or GPLv2 at the
+  user's option (the zbic repository itself is GPL-2.0). Eden's `src/common/zbic_compression.cpp`
+  builds them in to decode the ZBIC-compressed NSO segments of games for Switch system software
+  22.0.0 and later. The checks (`tools/nso_files.py`) also build its encoder to make test files;
+  that is not part of the app.
 - **[FFmpeg](https://ffmpeg.org)**, LGPL-2.1-or-later. Built from Eden's pinned
   source with only the H.264, VP8 and VP9 decoders.
 - **[OpenSSL](https://www.openssl.org)**, Apache-2.0, and

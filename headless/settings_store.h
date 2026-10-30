@@ -189,8 +189,9 @@ inline int KeyIndex(const std::string& value, const char* const* keys, int count
 }
 
 // A game's file as the Library names it: its path in the game files folder's roms/, either its
-// name ("Game.nsp"; .xci, .nsz and .xcz too) or a game folder and its name ("Game/Game.nsp", the
-// game's update and DLC beside it). Readable characters, one folder at most, never a hidden
+// name ("Game.nsp"; .xci, .nsz and .xcz too, homebrew's .nro and the advanced files of
+// game_files.h) or a game folder and its name ("Game/Game.nsp", the game's update and DLC beside
+// it; "Game/main" for an unpacked ExeFS). Readable characters, one folder at most, never a hidden
 // folder, "." or "..".
 inline bool ValidRomPath(std::string_view name) {
     if (name.size() < 5 || name.size() > 511) return false;
@@ -198,11 +199,12 @@ inline bool ValidRomPath(std::string_view name) {
         if (c < 32 || c == 127 || c == '\\') return false;
     if (const auto slash = name.find('/'); slash != std::string_view::npos) {
         if (slash == 0 || name[0] == '.' || name.find('/', slash + 1) != std::string_view::npos) return false;
-        if (slash > 255 || name.size() - slash - 1 < 5 || name.size() - slash - 1 > 255) return false;
+        if (slash > 255 || name.size() - slash - 1 > 255) return false;
+        if (name.size() - slash - 1 < 5 && !IsExeFsMain(name)) return false;
     } else if (name.size() > 255) {
         return false;
     }
-    return IsGameFile(name);
+    return IsLibraryFile(name);
 }
 
 // A wallpaper's file name: the name alone (the image lives in the wallpapers folder), readable

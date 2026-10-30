@@ -86,6 +86,7 @@ NOTES = {
     "None": "No add-ons (updates or DLC).",
     "Default ({0})": "A per-game setting that follows the general setting; {0} is its value.",
     "{0} not available": "{0} is a language name. Shown beside a game that lacks that language.",
+    "{0} (advanced)": "Library: a file's format, such as NSO or NCA, for a program file that runs only with what it needs beside it (for experienced users). {0} stays as it is.",
     "Add-ons: {0}  /  Language: {1} ({2} in this game)": "{2} is the text '{0} not available'.",
     "STARTING": "Shown over a game's cover while it starts.",
     "Make it yours.": "Headline of the Settings screen.",

@@ -1698,9 +1698,30 @@ int main(int argc, char** argv) {
                 // code, which then ran against the old data. It also gives Eden the game's control data.
                 game_contents.ClearAllEntries();
                 // (A game played where it lies is no file: its file is the one opened on its source.)
-                if (game && guest && !game_contents.AddEntriesFromContainer(
-                        streamed ? streamed->file : system.GetFilesystem()->OpenFile(guest, FileSys::OpenMode::Read)))
-                    Eden::Report("loader", "Game contents not registered; an update's data will not apply");
+                // Homebrew and the advanced files (game_files.h) hold no package of contents. A
+                // Program NCA (an NSP unpacked into a folder) has its control data in the Control NCA
+                // beside it: both are registered, so Eden finds the game's name, languages and save
+                // data sizes, and an update in updates/ finds its base.
+                if (game && guest && (streamed || Eden::IsGameFile(guest))) {
+                    if (!game_contents.AddEntriesFromContainer(
+                            streamed ? streamed->file : system.GetFilesystem()->OpenFile(guest, FileSys::OpenMode::Read)))
+                        Eden::Report("loader", "Game contents not registered; an update's data will not apply");
+                }
+#if defined(PS5_NATIVE) && defined(EDEN_PS5_OPENGL)
+                else if (game && guest && game_title != 0 && Eden::EndsWithNoCase(guest, ".nca") &&
+                         eden_program_kind(guest, Eden::AssetsPath("keys").c_str()) == EDEN_PROGRAM_NCA) {
+                    game_contents.AddEntry(FileSys::TitleType::Application, FileSys::ContentRecordType::Program,
+                                           game_title, system.GetFilesystem()->OpenFile(guest, FileSys::OpenMode::Read));
+                    char control[1024]{};
+                    if (eden_program_control_nca(guest, Eden::AssetsPath("keys").c_str(), control, sizeof(control))) {
+                        game_contents.AddEntry(FileSys::TitleType::Application, FileSys::ContentRecordType::Control,
+                                               game_title, system.GetFilesystem()->OpenFile(control, FileSys::OpenMode::Read));
+                        std::fprintf(stderr, "[ProsperoEden] launch: control data beside the NCA: %s\n", control);
+                    } else {
+                        Eden::Report("loader", "No Control NCA beside the Program NCA; the game runs without its control data");
+                    }
+                }
+#endif
                 system.RegisterContentProvider(FileSys::ContentProviderUnionSlot::FrontendManual, &game_contents);
                 {
                     Service::AM::Frontend::FrontendAppletSet applets;

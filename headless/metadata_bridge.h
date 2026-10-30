@@ -44,6 +44,23 @@ enum {
 };
 int eden_rom_content(const char* rom_path, const char* keys_dir);
 
+// The programs the Library lists beside games (game_files.h), as Eden's own loaders identify the
+// file: 0 when it is none Eden can start (an NCA that holds no program or is an update's, a NAX or
+// an NCA without the keys that read it, a file whose contents are not what its name says).
+enum {
+    EDEN_PROGRAM_NONE = 0,
+    EDEN_PROGRAM_NRO = 1,    // homebrew
+    EDEN_PROGRAM_NSO = 2,    // a lone NSO module
+    EDEN_PROGRAM_NCA = 3,    // a Program NCA
+    EDEN_PROGRAM_NAX = 4,    // a Program NCA as an SD card keeps it (named by its content ID)
+    EDEN_PROGRAM_KIP = 5,
+    EDEN_PROGRAM_EXEFS = 6,  // the main of an unpacked ExeFS (main.npdm beside it)
+};
+int eden_program_kind(const char* rom_path, const char* keys_dir);
+// For a Program NCA: the Control NCA beside it (same folder, same title ID: an NSP unpacked into a
+// folder), whose path is put in `control`. Nonzero when there is one.
+int eden_program_control_nca(const char* rom_path, const char* keys_dir, char* control, size_t capacity);
+
 // Update and DLC files (NSP or XCI, any depth) in updates_dir and in the game folders of roms_dir
 // (its folders, one per game; roms_dir may be null), read with the provider that also applies them
 // to a running game. Replaces the previous scan; eden_game_addons queries it.

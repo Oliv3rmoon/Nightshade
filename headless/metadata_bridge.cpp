@@ -48,9 +48,14 @@
 #include "core/file_sys/vfs/vfs_vector.h"
 #include "core/file_sys/submission_package.h"
 #include "core/file_sys/vfs/vfs_real.h"
+#include "core/file_sys/kernel_executable.h"
+#include "core/file_sys/xts_archive.h"
 #include "core/hle/service/ns/language.h"
 #include "core/hle/service/set/settings_types.h"
+#include "core/loader/deconstructed_rom_directory.h"
 #include "core/loader/loader.h"
+#include "core/loader/nro.h"
+#include "core/loader/nso.h"
 
 namespace {
 constexpr std::array<const char*, 18> language_names{
@@ -218,6 +223,124 @@ bool WriteTga(const FileSys::VirtualFile& icon, const char* output) {
     const auto encoded = icon->ReadAllBytes();
     return WriteTgaBytes(encoded.data(), encoded.size(), output, 4096);
 }
+
+// ---- Programs on their own (game_files.h): homebrew and the advanced files ----
+
+// A Program NCA that runs on its own: not an update's (an update's code runs on its base game).
+bool StartableProgram(const FileSys::NCA& nca) {
+    return nca.GetStatus() == Loader::ResultStatus::Success && nca.GetType() == FileSys::NCAContentType::Program &&
+           (nca.GetTitleId() & 0x800) == 0;
+}
+
+// The NCA a NAX holds, read with the SD card's keys (the build reads one named by its content ID,
+// headless/CMakeLists.txt); null when it cannot be read.
+std::unique_ptr<FileSys::NCA> NaxContents(const FileSys::VirtualFile& file) {
+    const FileSys::NAX nax(file);
+    if (nax.GetStatus() != Loader::ResultStatus::Success) return {};
+    auto nca = nax.AsNCA();
+    if (!nca || nca->GetStatus() != Loader::ResultStatus::Success) return {};
+    return nca;
+}
+
+// What a program file is, as Eden's loader for its kind identifies it (eden_program_kind). A file
+// named .nca whose contents are a NAX is one (as an SD card names them).
+int ProgramKind(const FileSys::VirtualFile& file, const std::string& path) {
+    using Loader::FileType;
+    if (!file) return EDEN_PROGRAM_NONE;
+    if (Eden::IsExeFsMain(path))
+        return Loader::AppLoader_DeconstructedRomDirectory::IdentifyType(file) == FileType::DeconstructedRomDirectory
+                   ? EDEN_PROGRAM_EXEFS : EDEN_PROGRAM_NONE;
+    if (Eden::IsHomebrewFile(path))
+        return Loader::AppLoader_NRO::IdentifyType(file) == FileType::NRO ? EDEN_PROGRAM_NRO : EDEN_PROGRAM_NONE;
+    if (Eden::EndsWithNoCase(path, ".nso"))
+        return Loader::AppLoader_NSO::IdentifyType(file) == FileType::NSO ? EDEN_PROGRAM_NSO : EDEN_PROGRAM_NONE;
+    if (Eden::EndsWithNoCase(path, ".kip"))
+        return FileSys::KIP(file).GetStatus() == Loader::ResultStatus::Success ? EDEN_PROGRAM_KIP : EDEN_PROGRAM_NONE;
+    if (Eden::EndsWithNoCase(path, ".nca")) {
+        const FileSys::NCA nca(file);
+        if (nca.GetStatus() == Loader::ResultStatus::Success)
+            return StartableProgram(nca) ? EDEN_PROGRAM_NCA : EDEN_PROGRAM_NONE;
+    }
+    if (Eden::EndsWithNoCase(path, ".nca") || Eden::EndsWithNoCase(path, ".nax"))
+        if (const auto nca = NaxContents(file); nca && StartableProgram(*nca)) return EDEN_PROGRAM_NAX;
+    return EDEN_PROGRAM_NONE;
+}
+
+// The title ID a program file gives itself, as Eden's loader of it reads it: an NRO's in its
+// control data, an NCA's (or a NAX's) in its header, a KIP's in its header, an unpacked ExeFS's in
+// its main.npdm. 0 without one (a lone NSO has none).
+uint64_t ProgramTitleId(const FileSys::VirtualFile& file, const std::string& path) {
+    u64 title_id = 0;
+    switch (ProgramKind(file, path)) {
+    case EDEN_PROGRAM_NRO:
+        (void)Loader::AppLoader_NRO(file).ReadProgramId(title_id);
+        break;
+    case EDEN_PROGRAM_NCA:
+        title_id = FileSys::NCA(file).GetTitleId();
+        break;
+    case EDEN_PROGRAM_NAX:
+        if (const auto nca = NaxContents(file)) title_id = nca->GetTitleId();
+        break;
+    case EDEN_PROGRAM_KIP:
+        title_id = FileSys::KIP(file).GetTitleID();
+        break;
+    case EDEN_PROGRAM_EXEFS:
+        (void)Loader::AppLoader_DeconstructedRomDirectory(file).ReadProgramId(title_id);
+        break;
+    default:
+        break;
+    }
+    return title_id;
+}
+
+// The Control NCA beside a Program NCA (in its folder, with its title ID): an NSP unpacked into a
+// folder keeps the game's name, icon and languages there. *path gets its path.
+std::shared_ptr<FileSys::NCA> ControlBeside(const FileSys::VirtualFile& program, u64 title_id, std::string* path) {
+    const auto folder = program->GetContainingDirectory();
+    if (!folder || !title_id) return {};
+    for (const auto& file : folder->GetFiles()) {
+        if (file->GetName() == program->GetName() || !Eden::EndsWithNoCase(file->GetName(), ".nca")) continue;
+        auto nca = std::make_shared<FileSys::NCA>(file);
+        if (nca->GetStatus() != Loader::ResultStatus::Success || nca->GetType() != FileSys::NCAContentType::Control ||
+            nca->GetTitleId() != title_id)
+            continue;
+        if (path) *path = file->GetFullPath();
+        return nca;
+    }
+    return {};
+}
+
+// A program file's control data, laid out as a game's control RomFS (control.nacp and
+// icon_<language>.dat), for its name, icon and languages: an NRO's assets, an unpacked ExeFS's
+// folder, a Program NCA's Control NCA beside it. *name gets the name a KIP gives itself. Null
+// without any.
+FileSys::VirtualDir ProgramControl(const FileSys::VirtualFile& file, const std::string& path, std::string* name) {
+    switch (ProgramKind(file, path)) {
+    case EDEN_PROGRAM_NRO: {
+        Loader::AppLoader_NRO nro(file);
+        std::vector<FileSys::VirtualFile> files;
+        FileSys::NACP nacp;
+        if (nro.ReadControlData(nacp) == Loader::ResultStatus::Success)
+            files.push_back(std::make_shared<FileSys::VectorVfsFile>(nacp.GetRawBytes(), "control.nacp"));
+        std::vector<u8> icon;
+        if (nro.ReadIcon(icon) == Loader::ResultStatus::Success && !icon.empty())
+            files.push_back(std::make_shared<FileSys::VectorVfsFile>(std::move(icon), "icon_AmericanEnglish.dat"));
+        if (files.empty()) return {};
+        return std::make_shared<FileSys::VectorVfsDirectory>(std::move(files));
+    }
+    case EDEN_PROGRAM_EXEFS:
+        return file->GetContainingDirectory();
+    case EDEN_PROGRAM_NCA:
+        if (const auto control = ControlBeside(file, FileSys::NCA(file).GetTitleId(), nullptr))
+            return ExtractControl(control);
+        return {};
+    case EDEN_PROGRAM_KIP:
+        if (name) *name = FileSys::KIP(file).GetName();
+        return {};
+    default:
+        return {};
+    }
+}
 }
 
 int eden_write_cover_tga(const unsigned char* encoded, size_t size, const char* cover_tga_path) {
@@ -251,7 +374,12 @@ uint64_t eden_game_title_id(const char* rom_path) {
         FileSys::NSP package(file);
         return package.GetStatus() == Loader::ResultStatus::Success ? package.GetProgramTitleID() : 0;
     }
-    return 0;
+    try {
+        return ProgramTitleId(file, path);
+    } catch (const std::exception& error) {
+        std::fprintf(stderr, "[ProsperoEden] title ID: %s\n", error.what());
+        return 0;
+    }
 }
 
 int eden_extract_game_metadata(const char* rom_path, const char* keys_dir,
@@ -268,8 +396,15 @@ int eden_extract_game_metadata(const char* rom_path, const char* keys_dir,
                    [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     const bool xci = Eden::IsCardImageFile(path);
     FileSys::VirtualDir packed_update;
-    const auto romfs = OpenControlRomFs(file, xci, &packed_update);
-    if (!romfs) return 0;
+    // A program on its own (homebrew, an advanced file): its own control data when it has any.
+    std::string program_name;
+    const auto romfs = Eden::IsGameFile(path) ? OpenControlRomFs(file, xci, &packed_update)
+                                              : ProgramControl(file, path, &program_name);
+    if (!romfs) {
+        if (program_name.empty() || !Eden::UsableName(program_name.c_str())) return 0;
+        std::snprintf(title, title_capacity, "%s", Eden::PlainName(program_name.c_str()).c_str());
+        return EDEN_METADATA_TITLE;
+    }
     GameLanguages()[rom_path] = ReadLanguages(romfs, packed_update);
 
     int result = 0;
@@ -295,7 +430,8 @@ uint32_t eden_game_supported_languages(const char* rom_path, const char* keys_di
         std::transform(path.begin(), path.end(), path.begin(),
                        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
         FileSys::VirtualDir packed_update;
-        const auto romfs = OpenControlRomFs(file, Eden::IsCardImageFile(path), &packed_update);
+        const auto romfs = Eden::IsGameFile(path) ? OpenControlRomFs(file, Eden::IsCardImageFile(path), &packed_update)
+                                                  : ProgramControl(file, path, nullptr);
         if (!romfs) return 0;
         return GameLanguages()[rom_path] = ReadLanguages(romfs, packed_update);
     } catch (const std::exception& error) {
@@ -346,6 +482,38 @@ int eden_rom_content(const char* rom_path, const char* keys_dir) {
         return content;
     } catch (const std::exception&) {
         return EDEN_CONTENT_UNKNOWN;
+    }
+}
+
+int eden_program_kind(const char* rom_path, const char* keys_dir) {
+    if (!rom_path || !keys_dir) return EDEN_PROGRAM_NONE;
+    try {
+        Common::FS::SetEdenPath(Common::FS::EdenPath::KeysDir, keys_dir);
+        FileSys::RealVfsFilesystem vfs;
+        return ProgramKind(vfs.OpenFile(rom_path, FileSys::OpenMode::Read), rom_path);
+    } catch (const std::exception& error) {
+        std::fprintf(stderr, "[ProsperoEden] library: %s: %s\n", rom_path, error.what());
+        return EDEN_PROGRAM_NONE;
+    }
+}
+
+int eden_program_control_nca(const char* rom_path, const char* keys_dir, char* control, size_t capacity) {
+    if (control && capacity) control[0] = '\0';
+    if (!rom_path || !keys_dir || !control || !capacity || !Eden::EndsWithNoCase(rom_path, ".nca")) return 0;
+    try {
+        Common::FS::SetEdenPath(Common::FS::EdenPath::KeysDir, keys_dir);
+        FileSys::RealVfsFilesystem vfs;
+        const auto file = vfs.OpenFile(rom_path, FileSys::OpenMode::Read);
+        if (!file) return 0;
+        const FileSys::NCA program(file);
+        std::string path;
+        if (!StartableProgram(program) || !ControlBeside(file, program.GetTitleId(), &path) || path.size() >= capacity)
+            return 0;
+        std::snprintf(control, capacity, "%s", path.c_str());
+        return 1;
+    } catch (const std::exception& error) {
+        std::fprintf(stderr, "[ProsperoEden] control data: %s: %s\n", rom_path, error.what());
+        return 0;
     }
 }
 
