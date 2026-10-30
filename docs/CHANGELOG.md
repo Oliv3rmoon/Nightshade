@@ -13,8 +13,9 @@ What changed in each release of ProsperoEden, newest first. A release's notes on
 
 ### Fixes
 
-- **A lone NSO starts.** It was loaded into a process that had not been laid out yet, so it could not run. Its process is now laid out first, as an NRO's is.
-- **An unpacked ExeFS starts with all its modules.** Its `main` was taken for a lone NSO and started without its `main.npdm`, `rtld`, `sdk` or `subsdk`. A `main` with `main.npdm` beside it now starts its folder, as yuzu did.
+- **A lone NSO starts.** It was loaded into a process that had not been laid out yet, and the file system answered none of its calls. Its process is now laid out first and known to the file system, as an NRO's is.
+- **An unpacked ExeFS starts with all its modules.** Its `main` was taken for a lone NSO and started without its `main.npdm`, `rtld`, `sdk` or `subsdk`. A `main` with `main.npdm` beside it now starts its folder, as yuzu did, and the file system answers its calls.
+- **A KIP can use the file system.** Its first file system call failed; it is now answered, as an NRO's is.
 - **A NAX is read wherever it is.** One was read only at its place on an SD card (`registered/000000XX/<content ID>.nca`); one that keeps its content ID as its name is now read in `roms/` too, with the same keys.
 - **Code compressed with ZBIC must decode whole.** Games made for Switch system software 22.0.0 and later compress their code with ZBIC, a variant of zstd, instead of LZ4; Nightshade has read it since v1.000.110, with Atmosphère's decoder. A part of the code that decoded to fewer bytes than the game gives for it was taken anyway, the rest left as whatever was there; such a game now stops at its load with an error instead, as an LZ4 one does. The host checks now decode ZBIC data and NSOs made in that format, and start a ZBIC NSO in the emulator.
 
