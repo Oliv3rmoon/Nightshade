@@ -1,9 +1,9 @@
 {
- "name": "Nightshade 1.011.000 checks",
+ "name": "Nightshade 1.011.001 checks",
  "on": {
   "push": {
    "branches": [
-    "test/1.011.000"
+    "test/1.011.001"
    ]
   },
   "workflow_dispatch": {}
@@ -23,7 +23,7 @@
    "env": {
     "XDG_CACHE_HOME": "/tmp/prosperoeden-dev-host-cache",
     "PROSPEROEDEN_DEPS_CACHE": "/tmp/prosperoeden-dev-downloads",
-    "DEV_HEAD": "c4792f8f15be660e9a227db2665adb14e2808d9d",
+    "DEV_HEAD": "f86248ecf2f9f513e0ad61488a7d0c9950721e21",
     "GITHUB_TOKEN": "${{ github.token }}"
    },
    "steps": [
@@ -31,7 +31,7 @@
      "name": "Check out the bridge commit",
      "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
      "with": {
-      "ref": "c4792f8f15be660e9a227db2665adb14e2808d9d",
+      "ref": "f86248ecf2f9f513e0ad61488a7d0c9950721e21",
       "persist-credentials": false
      }
     },
@@ -97,7 +97,7 @@
      "name": "Check out the bridge commit",
      "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
      "with": {
-      "ref": "c4792f8f15be660e9a227db2665adb14e2808d9d",
+      "ref": "f86248ecf2f9f513e0ad61488a7d0c9950721e21",
       "persist-credentials": false
      }
     },
