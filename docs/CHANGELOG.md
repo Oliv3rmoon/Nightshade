@@ -2,6 +2,24 @@
 
 What changed in each release of ProsperoEden, newest first. A release's notes on GitHub are its section here.
 
+## v1.012.001
+
+**Experimental test release: v1.012.000 with v1.010.006's faster starts and memory given back.** Everything in v1.012.000 (Switch 2 games, eden-nx2 `50fa86bbbc` under every game) and everything in v1.011.002, which is v1.010.006 below: a game starts as soon as its graphics are ready and its saved pipelines are built while it plays, the emulator's own memory goes back to the console, a large allocation takes memory in pieces when it must, and ASTC textures are converted to BC3 a layer at a time with Vulkan. None of it has run on a console with eden-nx2 yet. This release is for testing: if v1.011.002 plays your games well, keep it for playing.
+
+### On eden-nx2
+
+- **The shader cache is built while the game plays, for Switch 1 and Switch 2 games.** eden-nx2 reads and builds the cache as Eden did. The builds never touch what the game's graphics thread uses: with the split GPU thread of a Switch 2 game, only its second thread, the one that draws, takes pipelines from the build. Leaving the game stops the build before the next game starts.
+- **A Switch 2 game shares the spare CPUs with its build.** The split GPU thread's second thread runs on the same CPUs the builders use while the game plays, so its frames may be slower until `stderr.log` says `Shader cache ready`. If a Switch 2 game starts worse than on v1.012.000, try once with `"background_shader_cache": false` in that game's `"performance"` (see [the settings](SETTINGS.md#the-shader-cache-while-the-game-plays)) and say which run was which.
+- **ASTC a layer at a time** is for textures converted on the CPU: Switch 1 games with **ASTC textures as BC3**. A Switch 2 game decodes ASTC on the GPU.
+
+### What to send
+
+As for v1.012.000: `/data/nightshade/logs` (`eden_log.txt`, `stderr.log` and any crash report) with the game's name and title ID. Start a game with a big shader cache twice. The lines that say the most about this release: `Shader cache: the game starts now`, `Shader cache ready`, `EDEN_SHADER_START` and the `heap:` lines.
+
+### Install
+
+From 1.005.102 or later, **Update now** applies it (from a Nightshade before v1.011.000, open the old tile once afterwards). If it doesn't, send `/data/nightshade/logs/updater.log` (`/data/prosperoeden/logs/updater.log` from a Nightshade before v1.011.000). By hand, copy this ZIP's `PPSA64448` folder to `/data/homebrew/PPSA64448`.
+
 ## v1.012.000
 
 **Experimental test release: Switch 2 games, and a newer Eden under every game.** Nightshade now builds on Takoroka's [eden-nx2](https://git.eden-emu.dev/Takoroka/eden-nx2) (Eden master with experimental Switch 2 support, commit `50fa86bbbc`) instead of Eden `67bada77`, with everything in v1.011.001. No Switch 2 game has been run on a PS5 yet, and Switch 1 games have not been played on the newer Eden on a console either. This release is for testing: if v1.011.001 plays your games well, keep it for playing.
@@ -33,6 +51,10 @@ Two of eden-nx2's GPU changes that were measured only with Switch 2 games (dropp
 
 From 1.005.102 or later, **Update now** applies it (from a Nightshade before v1.011.000, open the old tile once afterwards). If it doesn't, send `/data/nightshade/logs/updater.log` (`/data/prosperoeden/logs/updater.log` from a Nightshade before v1.011.000). By hand, copy this ZIP's `PPSA64448` folder to `/data/homebrew/PPSA64448`.
 
+## v1.011.002
+
+**Nightshade's own app with v1.010.006: big games start right away, and Eden gives memory back.** Everything in v1.011.001, and everything in v1.010.006 below.
+
 ## v1.011.001
 
 **Nightshade's own app with v1.010.005's Tears of the Kingdom fixes and amiibo.** Everything in v1.011.000 (its own title ID, the bridge from the old tile) and everything in v1.010.005 below. With its own data folder, amiibo dumps go in `amiibo/` in the game files folder or in `/data/nightshade/amiibo/`.
@@ -55,6 +77,26 @@ From 1.005.102 or later, **Update now** applies it (from a Nightshade before v1.
 ### Install
 
 From 1.005.102 or later, **Update now** applies it: then open the old tile once. If it doesn't, send `/data/prosperoeden/logs/updater.log`. By hand, copy this ZIP's `PPSA64448` folder to `/data/homebrew/PPSA64448` and open Nightshade from its new tile once the homebrew loader lists it.
+
+## v1.010.006
+
+**Big games start right away, and the emulator gives memory back.** Tears of the Kingdom built the 16,000 pipelines it saved in earlier sessions for about 200 seconds at every start before it played, however often it had started before. Now a game starts as soon as its graphics are ready, and its saved pipelines are built while it plays. And a TOTK session that ended after 1.5 hours on v1.010.005 ("heap exhausted") should no longer end that way. Not measured on a console yet: start TOTK twice, play as long as you can, and send `/data/prosperoeden/logs`. The new `EDEN_SHADER_START` lines in `stderr.log` say where the start's time went, and the `heap:` lines what the emulator holds of the console's memory.
+
+### Fixes
+
+- **The game starts while its shader cache is built.** With the Vulkan renderer a game no longer waits for its saved pipelines: they are read and built behind it on the spare CPUs, and the game takes each one as soon as it is built. One it needs sooner it builds itself, as it does any new effect: with **Asynchronous shaders** on, that effect is missing for a moment; with them off, the game pauses for it. Leaving the game in the middle stops the build at once. `"background_shader_cache": false` in the settings file builds the whole cache before the game starts, as before (see [the settings](https://github.com/Oliv3rmoon/Nightshade/blob/v1.010.006/docs/SETTINGS.md#the-shader-cache-while-the-game-plays)). `stderr.log` says `Shader cache: the game starts now`, then how far the build is every 5 seconds, then `Shader cache ready: ... built while the game ran`.
+- **Building the cache should be faster.** In every TOTK log the build ran at about 200 pipelines a second for its first 3,000, then at about 60, and letting the builders use every CPU in v1.010.004 hardly helped. The most likely reason: each of the 15 building threads has 8 MiB of memory of its own for its small allocations, what it built filled that after a few thousand pipelines, and from then on all of them allocated through the one lock every thread shares. A thread whose memory is full now takes another 8 MiB of its own. `EDEN_SHADER_START_HEAP` in `stderr.log` counts the allocations that still go through the shared lock.
+- **The cache file is read in 8 MiB pieces, and only as fast as it is built.** It was read 4 KiB at a time, asking the file again for every entry: reading TOTK's took 15 seconds. And the whole file was queued at once, so the start held most of it in memory (the emulator's memory grew by 1.9 GB while TOTK's cache was built, and it keeps what it grows by); now at most a few pipelines per building thread wait to be built.
+- **Leaving a game while its cache is built before it starts** (with `background_shader_cache` off) now stops the build instead of waiting for it to finish.
+- **Converting a large ASTC texture no longer asks for half a gigabyte at once.** The v1.010.005 session ended converting a texture array of 121 layers to BC3 (**ASTC textures as BC3**): it asked for 484 MiB in one piece, and the console had no free block that large. That conversion was made to work a layer at a time (4 MiB) in v1.001.000, but the Vulkan renderer used another copy of the code without it. It works a layer at a time with Vulkan too now.
+- **The emulator's own memory goes back to the console.** It only grew: a TOTK session held 2.69 GB of it at its end with 0.16 GB in use, and the next session grew from there. The parts that hold nothing are now given back when a shader cache has been built, when a session ends, every 2 seconds while memory is short, and before an allocation would be refused (then it is tried again).
+- **A large allocation takes memory in smaller pieces when it must.** One of 32 MiB or more needed one free block of that size, and the emulator's memory grew in one block too: in a console whose free memory is in pieces, both failed although there was enough in all. They now take it in whatever pieces there are.
+- **`stderr.log` says what the emulator holds of the console's memory:** `heap: holds ... MiB (... of pieces, ... in large blocks), ... MiB of it in use; ... MiB given back so far` at the start and end of each session, every 30 seconds while a game runs, and whenever memory is given back. The `EDEN_MEMORY` lines (`heap.log`) have `heap_used` and `heap_returned` too.
+- **`stderr.log` shows where a start's time goes**, at the end of each cache build: `EDEN_SHADER_START` (the time, the reading, the sizes of the cache and of the driver's own pipeline cache), `EDEN_SHADER_START_STAGES` (how long the builds spent turning the game's shaders into Vulkan's, on layouts, and in the driver), `EDEN_SHADER_START_DRIVER` (how many pipelines the driver found in its cache and how many it had to compile) and `EDEN_SHADER_START_HEAP`.
+
+### Install
+
+From 1.005.102 or later, **Update now** applies it. If it doesn't, send `/data/prosperoeden/logs/updater.log`. From an older version, copy this ZIP's `PPSA99008` folder over yours.
 
 ## v1.010.005
 

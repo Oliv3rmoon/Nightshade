@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Host check of the shader cache reader (shader_cache_reader.inc): a damaged file must neither
-// stop the reading with an error nor lose the entries before the damage.
+// stop the reading with an error nor lose the entries before the damage. The reader reads the
+// file a piece at a time: each case runs with pieces from a few bytes (every entry, and every
+// position the reader goes back to, crosses one) to the console's 8 MiB.
 #include <array>
 #include <cstdint>
 #include <cstdio>
@@ -12,6 +14,10 @@
 #include <vector>
 #include "shader_recompiler/stage.h"
 #include "video_core/shader_environment.h"
+
+namespace VideoCommon {
+extern std::size_t shader_cache_chunk_bytes;
+}
 
 namespace {
 constexpr std::uint32_t kVersion = 7;
@@ -44,7 +50,8 @@ std::string Header() {
 
 int failures = 0;
 void Expect(bool ok, const char* what) {
-    std::printf("%s shader cache: %s\n", ok ? "PASS" : "FAIL", what);
+    std::printf("%s shader cache (read %zu bytes at a time): %s\n", ok ? "PASS" : "FAIL",
+                VideoCommon::shader_cache_chunk_bytes, what);
     if (!ok) ++failures;
 }
 
@@ -77,35 +84,47 @@ Loaded Load(const std::filesystem::path& file, const std::string& content) {
 int main() {
     const auto file = std::filesystem::temp_directory_path() / "eden-shader-cache-check.bin";
     const std::string entry = Entry(), two = Header() + entry + entry;
+    std::string many = Header();
+    for (int i = 0; i < 300; ++i) many += entry;
+    const std::size_t pieces[] = {1, 7, 13, 64, 4096, std::size_t{8} << 20};
+    for (const std::size_t piece : pieces) {
+        VideoCommon::shader_cache_chunk_bytes = piece;
+        Loaded r = Load(file, two);
+        Expect(r.loaded == 2 && r.size == two.size(), "a whole file is read and left as it is");
 
-    Loaded r = Load(file, two);
-    Expect(r.loaded == 2 && r.size == two.size(), "a whole file is read and left as it is");
+        r = Load(file, many);
+        Expect(r.loaded == 300 && r.size == many.size(), "300 entries are all read");
 
-    r = Load(file, two + std::string(4096, '\0'));
-    Expect(r.loaded == 2 && r.size == two.size(), "a zeroed tail is cut off, the entries before it stay");
+        r = Load(file, many + entry.substr(0, entry.size() / 3));
+        Expect(r.loaded == 300 && r.size == many.size(), "300 entries and one cut short: the 300 stay");
 
-    r = Load(file, two + entry.substr(0, entry.size() / 2));
-    Expect(r.loaded == 2 && r.size == two.size(), "an entry cut short is cut off, the entries before it stay");
+        r = Load(file, two + std::string(4096, '\0'));
+        Expect(r.loaded == 2 && r.size == two.size(), "a zeroed tail is cut off, the entries before it stay");
 
-    std::string huge = entry;
-    huge.replace(4, 8, std::string(8, '\x7f'));  // a code size far beyond the file
-    r = Load(file, two + huge);
-    Expect(r.loaded == 2 && r.size == two.size(), "an entry with an impossible size is cut off");
+        r = Load(file, two + entry.substr(0, entry.size() / 2));
+        Expect(r.loaded == 2 && r.size == two.size(), "an entry cut short is cut off, the entries before it stay");
 
-    r = Load(file, two + std::string(2048, '\xa5'));
-    Expect(r.loaded == 2 && r.size == two.size(), "a random tail is cut off");
+        std::string huge = entry;
+        huge.replace(4, 8, std::string(8, '\x7f'));  // a code size far beyond the file
+        r = Load(file, two + huge);
+        Expect(r.loaded == 2 && r.size == two.size(), "an entry with an impossible size is cut off");
 
-    r = Load(file, Header() + std::string(64, '\0'));
-    Expect(r.loaded == 0 && r.size == kHeader, "a file with nothing whole keeps only its header");
+        r = Load(file, two + std::string(2048, '\xa5'));
+        Expect(r.loaded == 2 && r.size == two.size(), "a random tail is cut off");
 
-    r = Load(file, std::string());
-    Expect(r.loaded == 0 && r.size == 0, "an empty file is removed");
+        r = Load(file, Header() + std::string(64, '\0'));
+        Expect(r.loaded == 0 && r.size == kHeader, "a file with nothing whole keeps only its header");
 
-    r = Load(file, std::string(4096, '\0'));
-    Expect(r.loaded == 0 && r.size == 0, "a zeroed file is removed");
+        r = Load(file, std::string());
+        Expect(r.loaded == 0 && r.size == 0, "an empty file is removed");
 
-    r = Load(file, two);
-    Expect(r.loaded == 2 && r.size == two.size(), "and a whole file still reads after all that");
+        r = Load(file, std::string(4096, '\0'));
+        Expect(r.loaded == 0 && r.size == 0, "a zeroed file is removed");
+
+        r = Load(file, two);
+        Expect(r.loaded == 2 && r.size == two.size(), "and a whole file still reads after all that");
+    }
+    VideoCommon::shader_cache_chunk_bytes = std::size_t{8} << 20;
 
     std::filesystem::remove(file);
     return failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE;

@@ -706,6 +706,12 @@ inline void CountJit(std::atomic<unsigned long long>& counter) {
 void ReportSessionMemory(const char* phase, unsigned session);
 // Vulkan frame report, every build: what holds the memory pool now (EDEN_MEMORY).
 void ReportMemory();
+// The heap's line in stderr.log: what it holds, what of that is in use, what it gave back.
+void ReportHeap(const char* why);
+// Gives the heap's empty pieces back to the pool (headless/heap_arenas.inc eden_heap_trim) and says
+// so in stderr.log when it gave any; returns the bytes given back. At the end of a shader cache
+// build and of a session, while the pool is short, and before an allocation is refused.
+std::size_t TrimHeap(const char* why);
 // GPU thread only (Vulkan frame report): cumulative GPU-thread idle/dispatch/wait
 // totals with the owner's CPU clock, then a guest-core CPU snapshot.
 void ReportGpuThread(unsigned frame);

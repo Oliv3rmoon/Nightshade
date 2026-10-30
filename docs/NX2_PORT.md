@@ -84,6 +84,7 @@ Adapted to eden-nx2's code (same effect as before):
 | `loader.cpp`, `registered_cache.cpp` | upstream #4552: Eden reads block NCZs, names `.nsz`/`.xcz` as types, rejects solid NCZs | names stay NSP/XCI, `.xcz` updates go to `ProcessXCI` as before, solid NCZs are not rejected (Nightshade reads them, `headless/ncz.h`); Eden's block reader stays behind ours |
 | `cpu_features.cpp` TSC | nx2 measures the TSC when the frequency is 0 | one fallback, Nightshade's rule (below 1 GHz) |
 | `gpu_thread.cpp` shutdown | nx2 stops the split GPU thread after the worker | the PS5 worker's `Stop()` does the same |
+| `vk_pipeline_cache.cpp` `CurrentGraphicsPipelineSlowPath` | nx2 reports each new pipeline key (`ReportNewPipelineKey`, `EDEN_NX2_PIPELINE_DIFF`) before building it | v1.010.006's take from the shader cache's load (1.012.001) goes after the report and before the GPU thread's own build |
 
 Dropped, because upstream now does it:
 
@@ -255,3 +256,17 @@ Nobody here has a Switch 2 dump or keys; the first console runs are the testers'
   service are unchanged but for headers). The memory layout is set once the mods are known
   (v1.010.005): a Switch 2 title gets the 12 GiB layout there, and the TOTK 4 GiB guard is asked
   about Switch 1 titles only (`check-performance-settings.py`).
+- 2026-10-30: v1.010.006 (`release/1.011.002`) merged into `release/1.012.001` (v1.012.001). Its
+  Eden edits are all in `prepare-vulkan-port.py` and `headless/CMakeLists.txt`; one anchor moved:
+  the GPU thread's take from the shader cache's load in `CurrentGraphicsPipelineSlowPath`, where
+  eden-nx2 reports each new key first (table above). eden-nx2's `LoadDiskResources`, the builders'
+  `CreateGraphicsPipeline`/`CreateComputePipeline`, the pipelines' constructors, `LoadPipelines`
+  and the ASTC recompression in `util.cpp` are Eden's as they were (eden-nx2 picks BC1 for opaque
+  ASTC through the same `bpp_div` the layer loop uses). Checked as for the pin move: the merged
+  script run on the patched eden-nx2 tree, and every derived file's additions compared with what
+  v1.010.006 added on `67bada77`: the same in all 32 files. The build while the game plays stays on
+  for Switch 2 titles: the builders touch none of the GPU thread's caches, the loader is locked,
+  only the thread that owns the rasterizer (the split's back thread) takes from it, the builders
+  read no Switch 2 process-wide state (cached native programs are already lowered), and the load
+  ends in `~PipelineCache`, after `GpuSplit::Stop` and before `Nx2::ResetForSession`. Not measured:
+  the builders share the secondary CPUs with `GPUBack` while the game plays.
