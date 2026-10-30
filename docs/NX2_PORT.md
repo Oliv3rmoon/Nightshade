@@ -98,39 +98,46 @@ Added for nx2 on the PS5:
 
 ## Switch 2 titles on the PS5
 
-- **Format.** nx2 boots a Switch 2 title as a loose ExeFS (`exefs/main`, `main.npdm`, `rtld`,
+What the host does for them (docs/SETTINGS.md has the player's side):
+
+- **Format.** eden-nx2 boots a Switch 2 title as a loose ExeFS (`exefs/main`, `main.npdm`, `rtld`,
   `sdk`, `subsdk*`) with its RomFS in a sibling `romfs/` folder; it has no Switch 2 NSP/XCI
-  support. Nightshade lists such a folder in the games folder as a game.
-- **Detection.** A Switch 2 program has the Switch 2 ACID layout in `main.npdm` (nx2's
-  `ProgramMetadata::IsSwitch2`); its program id starts with `04`.
-- **Defaults nx2 already applies to Switch 2 programs**: 12 GiB memory layout, auto-stubbed
-  unknown services, buffer downloads off, the split GPU thread (`EDEN_NX2_SPLIT=2`), Switch 2
-  collector sizes.
-- **PS5 defaults on top** (see risks): the Turing macro JIT off (the console refuses executable
-  memory outside the JIT's aliased mapping, as for Eden's Maxwell macro JIT), transcode threads
-  sized for the console.
-- **Keys and firmware**: as for Switch 1, the user's own `prod.keys` and firmware. A loose ExeFS
-  is already decrypted, so it needs no title keys.
-
-## PS5 risks
-
-- **Memory.** The 12 GiB layout plus nx2's 8 GiB for the graphics server's GPU-only regions is
-  20 GiB of guest DRAM. The PS5's pool is ~12.4 GiB for everything. It only works because guest
-  RAM is backed where the guest writes (`src/guest_memory_service.inc`), and only while a title
-  touches less than what is left after the GPU caches, the JIT and the host heap. Title 1 (Mario
-  Kart World) asks gpu 214 for two 5.7 GiB regions.
-- **CPU.** Switch 2 titles run 6 guest cores (nx2 folds 4/5 onto 0/1 by default), the split GPU
-  thread needs two host threads, and the console's Zen 2 at 3.5 GHz is slower than the PCs nx2 was
-  measured on. Expect CPU-bound frame rates, like the demo.
-- **Executable memory.** nx2's Turing MME JIT allocates with plain Xbyak (mprotect RX), which the
-  console refuses: off on the PS5 (interpreter with the call memo).
-- **RADV features.** Shaders are SM86 SASS lowered to Maxwell and compiled by Eden's SPIR-V
-  backend, so the features are the ones Switch 1 games use. New: sparse residency images for
-  "unbacked" huge textures (2^28+ texels), the `bc_encoder.comp` compute pass (ASTC to BC1/BC3),
-  64 MiB VMA blocks. Task/mesh programs are rejected by nx2 itself.
-- **Driver budget.** nx2 allocates images past the Vulkan budget when the budget refuses; on the
-  console the budget is not the pool's real state, which Nightshade already handles by asking again
-  outside it.
+  support. In Nightshade such a game is a game folder in `roms/` holding `exefs/` (with `main` and
+  `main.npdm`) and `romfs/`, and goes by the path of its main, `<folder>/exefs/main`
+  (`headless/game_files.h`; `ValidRomPath` accepts it, so recent games, the last game and
+  forwarders keep it). The Library lists it (`eden_services.cpp` `GameFiles`, `CountGames`), names
+  it by its folder or by a `control.nacp` beside `exefs/`, and sizes it by its folder. The
+  update/DLC scan skips such folders and every `exefs/`/`romfs/` folder (thousands of files).
+  A Switch 1 game dumped the same way plays too (format "ExeFS").
+- **Title ID and detection.** The program ID in `main.npdm` (`eden_game_title_id`); a Switch 2
+  title is one whose npdm has the Switch 2 ACID layout (`eden_game_is_switch2`, eden-nx2's
+  `ProgramMetadata::IsSwitch2`). Settings per game, saves and mods go by that ID as for any game.
+- **Keys and firmware**: as for Switch 1, the user's own `prod.keys` and firmware (the launcher asks
+  for them before any game). A loose ExeFS is already decrypted, so it needs no title keys.
+- **Launcher.** The Library's details say **Switch 2: experimental** (a warning chip) and "Expect
+  crashes, missing graphics and low frame rates." (a warning line); the format reads "Switch 2".
+  Both texts are in all 30 catalogs.
+- **eden-nx2's own defaults, applied by eden-nx2 itself to Switch 2 programs**: 12 GiB memory layout
+  plus 8 GiB for the graphics server, auto-stubbed unknown service commands, buffer downloads off,
+  Switch 2 collector sizes, six emulated cores.
+- **eden-nx2's run settings, applied by `main.cpp` for a Switch 2 session** (eden-cli reads them from
+  its config file on a PC): GPU accuracy Low, reactive flushing off, ASTC decoded on the GPU
+  (`bc_encoder.comp` keeps it as BC1/BC3 when textures are compressed), the split GPU thread, and the
+  12 GiB layout named in the launch report. `"switch2"` in the settings file (global and per game)
+  changes `gpu_split`, `exact_gpu` and `reactive_flushing` (`settings_store.h` `Switch2Settings`).
+- **PS5 choices on top**: the Turing macro JIT off (`EDEN_NX2_MME_JIT=0` at start, see risks); the
+  transcode thread count stays Eden's (half the hardware threads) for Switch 1 games; per-core idle
+  polling covers six cores (`performance.h kGuestCores`; a core without its own poll polled the
+  longest every time); the split GPU thread's mode is read once per session, not once per run.
+- **One process, many sessions.** eden-nx2 keeps Switch 2 GPU state process-wide (`g_nx2_driver`,
+  `g_nx2_ampere`, `Nx2GpuMemoryRegistry`, semaphore regions and waiters). A PC runs one game per
+  process; this app goes back to the launcher. `headless/nx2_session.h` puts that state back
+  before every session, so a Switch 1 game after a Switch 2 one does not run as Ampere.
+- **Switch 1 unchanged where eden-nx2 changed it for everyone** (patch 12): same-value register
+  write dropping and deferred inline-upload invalidation, both measured only with Switch 2 titles,
+  apply only once a Switch 2 driver is seen (`Tegra::g_nx2_ampere`). Kept for everyone (they are
+  fixes or keep order): the fence manager's own lock and batched release, the device memory
+  translation cache per thread, the spin-then-wait kernel lock (with the console's spin count).
 
 ## Progress log
 

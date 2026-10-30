@@ -48,6 +48,8 @@ constexpr Sample kSamples[] = {
     {"Neon Drifters", "NSP", "5.2 GB", "1.0.3", 0, "English (US)", "", 0x10002b, 0x7b2cbf, 0x5ef2ff},
     {"Caf\xC3\xA9 Nocturne", "NSP", "2.7 GB", "", 0, "French", "", 0x2b1d0e, 0xa9713c, 0xf6e7cb},
     {"Sky Shepherds", "XCI", "4.4 GB", "", 3, "English (US)", "", 0x457b9d, 0xa8dadc, 0xf1faee, true},
+    // A Switch 2 title held as its ExeFS and RomFS folders (game_files.h), with no cover of its own.
+    {"Lumen Drift", "Switch 2", "11.6 GB", "", 0, "English (US)", "", 0x0b132b, 0x3a506b, 0x5bc0be},
 };
 
 void put_pixel(std::vector<std::uint8_t> &pixels, int size, int x, int y, float r, float g, float b)
@@ -161,6 +163,12 @@ FakeServices::FakeServices(const std::string &covers_directory)
         game.file = std::string(sample.name) + " [" + id + "]." +
                     (std::string(sample.format) == "NSP" ? "nsp" : "xci");
         game.title_id = 0x0100A00000001000ull + static_cast<std::uint64_t>(index) * 0x10000;
+        if (std::string(sample.format) == "Switch 2")
+        {
+            game.switch2 = true;
+            game.file = std::string(sample.name) + "/exefs/main";
+            game.title_id = 0x0400A00000001000ull;
+        }
         if (sample.update[0] != 0)
         {
             game.addons = fill(tr("Update {0}"), {sample.update});

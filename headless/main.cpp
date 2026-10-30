@@ -55,6 +55,7 @@
 #include "game_files.h"
 #include "ncz_vfs.h"
 #include "streamed_game.h"
+#include "nx2_session.h"
 #ifdef EDEN_PS5_OPENGL
 #include "graphics.h"
 #include "video_core/renderer_base.h"
@@ -300,6 +301,11 @@ int main(int argc, char** argv) {
         SCOPE_EXIT { if (report != stdout) std::fclose(report); };
         std::setvbuf(report, nullptr, _IONBF, 0);
 #ifdef PS5_NATIVE
+        // eden-nx2's compiler for Switch 2 titles' macros writes x86-64 code into memory it makes
+        // executable with mprotect, which the console refuses, as for Eden's own macro compiler
+        // (headless/macro_recovery.cmake): those macros run through its interpreter and its call
+        // memo. Read once, when the first Switch 2 macro runs.
+        setenv("EDEN_NX2_MME_JIT", "0", 0);
         Eden::BootTrace::Begin(Eden::kAppVersion, __DATE__ " " __TIME__);
         // The PS5 keyboard's module, for a game's text entry: asked for before anything else
         // changes what the app may load (system_keyboard.h).
@@ -729,8 +735,12 @@ int main(int argc, char** argv) {
         // The audio and the renderer read this game's own settings (Library > Game settings).
 #ifdef PS5_NATIVE
         const uint64_t game_title = game ? eden_game_title_id(guest) : 0;
+        // A Switch 2 title (a game folder's ExeFS with the Switch 2 npdm, game_files.h): played by
+        // eden-nx2's experimental support, with its own defaults below (docs/NX2_PORT.md).
+        [[maybe_unused]] const bool switch2 = game && eden_game_is_switch2(guest) != 0;
 #else
         const uint64_t game_title = 0;
+        [[maybe_unused]] const bool switch2 = false;
 #endif
         Eden::session_title.store(game_title);
         // The loading screen shows the game's cover: the one the launcher keeps of it, found by
@@ -754,6 +764,7 @@ int main(int argc, char** argv) {
 #else
         const char* guest = argc >= 2 ? argv[1] : nullptr;
         const uint64_t game_title = 0;  // the host build has no game's own settings
+        [[maybe_unused]] const bool switch2 = false;
         unsigned cycles = 1;
         bool devices = false;
         bool game = false;
@@ -1392,6 +1403,34 @@ int main(int argc, char** argv) {
             // Which ones the session has, in stderr.log: the Vulkan renderer's alone.
             std::fprintf(stderr, "%s renderer=%s\n", Eden::GpuDebugLine(gpu_debug).c_str(),
                          Eden::BackendName(backend));
+            // A Switch 2 title (experimental, docs/NX2_PORT.md) starts with eden-nx2's own choices,
+            // which its "switch2" settings change (settings_store.h): the 12 GiB memory layout its
+            // heap is sized from (backed where it is written: src/guest_memory_service.inc), Eden's
+            // lowest GPU accuracy (the split GPU thread needs it), no reactive flushing, ASTC
+            // decoded on the GPU (and kept as BC1/BC3 when textures are compressed), and the split
+            // GPU thread. The Performance settings above do not change these.
+            if (switch2) {
+                const Eden::Switch2Settings nx2 = Eden::LoadSwitch2(game_title);
+                Settings::values.memory_layout_mode = Settings::MemoryLayout::Memory_12Gb;
+                const auto accuracy = nx2.exact_gpu ? Settings::GpuAccuracy::High : Settings::GpuAccuracy::Low;
+                Settings::values.gpu_accuracy.SetValue(accuracy);
+                Settings::values.current_gpu_accuracy = accuracy;
+                Settings::values.use_reactive_flushing.SetValue(nx2.reactive_flushing);
+                if (backend == Eden::GraphicsBackend::Vulkan)
+                    Settings::values.accelerate_astc.SetValue(Settings::AstcDecodeMode::Gpu);
+                // Read by eden-nx2's split GPU thread when the session's GPU thread starts.
+                setenv("EDEN_NX2_SPLIT", nx2.gpu_split ? "2" : "0", 1);
+                Eden::Report("launch",
+                             (std::string("Switch 2 title (experimental): 12 GiB memory layout and 8 GiB for "
+                                          "its graphics server, backed where written; GPU accuracy ") +
+                              (nx2.exact_gpu ? "exact" : "lowest") + ", reactive flushing " +
+                              (nx2.reactive_flushing ? "on" : "off") + ", ASTC decoded on the " +
+                              (backend == Eden::GraphicsBackend::Vulkan ? "GPU" : "CPU") + ", split GPU thread " +
+                              (nx2.gpu_split && !nx2.exact_gpu && backend == Eden::GraphicsBackend::Vulkan ? "on" : "off"))
+                                 .c_str());
+            } else {
+                setenv("EDEN_NX2_SPLIT", "0", 1);
+            }
             // The report reads the values back: what the emulator has, whoever set it.
             const auto on = [](bool value) { return value ? "on" : "off"; };
             Eden::Report("launch", (std::string("Performance: block list ") + on(Eden::JitList::enabled) +
@@ -1705,6 +1744,8 @@ int main(int argc, char** argv) {
                 Eden::Loading::Set(Eden::Loading::Step::game);
                 Eden::BootTrace::Line("loading the game");
                 Core::SystemResultStatus loaded;
+                // eden-nx2's process-wide Switch 2 state from an earlier session (nx2_session.h).
+                Eden::Nx2::ResetForSession();
                 try {
                     loaded = system.Load(window, guest, params);
                 } catch (const std::exception& error) {

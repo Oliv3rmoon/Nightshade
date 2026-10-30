@@ -1053,8 +1053,10 @@ string(REPLACE "${is_interrupted_old}"
 string(REPLACE "${prefetch_old}"
     "            } else {\n                interface->LogBacktrace(process);\n                if (prefetch_abort)\n                    ::Eden::RecordGuestFault(\"guest thread \" + Core::GetThreadName(thread).value_or(\"?\") +\n                                             \" jumped to an unmapped address\");\n            }\n            thread->RequestSuspend(kernel, SuspendType::Debug);"
     physical_core_source "${physical_core_source}")
+# Every emulated core has its own idle poll (performance.h kGuestCores).
+string(APPEND physical_core_source "\nstatic_assert(::Eden::Performance::kGuestCores >= ::Core::Hardware::NUM_CPU_CORES);\n")
 write_derived("${PORT_BUILD_DIR}/physical_core.cpp"
-    "#include \"${EDEN_PORT_DIR}/guest_fault.h\"\n#include \"${EDEN_PORT_DIR}/performance.h\"\n#include \"core/arm/debug.h\"\n${physical_core_source}")
+    "#include \"${EDEN_PORT_DIR}/guest_fault.h\"\n#include \"${EDEN_PORT_DIR}/performance.h\"\n#include \"core/arm/debug.h\"\n#include \"core/hardware_properties.h\"\n${physical_core_source}")
 # The guest's tick counter gives when a frame is a little late (headless/guest_clock.h): its
 # rate is applied where Eden applies its own clock settings, and it follows the frames the
 # game hands in (BufferQueueProducer::QueueBuffer, below).
@@ -2578,6 +2580,16 @@ else()
 endif()
 list(REMOVE_ITEM video_sources video_core.cpp gpu.cpp)
 list(APPEND video_sources "${PORT_BUILD_DIR}/video_core.cpp")
+# Texture transcoding threads (ASTC decoded on the CPU, astc_policy.h): eden-nx2 takes a quarter of
+# the hardware threads instead of half, measured on an 8-core PC with Switch 2 titles. On the
+# console the count stays what Switch 1 games were measured with; dev-settings
+# env=EDEN_NX2_TRANSCODE_THREADS=<n> sets another (read once, when the first game starts).
+file(READ "${PROJECT_SOURCE_DIR}/src/video_core/textures/workers.cpp" transcode_workers_source)
+eden_patch(transcode_workers_source "        return (std::max)(std::thread::hardware_concurrency() / 4, 2U);\n"
+    "        return (std::max)(std::thread::hardware_concurrency(), 2U) / 2;\n")
+write_derived("${PORT_BUILD_DIR}/texture_workers.cpp" "${transcode_workers_source}")
+list(REMOVE_ITEM video_sources textures/workers.cpp)
+list(APPEND video_sources "${PORT_BUILD_DIR}/texture_workers.cpp")
 # A game's own post-processing (headless/reshade_folder.h): its game folder's reshade/ is read
 # before post_presets/ and post_shaders/. Presets: listed first. Effects: listed first, and one of
 # the same name in post_shaders/ is left out; the renderer reads a chain's effect from the game's
@@ -2914,6 +2926,33 @@ if(EDEN_PS5_OPENGL)
                     break;
                 }
             }
+]=])
+        # Whether a session splits is the game's (settings_store.h Switch2Settings, main.cpp sets
+        # EDEN_NX2_SPLIT before it starts): read once per session instead of once per run.
+        eden_patch(gpu_split_source [=[    static const char mode = [] {
+        const char* value = std::getenv("EDEN_NX2_SPLIT");
+        return value != nullptr ? value[0] : '2';
+    }();
+]=] [=[    if (session_split_mode == 0) {
+        const char* value = std::getenv("EDEN_NX2_SPLIT");
+        session_split_mode = value != nullptr && value[0] != 0 ? value[0] : '2';
+    }
+    const char mode = session_split_mode;
+]=])
+        eden_patch(gpu_split_source [=[GpuSplit GpuSplit::instance;
+]=] [=[GpuSplit GpuSplit::instance;
+
+namespace {
+// EDEN_NX2_SPLIT as this session read it (0: not read yet). The GPU thread reads it; Stop, after
+// that thread has ended, clears it.
+char session_split_mode = 0;
+} // Anonymous namespace
+]=])
+        eden_patch(gpu_split_source [=[void GpuSplit::Stop() {
+    if (!back_thread.joinable()) {
+]=] [=[void GpuSplit::Stop() {
+    session_split_mode = 0;
+    if (!back_thread.joinable()) {
 ]=])
         eden_patch(gpu_split_source [=[    back_thread.join();
     active = false;

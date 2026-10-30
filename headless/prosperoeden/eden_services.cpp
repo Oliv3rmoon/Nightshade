@@ -44,6 +44,7 @@
 #include <filesystem>
 #include <initializer_list>
 #include <map>
+#include <mutex>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -170,8 +171,23 @@ int CountFiles(const std::string& directory, std::initializer_list<const char*> 
     return ok ? count : -1;
 }
 
+// A game folder's ExeFS main ("<folder>/exefs/main" in roms/, game_files.h): a Switch 2 title held as
+// its ExeFS and RomFS folders. Empty when the folder has no ExeFS with a main and a main.npdm.
+std::string ExeFsMainOf(const std::string& roms, const std::string& folder) {
+    bool listed = false;
+    for (const std::string& part : ListEntries(JoinPath(roms, folder), true, listed)) {
+        std::string lower = part;
+        for (char& c : lower) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        if (lower != "exefs") continue;
+        const std::string exefs = JoinPath(JoinPath(roms, folder), part);
+        if (IsFile(exefs + "/main") && IsFile(exefs + "/main.npdm")) return folder + "/" + part + "/main";
+    }
+    return {};
+}
+
 // The games in a roms folder: its game files (game_files.h), and its game folders (one level down, issue
-// 168) that hold one, each one game with its update and DLC beside it; -1 when it cannot be read. Counting the files in roms/ alone, a game files folder
+// 168) that hold one, each one game with its update and DLC beside it, or that hold a game as its
+// ExeFS and RomFS; -1 when it cannot be read. Counting the files in roms/ alone, a game files folder
 // whose games were all in game folders read "0 games" in Settings > Game files.
 int CountGames(const std::string& roms) {
     const auto rom = [](const std::string& name) { return Eden::IsGameFile(name); };
@@ -187,14 +203,16 @@ int CountGames(const std::string& roms) {
         const auto files = ListEntries(JoinPath(roms, folder), false, read);
         count += std::any_of(files.begin(), files.end(), [&](const std::string& name) {
             return rom(name) && Eden::ValidRomPath(folder + "/" + name);
-        });
+        }) || Eden::ValidRomPath(ExeFsMainOf(roms, folder));
     }
     return count;
 }
 
 // A title from the file's name: without its extension and the tags dumps carry
-// ("Name [0100...][v0]", "Name (USA)").
+// ("Name [0100...][v0]", "Name (USA)"). A game folder's ExeFS main goes by its folder's name.
 std::string CleanTitle(const std::string& filename) {
+    if (Eden::IsExeFsMain(filename))
+        return CleanTitle(std::filesystem::path(std::string{Eden::ExeFsGameFolder(filename)}).filename().string() + ".nsp");
     std::string title = std::filesystem::path(filename).stem().string();
     if (title.rfind("[Game] ", 0) == 0) title.erase(0, 7);
     if (const auto tag = title.find_first_of("[("); tag != std::string::npos && tag > 0) title.erase(tag);
@@ -277,6 +295,32 @@ std::map<std::string, std::string> SourceNames() {
     return names;
 }
 
+// The bytes of the files in a folder and its folders (a game held as its ExeFS and RomFS), counted
+// once per folder and kept while the folder's own entries stay as they were.
+std::uint64_t FolderBytes(const std::string& folder) {
+    static std::mutex counted_lock;
+    static std::map<std::string, std::pair<time_t, std::uint64_t>> counted;
+    const std::lock_guard lock(counted_lock);
+    struct stat info {};
+    if (stat(folder.c_str(), &info) != 0) return 0;
+    if (const auto found = counted.find(folder); found != counted.end() && found->second.first == info.st_mtime)
+        return found->second.second;
+    std::uint64_t bytes = 0;
+    std::vector<std::string> pending{folder};
+    for (std::size_t visited = 0; !pending.empty() && visited < 200000; ++visited) {
+        const std::string current = std::move(pending.back());
+        pending.pop_back();
+        bool ok = false;
+        for (const std::string& name : ListEntries(current, false, ok)) {
+            struct stat file {};
+            if (stat(JoinPath(current, name).c_str(), &file) == 0) bytes += static_cast<std::uint64_t>(file.st_size);
+        }
+        for (const std::string& name : ListEntries(current, true, ok)) pending.push_back(JoinPath(current, name));
+    }
+    counted[folder] = {info.st_mtime, bytes};
+    return bytes;
+}
+
 // "6.4 GB", "512.0 MB".
 std::string SizeLabel(double bytes) {
     char size[32];
@@ -319,9 +363,10 @@ bool AddOnInGameFolder(const std::string& path) {
 }
 
 // The games in roms/, by their paths in it: its NSP, XCI, NSZ and XCZ files, and those in its game
-// folders (one level down, issue 168) that hold a game and not its update or DLC. Directly in
-// roms/, a file whose name says an update or DLC (loose_addons.h) and that holds one is its game's,
-// not a game. Called with the metadata reader held.
+// folders (one level down, issue 168) that hold a game and not its update or DLC, and the ExeFS main
+// of a game folder that holds its game so (a Switch 2 title). Directly in roms/, a file whose name
+// says an update or DLC (loose_addons.h) and that holds one is its game's, not a game. Called with
+// the metadata reader held.
 std::vector<std::string> GameFiles() {
     const auto rom = [](const std::string& name) { return Eden::IsGameFile(name); };
     const std::string roms = Eden::GamesPath("roms");
@@ -339,6 +384,7 @@ std::vector<std::string> GameFiles() {
             if (rom(name) && Eden::ValidRomPath(file) && !AddOnInGameFolder(JoinPath(roms, file)))
                 files.push_back(file);
         }
+        if (const std::string main = ExeFsMainOf(roms, folder); Eden::ValidRomPath(main)) files.push_back(main);
     }
     return files;
 }
@@ -801,10 +847,17 @@ std::vector<pe::ui::Game> EdenServices::games() {
         struct stat info {};
         if (stat(path.c_str(), &info) != 0 || !S_ISREG(info.st_mode)) continue;
         pe::ui::Game game;
-        game.name = CleanTitle(std::filesystem::path(file).filename().string());
+        game.name = CleanTitle(Eden::IsExeFsMain(file) ? file : std::filesystem::path(file).filename().string());
         game.format = format;
         game.size = SizeLabel(static_cast<double>(info.st_size));
         game.file = file;
+        // A game folder's ExeFS and RomFS: a Switch 2 title (experimental), or a Switch game
+        // dumped so. Its size is its folder's.
+        if (Eden::IsExeFsMain(file)) {
+            game.switch2 = eden_game_is_switch2(path.c_str()) != 0;
+            game.format = game.switch2 ? "Switch 2" : "ExeFS";
+            game.size = SizeLabel(static_cast<double>(FolderBytes(GameFolderOf(file))));
+        }
         // A game whose data cannot be read is still listed, by its file name.
         try {
             char title[513]{};

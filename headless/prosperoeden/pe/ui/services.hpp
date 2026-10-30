@@ -173,11 +173,14 @@ struct BackupStatus
 struct Game
 {
     std::string name;
-    std::string format; // "NSP" or "XCI"
+    std::string format; // "NSP" or "XCI"; "Switch 2" (or "ExeFS") for a game folder's ExeFS
     std::string size;   // "1.2 GB"
     std::string file;   // its name in the games folder
     std::string cover;  // image path; empty without cover art
     std::uint64_t title_id = 0;
+    // A Switch 2 title (a game folder's ExeFS whose main.npdm has the Switch 2 layout): played by
+    // eden-nx2's experimental support, which the Library says (docs/NX2_PORT.md).
+    bool switch2 = false;
     std::string addons;        // "Update 1.2.0, 2 DLC"; empty without either
     std::string addons_short;  // the same where there is little room: "v1.2.0, 2 DLC"
     std::string language;      // the language the game will use

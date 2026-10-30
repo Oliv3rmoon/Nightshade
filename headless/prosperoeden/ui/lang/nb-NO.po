@@ -278,6 +278,16 @@ msgstr "Juksekoder"
 msgid "Cheats folder"
 msgstr "Mappe for juksekoder"
 
+#. Warning in a Switch 2 game's details: what experimental support means for playing it.
+#: pe/ui/library.cpp
+msgid "Expect crashes, missing graphics and low frame rates."
+msgstr "Regn med krasj, manglende grafikk og lav bildefrekvens."
+
+#. Tag in a game's details: the game is a Nintendo Switch 2 title, played by experimental support. Switch 2 is a product name and stays as it is.
+#: pe/ui/library.cpp
+msgid "Switch 2: experimental"
+msgstr "Switch 2: eksperimentell"
+
 #. Names the mod made of the files put straight into a game's mods folder, without a folder of their own.
 #: pe/ui/library.cpp
 msgid "Unnamed mod"

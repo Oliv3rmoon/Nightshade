@@ -552,7 +552,10 @@ inline std::array<std::atomic<unsigned long long>, 20> render_conditions{};
 struct IdleCounters {
     std::atomic<unsigned long long> calls{0}, nanoseconds{0}, sleeps{0}, spin_ns{0};
 };
-inline std::array<IdleCounters, 4> guest_idle{};
+// Emulated cores: six since eden-nx2 (Switch 2 titles use all six; Switch 1 titles leave 4 and 5
+// idle). Each has its own idle poll: a core without one would poll the longest every time.
+inline constexpr std::size_t kGuestCores = 6;
+inline std::array<IdleCounters, kGuestCores> guest_idle{};
 // The longest a guest core polls its interrupt flag before sleeping. Guest job systems hand work
 // between cores thousands of times a second, and sleeping on a handoff puts the host's thread
 // wake-up latency on the critical path: a 100 us poll took a racing game's heavy phase from ~55 to
@@ -579,10 +582,10 @@ inline std::atomic<bool> idle_poll_adaptive{true};
 inline constexpr unsigned kIdleLongRun = 32;
 // Per guest core, read and written only by that core's host thread: its poll now, its poll before
 // it last shrank, and how many waits in a row have outlasted the longest poll.
-inline std::array<std::atomic<long long>, 4> idle_poll_ns{}, idle_poll_kept_ns{};
-inline std::array<std::atomic<unsigned>, 4> idle_long_run{};
+inline std::array<std::atomic<long long>, kGuestCores> idle_poll_ns{}, idle_poll_kept_ns{};
+inline std::array<std::atomic<unsigned>, kGuestCores> idle_long_run{};
 // When an interrupt last raised each core's flag (under the core's lock, PhysicalCore::Interrupt).
-inline std::array<std::atomic<long long>, 4> idle_raised_ns{};
+inline std::array<std::atomic<long long>, kGuestCores> idle_raised_ns{};
 inline void NoteInterrupt(std::size_t core) {
     if (core < idle_raised_ns.size()) idle_raised_ns[core].store(NowNs(), std::memory_order_relaxed);
 }

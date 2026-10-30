@@ -718,10 +718,19 @@ void Launcher::draw_library(Canvas &c)
         }
         else
         {
+            // A Switch 2 title is played by experimental support (docs/NX2_PORT.md): said first.
+            if (game->switch2)
+                add(tr("Switch 2: experimental"), Tone::warning);
             add(game->addons_short.empty() ? game->addons : game->addons_short, Tone::plain);
             add(game->language, game->language_note.empty() ? Tone::plain : Tone::warning);
         }
         y += 56.0f;
+        if (!remote && game->switch2)
+        {
+            notice(c, tr("Expect crashes, missing graphics and low frame rates."), x, baseline(y, 26.0f, 18.0f),
+                   18.0f, t.warning, width, true);
+            y += 30.0f;
+        }
         if (!remote && !game->language_note.empty())
         {
             notice(c, game->language_note, x, baseline(y, 26.0f, 18.0f), 18.0f, t.warning, width, false);
