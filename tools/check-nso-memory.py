@@ -1,7 +1,9 @@
 from pathlib import Path
-import subprocess,tempfile
+import subprocess,sys,tempfile
 r=Path(__file__).resolve().parents[1]
 c=Path((r/'.local/headless-cache').read_text().strip())
+sys.path.insert(0,str(r/'tools'))
+import nso_files  # ZBIC frames made by the zbic package's encoder (tools/nso_files.py)
 t=(c/'native-local/headless/nso.cpp').read_text()
 body=t[t.index('    const size_t module_start'):t.index('    // Apply patches if necessary')]
 zero=t[t.index('    // Initialize BSS and page padding directly'):t.index('    // Load codeset for current process')]
@@ -25,8 +27,8 @@ namespace Settings { struct Arg {std::string value; const std::string& GetValue(
 struct PatchManager { bool patched{}; bool HasNSOPatch(int,const std::string&)const{return patched;} };
 struct Memory {size_t address{},length{};bool fail{};bool ZeroBlock(size_t a,size_t n){address=a;length=n;return !fail;}} memory;
 struct Process {Memory& GetMemory(){return memory;}} process;
-// No ZBIC encoder here: a segment that does not decode must end the load.
-namespace Common::Compression {int DecompressDataZBIC(std::span<u8>,std::span<const u8>){return 0;}}
+// Eden's own ZBIC decoder (src/common/zbic_compression.cpp, compiled beside this).
+namespace Common::Compression {int DecompressDataZBIC(std::span<u8>,std::span<const u8>);}
 namespace Common::Compression {int DecompressDataLZ4(u8* d,size_t n,const u8*s,size_t m){return LZ4_decompress_safe((const char*)s,(char*)d,m,n);}}
 int constructions=0;
 namespace Kernel {struct CodeSet { struct Segment {size_t addr{},offset{};u32 size{};}; std::vector<u8>memory;std::array<Segment,3>segments; CodeSet(){++constructions;} Segment&DataSegment(){return segments[2];}};}
@@ -60,7 +62,20 @@ int main(){
  assert(load(h,f,true)==size && image==reference);
  f.short_read=true;assert(!load(h,f,true));f.short_read=false;
  h.segments_compressed_size[0]=1;assert(!load(h,f,true));
- h.segments_compressed_size[0]=n;h.zbic=true;assert(!load(h,f,true));h.zbic=false;
+ h.segments_compressed_size[0]=n;h.zbic=true;assert(!load(h,f,true)); // LZ4 bytes are no ZBIC frame
+ // ZBIC (NSO flag bit 7): the frame decodes where the segment belongs, the same image as raw or LZ4.
+ h.segments[0].offset=f.bytes.size();h.segments_compressed_size[0]=zbic_text.size();
+ f.bytes.insert(f.bytes.end(),zbic_text.begin(),zbic_text.end());
+ assert(load(h,f,true)==size && image==reference);
+ // A frame that decodes to fewer bytes than the segment ends the load: the rest of the segment
+ // would have been whatever the image held.
+ h.segments[0].offset=f.bytes.size();h.segments_compressed_size[0]=zbic_short.size();
+ f.bytes.insert(f.bytes.end(),zbic_short.begin(),zbic_short.end());
+ assert(!load(h,f,true));
+ // A damaged frame does too.
+ h.segments[0].offset=f.bytes.size();h.segments_compressed_size[0]=zbic_text.size();
+ f.bytes.insert(f.bytes.end(),zbic_text.begin(),zbic_text.end());f.bytes[h.segments[0].offset+5]^=0xff;
+ assert(!load(h,f,true));h.zbic=false;
  h.flags=0;h.segments[0].offset=0;h.segments_compressed_size[0]=4;
  h.segments[2].bss_size=1800u*1024*1024;int before=constructions;
  assert(load(h,f,false) && constructions==before); // No large allocation for layout.
@@ -84,7 +99,16 @@ int main(){
 }
 '''
 with tempfile.TemporaryDirectory() as tmp:
- p=Path(tmp);(p/'test.cpp').write_text(code)
- subprocess.run(['g++','-std=c++20','-fsanitize=address,undefined','-g',str(p/'test.cpp'),'-I'+str(c/'source/.cache/cpm/lz4/ebb370ca83/lib'),str(c/'source/.cache/cpm/lz4/ebb370ca83/lib/lz4.c'),'-o',str(p/'test')],check=True)
+ p=Path(tmp)
+ # The text segment of the cases above (4 bytes) as a ZBIC frame, and a frame of its first 3 bytes.
+ codecs=nso_files.build_codecs(c/'source',p/'codecs',('zbic',))
+ frames={name:nso_files.compress(codecs['zbic'],data,p) for name,data in (('zbic_text',bytes([1,2,3,4])),('zbic_short',bytes([1,2,3])))}
+ assert all(frame[:4]==nso_files.ZBIC_MAGIC for frame in frames.values())
+ arrays=''.join('const std::vector<u8> %s{%s};\n'%(name,','.join(map(str,frame))) for name,frame in frames.items())
+ (p/'test.cpp').write_text(code.replace('int constructions=0;',arrays+'int constructions=0;'))
+ eden=c/'source'
+ # Eden's decoder as the build compiles it (the zbic package's zstd.c included in it), without the sanitizers.
+ subprocess.run(['g++','-std=c++20','-O1','-w','-c','-I'+str(eden/'src'),'-I'+str(nso_files.zbic_source(eden)),str(eden/'src/common/zbic_compression.cpp'),'-o',str(p/'zbic.o')],check=True)
+ subprocess.run(['g++','-std=c++20','-fsanitize=address,undefined','-g',str(p/'test.cpp'),str(p/'zbic.o'),'-I'+str(c/'source/.cache/cpm/lz4/ebb370ca83/lib'),str(c/'source/.cache/cpm/lz4/ebb370ca83/lib/lz4.c'),'-o',str(p/'test'),'-lpthread'],check=True)
  subprocess.run([str(p/'test')],check=True,timeout=20)
-print('Actual NSO loader: bounded staging, repeated huge BSS, direct zero/failure, patch/dump compatibility, compressed/raw bytes, args, invalid input PASS')
+print('Actual NSO loader: bounded staging, repeated huge BSS, direct zero/failure, patch/dump compatibility, compressed/raw bytes (LZ4 and ZBIC; a short or damaged ZBIC frame ends the load), args, invalid input PASS')

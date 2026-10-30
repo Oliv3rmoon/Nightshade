@@ -2479,6 +2479,11 @@ msgstr "Dein nächstes Abenteuer"
 msgid "Your save data is checked against the server's."
 msgstr "Deine Speicherdaten werden mit denen auf dem Server verglichen."
 
+#. Library: a file's format, such as NSO or NCA, for a program file that runs only with what it needs beside it (for experienced users). {0} stays as it is.
+#: eden_services.cpp
+msgid "{0} (advanced)"
+msgstr "{0} (erweitert)"
+
 #. How many settings of a kind this game has of its own; {0} is a number.
 #: pe/ui/library.cpp
 msgid "{0} changed"

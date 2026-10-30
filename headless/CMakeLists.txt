@@ -1424,10 +1424,42 @@ else()
 endif()
 string(REPLACE "${aslr_old}" "((::Eden::code_seed.load() >= 0 ? static_cast<u64>(::Eden::code_seed.load())\n        : Common::Random::Random64(0)) ${aslr_steps};"
     aslr_source "${aslr_source}")
+# A program's file system service (fsp-srv SetCurrentProcess, its save data, its RomFS) answers
+# only a process its loader registered. An NCA's loader registers the ExeFS it loads, an NRO's
+# loader its own; an unpacked ExeFS chosen by its main (game_files.h), a lone NSO and a KIP were
+# never registered, so the first file system call of their program failed. Each is now registered
+# as an NRO is (tools/check-direct-formats.py starts one of each).
+set(exefs_lone_old "    if (dir == nullptr) {\n        if (file == nullptr) {\n            return {ResultStatus::ErrorNullFile, {}};\n        }\n")
+set(exefs_register_old "    is_loaded = true;\n    return {ResultStatus::Success,\n            LoadParameters{metadata.GetMainThreadPriority(), metadata.GetMainThreadStackSize()}};")
+foreach(exefs_old IN ITEMS exefs_lone_old exefs_register_old)
+    string(FIND "${aslr_source}" "${${exefs_old}}" exefs_at)
+    if(exefs_at LESS 0)
+        message(FATAL_ERROR "Pinned unpacked ExeFS load changed")
+    endif()
+endforeach()
+string(REPLACE "${exefs_lone_old}"
+    "    // Chosen by its main, not an NCA's ExeFS (whose loader registers the process itself).\n    const bool chosen_by_main = dir == nullptr;\n${exefs_lone_old}"
+    aslr_source "${aslr_source}")
+string(REPLACE "${exefs_register_old}"
+    "    if (chosen_by_main)\n        system.GetFileSystemController().RegisterProcess(\n            process.GetProcessId(), metadata.GetTitleID(),\n            std::make_unique<FileSys::RomFSFactory>(*this, system.GetContentProvider(), system.GetFileSystemController()));\n${exefs_register_old}"
+    aslr_source "${aslr_source}")
 write_derived("${PORT_BUILD_DIR}/deconstructed_rom_directory.cpp"
     "#include \"${EDEN_PORT_DIR}/load_address.h\"\n${aslr_source}")
 list(REMOVE_ITEM core_sources "loader/deconstructed_rom_directory.cpp")
 list(APPEND core_sources "${PORT_BUILD_DIR}/deconstructed_rom_directory.cpp")
+file(READ "${PROJECT_SOURCE_DIR}/src/core/loader/kip.cpp" kip_source)
+set(kip_register_old "    LOG_DEBUG(Loader, \"loaded module {} @ {:#x}\", kip->GetName(), base_address);\n")
+string(FIND "${kip_source}" "${kip_register_old}" kip_register_at)
+if(kip_register_at LESS 0)
+    message(FATAL_ERROR "Pinned KIP load changed")
+endif()
+string(REPLACE "${kip_register_old}"
+    "    system.GetFileSystemController().RegisterProcess(\n        process.GetProcessId(), kip->GetTitleID(),\n        std::make_unique<FileSys::RomFSFactory>(*this, system.GetContentProvider(), system.GetFileSystemController()));\n${kip_register_old}"
+    kip_source "${kip_source}")
+write_derived("${PORT_BUILD_DIR}/kip.cpp"
+    "#include \"core/core.h\"\n#include \"core/file_sys/romfs_factory.h\"\n#include \"core/hle/service/filesystem/filesystem.h\"\n${kip_source}")
+list(REMOVE_ITEM core_sources "loader/kip.cpp")
+list(APPEND core_sources "${PORT_BUILD_DIR}/kip.cpp")
 # GetPseudoDeviceId read the seed through the control data without checking that there is
 # any (a game without control data, such as a homebrew NRO): seed 0 then, as for other
 # NACP fields Eden defaults when the metadata is missing.
@@ -1503,10 +1535,40 @@ string(REPLACE "${game_file_old}" "${game_file_old}${game_file_new}" system_sour
 string(PREPEND system_source "#include \"${EDEN_PORT_DIR}/streamed_game.h\"\n")
 write_derived("${PORT_BUILD_DIR}/core.cpp" "${system_source}")
 get_target_property(core_sources core SOURCES)
+file(READ "${PROJECT_SOURCE_DIR}/src/core/loader/nso.cpp" nso_source)
+# A lone NSO chosen in the Library (game_files.h) is its process's only module. Eden loaded it at
+# the entry point of a process nothing had laid out yet (no LoadFromMetadata, unlike its NRO, KIP
+# and unpacked ExeFS loaders), so it never ran. Its process is laid out first, as an NRO's is: with
+# the default metadata, at a fixed place (tools/check-direct-formats.py boots one).
+set(old_nso_lone "    // Load module\n    const VAddr base_address = GetInteger(process.GetEntryPoint());\n")
+set(new_nso_lone [=[    // A lone NSO: its process is laid out for it first (the layout pass reads no code on the PS5).
+    const auto layout = LoadModule(process, system, *file, 0, true, false);
+    if (!layout || process.LoadFromMetadata(system.Kernel(), FileSys::ProgramMetadata::GetDefault(),
+                                            static_cast<std::size_t>(*layout), 0, 0).IsError()) {
+        return {ResultStatus::ErrorLoadingNSO, {}};
+    }
+
+    // Load module
+    const VAddr base_address = GetInteger(process.GetEntryPoint());
+]=])
+string(FIND "${nso_source}" "${old_nso_lone}" nso_lone_at)
+if(nso_lone_at LESS 0)
+    message(FATAL_ERROR "Pinned lone NSO load changed")
+endif()
+string(REPLACE "${old_nso_lone}" "${new_nso_lone}" nso_source "${nso_source}")
+set(old_nso_register "    modules.insert_or_assign(base_address, file->GetName());\n")
+string(FIND "${nso_source}" "${old_nso_register}" nso_register_at)
+if(nso_register_at LESS 0)
+    message(FATAL_ERROR "Pinned lone NSO load changed")
+endif()
+# Its process is registered with the file system as an NRO's is (see the KIP's, below).
+string(REPLACE "${old_nso_register}"
+    "${old_nso_register}    system.GetFileSystemController().RegisterProcess(\n        process.GetProcessId(), 0,\n        std::make_unique<FileSys::RomFSFactory>(*this, system.GetContentProvider(), system.GetFileSystemController()));\n"
+    nso_source "${nso_source}")
+string(PREPEND nso_source "#include \"core/file_sys/romfs_factory.h\"\n#include \"core/hle/service/filesystem/filesystem.h\"\n")
 # The PS5 heap is bounded: avoid allocating/decompressing an executable merely
 # to calculate its layout, and avoid vector growth duplicating a large BSS image.
 if(PS5_NATIVE)
-    file(READ "${PROJECT_SOURCE_DIR}/src/core/loader/nso.cpp" nso_source)
     set(old_nso_image "    Kernel::CodeSet codeset;\n    codeset.memory.resize(module_start + last_segment_it->location + last_segment_it->size);")
     set(new_nso_image [=[    const u64 initialized_size = module_start + u64(last_segment_it->location) + u64(last_segment_it->size);
     const u64 argument_size = should_pass_arguments && !Settings::values.program_args.GetValue().empty()
@@ -1556,7 +1618,10 @@ if(PS5_NATIVE)
         "            auto* destination = codeset.memory.data() + module_start + nso_header.segments[i].location;\n            if (!nso_header.IsSegmentCompressed(i)) {\n                if (nso_file.Read(destination, nso_header.segments[i].size, nso_header.segments[i].offset) != nso_header.segments[i].size) return std::nullopt;\n            } else if (nso_file.Read(compressed_data.data(), nso_header.segments_compressed_size[i], nso_header.segments[i].offset) != nso_header.segments_compressed_size[i]) return std::nullopt;"
         nso_source "${nso_source}")
     # A segment is decoded where it belongs (read there directly when it is not compressed), and
-    # a segment that does not decode ends the load instead of the app.
+    # a segment that does not decode ends the load instead of the app. A ZBIC segment (zstd with
+    # binary interpolative coded tables, NSO flag bit 7; Switch 22.0.0 and later) must decode to
+    # its whole size, as an LZ4 one must and as the console's loader requires: a short frame left
+    # the rest of the segment as whatever the image held (tools/check-zbic.py).
     set(old_nso_segment [=[            if (nso_header.IsSegmentCompressed(i)) {
                 if (nso_header.IsZBICCompressed()) {
                     // ZBIC compression
@@ -1599,7 +1664,7 @@ if(PS5_NATIVE)
                     const int r = Common::Compression::DecompressDataZBIC(
                         std::span<u8>{destination, nso_header.segments[i].size},
                         std::span<const u8>{compressed_data}.first(nso_header.segments_compressed_size[i]));
-                    if (r <= 0) return std::nullopt;
+                    if (r != int(nso_header.segments[i].size)) return std::nullopt;
                 } else {
                     const int r = Common::Compression::DecompressDataLZ4(destination, nso_header.segments[i].size,
                         compressed_data.data(), nso_header.segments_compressed_size[i]);
@@ -1630,10 +1695,10 @@ if(PS5_NATIVE)
     endif()
     string(REPLACE "${old_nso_cheats}" "${new_nso_cheats}" nso_source "${nso_source}")
     string(PREPEND nso_source "#include <cstdio>\n")
-    write_derived("${PORT_BUILD_DIR}/nso.cpp" "${nso_source}")
-    list(REMOVE_ITEM core_sources loader/nso.cpp)
-    list(APPEND core_sources "${PORT_BUILD_DIR}/nso.cpp")
 endif()
+write_derived("${PORT_BUILD_DIR}/nso.cpp" "${nso_source}")
+list(REMOVE_ITEM core_sources loader/nso.cpp)
+list(APPEND core_sources "${PORT_BUILD_DIR}/nso.cpp")
 list(REMOVE_ITEM core_sources core.cpp)
 list(APPEND core_sources "${PORT_BUILD_DIR}/core.cpp")
 set_property(TARGET core PROPERTY SOURCES "${core_sources}")
@@ -1698,6 +1763,26 @@ eden_patch(loader_source [=[    else if (extension == "xci")
     else if (extension == "nsp" || extension == "nsz")
         return FileType::NSP;
 ]=])
+# An unpacked ExeFS (main, main.npdm and the modules beside them) is chosen by its main
+# (game_files.h). Eden asks a file's contents first, and main is an NSO: the folder's main ran
+# alone, without its main.npdm, rtld, sdk or subsdk. A main whose folder is an ExeFS is that
+# ExeFS, as in yuzu.
+eden_patch(loader_source [=[FileType IdentifyFile(FileSys::VirtualFile file) {
+    if (const auto nsp_type = IdentifyFileLoader<AppLoader_NSP>(file)) {
+]=] [=[FileType IdentifyFile(FileSys::VirtualFile file) {
+    if (file && file->GetName() == "main" && file->GetContainingDirectory())
+        if (const auto romdir_type = IdentifyFileLoader<AppLoader_DeconstructedRomDirectory>(file))
+            return *romdir_type;
+    if (const auto nsp_type = IdentifyFileLoader<AppLoader_NSP>(file)) {
+]=])
+# A NAX that no key reads is still named one by its extension, so its error says why.
+eden_patch(loader_source [=[    else if (extension == "kip")
+        return FileType::KIP;
+]=] [=[    else if (extension == "kip")
+        return FileType::KIP;
+    else if (extension == "nax")
+        return FileType::NAX;
+]=])
 file(READ "${PROJECT_SOURCE_DIR}/src/core/loader/nsp.cpp" nsp_loader_source)
 eden_patch(nsp_loader_source [=[        if (name.size() >= 4 && name.substr(name.size() - 4) == ".nca") {
 ]=] [=[        if (name.size() >= 4 &&
@@ -1750,6 +1835,40 @@ foreach(ncz_patched IN ITEMS "file_sys/submission_package.cpp|nsp_source" "file_
     list(APPEND core_sources "${PORT_BUILD_DIR}/ncz-${ncz_name}.cpp")
 endforeach()
 list(APPEND core_sources "${EDEN_PORT_DIR}/ncz.cpp")
+# A NAX is an NCA as an SD card keeps it, encrypted with keys made from its path on the card,
+# Nintendo/Contents/registered/000000XX/<content ID>.nca. Eden read one only at such a path. One
+# copied off the card keeps its content ID as its name (<ID>.nca, or <ID>.nax), and XX is the
+# first byte of that ID's SHA-256, as Eden's other NAX constructor (by content ID) computes it:
+# such a file is read in roms/ too.
+file(READ "${PROJECT_SOURCE_DIR}/src/core/file_sys/xts_archive.cpp" nax_source)
+eden_patch(nax_source [=[    std::smatch match;
+    if (!std::regex_search(path, match, nax_path_regex)) {
+        status = Loader::ResultStatus::ErrorBadNAXFilePath;
+        return;
+    }
+]=] [=[    std::smatch match;
+    if (!std::regex_search(path, match, nax_path_regex)) {
+        static const std::regex nax_name_regex("([0-9A-F]{32})\\.(nca|nax)",
+                                               std::regex_constants::ECMAScript |
+                                                   std::regex_constants::icase);
+        const std::string name = file->GetName();
+        std::smatch name_match;
+        if (!std::regex_match(name, name_match, nax_name_regex)) {
+            status = Loader::ResultStatus::ErrorBadNAXFilePath;
+            return;
+        }
+        const auto nca_id = Common::HexStringToArray<0x10>(std::string{name_match[1]});
+        Core::Crypto::SHA256Hash hash{};
+        u32 hash_len = 0;
+        EVP_Digest(nca_id.data(), nca_id.size(), hash.data(), &hash_len, EVP_sha256(), nullptr);
+        status = Parse(fmt::format("/registered/000000{:02X}/{}.nca", hash[0],
+                                   Common::HexToString(nca_id, false)));
+        return;
+    }
+]=])
+write_derived("${PORT_BUILD_DIR}/xts_archive.cpp" "${nax_source}")
+list(REMOVE_ITEM core_sources "file_sys/xts_archive.cpp")
+list(APPEND core_sources "${PORT_BUILD_DIR}/xts_archive.cpp")
 set_property(TARGET core PROPERTY SOURCES "${core_sources}")
 
 # Mods (headless/mods.h). Eden's .pchtxt reader takes every line as a record or a flag: the
@@ -3379,6 +3498,13 @@ else()
     target_include_directories(eden-shader-cache-check PRIVATE "${PROJECT_SOURCE_DIR}/src")
     target_link_libraries(eden-shader-cache-check PRIVATE video_core)
     target_compile_options(eden-shader-cache-check PRIVATE -fno-rtti)
+    # Homebrew and the advanced files (game_files.h): Eden's identification of them with the
+    # build's loader patches, and the Library's reading of them (metadata_bridge.cpp), on the files
+    # tools/check-direct-formats.py makes; written with assert().
+    add_executable(eden-formats-check "${EDEN_PORT_DIR}/formats_check.cpp")
+    target_include_directories(eden-formats-check PRIVATE "${PROJECT_SOURCE_DIR}/src" "${EDEN_PORT_DIR}")
+    target_link_libraries(eden-formats-check PRIVATE eden-metadata core)
+    target_compile_options(eden-formats-check PRIVATE -fno-rtti -UNDEBUG)
     add_executable(eden-mods-check "${EDEN_PORT_DIR}/mods_check.cpp")
     target_include_directories(eden-mods-check PRIVATE "${PROJECT_SOURCE_DIR}/src")
     target_link_libraries(eden-mods-check PRIVATE core)

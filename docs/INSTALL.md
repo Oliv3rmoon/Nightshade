@@ -14,20 +14,21 @@ Only these subfolders matter; the folder itself can have any name and location.
 ├── firmware/
 │   └── *.nca                           # extracted firmware NCAs
 ├── roms/
-│   └── <Game>/                         # one folder per game
-│       ├── <game>.nsp                  # the game (NSP or XCI, or NSZ or XCZ: see Compressed games)
-│       ├── <game> update.nsp           # optional: its update and DLC files, beside it
-│       ├── <game> DLC.nsp
-│       ├── mods/                       # optional: its mods, one folder each (see Mods and cheats)
-│       │   └── <mod name>/
-│       │       ├── exefs/              # code patches: *.pchtxt, *.ips
-│       │       ├── romfs/              # replacement game files
-│       │       └── romfs_ext/          # files added to the game's own
-│       ├── cheats/                     # optional: its cheats
-│       │   └── <build ID>.txt          # one file per version of the game
-│       └── reshade/                    # optional: its post-processing presets and effects
-│           ├── <preset>.fxp            # offered in this game's settings
-│           └── <effect>.fx             # and the .fxh files and Textures/ they use
+│   ├── <Game>/                         # one folder per game
+│   │   ├── <game>.nsp                  # the game (NSP or XCI, or NSZ or XCZ: see Compressed games)
+│   │   ├── <game> update.nsp           # optional: its update and DLC files, beside it
+│   │   ├── <game> DLC.nsp
+│   │   ├── mods/                       # optional: its mods, one folder each (see Mods and cheats)
+│   │   │   └── <mod name>/
+│   │   │       ├── exefs/              # code patches: *.pchtxt, *.ips
+│   │   │       ├── romfs/              # replacement game files
+│   │   │       └── romfs_ext/          # files added to the game's own
+│   │   ├── cheats/                     # optional: its cheats
+│   │   │   └── <build ID>.txt          # one file per version of the game
+│   │   └── reshade/                    # optional: its post-processing presets and effects
+│   │       ├── <preset>.fxp            # offered in this game's settings
+│   │       └── <effect>.fx             # and the .fxh files and Textures/ they use
+│   └── homebrew/                       # optional: homebrew, *.nro (see Homebrew and advanced files)
 ├── save-import/                        # optional: saves to import, one folder per title ID
 ├── ryujinx/                            # optional: a Ryujinx data folder to import saves from
 ├── save-export/                        # written by "Export a copy"
@@ -83,6 +84,24 @@ nsz -C -B <game>.nsp
 ```
 
 The folder `/data/prosperoeden/user/cache/nsz` can be deleted whenever no game is running; it is made again as needed.
+
+### Homebrew and advanced files
+
+`NRO` · `NSO` · `NCA` · `NAX` · `KIP` · unpacked ExeFS
+
+Besides games, the Library lists homebrew and, for experienced users, programs on their own:
+
+- **Homebrew (NRO).** Put `.nro` files in `roms/`, or together in a folder of it such as `roms/homebrew/`. Each is listed with the name and icon in its assets when it has them (else by its file name) and starts like a game. Its own settings (Library > Game settings) are kept by the title ID in its control data, when it has one.
+- **Advanced files**, marked **(advanced)** after their format in the Library. These are pieces of a game or of the system, not whole games: whether one starts depends on what it needs beside it, and most commercial games do not start from one. What Nightshade does with each:
+  - **NSO**: one program module, started alone with default settings (no `main.npdm`, `rtld` or `sdk`). Its code may be compressed with LZ4 or ZBIC.
+  - **NCA**: a Program NCA, as an NSP unpacked into a folder has one. Reading an NCA takes the keys in `prod.keys`, so only Program NCAs the keys read are listed; the game's other NCAs, and an update's Program NCA (it runs on its base game), are not. With the game's Control NCA in the same folder, the Library shows the game's name and icon, and the game gets its control data (its languages and save data sizes).
+  - **NAX**: an NCA as an SD card keeps it (`Nintendo/Contents/registered/000000XX/<content ID>.nca`), encrypted for that card. Copied off the card, it keeps its content ID as its name (`<32 hex digits>.nca`, or `.nax`). Reading it takes that card's keys in `prod.keys`: `sd_seed` and the SD card key sources.
+  - **KIP**: a system process (such as a sysmodule), started as the only program. It is listed by the name in its header.
+  - **Unpacked ExeFS**: a folder of `roms/` that holds `main` and `main.npdm` (and `rtld`, `sdk` and `subsdk*` when the program has them), listed by the folder's name as `EXEFS`. Its `control.nacp` and `icon_AmericanEnglish.dat`, when the folder has them, give its name and icon. It has no RomFS, so it runs only when it needs no game data.
+
+When one does not start, the Library says why, as for a game (a missing key, a missing `main.npdm`...), and `stderr.log` has the details.
+
+Newer games (made for Switch system software 22.0.0 and later) compress their code (the NSO files in their ExeFS) with ZBIC, a variant of zstd, instead of LZ4. Nightshade reads both, in games and in the files above.
 
 ## App data
 

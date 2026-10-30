@@ -173,33 +173,51 @@ int CountFiles(const std::string& directory, std::initializer_list<const char*> 
 // The games in a roms folder: its game files (game_files.h), and its game folders (one level down, issue
 // 168) that hold one, each one game with its update and DLC beside it; -1 when it cannot be read. Counting the files in roms/ alone, a game files folder
 // whose games were all in game folders read "0 games" in Settings > Game files.
+// Homebrew (an NRO) is one each, wherever it is. The advanced files are counted by their names
+// alone (what an NCA holds takes keys to read): a game folder with any, an unpacked ExeFS or NCAs
+// is one game; directly in roms/, each NSO, NAX and KIP is one, and NCAs (an NSP unpacked there)
+// are one together.
 int CountGames(const std::string& roms) {
-    const auto rom = [](const std::string& name) { return Eden::IsGameFile(name); };
+    const auto rom = [](const std::string& name) { return Eden::IsGameFile(name) || Eden::IsProgramFile(name); };
+    const auto nca = [](const std::string& name) { return Eden::EndsWithNoCase(name, ".nca"); };
     bool ok = false;
     int count = 0;
-    for (const std::string& name : ListEntries(roms, false, ok))
-        count += rom(name) && Eden::ValidRomPath(name);
+    bool ncas = false;
+    for (const std::string& name : ListEntries(roms, false, ok)) {
+        if (!Eden::ValidRomPath(name)) continue;
+        if (nca(name)) ncas = true;
+        else count += rom(name) || Eden::IsHomebrewFile(name);
+    }
     if (!ok) return -1;
+    count += ncas;
     bool listed = false;
     for (const std::string& folder : ListEntries(roms, true, listed)) {
         if (folder.empty() || folder[0] == '.') continue;
         bool read = false;
         const auto files = ListEntries(JoinPath(roms, folder), false, read);
-        count += std::any_of(files.begin(), files.end(), [&](const std::string& name) {
+        const bool exefs = std::find(files.begin(), files.end(), "main") != files.end() &&
+                           std::find(files.begin(), files.end(), "main.npdm") != files.end();
+        count += exefs || std::any_of(files.begin(), files.end(), [&](const std::string& name) {
             return rom(name) && Eden::ValidRomPath(folder + "/" + name);
         });
+        count += static_cast<int>(std::count_if(files.begin(), files.end(), [&](const std::string& name) {
+            return Eden::IsHomebrewFile(name) && Eden::ValidRomPath(folder + "/" + name);
+        }));
     }
     return count;
 }
 
 // A title from the file's name: without its extension and the tags dumps carry
-// ("Name [0100...][v0]", "Name (USA)").
+// ("Name [0100...][v0]", "Name (USA)"). An unpacked ExeFS ("Game/main") is named by its folder.
 std::string CleanTitle(const std::string& filename) {
-    std::string title = std::filesystem::path(filename).stem().string();
+    const std::string base = Eden::IsExeFsMain(filename)
+        ? std::filesystem::path(filename).parent_path().filename().string()
+        : std::filesystem::path(filename).stem().string();
+    std::string title = base;
     if (title.rfind("[Game] ", 0) == 0) title.erase(0, 7);
     if (const auto tag = title.find_first_of("[("); tag != std::string::npos && tag > 0) title.erase(tag);
     while (!title.empty() && (title.back() == ' ' || title.back() == '_' || title.back() == '-')) title.pop_back();
-    return title.empty() ? std::filesystem::path(filename).stem().string() : title;
+    return title.empty() ? base : title;
 }
 
 // Covers are keyed by the ROM's file name, not its full path, so they survive a new game
@@ -318,27 +336,63 @@ bool AddOnInGameFolder(const std::string& path) {
     return addon;
 }
 
+// Whether homebrew or an advanced file (game_files.h) is one Eden can start, as its loader for that
+// kind identifies it (eden_program_kind): an NCA that holds no program (the other NCAs of an NSP
+// unpacked into a folder) or that no key reads is not listed. Remembered by the file's size and time
+// and those of the keys, so that each file is read once. Called with the metadata reader held.
+bool StartableProgram(const std::string& path) {
+    struct Seen {
+        off_t size;
+        time_t modified;
+        time_t keys;
+        bool startable;
+    };
+    static std::map<std::string, Seen> seen;
+    struct stat info {};
+    if (stat(path.c_str(), &info) != 0) return false;
+    struct stat keys {};
+    (void)stat(Eden::AssetsPath("keys/prod.keys").c_str(), &keys);
+    if (const auto found = seen.find(path); found != seen.end() && found->second.size == info.st_size &&
+                                            found->second.modified == info.st_mtime && found->second.keys == keys.st_mtime)
+        return found->second.startable;
+    const bool startable = eden_program_kind(path.c_str(), Eden::AssetsPath("keys").c_str()) != EDEN_PROGRAM_NONE;
+    seen[path] = {info.st_size, info.st_mtime, keys.st_mtime, startable};
+    return startable;
+}
+
 // The games in roms/, by their paths in it: its NSP, XCI, NSZ and XCZ files, and those in its game
 // folders (one level down, issue 168) that hold a game and not its update or DLC. Directly in
 // roms/, a file whose name says an update or DLC (loose_addons.h) and that holds one is its game's,
-// not a game. Called with the metadata reader held.
+// not a game. Beside them, the same way, homebrew and the advanced files Eden can start, and the
+// unpacked ExeFS of a game folder as its main ("Game/main", main.npdm beside it). Called with the
+// metadata reader held.
 std::vector<std::string> GameFiles() {
-    const auto rom = [](const std::string& name) { return Eden::IsGameFile(name); };
     const std::string roms = Eden::GamesPath("roms");
+    const auto rom = [&](const std::string& name, const std::string& file) {
+        return Eden::IsGameFile(name) ||
+               ((Eden::IsHomebrewFile(name) || Eden::IsProgramFile(name)) && StartableProgram(JoinPath(roms, file)));
+    };
     std::vector<std::string> files;
     bool ok = false;
     for (const std::string& name : ListEntries(roms, false, ok))
-        if (rom(name) && Eden::ValidRomPath(name) &&
+        if (Eden::ValidRomPath(name) && rom(name, name) &&
             !(Eden::LooseAddOns::AddOn(name) && AddOnInGameFolder(JoinPath(roms, name))))
             files.push_back(name);
     for (const std::string& folder : ListEntries(roms, true, ok)) {
         if (folder.empty() || folder[0] == '.') continue;
         bool listed = false;
-        for (const std::string& name : ListEntries(JoinPath(roms, folder), false, listed)) {
+        const std::vector<std::string> names = ListEntries(JoinPath(roms, folder), false, listed);
+        for (const std::string& name : names) {
             const std::string file = folder + "/" + name;
-            if (rom(name) && Eden::ValidRomPath(file) && !AddOnInGameFolder(JoinPath(roms, file)))
+            if (Eden::ValidRomPath(file) && rom(name, file) &&
+                !(Eden::IsGameFile(name) && AddOnInGameFolder(JoinPath(roms, file))))
                 files.push_back(file);
         }
+        const std::string exefs = folder + "/main";
+        if (std::find(names.begin(), names.end(), "main") != names.end() &&
+            std::find(names.begin(), names.end(), "main.npdm") != names.end() && Eden::ValidRomPath(exefs) &&
+            StartableProgram(JoinPath(roms, exefs)))
+            files.push_back(exefs);
     }
     return files;
 }
@@ -794,14 +848,14 @@ std::vector<pe::ui::Game> EdenServices::games() {
         return sources;
     };
     for (const std::string& file : files) {
-        std::string format = file.substr(file.size() - 3);
-        std::transform(format.begin(), format.end(), format.begin(),
-                       [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
+        // NSP, XCI, NSZ, XCZ, NRO; "NSO (advanced)" and the like for the advanced files (game_files.h).
+        std::string format = Eden::LibraryFormat(file);
+        if (Eden::IsAdvancedFile(file)) format = fill(tr("{0} (advanced)"), {format});
         const std::string path = Eden::GamesPath("roms/" + file);
         struct stat info {};
         if (stat(path.c_str(), &info) != 0 || !S_ISREG(info.st_mode)) continue;
         pe::ui::Game game;
-        game.name = CleanTitle(std::filesystem::path(file).filename().string());
+        game.name = CleanTitle(file);
         game.format = format;
         game.size = SizeLabel(static_cast<double>(info.st_size));
         game.file = file;
