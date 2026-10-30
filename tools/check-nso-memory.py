@@ -101,7 +101,7 @@ int main(){
 with tempfile.TemporaryDirectory() as tmp:
  p=Path(tmp)
  # The text segment of the cases above (4 bytes) as a ZBIC frame, and a frame of its first 3 bytes.
- codecs=nso_files.build_codecs(c/'source',p/'codecs')
+ codecs=nso_files.build_codecs(c/'source',p/'codecs',('zbic',))
  frames={name:nso_files.compress(codecs['zbic'],data,p) for name,data in (('zbic_text',bytes([1,2,3,4])),('zbic_short',bytes([1,2,3])))}
  assert all(frame[:4]==nso_files.ZBIC_MAGIC for frame in frames.values())
  arrays=''.join('const std::vector<u8> %s{%s};\n'%(name,','.join(map(str,frame))) for name,frame in frames.items())

@@ -124,7 +124,7 @@ def main():
     eden = Path(sys.argv[1])
     with tempfile.TemporaryDirectory(prefix='zbic-') as tmp:
         work = Path(tmp)
-        tools = nso_files.build_codecs(eden, work / 'tools')
+        tools = nso_files.build_codecs(eden, work / 'tools', ('zbic', 'zstd'))
         (work / 'decode.cpp').write_text(DECODER)
         decoder = work / 'zbic-decode'
         # Eden's own decoder, built as the build builds it: the zbic package's zstd.c included in it.

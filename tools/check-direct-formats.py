@@ -57,7 +57,7 @@ results = root / 'results'
 results.mkdir(exist_ok=True)
 run = Path(tempfile.mkdtemp(prefix='direct-formats-', dir=results))
 print(f'Direct formats evidence: {run}', flush=True)
-codecs = nso_files.build_codecs(eden, run / 'codecs')
+codecs = nso_files.build_codecs(eden, run / 'codecs', ('zbic', 'lz4'))
 files = run / 'files'
 (files / 'keys').mkdir(parents=True)
 (files / 'Fixture').mkdir()

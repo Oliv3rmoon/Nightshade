@@ -74,22 +74,29 @@ def zbic_source(eden):
 
 
 def lz4_source(eden):
-    return package(eden, 'lz4', 'lib/lz4.c') / 'lib'
+    """lz4's lib/ in the package cache, or None where the build took the system's liblz4 (the Linux
+    host build: "Using system package lz4")."""
+    found = sorted(p for p in (Path(eden) / '.cache/cpm/lz4').glob('*') if (p / 'lib/lz4.c').exists())
+    return found[0] / 'lib' if len(found) == 1 else None
 
 
-def build_codecs(eden, work):
-    """Compiles the encoders: {'zbic', 'zstd', 'lz4'} -> executable."""
+def build_codecs(eden, work, names=('zbic', 'zstd', 'lz4')):
+    """Compiles the encoders named: 'zbic', 'zstd' (the same zstd.c without ZBIC), 'lz4' -> executable."""
     work = Path(work)
     work.mkdir(parents=True, exist_ok=True)
     source = work / 'encode.c'
     source.write_text(ENCODER)
     cc = os.environ.get('CC', 'cc')
-    zbic = zbic_source(eden)
     tools = {}
-    for name, flags, extra in (
-            ('zbic', ['-DZSTD_ZBIC_SUPPORT=1', '-I' + str(zbic)], [str(zbic / 'zstd.c'), '-lpthread']),
-            ('zstd', ['-DZSTD_ZBIC_SUPPORT=0', '-I' + str(zbic)], [str(zbic / 'zstd.c'), '-lpthread']),
-            ('lz4', ['-DUSE_LZ4', '-I' + str(lz4_source(eden))], [str(lz4_source(eden) / 'lz4.c')])):
+    for name in names:
+        if name in ('zbic', 'zstd'):
+            zbic = zbic_source(eden)
+            flags = ['-DZSTD_ZBIC_SUPPORT=%d' % (name == 'zbic'), '-I' + str(zbic)]
+            extra = [str(zbic / 'zstd.c'), '-lpthread']
+        else:
+            lz4 = lz4_source(eden)
+            flags = ['-DUSE_LZ4'] + (['-I' + str(lz4)] if lz4 else [])
+            extra = [str(lz4 / 'lz4.c')] if lz4 else ['-llz4']
         tool = work / f'{name}-encode'
         subprocess.run([cc, '-O1', '-w', *flags, str(source), *extra, '-o', str(tool)], check=True)
         tools[name] = tool
