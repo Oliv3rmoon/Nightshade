@@ -36,6 +36,7 @@
 #include <nlohmann/json.hpp>
 #include "devices.h"
 #include "amiibo.h"
+#include "memory_layout_guard.h"
 #include "diagnostics.h"
 #include "hud.h"
 #include "loading_art.h"
@@ -886,6 +887,8 @@ int main(int argc, char** argv) {
         // Likewise the switches a game's "gpu_debug" has too (settings_store.h): -1 where not named.
         [[maybe_unused]] Eden::GpuDebugSettings dev_gpu_debug;
         [[maybe_unused]] bool dev_cram_on = true, dev_cram_scan = true, dev_cram_dedup = false, dev_cram_fine = false;
+        // dev-settings layout_guard=off: a game of memory_layout_guard.h gets the layout chosen.
+        [[maybe_unused]] bool dev_layout_guard_off = false;
 #ifdef EDEN_DEV_PROFILE
         // One-run A/B switches written by the development runner; absent = defaults.
         {
@@ -900,6 +903,8 @@ int main(int argc, char** argv) {
                     if (entry == "cram_scan=off") dev_cram_scan = false;
                     if (entry == "cram_dedup=on") dev_cram_dedup = true;
                     if (entry == "cram_fine=on") dev_cram_fine = true;
+                } else if (entry == "layout_guard=off") {
+                    dev_layout_guard_off = true;
                 } else if (entry == "placement=off") {
                     Eden::Performance::SetSecondaryPlacement(false);
                 } else if (entry == "fastmem=off" || entry == "fastmem=on") {
@@ -1351,17 +1356,8 @@ int main(int argc, char** argv) {
             // are the console's developer memories: the guest's kernel divides the larger block the
             // same way, so the mod's heap is there. Above 4 GiB the guest's memory is the block
             // backed where the kernel uses it (src/memory_pages.cpp), so the pool below only has to
-            // hold what a session touches, not the whole of it.
-            Settings::values.memory_layout_mode =
-                speed.memory_layout == 1 ? Settings::MemoryLayout::Memory_6Gb
-                : speed.memory_layout == 2 ? Settings::MemoryLayout::Memory_8Gb
-                                           : Settings::MemoryLayout::Memory_4Gb;
-            Eden::Report("launch",
-                         ("Memory layout: " + std::string{Eden::kMemoryLayoutKeys[speed.memory_layout]} +
-                          " (" + std::to_string(Eden::kMemoryLayoutGib[speed.memory_layout]) +
-                          " GiB), direct memory pool " +
-                          std::to_string(sceKernelGetDirectMemorySize() >> 20) + " MiB")
-                             .c_str());
+            // hold what a session touches, not the whole of it. Set below, once the game's mods are
+            // known (memory_layout_guard.h).
             // Settings > Performance > Speed limit: how fast the game may run, as a percentage of
             // the console it was made for. Eden's vsync clock comes that much sooner (vi/conductor.cpp
             // on several cores), so a game that waits for it runs faster: one locked to 30 FPS can
@@ -1434,6 +1430,30 @@ int main(int argc, char** argv) {
             const std::string mods = Eden::Mods::Summary(all_mods, mods_off, cheats_on);
             Settings::values.disabled_addons[title] = mods_off;
             Eden::Report("launch", ("Mods: " + mods).c_str());
+            {
+                // The layout chosen, except for a game that stops with more memory than its
+                // console's and runs without a mod that may need it (memory_layout_guard.h).
+                const bool mods_on = std::any_of(all_mods.begin(), all_mods.end(), [&](const Eden::Mods::Mod& mod) {
+                    return !Eden::Mods::CheatsOnly(mod) &&
+                           std::find(mods_off.begin(), mods_off.end(), mod.name) == mods_off.end();
+                });
+                const int layout = Eden::MemoryLayoutGuard::Layout(title, speed.memory_layout, mods_on,
+                                                                   dev_layout_guard_off);
+                Settings::values.memory_layout_mode =
+                    layout == 1 ? Settings::MemoryLayout::Memory_6Gb
+                    : layout == 2 ? Settings::MemoryLayout::Memory_8Gb
+                                  : Settings::MemoryLayout::Memory_4Gb;
+                Eden::Report("launch",
+                             ("Memory layout: " + std::string{Eden::kMemoryLayoutKeys[layout]} + " (" +
+                              std::to_string(Eden::kMemoryLayoutGib[layout]) + " GiB)" +
+                              (layout != speed.memory_layout
+                                   ? std::string{", not the "} + Eden::kMemoryLayoutKeys[speed.memory_layout] +
+                                         " chosen: this game without mods stops with more than its console's"
+                                   : std::string{}) +
+                              ", direct memory pool " + std::to_string(sceKernelGetDirectMemorySize() >> 20) +
+                              " MiB")
+                                 .c_str());
+            }
             const auto streamed = Eden::StreamedGame::Find(guest);
             const std::string game_file = streamed ? streamed->file_name + " played where it lies on " + streamed->source :
                                                      std::filesystem::path(guest).filename().string();
