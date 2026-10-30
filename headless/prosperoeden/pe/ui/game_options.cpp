@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "pe/ui/launcher.hpp"
+#include "pe/ui/video_profiles.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -38,23 +39,31 @@ enum Category : int
     category_system,
     category_language,
 };
-// The Video category's rows that say something of their own once chosen.
-constexpr int kAstcRow = 3;
-constexpr int kRefreshRow = 4;
-constexpr int kHudRow = 5;
-constexpr int kHudSizeRow = 6;
-constexpr int kHudCornerRow = 7;
-constexpr int kPostProcessingRow = 8;
+// The Video category's rows: the video profile first (video_profiles.hpp), then the settings it
+// is made of and the others.
+constexpr int kProfileRow = 0;
+constexpr int kRendererRow = 1;
+constexpr int kResolutionRow = 2;
+constexpr int kFilterRow = 3;
+constexpr int kAstcRow = 4;
+constexpr int kRefreshRow = 5;
+constexpr int kHudRow = 6;
+constexpr int kHudSizeRow = 7;
+constexpr int kHudCornerRow = 8;
+constexpr int kPostProcessingRow = 9;
 // Frame generation follows the overlay's rows wherever it is shown (with_option): toggle, method,
 // target and multiplier. The last needs no row constant (the chain falls through).
-constexpr int kFrameGenRow = 9, kFrameGenMethodRow = 10, kFrameGenTargetRow = 11;
+constexpr int kFrameGenRow = 10, kFrameGenMethodRow = 11, kFrameGenTargetRow = 12;
 // The Controls category's rows.
 constexpr int kVibrationRow = 0;
 constexpr int kMappingRow = 1;
 constexpr int kControllerRow = 2;
-// The Performance category's row after its eight switches: the row Settings > Performance has
-// there too (settings.cpp's speed_limit_row), so performance_about() describes it.
+// The Performance category's rows after its eight switches: the rows Settings > Performance has
+// there too (settings.cpp's speed_limit_row and speed_memory_layout), so performance_about()
+// describes them.
 constexpr int kSpeedLimitRow = 8;
+constexpr int kMemoryRow = 9;
+constexpr const char *kMemoryNames[] = {"4 GiB", "6 GiB", "8 GiB"};
 // The System category's row.
 constexpr int kSeedRow = 0;
 
@@ -114,9 +123,10 @@ bool *performance_switch(Preferences &prefs, int index)
     return switches[std::clamp(index, 0, 7)];
 }
 
-// rates: the refresh rates as the launcher writes them (Launcher::hertz).
+// rates: the refresh rates as the launcher writes them (Launcher::hertz). title_id: the game's,
+// whose video profiles may be its own (video_profiles.hpp).
 std::vector<Option> options(int category, const GameSettings &game, Preferences prefs,
-                            Services &services, const std::vector<std::string> &rates)
+                            Services &services, const std::vector<std::string> &rates, std::uint64_t title_id)
 {
     const std::vector<std::string> off_on = {tr("Off"), tr("On")};
     std::vector<Option> rows;
@@ -128,6 +138,15 @@ std::vector<Option> options(int category, const GameSettings &game, Preferences 
         const auto &resolutions = services.resolution_labels();
         // A resolution's short name is how its label starts: "0.5x (faster, softer)" is "0.5x".
         const std::string usual_resolution = pick(resolutions, prefs.resolution);
+        // The video profile: one of the four tiers, Custom when the game's own values match none,
+        // or Settings' (whose own profile is named).
+        {
+            std::vector<std::string> tiers;
+            for (const char *name : kProfileNames)
+                tiers.emplace_back(tr(name));
+            rows.push_back({tr("Video profile"), tiers, game_profile_of(game, prefs, title_id),
+                            tr(kProfileNames[profile_of(prefs)])});
+        }
         rows.push_back({tr("Renderer"), renderers, game.renderer, pick(renderers, prefs.renderer)});
         rows.push_back({tr("Resolution"), resolutions, game.resolution,
                         usual_resolution.substr(0, usual_resolution.find(' '))});
@@ -187,6 +206,10 @@ std::vector<Option> options(int category, const GameSettings &game, Preferences 
         // How fast this game may run (kSpeedLimitRow).
         const std::vector<std::string> speeds = speed_limit_names();
         rows.push_back({tr("Speed limit"), speeds, game.speed_limit, pick(speeds, prefs.speed_limit)});
+        // The memory this game's console is told it has (kMemoryRow), as Settings > Performance >
+        // Memory has it for every game. A video profile can set it (Tears of the Kingdom's).
+        rows.push_back({tr("Memory"), {kMemoryNames[0], kMemoryNames[1], kMemoryNames[2]}, game.memory_layout,
+                        kMemoryNames[std::clamp(prefs.memory_layout, 0, 2)]});
         break;
     }
     case category_audio:
@@ -230,7 +253,8 @@ GameSettings with_option(GameSettings game, int category, int row, int value, co
     switch (category)
     {
     case category_video:
-        (row == 0 ? game.renderer : row == 1 ? game.resolution : row == 2 ? game.filter :
+        (row == kRendererRow ? game.renderer : row == kResolutionRow ? game.resolution :
+         row == kFilterRow ? game.filter :
          row == kAstcRow ? game.astc : row == kRefreshRow ? game.refresh : row == kHudRow ? game.hud :
          row == kHudSizeRow ? game.hud_size : row == kHudCornerRow ? game.hud_corner :
          row == kPostProcessingRow ? game.post_processing :
@@ -238,7 +262,9 @@ GameSettings with_option(GameSettings game, int category, int row, int value, co
          row == kFrameGenTargetRow ? game.frame_gen_target : game.frame_gen_multiplier) = value;
         break;
     case category_performance:
-        if (row == kSpeedLimitRow)
+        if (row == kMemoryRow)
+            game.memory_layout = value;
+        else if (row == kSpeedLimitRow)
             game.speed_limit = value;
         else
             game.performance[static_cast<std::size_t>(std::clamp(row, 0, 7))] = value;
@@ -287,7 +313,7 @@ int Launcher::game_overrides(int category) const
     case category_performance:
         return static_cast<int>(
                    std::count_if(game.performance.begin(), game.performance.end(), [](int v) { return v >= 0; })) +
-               (game.speed_limit >= 0);
+               (game.speed_limit >= 0) + (game.memory_layout >= 0);
     case category_audio:
         return (game.volume >= 0) + (game.mute >= 0);
     case category_controls:
@@ -299,13 +325,19 @@ int Launcher::game_overrides(int category) const
     }
 }
 
+std::uint64_t Launcher::option_title() const
+{
+    return library_.selected >= 0 && library_.selected < static_cast<int>(games_.size()) ?
+               games_[static_cast<std::size_t>(library_.selected)].title_id : 0;
+}
+
 void Launcher::open_game_options(int category)
 {
     game_options_ = std::clamp(category, 0, kGameOptionCategories - 1);
     option_rows_.visible = layout::kPaneRows;
     option_rows_.pitch = layout::kPanePitch;
     option_rows_.reset(
-        static_cast<int>(options(game_options_, game_settings_, prefs_, services_, {hertz(0), hertz(1)}).size()), 0);
+        static_cast<int>(options(game_options_, game_settings_, prefs_, services_, {hertz(0), hertz(1)}, option_title()).size()), 0);
     option_ = 0;
     modal_ = modal_shown_ = Modal::game_options;
     message_.clear();
@@ -374,7 +406,7 @@ void Launcher::press_game_options(Key key)
         return;
     }
     const Game &game = games_[static_cast<std::size_t>(library_.selected)];
-    const std::vector<Option> rows = options(game_options_, game_settings_, prefs_, services_, {hertz(0), hertz(1)});
+    const std::vector<Option> rows = options(game_options_, game_settings_, prefs_, services_, {hertz(0), hertz(1)}, option_title());
     switch (key)
     {
     case Key::circle:
@@ -420,6 +452,25 @@ void Launcher::press_game_options(Key key)
         cue(Cue::error);
         return;
     }
+    // The video profile: Settings' (-1), then the four tiers, each written as the game's own values
+    // of the settings it is made of. From Custom, Right goes to the first tier and Left to the last.
+    if (game_options_ == category_video && row == kProfileRow)
+    {
+        const int now = option.value;
+        const int tier = now == kCustomProfile ? (key == Key::left ? kVideoProfiles - 1 : 0) :
+                         (now + 1 + (key == Key::left ? -1 : 1) + kVideoProfiles + 1) % (kVideoProfiles + 1) - 1;
+        const GameSettings next = with_profile(game_settings_, game.title_id, tier);
+        const bool saved = services_.set_game_settings(game.title_id, next);
+        if (saved)
+            game_settings_ = next;
+        say(!saved ? std::string{tr("Could not save. Please try again.")} :
+            tier < 0 ? std::string{tr("Saved for this game. Applies on next launch.")} :
+                       fill(tr("{0}: {1}. Applies on next launch."),
+                            {tr(kProfileNames[tier]), profile_summary(game.title_id, tier)}),
+            !saved);
+        cue(saved ? Cue::toggle : Cue::error);
+        return;
+    }
     // Settings' value (-1), then each of the game's choices.
     const int count = static_cast<int>(option.values.size());
     const int step = key == Key::left ? -1 : 1;
@@ -456,14 +507,52 @@ std::string Launcher::option_about(int category, int row) const
     // The Performance switches and the speed limit each say what they do (settings.cpp).
     if (category == category_performance)
         return tr(performance_about(row));
+    // The video profile: what the game's tier sets, or that it is Custom, or Settings'.
+    if (category == category_video && row == kProfileRow)
+        return profile_about(option_title(), game_profile_of(game_settings_, prefs_, option_title()));
     return {};
+}
+
+std::string Launcher::profile_name(int tier) const
+{
+    return tr(kProfileNames[std::clamp(tier, 0, kCustomProfile)]);
+}
+
+std::string Launcher::profile_summary(std::uint64_t title_id, int tier) const
+{
+    const VideoProfile v = profile_for(title_id, tier);
+    const std::string resolution = pick(services_.resolution_labels(), v.resolution);
+    std::string line = resolution.substr(0, resolution.find(' ')) + ", " + pick(services_.filter_labels(), v.filter) +
+                       ", " + fill(tr("{0} ASTC"), {pick(services_.astc_labels(), v.astc)});
+    if (v.fast_gpu)
+        line += std::string{", "} + tr("Faster GPU emulation");
+    if (v.async_shaders)
+        line += std::string{", "} + tr("Asynchronous shaders");
+    if (v.memory_layout >= 0)
+        line += std::string{", "} + kMemoryNames[std::clamp(v.memory_layout, 0, 2)];
+    return line;
+}
+
+std::string Launcher::profile_about(std::uint64_t title_id, int tier) const
+{
+    if (tier == kCustomProfile)
+        return tr("Custom: this game's own values match none of the profiles. Choosing a profile sets them again.");
+    if (tier < 0)
+        return fill(tr("Follows Settings, whose video profile is {0}. A profile chosen here is this game's own."),
+                    {profile_name(profile_of(prefs_))});
+    std::string about = fill(tr("{0}: {1}. Frame generation and post-processing off; changing one of these makes it "
+                                "Custom."),
+                             {profile_name(tier), profile_summary(title_id, tier)});
+    if (const TitleProfiles *own = title_profiles(title_id))
+        about += std::string{" "} + tr(own->why);
+    return about;
 }
 
 void Launcher::draw_option_pane(Canvas &c, const Rect &pane, int category, bool active)
 {
     gfx::DrawList &list = c.list;
     const Theme &t = th();
-    const std::vector<Option> rows = options(category, game_settings_, prefs_, services_, {hertz(0), hertz(1)});
+    const std::vector<Option> rows = options(category, game_settings_, prefs_, services_, {hertz(0), hertz(1)}, option_title());
     const float pitch = layout::kPanePitch;
     const float height = layout::kPaneRow;
     const int count = static_cast<int>(rows.size());

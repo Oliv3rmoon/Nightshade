@@ -38,6 +38,7 @@ Nightshade runs your own Switch games on a jailbroken PS5. It is made by **[Oliv
 <details>
 <summary>Also in the box</summary>
 
+- **Video profiles, Quick settings and Safe Launch:** Minimum, Recommended, High and Ultra set the video settings at once, for every game or one; Options on a game opens a quick panel with Play, Start in safe mode, its profile and the common video settings; safe mode starts a game once at conservative settings with mods and cheats off, and is offered after a game fails to start.
 - **Renderers and scaling:** Vulkan (recommended) or OpenGL; 0.5x to 4x resolution with Bilinear, AMD FSR, Bicubic or Nearest; output at 1080p, 1440p or 2160p.
 - **Library:** covers, **Continue Playing** and **Recently Played**, and a folder browser that counts the keys, firmware files and games in each folder.
 - **Players:** profiles with their own saves, settings and recent games; up to four DualSense controllers with rumble, HD rumble and motion; button mapping and a controller type for each game; the PS5's on-screen keyboard when a game asks for text.
@@ -62,10 +63,10 @@ All three are PS5 ports of the same Switch emulator, and they share a lot. This 
 | Switch 2 games | Experimental, test builds only | — | — |
 | Big games, long sessions, memory | Background shader cache, Tears of the Kingdom fixes, memory given back | — | — |
 | Amiibo | Yes | — | — |
-| Recovery | Crash reports; closes on a GPU hang, with a stall report | Crash reports; starts again | One-session Safe Launch, confirmed resets, guarded data migration |
+| Recovery | Crash reports; closes on a GPU hang, with a stall report; one-start Safe Launch | Crash reports; starts again | One-session Safe Launch, confirmed resets, guarded data migration |
 | Vulkan driver | Belladonna (Nightshade's fork of Mihawk's PS5 Mesa) | Mihawk's PS5 Mesa | Mihawk's PS5 Mesa |
 | Post-processing, frame generation | ReShade FX presets; MihawkGen or Lossless Scaling | ReShade FX presets; MihawkGen or Lossless Scaling | — (has upscaling, sharpening and anti-aliasing options) |
-| Per-game settings | Video, performance, audio, controls, language | Video, performance, audio, controls, language | Video profiles per title: Minimum, Recommended, High, Ultra |
+| Per-game settings | Video, performance, audio, controls, language, memory; video profiles Minimum, Recommended, High, Ultra | Video, performance, audio, controls, language | Video profiles per title: Minimum, Recommended, High, Ultra |
 | Games from a server, save sync | RomM and other sources, streaming (experimental), save sync | RomM and other sources (download only), save sync | — |
 | Update check | Its own GitHub releases, ZIP checked against `SHA256SUMS` | The homebrew.page catalog, ZIP checked against its signed list | GitHub releases; its README says to verify checksums |
 | Companion apps from the menu | Physalis, Datura, Mandrake | — | — |

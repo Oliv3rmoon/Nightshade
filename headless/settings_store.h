@@ -170,8 +170,9 @@ struct Preferences {
     int hud_corner = 0;      // index into kHudCornerKeys: which corner of the picture it stands in
     bool hud_colors = true;  // the line in its inks rather than one (bake-loading-text.py)
     // What the overlay's line may say, bit by bit (hud.h's kHudField*): the pieces the user has
-    // chosen to show. All of them by default, the game's own resolution (bit 9) with the rest.
-    int hud_fields = 0x2ff;
+    // chosen to show. All of them by default (kHudFieldDefault): the game's own resolution (bit 9),
+    // the frame-time window (10), memory pressure (11) and shader building (12) with the rest.
+    int hud_fields = 0x1eff;
     // Which face button presses each core menu action (Settings > Controls > Menu keybinds).
     MenuBinding menu_bind = kDefaultMenuBinding;
     // Settings > Appearance > Wallpaper: the image file's name in the wallpapers folder ("" when
@@ -638,6 +639,10 @@ struct GameSettings {
     std::array<int, kPerformanceSwitches> performance{-1, -1, -1, -1, -1, -1, -1, -1};  // kPerformanceKeys
     int64_t rng_seed = -1;      // 0 to 4294967295, or -1: no seed (load_address.h)
     int speed_limit = -1;       // index into kSpeedLimitKeys ("performance" / "speed_limit")
+    // The memory the game's console is told it has: an index into kMemoryLayoutKeys
+    // ("performance" / "memory_layout"), which LoadPerformance reads for the session. Library >
+    // Game settings > Performance > Memory, and a video profile that names one (TOTK's).
+    int memory_layout = -1;
     // VK_EXT_vertex_input_dynamic_state, on unless the game's entry has "vertex_input_dynamic":
     // false. In the settings file only (docs/SETTINGS.md): Pokemon Legends: Z-A draws flashing
     // colour after the train station with it on desktop RADV (Swordpdf/ProsperoEden#59, #112).
@@ -699,6 +704,8 @@ inline GameSettings LoadGameSettings(uint64_t title_id, const std::string& file 
         result.performance[i] = flag(std::string("/performance/") + kPerformanceKeys[i]);
     result.speed_limit = KeyIndex(key("performance/speed_limit"), kSpeedLimitKeys,
                                   int(std::size(kSpeedLimitKeys)), -1);
+    result.memory_layout = KeyIndex(key("performance/memory_layout"), kMemoryLayoutKeys,
+                                    int(std::size(kMemoryLayoutKeys)), -1);
     const int volume = Settings::Int(document, Json::json_pointer(base + "/volume"), -1);
     result.volume = volume >= 0 && volume <= 100 ? volume : -1;
     const Json::json_pointer seed_at(base + "/rng_seed");
@@ -730,6 +737,7 @@ inline bool SaveGameSettings(uint64_t title_id, const GameSettings& value, const
         value.hud_size >= int(std::size(kHudSizeKeys)) ||
         value.hud_corner >= int(std::size(kHudCornerKeys)) ||
         value.speed_limit >= int(std::size(kSpeedLimitKeys)) ||
+        value.memory_layout >= int(std::size(kMemoryLayoutKeys)) ||
         !flag_ok(value.hud) || !flag_ok(value.frame_gen) ||
         !flag_ok(value.mute) ||
         !flag_ok(value.vibration) ||
@@ -779,6 +787,8 @@ inline bool SaveGameSettings(uint64_t title_id, const GameSettings& value, const
     for (int i = 0; i < kPerformanceSwitches; ++i) flag(performance, kPerformanceKeys[i], value.performance[i]);
     if (value.speed_limit < 0) performance.erase("speed_limit");
     else performance["speed_limit"] = kSpeedLimitKeys[value.speed_limit];
+    if (value.memory_layout < 0) performance.erase("memory_layout");
+    else performance["memory_layout"] = kMemoryLayoutKeys[value.memory_layout];
     if (performance.empty()) game.erase("performance");
     return Settings::Write(document, file);
 }
@@ -957,6 +967,54 @@ inline bool SavePerformance(uint64_t title_id, const PerformanceSettings& value,
                             {"speed_limit", kSpeedLimitKeys[value.speed_limit]}};
     return Settings::Write(document, file);
 }
+
+// Safe Launch: one session of a game with conservative settings and its mods and cheats off,
+// chosen in the launcher ("Start in safe mode", Quick settings) for that start only. Nothing is
+// written to the settings file: the launcher arms it for one title as it hands the game over, the
+// session that starts that title takes it (Begin), and the next start of anything is as the
+// settings say again. The launcher and the session are one process, so the arming is a value in
+// memory: an app that closes or crashes forgets it.
+//
+// What a safe session changes: the internal resolution 1x, the Bilinear filter, ASTC kept as BC3,
+// a 1080p output at 60 Hz, no frame generation and no post-processing; every Performance switch at
+// its default (the exact settings), the console's own 4 GiB, a 100% speed limit; mods and cheats
+// off. What it keeps: the renderer, the console mode, the controls, the language, the audio, the
+// overlay, and the settings file's own per-game workarounds (gpu_debug, adaptive_clock,
+// vertex_input_dynamic), which a player sets for a game that needs them.
+namespace SafeLaunch {
+inline std::atomic<uint64_t> armed{0};   // the title the next session is safe for (0: none)
+inline std::atomic<uint64_t> active{0};  // the title of the safe session running (0: none)
+// The launcher: the next start of this title is safe (0 takes it back).
+inline void Arm(uint64_t title_id) { armed.store(title_id); }
+// A session starts: safe when it was armed for this title. The arming is used up either way.
+inline bool Begin(uint64_t title_id) {
+    const uint64_t wanted = armed.exchange(0);
+    const bool safe = title_id != 0 && wanted == title_id;
+    active.store(safe ? title_id : 0);
+    return safe;
+}
+// The same game starts again on its own (a guest fault retry, main.cpp): still safe.
+inline void Again() { armed.store(active.load()); }
+inline bool On() { return active.load() != 0; }
+inline void Apply(Preferences& video) {
+    video.resolution = kNativeResolution;
+    video.upscaling_filter = 0;  // Bilinear
+    video.astc_textures = 0;     // compressed (BC3)
+    video.refresh = 0;           // 60 Hz
+    video.output = 0;            // 1080p
+    video.frame_gen = false;
+    video.post_processing.clear();
+}
+inline void Apply(PerformanceSettings& speed) {
+    const bool background = speed.background_shader_cache;
+    speed = PerformanceSettings{};
+    speed.background_shader_cache = background;
+}
+// The launch report's line for a safe session.
+inline constexpr const char* kReport =
+    "Safe mode (this start only): 1x, Bilinear, ASTC as BC3, 1080p, 60 Hz, no frame generation or "
+    "post-processing, Performance at its defaults, 4 GiB, 100% speed, mods and cheats off";
+} // namespace SafeLaunch
 
 // Library > Game settings > Mods: the names of the game's mods that are switched off (mods.h). A
 // mod is on unless it is listed, so one added later is used without a visit to the launcher.

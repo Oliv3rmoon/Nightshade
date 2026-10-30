@@ -26,6 +26,95 @@ namespace
 
 constexpr Rect kScreen{0.0f, 0.0f, 1920.0f, 1080.0f};
 
+// The game's case as a game starts: its cover the front of a case that turns about its upright
+// axis, seen in perspective. A turn about that axis keeps every upright line upright, so each face
+// is drawn as upright slices of the picture, each as tall as perspective makes its place: no new
+// shape for the renderer, and the slices meet exactly. The back is the cover darkened; the spine
+// is the cover's edge stretched and tinted, as a printed case wraps its art. turn: radians from
+// facing front. False when the cover is not there yet, or the game has none: the flat cover then.
+bool game_case(Canvas &c, const std::string &path, const Rect &face, float turn, Color tint)
+{
+    const Cover image = c.textures.cover(path, face.w);
+    if (image.texture == 0 || image.missing)
+        return false;
+    const float w = face.w;
+    const float h = face.h;
+    const float depth = w * 0.13f;
+    const float cx = face.x + w * 0.5f;
+    const float cy = face.y + h * 0.5f;
+    const float focal = w * 3.2f;
+    const float cs = std::cos(turn);
+    const float sn = std::sin(turn);
+    struct Seen
+    {
+        float x;
+        float scale;
+        float z;
+    };
+    // Where a point of the case (x across it, z towards the viewer) shows, and how much nearer it is.
+    const auto see = [&](float x, float z)
+    {
+        const float rx = x * cs + z * sn;
+        const float rz = -x * sn + z * cs;
+        const float scale = focal / std::max(focal - rz, 1.0f);
+        return Seen{cx + rx * scale, scale, rz};
+    };
+    const float fade = tween::cubic_out(image.age / 0.22f);
+    // One face from (x0, z0) to (x1, z1), walked so that it reads left to right where it shows, as
+    // `strips` slices of the picture's u0..u1 in `base`, lit by how squarely it faces the viewer.
+    const auto side = [&](float x0, float z0, float x1, float z1, int strips, float u0, float u1, Color base,
+                          float light)
+    {
+        const Color ink{base.r * light, base.g * light, base.b * light, fade};
+        for (int i = 0; i < strips; ++i)
+        {
+            const float a = static_cast<float>(i) / static_cast<float>(strips);
+            const float b = static_cast<float>(i + 1) / static_cast<float>(strips);
+            const Seen l = see(x0 + (x1 - x0) * a, z0 + (z1 - z0) * a);
+            const Seen r = see(x0 + (x1 - x0) * b, z0 + (z1 - z0) * b);
+            if (r.x <= l.x)
+                continue;
+            const float tall = h * 0.5f * (l.scale + r.scale);
+            c.list.image(image.texture, {l.x, cy - tall * 0.5f, r.x - l.x, tall},
+                         {u0 + (u1 - u0) * a, 0.0f, (u1 - u0) * (b - a), 1.0f}, ink);
+        }
+    };
+    const float half = w * 0.5f;
+    const float thick = depth * 0.5f;
+    // The faces that show: the front or the back, and the spine on one side; the farther first.
+    const bool front = cs >= 0.0f;
+    const bool right = sn < 0.0f;
+    const float face_z = see(0.0f, front ? thick : -thick).z;
+    const float spine_z = see(right ? half : -half, 0.0f).z;
+    const auto draw_face = [&]
+    {
+        const Color white{1.0f, 1.0f, 1.0f, 1.0f};
+        if (front)
+            side(-half, thick, half, thick, 48, 0.0f, 1.0f, white, 0.62f + 0.38f * std::fabs(cs));
+        else
+            side(half, -thick, -half, -thick, 48, 0.0f, 1.0f, tint, 0.36f * (0.62f + 0.38f * std::fabs(cs)));
+    };
+    const auto draw_spine = [&]
+    {
+        const float light = 0.30f + 0.36f * std::fabs(sn);
+        if (right)
+            side(half, thick, half, -thick, 8, 0.97f, 1.0f, tint, light);
+        else
+            side(-half, -thick, -half, thick, 8, 0.0f, 0.03f, tint, light);
+    };
+    if (spine_z < face_z)
+    {
+        draw_spine();
+        draw_face();
+    }
+    else
+    {
+        draw_face();
+        draw_spine();
+    }
+    return true;
+}
+
 } // namespace
 
 Launcher::Launcher(Services &services, Textures &textures, const Fonts &fonts, bool first_start)
@@ -169,7 +258,8 @@ bool Launcher::save_preferences(bool quiet)
     return saved;
 }
 
-void Launcher::launch(const std::string &file, const std::string &title, const std::string &cover)
+void Launcher::launch(const std::string &file, const std::string &title, const std::string &cover,
+                      std::uint64_t safe_title)
 {
     // A game whose file was taken away since the menu showed it is not started: it leaves the
     // menu instead.
@@ -187,6 +277,7 @@ void Launcher::launch(const std::string &file, const std::string &title, const s
         sync_file_ = file;
         sync_title_ = title;
         sync_cover_ = cover;
+        sync_safe_ = safe_title;
         sync_launch_ = true;
         sync_started_ = false;
         sync_time_ = 0.0f;
@@ -196,18 +287,28 @@ void Launcher::launch(const std::string &file, const std::string &title, const s
         cue(Cue::modal_open);
         return;
     }
-    start_game(file, title, cover);
+    start_game(file, title, cover, safe_title);
 }
 
-void Launcher::start_game(const std::string &file, const std::string &title, const std::string &cover)
+void Launcher::start_game(const std::string &file, const std::string &title, const std::string &cover,
+                          std::uint64_t safe_title)
 {
     if (!services_.can_launch_game()) {
         say(tr("Join a room successfully or leave it before starting a game."), true);
         cue(Cue::error);
         return;
     }
+    // Safe Launch: armed for this start of this game, or taken back (0) for any other start.
+    services_.arm_safe_launch(safe_title);
     selected_game_ = commit_launch(services_, file);
-    if (selected_game_.empty()) { say(tr("Game cannot start now."), true); cue(Cue::error); return; }
+    if (selected_game_.empty())
+    {
+        services_.arm_safe_launch(0);
+        say(tr("Game cannot start now."), true);
+        cue(Cue::error);
+        return;
+    }
+    launch_safe_ = safe_title != 0;
     launch_title_ = title;
     launch_cover_ = cover;
     launch_.start(th().launch_seconds);
@@ -257,6 +358,8 @@ void Launcher::press(Key key)
         return press_apps(key);
     if (modal_ == Modal::backup)
         return press_backup(key);
+    if (modal_ == Modal::quick)
+        return press_quick(key);
     if (modal_ == Modal::save_sync)
         return press_save_sync(key);
     if (modal_ == Modal::sync_setup)
@@ -363,7 +466,7 @@ void Launcher::update(float dt)
     const Theme &t = th();
     for (std::size_t i = 0; i < home_springs_.size(); ++i)
     {
-        home_springs_[i].target = static_cast<int>(i) == home_focus_ && !rail_focus_ && !home_on_grid_ ? 1.0f : 0.0f;
+        home_springs_[i].target = static_cast<int>(i) == home_focus_ && !rail_focus_ && !home_on_grid_ && !home_on_recents_ ? 1.0f : 0.0f;
         home_springs_[i].update(dt, t.focus_spring);
     }
     for (std::size_t i = 0; i < settings_springs_.size(); ++i)
@@ -412,6 +515,8 @@ void Launcher::update(float dt)
     choice_rows_.update(dt);
     sync_rows_.update(dt);
     sync_setup_rows_.update(dt);
+    quick_rows_.update(dt);
+    home_recent_y_.update(dt, t.cursor_spring);
     mode_.target = selected_docked_ ? 0.0f : 1.0f;
     mode_.update(dt, 22.0f);
     const bool mods_on = library_.selected >= 0 && library_.selected < static_cast<int>(games_.size()) &&
@@ -653,13 +758,18 @@ void Launcher::draw_launch(Canvas &c)
     c.list.push_opacity(leave * (look().reduce_motion ? tween::clamp01(p / 0.18f) : 1.0f));
     c.list.shadow({art.x - 30.0f, art.y - 10.0f, art.w + 60.0f, art.h + 60.0f}, 60.0f, 120.0f,
                   t.highlight.with_alpha(0.16f * tween::clamp01(fly)));
-    cover(c, launch_cover_, art, corner, 1.6f);
+    // The game's case turns as it comes forward: a turn and a quarter, slowing to face the player as
+    // it lands, then it rests. Reduced motion, or no cover to make a case of: the cover as it is.
+    const float turn = -1.25f * 6.2831853f * (1.0f - tween::cubic_out(p / 0.60f));
+    if (look().reduce_motion || !game_case(c, launch_cover_, art, turn, gfx::mix(t.accent_pale, Color{1.0f, 1.0f, 1.0f, 1.0f}, 0.7f)))
+        cover(c, launch_cover_, art, corner, 1.6f);
     c.list.pop_opacity();
     // Its name comes in under it once it is nearly there.
     const float named = tween::cubic_out((p - 0.22f) / 0.30f);
     c.list.push_opacity(named * leave);
     c.list.push_transform(1.0f, 0.0f, 0.0f, 0.0f, (1.0f - named) * 18.0f * motion());
-    kicker(c, tr("STARTING"), 960.0f, 664.0f, t.accent, 1200.0f, Align::center);
+    kicker(c, launch_safe_ ? tr("STARTING IN SAFE MODE") : tr("STARTING"), 960.0f, 664.0f, t.accent, 1200.0f,
+           Align::center);
     {
         const Heavy heavy(c);
         text_fit(c, launch_title_, 960.0f, 730.0f, t.size_display, t.title, 1400.0f, Align::center);
@@ -781,8 +891,10 @@ void Launcher::draw(gfx::DrawList &list)
     // mapping is a dialog over that page.
     const float opened = tween::clamp01(modal_open_.value);
     const bool mapping_of_game = modal_shown_ == Modal::mapping && mapping_for_game_;
+    // Quick settings opened from the game's settings page show over that page.
+    const bool quick_on_page = modal_shown_ == Modal::quick && quick_from_page_;
     const bool page = modal_shown_ == Modal::game || modal_shown_ == Modal::mods || modal_shown_ == Modal::cheats ||
-                      modal_shown_ == Modal::game_options || mapping_of_game;
+                      modal_shown_ == Modal::game_options || mapping_of_game || quick_on_page;
     if (page)
         draw_game_page(c, opened);
     if (!page || opened < 0.99f)
@@ -790,7 +902,7 @@ void Launcher::draw(gfx::DrawList &list)
     draw_clock(c);
     if (th().top_nav && (screen_ == Screen::home || screen_ == Screen::library))
         draw_home_status(c);
-    if (modal_shown_ != Modal::none && (!page || mapping_of_game))
+    if (modal_shown_ != Modal::none && (!page || mapping_of_game || quick_on_page))
     {
         list.rounded_rect(kScreen, 0.0f, th().scrim.with_alpha(0.72f * opened));
         if (modal_shown_ == Modal::mapping)
@@ -819,6 +931,8 @@ void Launcher::draw(gfx::DrawList &list)
             draw_apps(c, opened);
         else if (modal_shown_ == Modal::backup)
             draw_backup(c, opened);
+        else if (modal_shown_ == Modal::quick)
+            draw_quick(c, opened);
         else
             draw_dialog(c, modal_shown_, opened);
     }

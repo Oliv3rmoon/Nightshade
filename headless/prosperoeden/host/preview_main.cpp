@@ -14,6 +14,7 @@
 #include "pe/gfx/gl_program.hpp"
 #include "pe/gfx/system_fonts.hpp"
 #include "pe/ui/launcher.hpp"
+#include "pe/ui/video_profiles.hpp"
 
 #include <array>
 #include <EGL/egl.h>
@@ -125,7 +126,12 @@ struct Stage
             press({Key::right});
             if (std::find(heard.begin() + static_cast<std::ptrdiff_t>(before), heard.end(),
                           pe::audio::Cue::focus) != heard.end())
+            {
+                // The recent games' column lies between the game's panel and the grid.
+                if (launcher->home_recents_focused())
+                    press({Key::right});
                 return;
+            }
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
         }
         std::fprintf(stderr, "warning: the home screen's grid did not take the focus\n");
@@ -213,6 +219,27 @@ void pictures(Stage &s)
     s.press({Key::right});
     s.wait(0.6f);
     s.shoot("02-home-details-focus");
+    // Nightshade's and Slate's home: Right from the game's panel is the recent games' column, and
+    // the panel shows the recent game focused there.
+    if (pe::ui::th().minimal_home)
+    {
+        // The column shows once the games are listed (read on a thread of their own).
+        for (int tries = 0; tries < 600 && !s.launcher->home_recents_focused(); ++tries)
+        {
+            s.press({Key::left});
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            s.press({Key::right});
+        }
+        if (!s.launcher->home_recents_focused())
+        {
+            std::fprintf(stderr, "error: Right from the home screen's panel did not reach the recent games\n");
+            s.ok = false;
+        }
+        s.press({Key::down});
+        s.wait(0.6f);
+        s.shoot("02b-home-recents-second");
+        s.press({Key::up});
+    }
     s.press({Key::down, Key::right});
     s.wait(0.6f);
     s.shoot("03-home-recent-focus");
@@ -257,9 +284,47 @@ void pictures(Stage &s)
     s.press({Key::square});
     s.wait(0.6f);
     s.shoot("45-library-mods-on");
+    // Quick settings (Options): Play, Start in safe mode, the video profile and the common video
+    // settings. A profile chosen there is the game's own; back to Settings' again.
+    s.press({Key::options});
+    s.wait(0.8f);
+    s.shoot("Q0-quick-settings");
+    s.press({Key::down, Key::down});
+    s.wait(0.5f);
+    s.shoot("Q1-quick-profile");
+    s.press({Key::right});
+    s.wait(0.5f);
+    s.shoot("Q2-quick-profile-minimum");
+    {
+        const pe::ui::GameSettings game = s.services.game_settings(0);
+        if (game.resolution != 1 || game.filter != 1 || game.performance[2] != 1 || game.performance[1] != 1 ||
+            game.frame_gen != 0 || game.post_processing != 0)
+        {
+            std::fprintf(stderr, "error: Quick settings' Minimum did not reach the game's settings\n");
+            s.ok = false;
+        }
+    }
+    s.press({Key::left});
+    s.wait(0.3f);
+    if (!pe::ui::game_follows_profile(s.services.game_settings(0), 0))
+    {
+        std::fprintf(stderr, "error: Quick settings' Default did not give the profile back to Settings\n");
+        s.ok = false;
+    }
+    s.press({Key::down, Key::down, Key::down, Key::down});
+    s.wait(0.5f);
+    s.shoot("Q3-quick-overlay");
+    s.press({Key::circle});
+    s.wait(0.6f);
     s.press({Key::triangle});
     s.wait(0.8f);
     s.shoot("09-game-settings");
+    // Quick settings over the game's settings page, and back to it.
+    s.press({Key::options});
+    s.wait(0.6f);
+    s.shoot("Q4-quick-over-page");
+    s.press({Key::circle});
+    s.wait(0.6f);
     // The console mode, the first of its kinds: handheld for this game.
     s.press({Key::right});
     s.wait(0.6f);
@@ -268,7 +333,30 @@ void pictures(Stage &s)
     s.press({Key::down, Key::cross});
     s.wait(0.6f);
     s.shoot("49-game-video");
-    s.press({Key::right});
+    // Its video profile, the Video category's first row: High for this game, then back to Settings'.
+    s.press({Key::right, Key::right, Key::right});
+    s.wait(0.6f);
+    s.shoot("49b-game-profile-high");
+    {
+        const pe::ui::GameSettings game = s.services.game_settings(0);
+        if (game.resolution != 3 || game.filter != 2 || game.astc != 0 || game.performance[2] != 0 ||
+            pe::ui::game_profile_of(game, s.services.preferences(), 0) != 2)
+        {
+            std::fprintf(stderr, "error: the game's High profile did not reach its settings\n");
+            s.ok = false;
+        }
+        // A setting of the profile's changed by hand: the profile is Custom.
+        pe::ui::GameSettings changed = game;
+        changed.resolution = 5;  // 3x: High's 1.5x and Ultra's 2x are tiers of their own
+        if (pe::ui::game_profile_of(changed, s.services.preferences(), 0) != pe::ui::kCustomProfile)
+        {
+            std::fprintf(stderr, "error: a changed profile did not read as Custom\n");
+            s.ok = false;
+        }
+    }
+    s.press({Key::left, Key::left, Key::left});
+    s.wait(0.3f);
+    s.press({Key::down, Key::right});
     s.wait(0.6f);
     s.shoot("10-game-settings-changed");
     // ASTC textures at full quality says what it costs; then back to what Settings has.
@@ -287,6 +375,15 @@ void pictures(Stage &s)
     s.press({Key::right, Key::right, Key::right});
     s.wait(0.6f);
     s.shoot("50b-game-speed-limit");
+    // Its own memory, the row after the speed limit: 4 GiB for this game.
+    s.press({Key::down, Key::right});
+    s.wait(0.6f);
+    s.shoot("50c-game-memory");
+    if (s.services.game_settings(0).memory_layout != 0)
+    {
+        std::fprintf(stderr, "error: the game's own memory did not reach its settings\n");
+        s.ok = false;
+    }
     // Its own Controls: a button mapping of its own, and A moved to another button.
     s.press({Key::circle, Key::down, Key::down, Key::cross, Key::down, Key::right});
     s.wait(0.6f);
@@ -585,7 +682,26 @@ void pictures(Stage &s)
     s.press({Key::cross});
     s.wait(0.8f);
     s.shoot("14-video");
-    s.press({Key::down, Key::right});
+    // The video profile, Video's first row: High, and back to Recommended, a new install's.
+    s.press({Key::right});
+    s.wait(0.6f);
+    s.shoot("14b-video-profile-high");
+    {
+        const pe::ui::Preferences p = s.services.preferences();
+        if (p.resolution != 3 || p.filter != 2 || pe::ui::profile_of(p) != 2)
+        {
+            std::fprintf(stderr, "error: Settings' High profile did not reach the settings\n");
+            s.ok = false;
+        }
+    }
+    s.press({Key::left});
+    s.wait(0.3f);
+    if (pe::ui::profile_of(s.services.preferences()) != pe::ui::kRecommendedProfile)
+    {
+        std::fprintf(stderr, "error: Settings' profile did not go back to Recommended\n");
+        s.ok = false;
+    }
+    s.press({Key::down, Key::down, Key::right});
     s.wait(0.6f);
     s.shoot("15-video-saved");
     // ASTC textures at full quality says what it costs; then back to compressed.
@@ -599,6 +715,15 @@ void pictures(Stage &s)
     s.press({Key::down});
     s.wait(0.6f);
     s.shoot("43-video-overlay");
+    // Overlay options: the frame-time window, memory pressure and shader building are the last
+    // three of its switches (Up from the first goes round to them).
+    s.press({Key::down, Key::cross});
+    s.wait(0.6f);
+    s.press({Key::up, Key::up, Key::up});
+    s.wait(0.6f);
+    s.shoot("43b-overlay-new-pieces");
+    s.press({Key::circle});
+    s.wait(0.4f);
     // Performance: seven switches, four of them showing. Reactive flushing starts on, the
     // others off, and a press on each one reaches the settings.
     s.press({Key::circle});
@@ -936,6 +1061,28 @@ void pictures(Stage &s)
     s.restart();
     s.wait(2.0f);
     s.shoot("25-home-launch-failed");
+    // Options offers the game that stopped its safe start: Quick settings on that row, and Cross
+    // starts it once in safe mode (Safe Launch), armed for that game alone.
+    s.press({Key::options});
+    s.wait(0.8f);
+    s.shoot("25c-home-safe-offer");
+    {
+        std::uint64_t title = 0;
+        for (const pe::ui::Game &game : s.services.games())
+            if (game.file == s.services.home().last_file)
+                title = game.title_id;
+        s.services.safe_armed = 0;
+        s.press({Key::cross});
+        s.wait(0.30f);
+        s.shoot("25d-safe-starting");
+        if (title == 0 || s.services.safe_armed != title)
+        {
+            std::fprintf(stderr, "error: the safe start was not armed for the game that stopped\n");
+            s.ok = false;
+        }
+        s.wait(0.30f);
+        s.shoot("25e-safe-starting-case");
+    }
     s.services.launch_error.clear();
     s.services.crash_report = "/data/prosperoeden/logs/crash-20261001-213000.txt";
     s.restart();

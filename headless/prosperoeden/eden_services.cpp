@@ -630,6 +630,8 @@ bool EdenServices::can_launch_game() {
     const auto phase = rooms_.GetSnapshot().phase;
     return phase == Eden::Multiplayer::Phase::Idle || phase == Eden::Multiplayer::Phase::Connected;
 }
+// The session that starts next takes it (headless/main.cpp, Eden::SafeLaunch::Begin).
+void EdenServices::arm_safe_launch(std::uint64_t title_id) { Eden::SafeLaunch::Arm(title_id); }
 std::optional<std::string> EdenServices::room_text(int field, const std::string& initial,
                                                 const std::atomic<bool>& stop) {
     if (field < 0 || field > 3) return std::nullopt;
@@ -1138,6 +1140,7 @@ pe::ui::GameSettings EdenServices::game_settings(std::uint64_t title_id) {
     result.performance = saved.performance;
     result.rng_seed = saved.rng_seed;
     result.speed_limit = saved.speed_limit;
+    result.memory_layout = saved.memory_layout;
     return result;
 }
 
@@ -1169,6 +1172,7 @@ bool EdenServices::set_game_settings(std::uint64_t title_id, const pe::ui::GameS
     value.performance = settings.performance;
     value.rng_seed = settings.rng_seed;
     value.speed_limit = settings.speed_limit;
+    value.memory_layout = settings.memory_layout;
     const bool saved = Eden::SaveGameSettings(title_id, value);
     if (!saved) Eden::Report("settings", "Could not write game settings");
     return saved;

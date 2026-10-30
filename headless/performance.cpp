@@ -748,6 +748,13 @@ void RecordHle(const char* service, unsigned command, long long ns) {
     entry.second += static_cast<unsigned long long>(ns > 0 ? ns : 0);
 }
 
+void HeapUsage(unsigned long long* held, unsigned long long* in_use) {
+    std::size_t h = 0, u = 0;
+    if (eden_heap_usage) eden_heap_usage(&h, &u, nullptr);
+    if (held) *held = h;
+    if (in_use) *in_use = u;
+}
+
 // The heap's line in stderr.log: what it holds of the pool (pieces and large blocks), what of that
 // its blocks use, and what it has given back. `why` says when.
 void ReportHeap(const char* why) {

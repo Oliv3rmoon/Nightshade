@@ -60,6 +60,9 @@ class FakeServices : public ui::Services
     bool can_launch_game() override {
         return room.phase == Eden::Multiplayer::Phase::Idle || room.phase == Eden::Multiplayer::Phase::Connected;
     }
+    // The title the next start is safe for (Safe Launch), as the launcher armed it.
+    std::uint64_t safe_armed = 0;
+    void arm_safe_launch(std::uint64_t title_id) override { safe_armed = title_id; }
 
     ui::Home home() override;
     std::string clock() override

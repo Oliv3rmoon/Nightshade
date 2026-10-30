@@ -16,6 +16,7 @@
 #include <cstring>
 #include <time.h>
 #include "hud.h"
+#include "shader_start.h"
 #include "start_wait.h"
 #include "loading_art.h"
 #include "network/network.h"
@@ -66,6 +67,14 @@ HudMachine MachineNow() {
     machine.gpu = Performance::GpuBusyPercent();
     Performance::MemoryPool(&machine.memory_free, &machine.memory_total);
     if (const auto held = Performance::graphics_memory_held.load(std::memory_order_relaxed)) machine.graphics = held();
+    // Memory pressure: the heap's part of the pool, and whether the pool is short now.
+    Performance::HeapUsage(&machine.heap_held, &machine.heap_used);
+    machine.pool_short = Performance::graphics_memory_short.load(std::memory_order_relaxed);
+    // The saved shaders built while the game plays (shader_start.h): until the last one is built.
+    const ShaderStart::Progress shaders = ShaderStart::GetProgress();
+    machine.shaders_active = shaders.active && (shaders.reading || shaders.built < shaders.total);
+    machine.shaders_built = shaders.built;
+    machine.shaders_total = shaders.total;
     return machine;
 }
 std::atomic<bool> hud_enabled{true};
@@ -75,7 +84,7 @@ std::atomic<bool> hud_enabled{true};
 std::atomic<int> hud_size{0};
 std::atomic<int> hud_corner{0};
 std::atomic<bool> hud_colors{true};
-std::atomic<int> hud_fields{0x2ff};
+std::atomic<int> hud_fields{0x1eff};
 // What the session's settings say the overlay should look like, for all of them at once.
 void LoadHudPreferences() {
     const auto prefs = PreferencesFor(session_title.load());

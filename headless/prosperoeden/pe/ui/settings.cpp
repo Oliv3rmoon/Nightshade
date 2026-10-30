@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "pe/ui/launcher.hpp"
+#include "pe/ui/video_profiles.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -62,6 +63,7 @@ Rect tile_rect(int index)
 // are).
 enum VideoRow : int
 {
+    video_profile, // Minimum, Recommended, High, Ultra (video_profiles.hpp); Custom when none matches
     video_renderer,
     video_output,
     video_resolution,
@@ -95,7 +97,10 @@ enum HudRow : int
     hud_mem_row,
     hud_ping_row,
     hud_cores_row, // the CPU piece as each of the four cores (its bit clear), or only the busiest
-    hud_resolution_row, // the game's own picture, as it renders it (bit 9; last, so no earlier bit moves)
+    hud_resolution_row, // the game's own picture, as it renders it (bit 9; so no earlier bit moves)
+    hud_average_row,    // the MS piece with the last second's average frame before its worst (bit 10)
+    hud_pressure_row,   // memory pressure: the heap's held and used, LOW while the pool is short (bit 11)
+    hud_shaders_row,    // the saved shaders built while the game plays (bit 12)
     kHudRows,
 };
 constexpr int kFrameGenMethods = 2;     // Lossless Scaling, MihawkGen (settings_store.h)
@@ -784,7 +789,16 @@ void Launcher::press_dialog(Key key)
     switch (modal_)
     {
     case Modal::video:
-        if (option_ == video_renderer)
+        if (option_ == video_profile)
+        {
+            // The four tiers in turn, each written as the settings it is made of; from Custom,
+            // Right goes to the first and Left to the last.
+            const int now = profile_of(prefs_);
+            const int tier = now == kCustomProfile ? (step > 0 ? 0 : kVideoProfiles - 1)
+                                                   : (now + step + kVideoProfiles) % kVideoProfiles;
+            apply_profile(prefs_, tier);
+        }
+        else if (option_ == video_renderer)
             prefs_.renderer = prefs_.renderer != 0 ? 0 : 1;
         else if (option_ == video_output)
         {
@@ -1020,6 +1034,14 @@ void Launcher::draw_dialog(Canvas &c, Modal modal, float open)
     case Modal::video:
         title = tr("Video");
         copy = tr("How games are drawn and scaled to your TV.");
+        // On the profile's row: what the profile Settings has sets.
+        if (option_ == video_profile)
+        {
+            const int tier = profile_of(prefs_);
+            sourced = tier == kCustomProfile ? std::string{tr("Custom: your values match none of the profiles.")} :
+                                               profile_name(tier) + ": " + profile_summary(0, tier);
+            copy = sourced.c_str();
+        }
         break;
     case Modal::performance:
         title = tr("Performance");
@@ -1128,6 +1150,7 @@ void Launcher::draw_dialog(Canvas &c, Modal modal, float open)
     case Modal::video:
     {
         const std::string values[] = {
+            profile_name(profile_of(prefs_)),
             prefs_.renderer != 0 ? tr("Vulkan (recommended)") : "OpenGL",
             output_name(prefs_.output),
             pick(services_.resolution_labels(), prefs_.resolution),
@@ -1148,6 +1171,7 @@ void Launcher::draw_dialog(Canvas &c, Modal modal, float open)
         const bool frame_gen_locked = prefs_.frame_gen_method == 0 ? lsfg_locked :
                                       prefs_.frame_gen_method == 1 ? mihawkgen_locked : true;
         static constexpr const char *kNames[kVideoRows] = {
+            TR("Video profile"),
             TR("Renderer"),         TR("Output resolution"), TR("Resolution"),
             TR("Upscaling filter"), TR("ASTC textures"),     TR("Refresh rate"),
             TR("FPS overlay"),      TR("Overlay options"),   TR("Post-processing"),
@@ -1641,7 +1665,8 @@ void Launcher::draw_hud(Canvas &c, float open)
     static constexpr const char *kNames[kHudRows] = {
         TR("Enable colors"), TR("Size"), TR("Corner"), TR("Backend"), TR("FPS"),
         TR("Frame time"), TR("Speed"), TR("CPU"), TR("GPU"), TR("Memory"), TR("Ping"),
-        TR("CPU by core"), TR("Resolution")};
+        TR("CPU by core"), TR("Resolution"), TR("Average frame time"), TR("Memory pressure"),
+        TR("Shader cache progress")};
     for (int row = hud_rows_.first_row(); row <= hud_rows_.last_row(); ++row)
     {
         list.push_opacity(hud_rows_.row_alpha(row, kVideoRowHeight));

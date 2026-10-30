@@ -75,6 +75,17 @@ struct HudMachine {
     unsigned long long memory_free = 0;
     unsigned long long memory_total = 0;
     unsigned long long graphics = 0;  // of what is taken, what the graphics hold; 0: not known
+    // Memory pressure (kHudFieldPressure), as EDEN_MEMORY says it every 5 s (performance.cpp): the
+    // heap's pieces it holds of the pool and what of them is in use (0: not known), and whether the
+    // pool is short now (the caches give memory back while it is).
+    unsigned long long heap_held = 0;
+    unsigned long long heap_used = 0;
+    bool pool_short = false;
+    // The game's saved shaders being built while it plays (shader_start.h, kHudFieldShaders): how
+    // many are built of how many there are (an estimate while the file is still read).
+    bool shaders_active = false;
+    unsigned long long shaders_built = 0;
+    unsigned long long shaders_total = 0;
 };
 // The overlay's line and where its box goes, in a picture 1080 rows high. Where it is drawn they
 // are scaled to the picture, and `width` then carries the picture's height to the shader instead
@@ -123,10 +134,22 @@ inline constexpr uint32_t kHudFieldPing = 1u << 7;
 inline constexpr uint32_t kHudFieldOneCore = 1u << 8;
 // The game's own picture: what it renders at, before the upscaling filter and the output size.
 inline constexpr uint32_t kHudFieldResolution = 1u << 9;
-// Every piece of the line, which is what a setting that names none starts at. Bit 8 is a mode of
-// the CPU piece rather than a piece, so it is not in this, as it was not before.
+// Every piece of the line as it was before the three below. Bit 8 is a mode of the CPU piece rather
+// than a piece, so it is not in this, as it was not before.
 inline constexpr uint32_t kHudFieldAll = 0x2ffu;
-inline constexpr uint32_t kHudFieldSupported = kHudFieldAll | kHudFieldOneCore;
+// How the MS piece reads: set, the average frame of the last second before its worst
+// ("16.7/33.4MS"); clear, as before, the worst alone.
+inline constexpr uint32_t kHudFieldFrameAverage = 1u << 10;
+// Memory pressure: the heap's pieces in use of those it holds of the pool ("HEAP 1.1/1.4G"), and
+// LOW after the MEM piece while the pool is short.
+inline constexpr uint32_t kHudFieldPressure = 1u << 11;
+// The game's saved shaders built while it plays, while that build runs ("SHD 45%").
+inline constexpr uint32_t kHudFieldShaders = 1u << 12;
+// What a new install's line says (Preferences::hud_fields): every piece, with the three above.
+// Settings saved before them keep the bits they had, so their line is as it was.
+inline constexpr uint32_t kHudFieldDefault = kHudFieldAll | kHudFieldFrameAverage | kHudFieldPressure |
+                                             kHudFieldShaders;
+inline constexpr uint32_t kHudFieldSupported = kHudFieldDefault | kHudFieldOneCore;
 inline constexpr bool ValidHudFields(int fields) {
     return fields >= 0 && (static_cast<uint32_t>(fields) & ~kHudFieldSupported) == 0;
 }
@@ -307,7 +330,11 @@ inline std::array<char, kHudTextMax + 1> FormatHudText(const HudClock& clock, co
                 std::snprintf(piece, sizeof(piece), " %.0f/%.0fFPS", clock.fps, shown);
             put(piece);
         }
-        if (fields & kHudFieldMs) {
+        if ((fields & kHudFieldMs) && (fields & kHudFieldFrameAverage) && clock.fps > 0) {
+            // The frame-time window: the last second's average frame, then its worst.
+            std::snprintf(piece, sizeof(piece), " %.1f/%.1fMS", 1000.0 / clock.fps, clock.worst_ms);
+            put(piece);
+        } else if (fields & kHudFieldMs) {
             std::snprintf(piece, sizeof(piece), " %.1fMS", clock.worst_ms);
             put(piece);
         }
@@ -364,11 +391,31 @@ inline std::array<char, kHudTextMax + 1> FormatHudText(const HudClock& clock, co
                           static_cast<double>(machine.memory_total) / 1073741824.0);
         std::snprintf(piece, sizeof(piece), " MEM %s", memory);
         put(piece);
+        // The pool is short now: the caches are giving memory back (memory pressure).
+        if ((fields & kHudFieldPressure) && machine.pool_short) put(" LOW");
         // The graphics' part of it: the one that grows as scenery loads.
         if (machine.graphics != 0) {
             std::snprintf(piece, sizeof(piece), " GFX %.1fG", static_cast<double>(machine.graphics) / 1073741824.0);
             put(piece);
         }
+    }
+    // Memory pressure: of the pieces the heap holds of the pool, what is in use. A heap that holds
+    // much more than it uses is memory the pool lacks elsewhere.
+    if ((fields & kHudFieldPressure) && machine.heap_held != 0) {
+        std::snprintf(piece, sizeof(piece), " HEAP %.1f/%.1fG",
+                      static_cast<double>(std::min(machine.heap_used, machine.heap_held)) / 1073741824.0,
+                      static_cast<double>(machine.heap_held) / 1073741824.0);
+        put(piece);
+    }
+    // The saved shaders built while the game plays: only while that build runs.
+    if ((fields & kHudFieldShaders) && machine.shaders_active) {
+        if (machine.shaders_total != 0)
+            std::snprintf(piece, sizeof(piece), " SHD %u%%",
+                          static_cast<unsigned>(std::min<unsigned long long>(
+                              99, machine.shaders_built * 100 / machine.shaders_total)));
+        else
+            std::snprintf(piece, sizeof(piece), " SHD --%%");
+        put(piece);
     }
     if ((fields & kHudFieldPing) && ping_ms >= 0) {
         std::snprintf(piece, sizeof(piece), " P%d", std::min(ping_ms, 9999));

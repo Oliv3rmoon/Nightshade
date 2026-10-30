@@ -156,7 +156,7 @@ void Launcher::poll_save_sync(float dt)
             save_sync_ = services_.save_sync();
             sync_launch_ = false;
             modal_ = Modal::none;
-            start_game(sync_file_, sync_title_, sync_cover_);
+            start_game(sync_file_, sync_title_, sync_cover_, sync_safe_);
             return;
         }
     }
@@ -234,7 +234,7 @@ void Launcher::press_save_sync(Key key)
         if (answer == Answer::play_anyway && launching)
         {
             modal_ = Modal::none;
-            start_game(sync_file_, sync_title_, sync_cover_);
+            start_game(sync_file_, sync_title_, sync_cover_, sync_safe_);
             return;
         }
         close_modal();

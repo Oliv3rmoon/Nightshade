@@ -100,6 +100,11 @@ msgstr "Semua cheat"
 msgid "All credit for the Eden emulator goes to its developers and contributors."
 msgstr "Semua kredit untuk emulator Eden adalah milik para pengembang dan kontributornya."
 
+#. Button hint: open every setting of the game (its settings page).
+#: pe/ui/quick.cpp
+msgid "All settings"
+msgstr "Semua pengaturan"
+
 #: settings_store.h
 msgid "AMD FSR"
 msgstr "AMD FSR"
@@ -164,6 +169,11 @@ msgstr "Otomatis"
 #: pe/ui/game_options.cpp
 msgid "Automatic"
 msgstr "Otomatis"
+
+#. FPS overlay option: the average time between frames, shown before the worst one.
+#: pe/ui/settings.cpp
+msgid "Average frame time"
+msgstr "Waktu frame rata-rata"
 
 #. Button hint: go back one screen.
 #: pe/ui/browse.cpp, pe/ui/game_options.cpp, pe/ui/library.cpp, pe/ui/multiplayer.cpp, pe/ui/pairing.cpp, pe/ui/profiles.cpp, pe/ui/remote.cpp, pe/ui/save_sync.cpp, pe/ui/settings.cpp, pe/ui/update.cpp
@@ -489,6 +499,19 @@ msgstr "Kredit dan penyiapan"
 msgid "Cross"
 msgstr "Silang"
 
+#. Video profile name: the player changed one of the profile's settings by hand.
+#: pe/ui/video_profiles.hpp
+msgid "Custom"
+msgstr "Kustom"
+
+#: pe/ui/game_options.cpp
+msgid "Custom: this game's own values match none of the profiles. Choosing a profile sets them again."
+msgstr "Kustom: nilai khusus game ini tidak cocok dengan preset mana pun. Memilih preset mengatur ulang nilainya."
+
+#: pe/ui/settings.cpp
+msgid "Custom: your values match none of the profiles."
+msgstr "Kustom: nilai Anda tidak cocok dengan preset mana pun."
+
 #: pe/ui/settings.cpp
 msgid "Default"
 msgstr "Bawaan"
@@ -730,6 +753,10 @@ msgid "Follows Settings"
 msgstr "Mengikuti Pengaturan"
 
 #: pe/ui/game_options.cpp
+msgid "Follows Settings, whose video profile is {0}. A profile chosen here is this game's own."
+msgstr "Mengikuti Pengaturan, yang preset grafisnya {0}. Preset yang dipilih di sini hanya untuk game ini."
+
+#: pe/ui/game_options.cpp
 msgid "For every controller. A game can have its own."
 msgstr "Untuk semua kontroler. Game bisa punya sendiri."
 
@@ -765,9 +792,17 @@ msgstr "Pembuatan frame memerlukan Lossless.dll dari Lossless Scaling di folder 
 msgid "Frame generation needs MihawkGen weights (network.fgw)."
 msgstr "Pembuatan frame memerlukan bobot MihawkGen (network.fgw)."
 
+#: pe/ui/quick.cpp
+msgid "Frame rate, frame time, CPU, GPU and memory over the game. Touchpad + R1 shows or hides it while playing."
+msgstr "Frame rate, waktu frame, CPU, GPU, dan memori di atas game. Touchpad + R1 menampilkan atau menyembunyikan penghitung saat bermain."
+
 #: pe/ui/settings.cpp
 msgid "Frame time"
 msgstr "Waktu frame"
+
+#: pe/ui/quick.cpp
+msgid "Frames made between the game's own, up to the output's rate (Vulkan)."
+msgstr "Frame yang dibuat di antara frame game itu sendiri, hingga kecepatan keluaran (Vulkan)."
 
 #. The console does not say how much room a USB drive has. Keep it short.
 #: pe/ui/backup.cpp
@@ -906,6 +941,11 @@ msgstr "Inisialisasi renderer grafis gagal. Coba renderer lain di Pengaturan; li
 msgid "Handheld"
 msgstr "Genggam"
 
+#. Video profile name: higher picture quality.
+#: pe/ui/video_profiles.hpp
+msgid "High"
+msgstr "Tinggi"
+
 #. A switch: solid dark panels, brighter text.
 #: pe/ui/settings.cpp
 msgid "High contrast"
@@ -919,6 +959,14 @@ msgstr "Beranda"
 #: pe/ui/library.cpp, pe/ui/settings.cpp
 msgid "How games are drawn and scaled to your TV."
 msgstr "Cara game dirender dan diskalakan ke TV Anda."
+
+#: pe/ui/quick.cpp
+msgid "How many pixels the game is drawn with: above 1x is sharper and needs more of the GPU and its memory."
+msgstr "Dengan berapa piksel game digambar: di atas 1x lebih tajam dan butuh lebih banyak GPU serta memorinya."
+
+#: pe/ui/quick.cpp
+msgid "How the game's picture is scaled to the output."
+msgstr "Cara gambar game diskalakan ke keluaran."
 
 #: pe/ui/settings.cpp
 msgid "Images in this folder: {0}"
@@ -976,6 +1024,10 @@ msgstr "Akan dicoba lagi saat menu dibuka berikutnya."
 #: pe/ui/save_sync.cpp
 msgid "It replaces this console's."
 msgstr "Menggantikan milik konsol ini."
+
+#: pe/ui/quick.cpp
+msgid "It stopped last time."
+msgstr "Game berhenti terakhir kali."
 
 #: pe/ui/pairing.cpp
 msgid "It was declined on the server."
@@ -1139,6 +1191,11 @@ msgstr "Sedang"
 msgid "Memory"
 msgstr "Memori"
 
+#. FPS overlay option: how close the console's memory is to running out.
+#: pe/ui/settings.cpp
+msgid "Memory pressure"
+msgstr "Tekanan memori"
+
 #: pe/ui/game_options.cpp, pe/ui/settings.cpp
 msgid "Menu keybinds"
 msgstr "Tombol menu"
@@ -1150,6 +1207,11 @@ msgstr "Efek suara menu dibuat dengan ElevenLabs."
 #: pe/ui/settings.cpp
 msgid "Menu sounds"
 msgstr "Suara menu"
+
+#. Video profile name: the lightest settings (fastest).
+#: pe/ui/video_profiles.hpp
+msgid "Minimum"
+msgstr "Minimum"
 
 #: eden_services.cpp, host/fake_services.cpp
 msgid "Missing or empty keys/prod.keys in {0}."
@@ -1639,6 +1701,11 @@ msgstr "Dalam antrean"
 msgid "Queued, from {0}"
 msgstr "Dalam antrean, dari {0}"
 
+#. A panel of a game's most used settings, opened with the Options button.
+#: pe/ui/home.cpp, pe/ui/library.cpp, pe/ui/quick.cpp
+msgid "Quick settings"
+msgstr "Pengaturan cepat"
+
 #. The usual value of RNG seed: no fixed seed, a new random one at every start of the game.
 #: pe/ui/game_options.cpp
 msgid "Random"
@@ -1665,9 +1732,19 @@ msgstr "Membaca..."
 msgid "Ready"
 msgstr "Siap"
 
+#. Home screen: the label over a column of recently played games (short: it has little room).
+#: pe/ui/home.cpp
+msgid "RECENT"
+msgstr "BARU"
+
 #: pe/ui/home.cpp
 msgid "RECENTLY PLAYED"
 msgstr "BARU DIMAINKAN"
+
+#. Video profile name: the settings a new install has.
+#: pe/ui/video_profiles.hpp
+msgid "Recommended"
+msgstr "Disarankan"
 
 #. A switch: no drifting, sliding or zooming on screen.
 #: pe/ui/settings.cpp
@@ -1919,6 +1996,11 @@ msgstr "Beberapa server dapat menyimpan data simpanan. Mana yang dipakai profil 
 msgid "Several sources have this game. Which one should it come from?"
 msgstr "Beberapa sumber memiliki game ini. Unduh dari yang mana?"
 
+#. FPS overlay option: how far the game's saved shaders are built while it plays.
+#: pe/ui/settings.cpp
+msgid "Shader cache progress"
+msgstr "Kemajuan cache shader"
+
 #: pe/ui/settings.cpp
 msgid "Show an image of your own behind the menu."
 msgstr "Tampilkan gambar milikmu di belakang menu."
@@ -1987,15 +2069,39 @@ msgstr "Kotak sekali lagi menghapus {0} dari daftar. Data simpanannya tetap di k
 msgid "Square again unlinks {0}. Its save data stays on the console and on the server."
 msgstr "Kotak sekali lagi memutuskan tautan {0}. Data simpanannya tetap di konsol dan di server."
 
+#. Button hint: start the game.
+#: pe/ui/quick.cpp
+msgid "Start"
+msgstr "Mulai"
+
 #. The app creates its user the first time a game runs.
 #: eden_services.cpp
 msgid "Start any game once before importing a save."
 msgstr "Jalankan game apa pun sekali sebelum mengimpor data tersimpan."
 
+#. Starts the game once with conservative settings and its mods off; nothing saved changes.
+#: pe/ui/quick.cpp
+msgid "Start in safe mode"
+msgstr "Mulai dalam mode aman"
+
+#. Under a message that a game failed to start: start that game once in safe mode.
+#: pe/ui/home.cpp
+msgid "Start it in safe mode"
+msgstr "Mulai dalam mode aman"
+
 #. Shown over a game's cover while it starts.
 #: pe/ui/launcher.cpp
 msgid "STARTING"
 msgstr "MEMULAI"
+
+#. Shown while a game starts in safe mode (one time, conservative settings, mods off).
+#: pe/ui/launcher.cpp
+msgid "STARTING IN SAFE MODE"
+msgstr "MEMULAI DALAM MODE AMAN"
+
+#: pe/ui/quick.cpp
+msgid "Starts with: {0}"
+msgstr "Dimulai dengan: {0}"
 
 #: pe/ui/settings.cpp
 msgid "Stops the background drifting and the screens sliding, here and on the loading screen."
@@ -2029,6 +2135,10 @@ msgstr "Ambil milik server"
 #: pe/ui/profiles.cpp
 msgid "Taken off the list. Its save data stays on the console."
 msgstr "Dihapus dari daftar. Data simpanannya tetap di konsol."
+
+#: pe/ui/video_profiles.hpp
+msgid "Tears of the Kingdom: 4 GiB and compressed ASTC in every tier, what it needs to play for hours."
+msgstr "Tears of the Kingdom: 4 GiB dan ASTC terkompresi di setiap tingkat, yang dibutuhkan untuk bermain berjam-jam."
 
 #: settings_store.h
 msgid "Thai"
@@ -2202,6 +2312,10 @@ msgstr "Pengaturan game ini tidak dapat disimpan (tidak ada ID judul)."
 msgid "This room uses a different protocol version."
 msgstr "Ruang ini memakai versi protokol yang berbeda."
 
+#: pe/ui/quick.cpp
+msgid "This start only: 1x, Bilinear, compressed ASTC, a 1080p output at 60 Hz, no frame generation or post-processing, Performance at its defaults, 4 GiB, mods and cheats off. Nothing you saved changes."
+msgstr "Hanya untuk kali ini: 1x, Bilinear, ASTC terkompresi, keluaran 1080p pada 60 Hz, tanpa pembuatan bingkai atau pascaproses, Performa pada nilai default, 4 GiB, mod dan cheat nonaktif. Yang sudah Anda simpan tidak berubah."
+
 #. Exactly one file; {0} is a size such as 1.2 GB. See '{0} game'.
 #: pe/ui/backup.cpp
 msgid "To back up: {0} in {1} file"
@@ -2256,6 +2370,11 @@ msgstr "Aktifkan atau nonaktifkan"
 #: pe/ui/multiplayer.cpp
 msgid "UDP port"
 msgstr "Port UDP"
+
+#. Video profile name: the highest picture quality.
+#: pe/ui/video_profiles.hpp
+msgid "Ultra"
+msgstr "Ultra"
 
 #: pe/ui/game_options.cpp, pe/ui/library.cpp, pe/ui/settings.cpp
 msgid "Unavailable"
@@ -2385,6 +2504,11 @@ msgstr "Getaran, pemetaan tombol, dan pintasan selama bermain."
 msgid "Video"
 msgstr "Video"
 
+#. A setting: a set of video settings chosen at once (Minimum, Recommended, High, Ultra), like a game's graphics preset.
+#: pe/ui/game_options.cpp, pe/ui/quick.cpp, pe/ui/settings.cpp
+msgid "Video profile"
+msgstr "Preset grafis"
+
 #: pe/ui/home.cpp
 msgid "VIEW ALL GAMES"
 msgstr "LIHAT SEMUA GAME"
@@ -2393,6 +2517,10 @@ msgstr "LIHAT SEMUA GAME"
 #: pe/ui/settings.cpp
 msgid "Vulkan (recommended)"
 msgstr "Vulkan (disarankan)"
+
+#: pe/ui/quick.cpp
+msgid "Vulkan is faster and recommended; OpenGL is there for a game that needs it."
+msgstr "Vulkan lebih cepat dan disarankan; OpenGL tersedia untuk game yang membutuhkannya."
 
 #: pe/ui/pairing.cpp
 msgid "Waiting for the approval  ·  the code works {0} more"
@@ -2483,6 +2611,11 @@ msgstr "Data simpanan Anda dicocokkan dengan yang di server."
 #: eden_services.cpp
 msgid "{0} (advanced)"
 msgstr "{0} (lanjutan)"
+
+#. {0} is how ASTC textures are held, for example Compressed or Full quality. ASTC is a texture format's name.
+#: pe/ui/game_options.cpp
+msgid "{0} ASTC"
+msgstr "ASTC: {0}"
 
 #. How many settings of a kind this game has of its own; {0} is a number.
 #: pe/ui/library.cpp
@@ -2637,6 +2770,14 @@ msgstr "{0}/ (NSP atau XCI)"
 #: pe/ui/browse.cpp
 msgid "{0}/ (one folder per game ID)"
 msgstr "{0}/ (satu folder per ID judul)"
+
+#: pe/ui/game_options.cpp, pe/ui/quick.cpp
+msgid "{0}: {1}. Applies on next launch."
+msgstr "{0}: {1}. Berlaku saat game dijalankan lagi."
+
+#: pe/ui/game_options.cpp
+msgid "{0}: {1}. Frame generation and post-processing off; changing one of these makes it Custom."
+msgstr "{0}: {1}. Pembuatan bingkai dan pascaproses nonaktif; mengubah salah satunya menjadikannya Kustom."
 
 #: pe/ui/settings.cpp
 msgid "Crash reports (FTP): {0}\nAttach crash-*.txt and its matching logs to your issue."
