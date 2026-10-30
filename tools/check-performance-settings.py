@@ -77,11 +77,18 @@ assert 'Eden::SavePerformance(0, speed)' in save
 assert 'Settings::values.memory_layout_mode = Settings::MemoryLayout::Memory_4Gb;' in release
 layout = release.index('Settings::values.memory_layout_mode =\n')
 assert read < layout < release.index('Core::System system;')
-for case in ('speed.memory_layout == 1 ? Settings::MemoryLayout::Memory_6Gb',
-             'speed.memory_layout == 2 ? Settings::MemoryLayout::Memory_8Gb',
+for case in ('layout == 1 ? Settings::MemoryLayout::Memory_6Gb',
+             'layout == 2 ? Settings::MemoryLayout::Memory_8Gb',
              'Settings::MemoryLayout::Memory_4Gb;'):
     assert case in release[layout:layout + 600], case
 assert 'Memory layout: ' in release  # the session says which one it uses
+# The layout chosen, except for a game that stops with more memory than its console's and runs
+# without a mod (memory_layout_guard.h): decided once the game's mods are known, and only then set.
+guard = release.index('const int layout = Eden::MemoryLayoutGuard::Layout(title, speed.memory_layout, mods_on,')
+assert release.index('const auto& mods_off = switched.mods_off;') < guard < layout
+assert release.count('Settings::values.memory_layout_mode =\n') == 1
+guard_header = (root / 'headless/memory_layout_guard.h').read_text()
+assert '0x0100F2C0115B6000, // The Legend of Zelda: Tears of the Kingdom' in guard_header
 assert 'inline constexpr const char* kMemoryLayoutKeys[] = {"4Gb", "6Gb", "8Gb"};' in store
 assert 'int memory_layout = 0;' in store
 assert 'kMemoryLayoutKeys[value.memory_layout]' in store

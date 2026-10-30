@@ -105,6 +105,8 @@ A game's console has 4 GiB of memory, and its kernel divides them between the ga
 
 A mod that keeps memory of its own asks the kernel how much there is and takes what it wants from the answer. A mod that wants more than 4 GiB then finds less than it asked for, and the game stops before its first picture; that mod's game needs 6 or 8 GiB, as [Mods](MODS.md) describes.
 
+**Tears of the Kingdom plays with 4 GiB unless a mod is switched on for it.** Told it has 8 GiB, it is handed 6.4 GiB (twice what a Switch gives it) and fills it: on a tester's console every session with 8 GiB and no mods ended 19 to 74 minutes in, after the game suddenly wrote gigabytes of memory it had never used. With one of its mods on, the layout chosen applies, since the mod may need it. The launch line says when this happens (`Memory layout: 4Gb (4 GiB), not the 8Gb chosen`).
+
 ```json
 {
   "performance": { "memory_layout": "6Gb" },

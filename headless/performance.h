@@ -483,6 +483,26 @@ inline std::atomic<bool> graphics_memory_short{false};
 // here the collector let the pool run down to 620 MiB in one block at 2x, and that request
 // ended the session.
 inline constexpr std::size_t kShortMemory = std::size_t{1} << 30;
+// The guest's headroom in the pool: 1 GiB that a game's own memory may take at once while the
+// graphics caches give memory back (a large open-world game wrote 0.5 to 1.8 GB within seconds).
+// The memory service holds it as blocks of its own (src/guest_memory_service.inc, the reserve).
+inline constexpr std::size_t kGuestReserve = std::size_t{1} << 30;
+// What the caches see of the pool (performance.cpp, the PS5's RefreshFreeMemory): its largest free
+// block less the part of the guest's headroom the service does not hold yet (all of it when no
+// service holds any: a 32-bit game, or Compact memory's service switched off), and memory short
+// when that is under kShortMemory or a burst of the game's writes has taken half the headroom, so
+// the caches start giving memory back before a write has to wait for them. `known`: the pool
+// could be read; `held`, `target`: the service's reserve now and in full (bytes, both 0 without).
+struct PoolView {
+    std::size_t free;
+    bool short_memory;
+};
+inline PoolView ViewOfPool(bool known, std::size_t largest, std::size_t held, std::size_t target) {
+    if (!known) return {0, true};
+    const std::size_t headroom = target == 0 ? kGuestReserve : held < target ? target - held : 0;
+    const std::size_t free = largest > headroom ? largest - headroom : 0;
+    return {free, free < kShortMemory || (target != 0 && held < target / 2)};
+}
 // Development: the texture cache reports its memory use and marks every 300 frames.
 inline std::atomic<bool> texture_budget_log{false};
 // "Is memory short?", installed by the PS5 build (performance.cpp, GraphicsMemoryShort). This

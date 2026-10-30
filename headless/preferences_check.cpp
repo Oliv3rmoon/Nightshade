@@ -2,6 +2,7 @@
 // text files. Build: c++ -std=c++20 -I<nlohmann include> preferences_check.cpp && ./a.out
 #include "game_name.h"
 #include "preferences.h"
+#include "memory_layout_guard.h"
 #include <cassert>
 #include <fstream>
 #include <filesystem>
@@ -475,6 +476,20 @@ int main() {
         saved_game.performance[2] = 1;  // Settings > Performance > fast GPU, the launcher's write
         assert(Eden::SaveGameSettings(racer, saved_game, layout_file));
         assert(Eden::LoadPerformance(racer, layout_file).memory_layout == 1);
+    }
+    // A game that stops with more memory than its console's (memory_layout_guard.h, Tears of the
+    // Kingdom) plays with 4 GiB without a mod, whatever layout was chosen; with a mod on, or the
+    // development switch, the layout chosen stands; every other game gets what was chosen.
+    {
+        constexpr std::uint64_t totk = 0x0100F2C0115B6000;
+        namespace Guard = Eden::MemoryLayoutGuard;
+        assert(Guard::Listed(totk) && !Guard::Listed(racer) && !Guard::Listed(0));
+        assert(Guard::Layout(totk, 2, false) == 0 && Guard::Layout(totk, 1, false) == 0);
+        assert(Guard::Layout(totk, 0, false) == 0 && Guard::Layout(totk, 0, true) == 0);
+        assert(Guard::Layout(totk, 2, true) == 2 && Guard::Layout(totk, 1, true) == 1);
+        assert(Guard::Layout(totk, 2, false, true) == 2);
+        assert(Guard::Layout(racer, 2, false) == 2 && Guard::Layout(racer, 1, false) == 1 &&
+               Guard::Layout(quest, 0, false) == 0);
     }
     // Speed limit ("performance/speed_limit"): 100% without a file, a game's own before the general
     // one, a value that is not one of the steps read as 100%, and both kinds of write keep it.
