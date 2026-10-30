@@ -1336,8 +1336,41 @@ adapt('src/video_core/texture_cache/texture_cache.h',
      'const s64 min_vacancy_expected =\n            ((std::is_same_v<Runtime, Vulkan::TextureCacheRuntime> ? 4 : 6) * mem_threshold) / 10;'),
 ] + texture_partial + texture_costs)
 
+# ASTC recompressed to BC1 or BC3 a layer at a time, as headless/CMakeLists.txt makes Eden's own
+# util.cpp do: this copy is the one the Vulkan build links, and it decoded a whole mip level of
+# every layer into one buffer, 484 MiB for a texture array of 121 layers. A Tears of the Kingdom
+# session (v1.010.005) ended asking for exactly that much ("Direct allocation failed ...
+# bytes=509607936", the block and its lead) with the pool short.
+recompress_old = '''            decode_scratch.resize_destructive(level_size);
+
+            Tegra::Texture::ASTC::Decompress(
+                input_offset, copy.image_extent.width, copy.image_extent.height,
+                copy.image_subresource.num_layers * copy.image_extent.depth, tile_size.width,
+                tile_size.height, decode_scratch);
+
+            compress(decode_scratch, copy.image_extent.width, copy.image_extent.height,
+                     copy.image_subresource.num_layers * copy.image_extent.depth,
+                     output.subspan(output_offset));
+'''
+recompress_new = '''            // A layer at a time (headless/CMakeLists.txt): ASTC blocks are 16 bytes, BC blocks
+            // cover 4x4 pixels.
+            const u32 layers = copy.image_subresource.num_layers * copy.image_extent.depth;
+            const u32 layer_input = Common::DivideUp(copy.image_extent.width, tile_size.width) *
+                                    Common::DivideUp(copy.image_extent.height, tile_size.height) * 16;
+            const u32 layer_output = Common::AlignUp(copy.image_extent.width, 4) *
+                                     Common::AlignUp(copy.image_extent.height, 4) / bpp_div;
+            decode_scratch.resize_destructive(level_size / (std::max)(layers, 1u));
+            for (u32 layer = 0; layer < layers; ++layer) {
+                Tegra::Texture::ASTC::Decompress(
+                    input_offset.subspan(layer * layer_input), copy.image_extent.width,
+                    copy.image_extent.height, 1, tile_size.width, tile_size.height, decode_scratch);
+                compress(decode_scratch, copy.image_extent.width, copy.image_extent.height, 1,
+                         output.subspan(output_offset + layer * layer_output));
+            }
+'''
 adapt('src/video_core/texture_cache/util.cpp', 'texture_util.cpp', [
     ('#include <vector>', '#include <cstring>\n#include <vector>\n#include "texture_partial.h"'),
+    (recompress_old, recompress_new),
     ('} // namespace VideoCommon', (port / 'texture_rows.inc').read_text() + '\n} // namespace VideoCommon'),
 ])
 
@@ -2042,6 +2075,8 @@ def loader_body(filter_block):
         summary.wall_ns = ::Eden::ShaderStart::Now() - eden_start;
         ::Eden::ShaderStart::Report(stderr, summary, eden_heap);
         ::Eden::ShaderStart::SetProgress({});
+        // What the build took of the heap and no longer uses goes back to the pool.
+        ::Eden::Performance::TrimHeap("the shader cache was built");
         if (summary.background) {
             ::Eden::Report("loader",
                            fmt::format("Shader cache ready: {} pipelines in {} ms, built while the game ran{}",

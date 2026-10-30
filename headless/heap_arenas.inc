@@ -40,6 +40,22 @@
  * most a thread ever held, not again for each session. The small requests that still reach the
  * heap's own spaces, and the frees of blocks there, are counted with the time they took
  * (eden_heap_spill_stats; EDEN_SHADER_START_HEAP in stderr.log).
+ *
+ * Memory given back. The heap only grew: a Tears of the Kingdom session held 2.69 GB of pieces at
+ * its end with 0.16 GB of them in use, and the next session grew from there. A space (the mspace
+ * over one piece, or a run of pieces for a larger request) that holds no block is now given back
+ * by eden_heap_trim: retired so no request uses it, its memory released to the system, its
+ * address space kept, and its pieces made again (and the slot used again) by a later growth. A
+ * space counts the blocks taken from it, and the threads inside it at the moment (so it is
+ * retired only when none is); the first space, where the arenas are, stays. The app trims at the
+ * end of a shader cache build, at the end of a session, when the pool the CPU shares with the GPU
+ * is short, and before an allocation is refused (headless/performance.cpp TrimHeap).
+ *
+ * Large blocks the pool has no room for in one piece. A block of its own is one piece of direct
+ * memory, and a growth of the heap was too: in a fragmented pool both failed for a 486 MiB request
+ * with a gigabyte free in smaller pieces, and the session ended. A large block that finds no one
+ * piece is now address space with memory behind it in pieces of whatever size the pool has
+ * (eden_heap_split_pages), and a growth takes its pieces' memory the same way (src/memory_pages.cpp).
  */
 #include <pthread.h>
 #include <string.h>
@@ -70,6 +86,10 @@
 
 void *eden_heap_reserve(size_t size);             /* address space only; NULL when refused */
 int eden_heap_commit(void *address, size_t size); /* zeroed memory for a part of it; 0 when done */
+/* Its memory back to the system, the address space kept: 1 done, 0 nothing done, -1 in part. */
+int eden_heap_decommit(void *address, size_t size);
+void *eden_heap_split_pages(size_t size);         /* a large block in pieces of memory; NULL: none */
+void eden_heap_split_pages_free(void *address, size_t size);
 
 static void *_Atomic eden_heap_slots[EDEN_HEAP_SLOTS]; /* arena mspace owning each slot */
 static void *eden_heap_arena_list[EDEN_HEAP_MAX_ARENAS];
@@ -84,11 +104,26 @@ static atomic_flag eden_heap_arena_create_lock = ATOMIC_FLAG_INIT;
 static _Atomic unsigned long eden_heap_create_holder;
 static atomic_uint eden_heap_create_waiters;
 
-/* The heap's own mspaces in the order they were made; each spans one or more pieces in a row. */
-static void *eden_heap_spaces[EDEN_HEAP_PIECES];
-static atomic_uint eden_heap_space_count;
-/* The mspace each piece belongs to. */
+/* The heap's own mspaces, a slot each; each spans one or more pieces in a row. Slot 0 is the
+ * first space and stays. A slot whose space was given back (eden_heap_trim) is retired, and a
+ * later growth may use it again. */
+static void *_Atomic eden_heap_spaces[EDEN_HEAP_PIECES];
+static atomic_uint eden_heap_space_count;                    /* slots in use, retired ones too */
+static atomic_uint eden_heap_space_users[EDEN_HEAP_PIECES];  /* threads in the slot's space now */
+static atomic_int eden_heap_space_retired[EDEN_HEAP_PIECES]; /* 1: no request uses it */
+static atomic_long eden_heap_space_blocks[EDEN_HEAP_PIECES]; /* blocks taken from it, not freed */
+/* A slot's pieces, [first, first + span); span 0: given back (both under the growth lock). */
+static unsigned eden_heap_space_first[EDEN_HEAP_PIECES], eden_heap_space_span[EDEN_HEAP_PIECES];
+/* Bumped by every growth: a request that found no room tries again before growing itself. */
+static atomic_uint eden_heap_space_generation;
+/* The mspace each piece belongs to, and its slot. */
 static void *_Atomic eden_heap_piece_space[EDEN_HEAP_PIECES];
+static atomic_uint eden_heap_piece_slot[EDEN_HEAP_PIECES];
+/* A piece below `used`: 0 in a space, 1 given back (a growth may take it again), 2 given back in
+ * part (never used again; not the heap's to free into). */
+static atomic_uchar eden_heap_piece_state[EDEN_HEAP_PIECES];
+/* What the pieces hold now, and what was given back since the process began. */
+static atomic_size_t eden_heap_committed_bytes, eden_heap_returned_bytes;
 /* Where no range can be reserved, the heap takes this much at once. Its 6 GiB taken whole would
  * leave graphics too little of the 12 GiB pool. */
 #define EDEN_HEAP_WHOLE_SIZE ((size_t)3072 << 20)
@@ -107,6 +142,7 @@ static atomic_flag eden_heap_grow_lock = ATOMIC_FLAG_INIT;
 static struct {
   _Atomic uintptr_t address;
   size_t size;
+  int split; /* its memory in pieces (eden_heap_split_pages) */
 } eden_heap_large[EDEN_HEAP_LARGE_BLOCKS];
 static atomic_uint eden_heap_large_count;
 static atomic_size_t eden_heap_large_bytes;
@@ -145,6 +181,7 @@ unsigned long eden_heap_create_lock_state(unsigned *waiters) {
 }
 
 static void *eden_heap_owner(const void *address);
+static void eden_heap_free_owned(void *address);
 
 /* Per-thread allocation statistics. The live/peak/block counters are process-wide atomics, and
  * updating them on every malloc and free made all allocating threads bounce the same cache
@@ -237,7 +274,7 @@ static void eden_heap_thread_exit(void *value) {
     while (self->bins[bin] != NULL) {
       void *block = self->bins[bin];
       self->bins[bin] = *(void **)block;
-      sceLibcMspaceFree(eden_heap_owner(block), block);
+      eden_heap_free_owned(block);
     }
     self->counts[bin] = 0;
   }
@@ -249,9 +286,21 @@ unsigned eden_heap_arenas_created(void) {
   return atomic_load_explicit(&eden_heap_arena_count, memory_order_relaxed);
 }
 
-/* Memory the heap's pieces hold now: this part only grows. */
+/* Memory the heap's pieces hold now (pieces given back are not counted). */
 size_t eden_heap_committed(void) {
-  return (size_t)atomic_load_explicit(&eden_heap_pieces_used, memory_order_relaxed) << EDEN_HEAP_PIECE_SHIFT;
+  return atomic_load_explicit(&eden_heap_committed_bytes, memory_order_relaxed);
+}
+
+/* What the heap holds (its pieces and its large blocks), what of that its blocks use (its own
+ * count, which lags each thread's last 64 operations), and what it has given back. */
+void eden_heap_usage(size_t *held, size_t *in_use, size_t *returned) {
+  if (held)
+    *held = atomic_load_explicit(&eden_heap_committed_bytes, memory_order_relaxed) +
+            atomic_load_explicit(&eden_heap_large_bytes, memory_order_relaxed);
+  if (in_use)
+    *in_use = atomic_load_explicit(&ps5_heap_live_bytes, memory_order_relaxed);
+  if (returned)
+    *returned = atomic_load_explicit(&eden_heap_returned_bytes, memory_order_relaxed);
 }
 
 /* Memory of the large blocks alive now, and how many there are. */
@@ -280,11 +329,18 @@ static void *eden_heap_large_allocate(size_t bytes) {
                                                  memory_order_relaxed))
       continue;
     void *block = eden_heap_pages(bytes);
+    int split = 0;
+    if (block == NULL) {
+      /* No free piece of the pool that large: memory in smaller pieces behind one range. */
+      block = eden_heap_split_pages(bytes);
+      split = 1;
+    }
     if (block == NULL) {
       atomic_store_explicit(&eden_heap_large[i].address, 0, memory_order_release);
       return NULL;
     }
     eden_heap_large[i].size = bytes;
+    eden_heap_large[i].split = split;
     atomic_fetch_add_explicit(&eden_heap_large_bytes, bytes, memory_order_relaxed);
     atomic_fetch_add_explicit(&eden_heap_large_count, 1, memory_order_release);
     atomic_store_explicit(&eden_heap_large[i].address, (uintptr_t)block, memory_order_release);
@@ -299,7 +355,10 @@ static void eden_heap_large_free(int entry) {
   /* The entry stops naming the address before the memory goes: the next large block may be
    * given the same address at once. */
   atomic_store_explicit(&eden_heap_large[entry].address, 1, memory_order_release);
-  eden_heap_pages_free(block, bytes);
+  if (eden_heap_large[entry].split)
+    eden_heap_split_pages_free(block, bytes);
+  else
+    eden_heap_pages_free(block, bytes);
   atomic_fetch_sub_explicit(&eden_heap_large_bytes, bytes, memory_order_relaxed);
   atomic_fetch_sub_explicit(&eden_heap_large_count, 1, memory_order_release);
   atomic_store_explicit(&eden_heap_large[entry].address, 0, memory_order_release);
@@ -345,10 +404,13 @@ static int ps5_heap_ready(void) {
     atomic_store_explicit(&ps5_heap_state, -1, memory_order_release);
     return 0;
   }
-  eden_heap_spaces[0] = ps5_heap_mspace;
+  atomic_store_explicit(&eden_heap_spaces[0], ps5_heap_mspace, memory_order_relaxed);
+  eden_heap_space_first[0] = 0;
+  eden_heap_space_span[0] = first_pieces;
   for (unsigned piece = 0; piece < first_pieces; ++piece)
     atomic_store_explicit(&eden_heap_piece_space[piece], ps5_heap_mspace, memory_order_relaxed);
   atomic_store_explicit(&eden_heap_pieces_used, first_pieces, memory_order_relaxed);
+  atomic_store_explicit(&eden_heap_committed_bytes, first_size, memory_order_relaxed);
   atomic_store_explicit(&eden_heap_space_count, 1, memory_order_release);
   /* libthr keeps specific data in its own storage; no recursion into malloc. */
   eden_heap_arena_key_valid = pthread_key_create(&eden_heap_arena_key, eden_heap_thread_exit) == 0;
@@ -364,7 +426,11 @@ static int eden_heap_in_range(const void *address) {
     return 0;
   uintptr_t value = (uintptr_t)address;
   uintptr_t base = (uintptr_t)ps5_heap_base;
-  return value >= base && value - base < eden_heap_range_size;
+  if (value < base || value - base >= eden_heap_range_size)
+    return 0;
+  /* A piece given back in part is not the heap's any more. */
+  return atomic_load_explicit(&eden_heap_piece_state[(value - base) >> EDEN_HEAP_PIECE_SHIFT],
+                              memory_order_relaxed) != 2;
 }
 
 /* Any block of this heap: one in its range, or a large block with memory of its own. */
@@ -398,6 +464,23 @@ static void *eden_heap_owner(const void *address) {
 /* ---- the heap's own spaces ---- */
 
 enum { EDEN_HEAP_MALLOC, EDEN_HEAP_CALLOC, EDEN_HEAP_ALIGNED };
+
+/* Frees a block of a space (not an arena's), counting it off its space. */
+static void eden_heap_space_free(void *address) {
+  const uintptr_t piece = ((uintptr_t)address - (uintptr_t)ps5_heap_base) >> EDEN_HEAP_PIECE_SHIFT;
+  const unsigned slot = atomic_load_explicit(&eden_heap_piece_slot[piece], memory_order_acquire);
+  sceLibcMspaceFree(atomic_load_explicit(&eden_heap_piece_space[piece], memory_order_acquire), address);
+  atomic_fetch_sub_explicit(&eden_heap_space_blocks[slot], 1, memory_order_release);
+}
+
+/* Frees an owned block (not a large one) to its arena or its space. */
+static void eden_heap_free_owned(void *address) {
+  void *arena = atomic_load_explicit(&eden_heap_slots[eden_heap_slot(address)], memory_order_acquire);
+  if (arena != NULL)
+    sceLibcMspaceFree(arena, address);
+  else
+    eden_heap_space_free(address);
+}
 
 /* One request to one mspace: malloc(a), calloc(a, b) or an a-aligned block of b bytes. */
 static void *eden_heap_space_try(void *space, int kind, size_t a, size_t b) {
@@ -453,17 +536,21 @@ size_t eden_heap_last_failure(unsigned *why, size_t *count) {
   return atomic_load_explicit(&eden_heap_failed_bytes, memory_order_relaxed);
 }
 
-/* Adds a space with room for `bytes`: memory for the next pieces of the range and an mspace
- * over them. `seen` is how many spaces the caller tried: when another thread added one
- * meanwhile, that one is tried first. Returns 0 when the heap is at its limit or the console
- * has no memory left. */
-static int eden_heap_grow(size_t bytes, unsigned seen) {
+static void eden_heap_grow_acquire(void) {
   for (unsigned spins = 0; atomic_flag_test_and_set_explicit(&eden_heap_grow_lock, memory_order_acquire); ++spins) {
     if (spins < 64)
       __builtin_ia32_pause();
     else
       sceKernelUsleep(50);
   }
+}
+
+/* Adds a space with room for `bytes`: memory for pieces of the range (pieces given back earlier
+ * first, else the next ones) and an mspace over them, in a slot given back earlier or a new one.
+ * `seen` is the growth the caller tried after: when another thread grew the heap meanwhile, that
+ * space is tried first. Returns 0 when the heap is at its limit or the console has no memory left. */
+static int eden_heap_grow(size_t bytes, unsigned seen) {
+  eden_heap_grow_acquire();
   int grown = 0;
   atomic_store_explicit(&eden_heap_grow_why, EDEN_HEAP_WHY_NONE, memory_order_relaxed);
   const unsigned count = atomic_load_explicit(&eden_heap_space_count, memory_order_relaxed);
@@ -471,22 +558,58 @@ static int eden_heap_grow(size_t bytes, unsigned seen) {
   /* Room for the request and for the mspace's own records. */
   const size_t need = bytes + ((size_t)1 << 20);
   const size_t pieces = (need + EDEN_HEAP_PIECE_SIZE - 1) >> EDEN_HEAP_PIECE_SHIFT;
-  if (count != seen) {
+  /* Pieces given back, `pieces` of them in a row, else the next ones. */
+  unsigned first = used;
+  if (eden_heap_grows && need > bytes) {
+    for (unsigned at = 0, run = 0; at < used; ++at) {
+      run = atomic_load_explicit(&eden_heap_piece_state[at], memory_order_relaxed) == 1 ? run + 1 : 0;
+      if (run == pieces) {
+        first = at + 1 - (unsigned)pieces;
+        break;
+      }
+    }
+  }
+  /* A slot given back, else a new one. */
+  unsigned slot = count;
+  for (unsigned at = 1; at < count; ++at)
+    if (eden_heap_space_span[at] == 0) {
+      slot = at;
+      break;
+    }
+  if (atomic_load_explicit(&eden_heap_space_generation, memory_order_relaxed) != seen) {
     grown = 1;
-  } else if (eden_heap_grows && need > bytes && pieces <= EDEN_HEAP_PIECES - used) {
-    void *start = (char *)ps5_heap_base + ((size_t)used << EDEN_HEAP_PIECE_SHIFT);
+  } else if (eden_heap_grows && need > bytes && slot < EDEN_HEAP_PIECES &&
+             (first < used || pieces <= EDEN_HEAP_PIECES - used)) {
+    void *start = (char *)ps5_heap_base + ((size_t)first << EDEN_HEAP_PIECE_SHIFT);
     const size_t size = pieces << EDEN_HEAP_PIECE_SHIFT;
     if (eden_heap_commit(start, size) == 0) {
       void *space = sceLibcMspaceCreate("Eden-heap", start, size, 0);
-      /* The pieces are taken either way: memory is not given back. */
-      atomic_store_explicit(&eden_heap_pieces_used, used + (unsigned)pieces, memory_order_relaxed);
+      atomic_fetch_add_explicit(&eden_heap_committed_bytes, size, memory_order_relaxed);
+      if (first == used)
+        atomic_store_explicit(&eden_heap_pieces_used, used + (unsigned)pieces, memory_order_relaxed);
       if (space != NULL) {
-        for (size_t piece = 0; piece < pieces; ++piece)
-          atomic_store_explicit(&eden_heap_piece_space[used + piece], space, memory_order_release);
-        eden_heap_spaces[count] = space;
-        atomic_store_explicit(&eden_heap_space_count, count + 1, memory_order_release);
+        for (size_t piece = first; piece < first + pieces; ++piece) {
+          atomic_store_explicit(&eden_heap_piece_space[piece], space, memory_order_release);
+          atomic_store_explicit(&eden_heap_piece_slot[piece], slot, memory_order_release);
+          atomic_store_explicit(&eden_heap_piece_state[piece], 0, memory_order_relaxed);
+        }
+        eden_heap_space_first[slot] = first;
+        eden_heap_space_span[slot] = (unsigned)pieces;
+        atomic_store_explicit(&eden_heap_space_blocks[slot], 0, memory_order_relaxed);
+        atomic_store_explicit(&eden_heap_spaces[slot], space, memory_order_release);
+        if (slot == count)
+          atomic_store_explicit(&eden_heap_space_count, count + 1, memory_order_release);
+        else
+          atomic_store_explicit(&eden_heap_space_retired[slot], 0, memory_order_seq_cst);
+        atomic_fetch_add_explicit(&eden_heap_space_generation, 1, memory_order_release);
         grown = 1;
       } else {
+        /* The memory stays committed but no space is over it: given back at once. */
+        if (eden_heap_decommit(start, size) == 1) {
+          atomic_fetch_sub_explicit(&eden_heap_committed_bytes, size, memory_order_relaxed);
+          for (size_t piece = first; piece < first + pieces; ++piece)
+            atomic_store_explicit(&eden_heap_piece_state[piece], 1, memory_order_relaxed);
+        }
         atomic_store_explicit(&eden_heap_grow_why, EDEN_HEAP_WHY_NO_SPACE, memory_order_relaxed);
         eden_heap_grow_refused("EDEN_HEAP_GROW refused: no allocator for a new piece\n");
       }
@@ -502,26 +625,85 @@ static int eden_heap_grow(size_t bytes, unsigned seen) {
   return grown;
 }
 
+/* Gives the memory of every space (but the first) that holds no block back to the system: the
+ * space is retired, its memory released, its address space kept for a later growth. Returns the
+ * bytes given back. */
+size_t eden_heap_trim(void) {
+  if (atomic_load_explicit(&ps5_heap_state, memory_order_acquire) != 2 || !eden_heap_grows)
+    return 0;
+  eden_heap_grow_acquire();
+  size_t returned = 0;
+  const unsigned count = atomic_load_explicit(&eden_heap_space_count, memory_order_relaxed);
+  for (unsigned slot = 1; slot < count; ++slot) {
+    if (eden_heap_space_span[slot] == 0 ||
+        atomic_load_explicit(&eden_heap_space_blocks[slot], memory_order_relaxed) != 0)
+      continue;
+    atomic_store_explicit(&eden_heap_space_retired[slot], 1, memory_order_seq_cst);
+    if (atomic_load_explicit(&eden_heap_space_users[slot], memory_order_seq_cst) != 0 ||
+        atomic_load_explicit(&eden_heap_space_blocks[slot], memory_order_acquire) != 0) {
+      atomic_store_explicit(&eden_heap_space_retired[slot], 0, memory_order_seq_cst);
+      continue;
+    }
+    const unsigned first = eden_heap_space_first[slot], span = eden_heap_space_span[slot];
+    const size_t size = (size_t)span << EDEN_HEAP_PIECE_SHIFT;
+    const int done = eden_heap_decommit((char *)ps5_heap_base + ((size_t)first << EDEN_HEAP_PIECE_SHIFT), size);
+    if (done == 0) {
+      /* Kept as it was (dev-settings heap_return=off, or nothing to give back): usable again. */
+      atomic_store_explicit(&eden_heap_space_retired[slot], 0, memory_order_seq_cst);
+      continue;
+    }
+    for (unsigned piece = first; piece < first + span; ++piece) {
+      atomic_store_explicit(&eden_heap_piece_space[piece], NULL, memory_order_release);
+      atomic_store_explicit(&eden_heap_piece_state[piece], done > 0 ? 1 : 2, memory_order_relaxed);
+    }
+    eden_heap_space_span[slot] = 0;
+    atomic_store_explicit(&eden_heap_spaces[slot], NULL, memory_order_release);
+    atomic_fetch_sub_explicit(&eden_heap_committed_bytes, size, memory_order_relaxed);
+    if (done > 0)
+      returned += size;
+  }
+  atomic_flag_clear_explicit(&eden_heap_grow_lock, memory_order_release);
+  atomic_fetch_add_explicit(&eden_heap_returned_bytes, returned, memory_order_relaxed);
+  return returned;
+}
+
 /* A block from the heap's spaces, then from a new one. A small request starts at the space that
  * served the last one (it is asked for millions of times: compiled-code records); a request of
  * 1 MiB or more starts at the first space, which keeps the later ones free of long-lived blocks
  * and able to take the next large request. */
+/* One request to one slot's space, unless the slot is retired. A thread counts itself in the
+ * slot first and then looks at the flag; eden_heap_trim sets the flag first and then looks at the
+ * count (both sequentially consistent): a space is given back only when no thread is in it, and
+ * none can enter it once it is retired. */
+static void *eden_heap_space_use(unsigned slot, int kind, size_t a, size_t b) {
+  atomic_fetch_add_explicit(&eden_heap_space_users[slot], 1, memory_order_seq_cst);
+  void *address = NULL;
+  if (atomic_load_explicit(&eden_heap_space_retired[slot], memory_order_seq_cst) == 0) {
+    address = eden_heap_space_try(atomic_load_explicit(&eden_heap_spaces[slot], memory_order_acquire), kind, a, b);
+    if (address != NULL)
+      atomic_fetch_add_explicit(&eden_heap_space_blocks[slot], 1, memory_order_relaxed);
+  }
+  atomic_fetch_sub_explicit(&eden_heap_space_users[slot], 1, memory_order_release);
+  return address;
+}
+
 static void *eden_heap_main(int kind, size_t a, size_t b) {
   const size_t bytes = kind == EDEN_HEAP_MALLOC ? a : kind == EDEN_HEAP_CALLOC ? a * b : a + b;
   for (;;) {
+    const unsigned generation = atomic_load_explicit(&eden_heap_space_generation, memory_order_acquire);
     const unsigned count = atomic_load_explicit(&eden_heap_space_count, memory_order_acquire);
     const int small = bytes < ((size_t)1 << 20);
     const unsigned hint = small ? atomic_load_explicit(&eden_heap_space_hint, memory_order_relaxed) : 0;
     for (unsigned i = 0; i < count; ++i) {
       const unsigned index = (hint + i) % count;
-      void *address = eden_heap_space_try(eden_heap_spaces[index], kind, a, b);
+      void *address = eden_heap_space_use(index, kind, a, b);
       if (address != NULL) {
         if (small && i != 0)
           atomic_store_explicit(&eden_heap_space_hint, index, memory_order_relaxed);
         return address;
       }
     }
-    if (bytes == 0 || !eden_heap_grow(bytes, count))
+    if (bytes == 0 || !eden_heap_grow(bytes, generation))
       return NULL;
   }
 }
@@ -544,7 +726,7 @@ static void *eden_heap_create_arena(int first) {
         if (first)
           eden_heap_first_arenas++;
       } else {
-        sceLibcMspaceFree(eden_heap_owner(block), block);
+        eden_heap_space_free(block);
       }
     }
   }
@@ -696,7 +878,7 @@ static void eden_heap_release(void *address) {
     return;
   }
   const unsigned long long start = eden_heap_cycles();
-  sceLibcMspaceFree(eden_heap_owner(address), address);
+  eden_heap_space_free(address);
   const unsigned long long cycles = eden_heap_cycles() - start;
   struct eden_heap_thread *self = eden_heap_self();
   if (self != NULL) {
@@ -818,7 +1000,7 @@ void *__wrap_realloc(void *address, size_t size) {
   if (large >= 0)
     eden_heap_large_free(large);
   else
-    sceLibcMspaceFree(eden_heap_owner(address), address);
+    eden_heap_free_owned(address);
   return moved;
 }
 

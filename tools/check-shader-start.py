@@ -91,5 +91,13 @@ with tempfile.TemporaryDirectory(prefix='eden-shader-start-') as work:
         assert wrapper.count('EdenCreatePipeline(ci, [&](const Vk') == 2
         assert 'VK_PIPELINE_CREATION_FEEDBACK_APPLICATION_PIPELINE_CACHE_HIT_BIT' in wrapper
         assert '::Eden::ShaderStart::Report(stderr, summary, eden_heap);' in load
+        assert '::Eden::Performance::TrimHeap("the shader cache was built");' in load
+        # The copy of util.cpp the Vulkan build links recompresses ASTC a layer at a time (a whole
+        # level of a 121-layer array was a 484 MiB buffer), and CMake leaves the other copy out.
+        texture_util = (port / 'texture_util.cpp').read_text()
+        assert 'decode_scratch.resize_destructive(level_size / (std::max)(layers, 1u));' in texture_util
+        assert 'decode_scratch.resize_destructive(level_size);' not in texture_util
+        cmake = (root / 'headless/CMakeLists.txt').read_text()
+        assert 'if(NOT "${PORT_BUILD_DIR}/texture_util.cpp" IN_LIST video_sources)' in cmake
         print('Shader cache load in the Vulkan port: stopped first when the cache goes, the GPU thread takes from '
               'the load before building, saves through the load, every stage and the driver accounted PASS')

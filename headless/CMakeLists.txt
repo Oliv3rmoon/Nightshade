@@ -3110,7 +3110,11 @@ string(REPLACE "${recompress_old}" [=[            // A layer at a time (headless
 ]=] texture_util_source "${texture_util_source}")
 write_derived("${PORT_BUILD_DIR}/texture_cache_util.cpp" "${texture_util_source}")
 list(REMOVE_ITEM video_sources texture_cache/util.cpp)
-list(APPEND video_sources "${PORT_BUILD_DIR}/texture_cache_util.cpp")
+# The Vulkan port links its own copy of util.cpp (tools/prepare-vulkan-port.py, texture_util.cpp,
+# with the same layer-at-a-time recompression): with both in the library this one was never used.
+if(NOT "${PORT_BUILD_DIR}/texture_util.cpp" IN_LIST video_sources)
+    list(APPEND video_sources "${PORT_BUILD_DIR}/texture_cache_util.cpp")
+endif()
 list(REMOVE_ITEM video_sources shader_environment.cpp)
 list(APPEND video_sources "${PORT_BUILD_DIR}/shader_environment.cpp")
 set_property(TARGET video_core PROPERTY SOURCES "${video_sources}")

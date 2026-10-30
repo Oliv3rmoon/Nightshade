@@ -387,8 +387,12 @@ int main(int argc, char** argv) {
                                   Eden::FileExists(std::string{folder} + "/ui/fonts/montserrat-medium.pefont") ? "yes" : "no");
         Eden::BootTrace::Line("app folder: %s", Eden::AppDir().c_str());
         std::set_new_handler([] {
+            // Before an allocation is refused, the heap gives its empty pieces back to the pool and
+            // operator new tries again; only when there was nothing to give back is it refused.
+            if (Eden::Performance::TrimHeap("an allocation found no memory") != 0) return;
             ps5_opengl_heap_snapshot("allocation_failure", 0);
             std::fflush(stdout);
+            Eden::Performance::ReportHeap("an allocation found no memory");
             Eden::Report("allocation failure", "operator new: heap exhausted");
             throw std::bad_alloc{};
         });
@@ -2352,6 +2356,8 @@ int main(int argc, char** argv) {
         }
         passed("core_destroyed");
 #ifdef EDEN_PS5_OPENGL
+        // What the session's memory left of the heap goes back to the pool for the next one.
+        Eden::Performance::TrimHeap("the session ended");
         Eden::Performance::ReportSessionMemory("end", 0);
 #endif
         if (devices && pad) {

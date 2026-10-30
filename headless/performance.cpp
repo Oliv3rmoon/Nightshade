@@ -476,6 +476,8 @@ extern "C" void ps5_opengl_heap_snapshot(const char* phase, unsigned iteration);
 extern "C" unsigned eden_heap_arenas_created(void) __attribute__((weak));
 extern "C" std::size_t eden_heap_committed(void) __attribute__((weak));
 extern "C" std::size_t eden_heap_large_held(unsigned* blocks) __attribute__((weak));
+extern "C" std::size_t eden_heap_trim(void) __attribute__((weak));
+extern "C" void eden_heap_usage(std::size_t* held, std::size_t* in_use, std::size_t* returned) __attribute__((weak));
 extern "C" unsigned eden_guest_memory_wanted(void) __attribute__((weak));
 extern "C" void eden_guest_memory_waits(unsigned long long* won, unsigned long long* lost,
                                         unsigned long long* refused) __attribute__((weak));
@@ -518,6 +520,12 @@ static void RefreshFreeMemory() {
     const PoolView view = ViewOfPool(known, largest, held, target);
     largest_free_block.store(known ? (view.free != 0 ? view.free : 1) : 0, std::memory_order_relaxed);
     graphics_memory_short.store(view.short_memory, std::memory_order_relaxed);
+    // The heap's empty pieces go back to the pool while it is short (every 2 s at most).
+    static std::atomic<long long> trimmed_ns{0};
+    if (view.short_memory && now - trimmed_ns.load(std::memory_order_relaxed) >= 2'000'000'000) {
+        trimmed_ns.store(now, std::memory_order_relaxed);
+        TrimHeap("the pool is short");
+    }
 }
 // A write to the guest's memory waiting for a block (src/guest_memory_service.inc, WaitForBlock):
 // the game's own memory comes first, so while one waits the caches see memory short and none free,
@@ -740,6 +748,30 @@ void RecordHle(const char* service, unsigned command, long long ns) {
     entry.second += static_cast<unsigned long long>(ns > 0 ? ns : 0);
 }
 
+// The heap's line in stderr.log: what it holds of the pool (pieces and large blocks), what of that
+// its blocks use, and what it has given back. `why` says when.
+void ReportHeap(const char* why) {
+    if (!eden_heap_usage) return;
+    std::size_t held = 0, in_use = 0, returned = 0;
+    eden_heap_usage(&held, &in_use, &returned);
+    unsigned large_blocks = 0;
+    const std::size_t large = eden_heap_large_held ? eden_heap_large_held(&large_blocks) : 0;
+    std::fprintf(stderr, "[ProsperoEden] heap: holds %zu MiB (%zu MiB of pieces, %zu MiB in %u large blocks), "
+                         "%zu MiB of it in use; %zu MiB given back so far (%s)\n",
+                 held >> 20, (held - large) >> 20, large >> 20, large_blocks, in_use >> 20, returned >> 20, why);
+}
+
+std::size_t TrimHeap(const char* why) {
+    if (!eden_heap_trim) return 0;
+    const std::size_t returned = eden_heap_trim();
+    if (returned != 0) {
+        char text[160];
+        std::snprintf(text, sizeof(text), "gave back %zu MiB: %s", returned >> 20, why);
+        ReportHeap(text);
+    }
+    return returned;
+}
+
 void ReportSessionMemory(const char* phase, unsigned session) {
     unsigned large_blocks = 0;
     const std::size_t large = eden_heap_large_held ? eden_heap_large_held(&large_blocks) : 0;
@@ -768,6 +800,9 @@ void ReportSessionMemory(const char* phase, unsigned session) {
                 phase, session, total, free_bytes, largest, regions,
                 eden_heap_committed ? eden_heap_committed() : std::size_t{0}, large, large_blocks, table_held);
     std::fflush(stdout);
+    char why[64];
+    std::snprintf(why, sizeof(why), "session %s", phase);
+    ReportHeap(why);
 }
 
 // Every 5 s of frames, in every build: who holds the pool when a long session runs out of it. The
@@ -793,13 +828,17 @@ void ReportMemory() {
 #endif
     std::size_t reserve = 0, reserve_target = 0;
     if (eden_guest_memory_reserve) eden_guest_memory_reserve(&reserve, &reserve_target);
+    std::size_t heap_used = 0, heap_returned = 0;
+    if (eden_heap_usage) eden_heap_usage(nullptr, &heap_used, &heap_returned);
     std::printf("EDEN_MEMORY guest=%zuMiB heap=%zuMiB large=%zuMiB/%u tables=%zuMiB graphics=%lluMiB "
                 "free=%lluMiB largest_free=%zuMiB short=%d waits_won=%llu waits_lost=%llu refused=%llu "
-                "reserve=%zuMiB/%zuMiB\n",
+                "reserve=%zuMiB/%zuMiB heap_used=%zuMiB heap_returned=%zuMiB\n",
                 guest >> 20, (eden_heap_committed ? eden_heap_committed() : std::size_t{0}) >> 20, large >> 20,
                 large_blocks, tables >> 20, held ? held() >> 20 : 0ULL, free_bytes >> 20, largest >> 20,
                 int(graphics_memory_short.load(std::memory_order_relaxed)), won, lost, refused, reserve >> 20,
-                reserve_target >> 20);
+                reserve_target >> 20, heap_used >> 20, heap_returned >> 20);
+    static unsigned reports = 0;
+    if (++reports % 6 == 0) ReportHeap("every 30 s");
 }
 
 void ReportGpuThread(unsigned frame) {
