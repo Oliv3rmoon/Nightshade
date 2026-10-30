@@ -202,11 +202,11 @@ The FPS overlay (Touchpad + R1 while playing, **FPS overlay** in **Settings > Vi
 | FPS | The game's frames a second; with frame generation, the game's and the output's (`30/60FPS`) |
 | Frame time | The worst frame of the last second, in milliseconds |
 | Average frame time | Before the worst, the last second's average frame (`33.3/41.2MS`): a worst far above the average is a stutter, both high together a slow scene |
-| Speed | How far the emulation is behind 100%, when it is |
+| Speed | How far the game runs behind full speed, when it does |
 | CPU, CPU by core | The emulated cores' work, each or only the busiest |
 | GPU | How busy the GPU is |
 | Memory | What is taken of the memory pool the CPU and the GPU share, of all of it, and the graphics' part (`GFX`) |
-| Memory pressure | `LOW` after the pool while it is short (the caches are giving memory back), and the emulator's heap: in use of what it holds of the pool (`HEAP 1.1/1.5G`, the `heap_used` and `heap` of the `EDEN_MEMORY` lines in `heap.log`) |
+| Memory pressure | `LOW` after the pool while it is short (the caches are giving memory back), and Nightshade's own memory (its heap): in use of what it holds of the pool (`HEAP 1.1/1.5G`, the `heap_used` and `heap` of the `EDEN_MEMORY` lines in `heap.log`) |
 | Shader cache progress | While the game's saved shaders are built as it plays ([The shader cache while the game plays](#the-shader-cache-while-the-game-plays)), how far that is (`SHD 45%`); gone once they are built |
 | Ping | The round trip to a multiplayer room's server |
 
