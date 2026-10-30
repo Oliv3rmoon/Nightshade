@@ -1,9 +1,9 @@
 {
- "name": "Nightshade bridge checks",
+ "name": "Nightshade 1.011.000 checks",
  "on": {
   "push": {
    "branches": [
-    "test/bridge"
+    "test/1.011.000"
    ]
   },
   "workflow_dispatch": {}
@@ -23,15 +23,15 @@
    "env": {
     "XDG_CACHE_HOME": "/tmp/prosperoeden-dev-host-cache",
     "PROSPEROEDEN_DEPS_CACHE": "/tmp/prosperoeden-dev-downloads",
-    "DEV_HEAD": "e187e25b3cc0edf5c1e043d1d6c8447d49c630b3",
+    "DEV_HEAD": "c4792f8f15be660e9a227db2665adb14e2808d9d",
     "GITHUB_TOKEN": "${{ github.token }}"
    },
    "steps": [
     {
      "name": "Check out the bridge commit",
-     "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+     "uses": "actions/checkout@c4792f8f15be660e9a227db2665adb14e2808d9d",
      "with": {
-      "ref": "e187e25b3cc0edf5c1e043d1d6c8447d49c630b3",
+      "ref": "c4792f8f15be660e9a227db2665adb14e2808d9d",
       "persist-credentials": false
      }
     },
@@ -55,7 +55,7 @@
     {
      "name": "Preserve logs",
      "if": "always()",
-     "uses": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+     "uses": "actions/upload-artifact@c4792f8f15be660e9a227db2665adb14e2808d9d",
      "with": {
       "name": "host-logs",
       "retention-days": 7,
@@ -95,9 +95,9 @@
    "steps": [
     {
      "name": "Check out the bridge commit",
-     "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+     "uses": "actions/checkout@c4792f8f15be660e9a227db2665adb14e2808d9d",
      "with": {
-      "ref": "e187e25b3cc0edf5c1e043d1d6c8447d49c630b3",
+      "ref": "c4792f8f15be660e9a227db2665adb14e2808d9d",
       "persist-credentials": false
      }
     },
@@ -116,7 +116,7 @@
     {
      "name": "Keep the screens",
      "if": "always()",
-     "uses": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+     "uses": "actions/upload-artifact@c4792f8f15be660e9a227db2665adb14e2808d9d",
      "with": {
       "name": "screens-${{ strategy.job-index }}",
       "retention-days": 7,
