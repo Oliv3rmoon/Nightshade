@@ -136,7 +136,7 @@ Outcome Round(unsigned round, std::mt19937& random, bool stop_early) {
     std::atomic<bool> reading_done{false}, saved_while_reading{false};
     std::mutex saves_mutex;
     std::vector<std::pair<bool, std::uint64_t>> saved;  // what was written to the "file"
-    Pool workers{1 + random() % 6};
+    Pool workers{static_cast<unsigned>(1 + random() % 6)};
     Pool serialization{1};
     const unsigned seed = random();
 

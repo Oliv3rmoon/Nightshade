@@ -1997,11 +1997,13 @@ def loader_body(filter_block):
             if (!summary.background) {
                 return;
             }
-            const auto counts = loader->GetCounts();
+            // While the file is still being read, its total is an estimate.
+            const auto progress = ::Eden::ShaderStart::GetProgress();
             const long long seconds = (::Eden::ShaderStart::Now() - eden_start) / 1'000'000'000LL;
             ::Eden::Report("loader",
-                           fmt::format("Shader cache: {} of {} pipelines built while the game runs ({} s)",
-                                       counts.finished, counts.graphics + counts.compute, seconds)
+                           fmt::format("Shader cache: {} of {}{} pipelines built while the game runs ({} s)",
+                                       progress.built, progress.reading ? "about " : "", progress.total,
+                                       seconds)
                                .c_str());
         });
         if (built && statistics) {
