@@ -242,3 +242,9 @@ Nobody here has a Switch 2 dump or keys; the first console runs are the testers'
   success (`make test`: settings store, guest idle, kernel spin lock, NCZ, GC scan, streamed game,
   the 30 catalogs...). The preview tour now also shoots a Switch 2 title's details
   (`07b-library-switch2`).
+- 2026-10-30: final code commit 9eab461 (the label in the Home tab's details too, after the new
+  preview screen showed it only in Canopy's Library). PS5 build: **success**,
+  <https://github.com/Oliv3rmoon/Nightshade/actions/runs/40987967896>. Linux host suite and the
+  three themes' screens on test/nx2 (c17314b pins 9eab461): **success**,
+  <https://github.com/Oliv3rmoon/Nightshade/actions/runs/40987975328>. Nothing has run on a
+  console: no Switch 2 dump or keys here.
