@@ -1371,6 +1371,37 @@ foreach(pair IN ITEMS unmapped_read unmapped_write)
     string(REPLACE "${${pair}_old}" "${${pair}_new}" arena_source "${arena_source}")
 endforeach()
 string(PREPEND arena_source "#include \"${EDEN_PORT_DIR}/unmapped_log.h\"\n")
+# A range read where it lies (GetSpan: a service's input buffers, a voice's samples) when it is one
+# piece of host memory, as every page of it says (headless/guest_span.h), not when its first page
+# and the page after it carry the same mapping number: the number goes round after 65,536 mappings
+# (43 minutes into a Tears of the Kingdom session) and a range could then be read from memory it
+# does not cover. tools/check-guest-span.py runs the rule.
+set(span_old [=[    [[nodiscard]] inline const u8* GetSpan(const VAddr addr, const std::size_t size) const noexcept {
+        return (current_page_table->entries[addr >> YUZU_PAGEBITS].Block() == current_page_table->entries[(addr + size) >> YUZU_PAGEBITS].Block()) ? GetPointerSilent(addr) : nullptr;
+    }
+    [[nodiscard]] inline u8* GetSpan(const VAddr addr, const std::size_t size) noexcept {
+        return (current_page_table->entries[addr >> YUZU_PAGEBITS].Block() == current_page_table->entries[(addr + size) >> YUZU_PAGEBITS].Block()) ? GetPointerSilent(addr) : nullptr;
+    }
+]=])
+set(span_new [=[    [[nodiscard]] inline bool OnePiece(const VAddr addr, const std::size_t size) const noexcept {
+        const VAddr masked = addr & 0xffffffffffffULL;
+        return size != 0 && AddressSpaceContains(*current_page_table, masked, size) &&
+               ::Eden::GuestSpan::OnePiece(current_page_table->entries, masked >> YUZU_PAGEBITS,
+                                           (masked + size - 1) >> YUZU_PAGEBITS);
+    }
+    [[nodiscard]] inline const u8* GetSpan(const VAddr addr, const std::size_t size) const noexcept {
+        return OnePiece(addr, size) ? GetPointerSilent(addr) : nullptr;
+    }
+    [[nodiscard]] inline u8* GetSpan(const VAddr addr, const std::size_t size) noexcept {
+        return OnePiece(addr, size) ? GetPointerSilent(addr) : nullptr;
+    }
+]=])
+string(FIND "${arena_source}" "${span_old}" span_at)
+if(span_at LESS 0)
+    message(FATAL_ERROR "Pinned Memory::GetSpan changed; review headless/guest_span.h")
+endif()
+string(REPLACE "${span_old}" "${span_new}" arena_source "${arena_source}")
+string(PREPEND arena_source "#include \"${EDEN_PORT_DIR}/guest_span.h\"\n")
 write_derived("${PORT_BUILD_DIR}/memory.cpp" "${arena_source}")
 list(REMOVE_ITEM core_sources "memory.cpp")
 list(APPEND core_sources "${PORT_BUILD_DIR}/memory.cpp")
