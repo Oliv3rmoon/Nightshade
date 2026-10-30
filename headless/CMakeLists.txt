@@ -2497,7 +2497,7 @@ get_target_property(npad_sources hid_core SOURCES)
 list(FILTER npad_sources EXCLUDE REGEX "(^|/)npad\\.cpp$")
 list(APPEND npad_sources "${PORT_BUILD_DIR}/npad.cpp")
 set_property(TARGET hid_core PROPERTY SOURCES "${npad_sources}")
-add_library(eden-pad STATIC "${EDEN_PORT_DIR}/pad.cpp" "${EDEN_PORT_DIR}/pad_haptics.cpp"
+add_library(eden-pad STATIC "${EDEN_PORT_DIR}/pad.cpp" "${EDEN_PORT_DIR}/pad_haptics.cpp" "${EDEN_PORT_DIR}/amiibo.cpp"
     "${PROJECT_SOURCE_DIR}/src/input_common/input_engine.cpp"
     "${PROJECT_SOURCE_DIR}/src/input_common/input_poller.cpp"
     "${PROJECT_SOURCE_DIR}/src/input_common/drivers/virtual_gamepad.cpp")

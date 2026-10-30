@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "devices.h"
+#include "amiibo.h"
 #include "controller_applet.h"
 #include "keyboard_applet.h"
 #include <condition_variable>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <mutex>
 #include "mock_devices.h"
 #include <algorithm>
@@ -1055,10 +1059,132 @@ void CheckResampling() {
     }
     std::puts("SRC 3 qualities x 6 rates: silence, 500 Hz level/frequency, exact low-quality samples, split continuity and phase PASS");
 }
+// Player 1's NFC reader (amiibo.h): Eden's controller binds its NFC to "virtual_amiibo", which a
+// game sees as a reader. A scan is shown the next dump of the amiibo/ folders a moment later; a
+// write goes to that dump; with no dumps the scan just waits, as on a Switch with no figure.
+void CheckAmiibo() {
+    namespace fs = std::filesystem;
+    using Common::Input::NfcState;
+    using Common::Input::PollingMode;
+    const fs::path folder = fs::absolute("amiibo-check");
+    fs::remove_all(folder);
+    fs::create_directories(folder / "empty");
+    const auto dump = [](std::size_t size, u8 first) {
+        std::vector<u8> bytes(size);
+        for (std::size_t i = 0; i < size; ++i) bytes[i] = static_cast<u8>(first + i * 7);
+        return bytes;
+    };
+    const auto write = [](const fs::path& path, const std::vector<u8>& bytes) {
+        std::ofstream(path, std::ios::binary).write(reinterpret_cast<const char*>(bytes.data()),
+                                                    static_cast<std::streamsize>(bytes.size()));
+    };
+    const auto read = [](const fs::path& path) {
+        std::ifstream in(path, std::ios::binary);
+        return std::vector<u8>{std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+    };
+    const auto first = dump(0x21C, 0x04), second = dump(0x21C + 0x20, 0x40);
+    write(folder / "a-link.bin", first);
+    write(folder / "b-zelda.BIN", second);           // with its signature (572 bytes)
+    write(folder / "c-notes.txt", dump(0x21C, 1));   // not a .bin
+    write(folder / "d-short.bin", dump(100, 1));     // not a dump's size
+    write(folder / ".e-hidden.bin", dump(0x21C, 1)); // hidden
+    {
+        Eden::Amiibo amiibo({folder.string(), (folder / "missing").string()}, 30ms);
+        CHECK(amiibo.Engine().Dumps().size() == 2);
+        // What Eden's controller asks for its NFC: output and input on the same engine.
+        auto reader = Common::Input::CreateOutputDeviceFromString("engine:virtual_amiibo,nfc:1,output:1");
+        auto tags = Common::Input::CreateInputDeviceFromString("engine:virtual_amiibo,nfc:1");
+        std::mutex mutex;
+        std::condition_variable changed;
+        std::vector<Common::Input::NfcStatus> seen;
+        tags->SetCallback({[&](const Common::Input::CallbackStatus& status) {
+            const std::lock_guard lock(mutex);
+            seen.push_back(status.nfc_status);
+            changed.notify_all();
+        }});
+        const auto wait_for = [&](std::size_t count) {
+            std::unique_lock lock(mutex);
+            return changed.wait_for(lock, 3s, [&] { return seen.size() >= count; });
+        };
+        // The controller has NFC (EmulatedController::HasNfc asks the reader whether it does).
+        CHECK(reader->SupportsNfc() == NfcState::Success);
+        // A scan before the game set the reader up is refused, as on Eden's own reader.
+        CHECK(reader->StartNfcPolling() == NfcState::WrongDeviceState);
+        CHECK(reader->SetPollingMode(PollingMode::NFC) == Common::Input::DriverResult::Success);
+        CHECK(reader->StartNfcPolling() == NfcState::Success);
+        CHECK(wait_for(1));
+        {
+            const std::lock_guard lock(mutex);
+            CHECK(seen[0].state == NfcState::NewAmiibo && seen[0].tag_type == 1U << 1 && seen[0].uuid_length == 7);
+            CHECK(std::equal(first.begin(), first.begin() + 7, seen[0].uuid.begin()));
+        }
+        std::vector<u8> data;
+        CHECK(reader->ReadAmiiboData(data) == NfcState::Success && data == first);
+        // The game writes the figure: the dump holds it.
+        auto written = first;
+        written[0x100] ^= 0xff;
+        CHECK(reader->WriteNfcData(written) == NfcState::Success);
+        CHECK(read(folder / "a-link.bin") == written);
+        CHECK(!fs::exists(folder / "a-link.bin.writing"));
+        // The game stops scanning: the figure leaves the reader.
+        CHECK(reader->StopNfcPolling() == NfcState::Success);
+        CHECK(wait_for(2));
+        { const std::lock_guard lock(mutex); CHECK(seen[1].state == NfcState::AmiiboRemoved); }
+        CHECK(reader->ReadAmiiboData(data) == NfcState::WrongDeviceState);
+        // The next scan shows the next dump, its 540 bytes; a write keeps its signature.
+        CHECK(reader->StartNfcPolling() == NfcState::Success);
+        CHECK(wait_for(3));
+        CHECK(reader->ReadAmiiboData(data) == NfcState::Success);
+        CHECK(data == std::vector<u8>(second.begin(), second.begin() + 0x21C));
+        CHECK(fs::path(amiibo.Engine().LastShown()).filename() == "b-zelda.BIN");
+        auto rewritten = data;
+        rewritten[0x10] ^= 0x55;
+        CHECK(reader->WriteNfcData(rewritten) == NfcState::Success);
+        const auto on_disk = read(folder / "b-zelda.BIN");
+        CHECK(on_disk.size() == second.size());
+        CHECK(std::equal(rewritten.begin(), rewritten.end(), on_disk.begin()));
+        CHECK(std::equal(second.begin() + 0x21C, second.end(), on_disk.begin() + 0x21C));
+        CHECK(reader->StopNfcPolling() == NfcState::Success);
+        CHECK(wait_for(4));
+        // Then the first again.
+        CHECK(reader->StartNfcPolling() == NfcState::Success);
+        CHECK(wait_for(5));
+        CHECK(fs::path(amiibo.Engine().LastShown()).filename() == "a-link.bin");
+        // The reader switched off (the game is done with NFC) takes the figure away too.
+        CHECK(reader->SetPollingMode(PollingMode::Active) == Common::Input::DriverResult::NotSupported);
+        CHECK(wait_for(6));
+        { const std::lock_guard lock(mutex); CHECK(seen[5].state == NfcState::AmiiboRemoved); }
+        CHECK(amiibo.Engine().GetState() == Eden::AmiiboEngine::State::Disabled);
+    }
+    {
+        // No dumps: the scan is accepted and waits for a figure that does not come, until the
+        // game cancels it.
+        Eden::Amiibo amiibo({(folder / "empty").string()}, 20ms);
+        auto reader = Common::Input::CreateOutputDeviceFromString("engine:virtual_amiibo,nfc:1,output:1");
+        auto tags = Common::Input::CreateInputDeviceFromString("engine:virtual_amiibo,nfc:1");
+        std::atomic<int> updates{0};
+        tags->SetCallback({[&](const Common::Input::CallbackStatus&) { ++updates; }});
+        CHECK(reader->SupportsNfc() == NfcState::Success);
+        CHECK(reader->SetPollingMode(PollingMode::NFC) == Common::Input::DriverResult::Success);
+        CHECK(reader->StartNfcPolling() == NfcState::Success);
+        std::this_thread::sleep_for(200ms);
+        CHECK(updates == 0);
+        CHECK(amiibo.Engine().GetState() == Eden::AmiiboEngine::State::WaitingForAmiibo);
+        CHECK(reader->StopNfcPolling() == NfcState::Success);
+        CHECK(amiibo.Engine().GetState() == Eden::AmiiboEngine::State::Initialized);
+        CHECK(updates == 0);
+    }
+    // Without the reader the engine is unknown again (a session's controllers are gone).
+    auto gone = Common::Input::CreateOutputDeviceFromString("engine:virtual_amiibo,nfc:1,output:1");
+    CHECK(gone->SupportsNfc() == NfcState::NotSupported);
+    fs::remove_all(folder);
+    std::puts("Amiibo: player 1 has an NFC reader, a scan shows the next dump and a write keeps it, no dumps waits for a cancel PASS");
+}
+
 int main() {
     Common::FS::CreateEdenPaths(); Common::Log::Initialize(); Common::Log::Start();
     int status = 0;
-    try { CheckResampling(); CheckVoiceFlags(); CheckControllerStyle(); CheckKeyboard(); CheckPad(); CheckAudio(); }
+    try { CheckResampling(); CheckVoiceFlags(); CheckControllerStyle(); CheckKeyboard(); CheckPad(); CheckAmiibo(); CheckAudio(); }
     catch (const std::exception& error) { std::fprintf(stderr, "%s\n", error.what()); status = 1; }
     Common::Log::Stop();
     return status;

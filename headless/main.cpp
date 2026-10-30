@@ -35,6 +35,7 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include "devices.h"
+#include "amiibo.h"
 #include "diagnostics.h"
 #include "hud.h"
 #include "loading_art.h"
@@ -1503,12 +1504,29 @@ int main(int argc, char** argv) {
                                     Eden::kLanguageKeys[choice] + ")").c_str());
         }
         std::unique_ptr<Eden::Pad> pad;
+        // Player 1's NFC reader (amiibo.h), there before Eden's controllers bind to it and gone
+        // after them.
+        std::unique_ptr<Eden::Amiibo> amiibo;
         bool return_to_menu = false;
         if (devices || game) {
             Eden::BootTrace::Line("opening the controllers");
             pad = std::make_unique<Eden::Pad>();
             if (!pad->Open()) throw std::runtime_error("PS5 controller initialization failed");
             Eden::BootTrace::Line("controllers open");
+            {
+                // Dumps from the game files folder's amiibo/, and from /data/prosperoeden/amiibo when
+                // that is another folder.
+                std::vector<std::string> amiibo_folders{Eden::AssetsPath("amiibo")};
+                if (const std::string data_amiibo = std::string{Eden::kDataDir} + "/amiibo"; data_amiibo != amiibo_folders.front())
+                    amiibo_folders.push_back(data_amiibo);
+                amiibo = std::make_unique<Eden::Amiibo>(amiibo_folders);
+                const std::size_t dumps = amiibo->Engine().Dumps().size();
+                Eden::Report("launch", ("Amiibo: player 1 has an NFC reader; " +
+                                        (dumps ? std::to_string(dumps) + " dump" + (dumps == 1 ? "" : "s") +
+                                                     " in amiibo/, shown one per scan"
+                                               : std::string{"no dumps in amiibo/"}))
+                                           .c_str());
+            }
             Settings::values.audio_output_device_id = "ps5";
             // AudioIn sessions take their stream from the input sink, a separate one: left at the
             // default it was upstream's NullSink, which releases no samples (audio.cpp).
