@@ -1424,10 +1424,42 @@ else()
 endif()
 string(REPLACE "${aslr_old}" "((::Eden::code_seed.load() >= 0 ? static_cast<u64>(::Eden::code_seed.load())\n        : Common::Random::Random64(0)) ${aslr_steps};"
     aslr_source "${aslr_source}")
+# A program's file system service (fsp-srv SetCurrentProcess, its save data, its RomFS) answers
+# only a process its loader registered. An NCA's loader registers the ExeFS it loads, an NRO's
+# loader its own; an unpacked ExeFS chosen by its main (game_files.h), a lone NSO and a KIP were
+# never registered, so the first file system call of their program failed. Each is now registered
+# as an NRO is (tools/check-direct-formats.py starts one of each).
+set(exefs_lone_old "    if (dir == nullptr) {\n        if (file == nullptr) {\n            return {ResultStatus::ErrorNullFile, {}};\n        }\n")
+set(exefs_register_old "    is_loaded = true;\n    return {ResultStatus::Success,\n            LoadParameters{metadata.GetMainThreadPriority(), metadata.GetMainThreadStackSize()}};")
+foreach(exefs_old IN ITEMS exefs_lone_old exefs_register_old)
+    string(FIND "${aslr_source}" "${${exefs_old}}" exefs_at)
+    if(exefs_at LESS 0)
+        message(FATAL_ERROR "Pinned unpacked ExeFS load changed")
+    endif()
+endforeach()
+string(REPLACE "${exefs_lone_old}"
+    "    // Chosen by its main, not an NCA's ExeFS (whose loader registers the process itself).\n    const bool chosen_by_main = dir == nullptr;\n${exefs_lone_old}"
+    aslr_source "${aslr_source}")
+string(REPLACE "${exefs_register_old}"
+    "    if (chosen_by_main)\n        system.GetFileSystemController().RegisterProcess(\n            process.GetProcessId(), metadata.GetTitleID(),\n            std::make_unique<FileSys::RomFSFactory>(*this, system.GetContentProvider(), system.GetFileSystemController()));\n${exefs_register_old}"
+    aslr_source "${aslr_source}")
 write_derived("${PORT_BUILD_DIR}/deconstructed_rom_directory.cpp"
     "#include \"${EDEN_PORT_DIR}/load_address.h\"\n${aslr_source}")
 list(REMOVE_ITEM core_sources "loader/deconstructed_rom_directory.cpp")
 list(APPEND core_sources "${PORT_BUILD_DIR}/deconstructed_rom_directory.cpp")
+file(READ "${PROJECT_SOURCE_DIR}/src/core/loader/kip.cpp" kip_source)
+set(kip_register_old "    LOG_DEBUG(Loader, \"loaded module {} @ {:#x}\", kip->GetName(), base_address);\n")
+string(FIND "${kip_source}" "${kip_register_old}" kip_register_at)
+if(kip_register_at LESS 0)
+    message(FATAL_ERROR "Pinned KIP load changed")
+endif()
+string(REPLACE "${kip_register_old}"
+    "    system.GetFileSystemController().RegisterProcess(\n        process.GetProcessId(), kip->GetTitleID(),\n        std::make_unique<FileSys::RomFSFactory>(*this, system.GetContentProvider(), system.GetFileSystemController()));\n${kip_register_old}"
+    kip_source "${kip_source}")
+write_derived("${PORT_BUILD_DIR}/kip.cpp"
+    "#include \"core/core.h\"\n#include \"core/file_sys/romfs_factory.h\"\n#include \"core/hle/service/filesystem/filesystem.h\"\n${kip_source}")
+list(REMOVE_ITEM core_sources "loader/kip.cpp")
+list(APPEND core_sources "${PORT_BUILD_DIR}/kip.cpp")
 # GetPseudoDeviceId read the seed through the control data without checking that there is
 # any (a game without control data, such as a homebrew NRO): seed 0 then, as for other
 # NACP fields Eden defaults when the metadata is missing.
@@ -1524,6 +1556,16 @@ if(nso_lone_at LESS 0)
     message(FATAL_ERROR "Pinned lone NSO load changed")
 endif()
 string(REPLACE "${old_nso_lone}" "${new_nso_lone}" nso_source "${nso_source}")
+set(old_nso_register "    modules.insert_or_assign(base_address, file->GetName());\n")
+string(FIND "${nso_source}" "${old_nso_register}" nso_register_at)
+if(nso_register_at LESS 0)
+    message(FATAL_ERROR "Pinned lone NSO load changed")
+endif()
+# Its process is registered with the file system as an NRO's is (see the KIP's, below).
+string(REPLACE "${old_nso_register}"
+    "${old_nso_register}    system.GetFileSystemController().RegisterProcess(\n        process.GetProcessId(), 0,\n        std::make_unique<FileSys::RomFSFactory>(*this, system.GetContentProvider(), system.GetFileSystemController()));\n"
+    nso_source "${nso_source}")
+string(PREPEND nso_source "#include \"core/file_sys/romfs_factory.h\"\n#include \"core/hle/service/filesystem/filesystem.h\"\n")
 # The PS5 heap is bounded: avoid allocating/decompressing an executable merely
 # to calculate its layout, and avoid vector growth duplicating a large BSS image.
 if(PS5_NATIVE)
