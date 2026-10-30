@@ -5,175 +5,117 @@
 <h1 align="center">Nightshade</h1>
 
 <p align="center">
-  <strong>The Switch emulator for PS5 homebrew, by Oliv3rmoon: everything in ProsperoEden, plus my fixes, my features and a look of its own.</strong>
+  <strong>The Switch emulator for PS5 homebrew that keeps up: faster starts, fewer crashes, Switch 2 in testing.</strong>
 </p>
 
 <p align="center">
   <a href="https://github.com/Oliv3rmoon/Nightshade/releases/latest"><img src="https://img.shields.io/github/v/release/Oliv3rmoon/Nightshade?style=for-the-badge&label=download&color=e5484d&labelColor=0d0d0f" alt="Download the latest release"></a>
   <a href="https://discord.gg/pSqgRU3YP9"><img src="https://img.shields.io/badge/discord-nightly-0d0d0f?style=for-the-badge&logo=discord&logoColor=e5484d" alt="Discord: nightly"></a>
+  <a href="https://github.com/Oliv3rmoon/Nightshade"><img src="https://img.shields.io/github/stars/Oliv3rmoon/Nightshade?style=for-the-badge&color=e5484d&labelColor=0d0d0f" alt="GitHub stars"></a>
   <a href="https://buymeacoffee.com/oliv3rmoon"><img src="https://img.shields.io/badge/buy%20me%20a%20coffee-0d0d0f?style=for-the-badge&logo=buymeacoffee&logoColor=e5484d" alt="Buy me a coffee"></a>
 </p>
 
-Nightshade is **[Oliv3rmoon](https://github.com/Oliv3rmoon)**'s release of [ProsperoEden](https://github.com/Swordpdf/ProsperoEden). Each release is built on the newest official one, with my work and every open community fix on top. My fixes also go to the official project as pull requests, so they reach everyone in the end.
-
-## What you get
-
-- **Its own look.** A red nightshade flower for the icon and home screen, and the Nightshade theme: black and red, clean and dark. The other themes are still there.
-- **More games and mods that run.** UltraCam-size mods, compressed NSZ/XCZ games, Smash Skyline mods, translation fonts, game folders that keep their mods and DLC apart.
-- **Fewer crashes.** Long sessions that died on a write to game memory, a full audio queue, Metroid Prime 4's graphics memory, controls after rest mode.
-- **Play from your server.** A download source can stream its games instead of downloading them first (experimental).
-- **Games on a USB drive** while keys, firmware, mods and saves stay on the console.
-- **Logs that say why.** When something still goes wrong, the logs name the cause, so it can be fixed.
-
-Every release lists exactly what's in it: see [Releases](https://github.com/Oliv3rmoon/Nightshade/releases) and the [changelog](docs/CHANGELOG.md).
-
-## Install
-
-1. Close ProsperoEden (or Nightshade).
-2. Download the ZIP from the [latest release](https://github.com/Oliv3rmoon/Nightshade/releases/latest) and unzip it.
-3. Copy its `PPSA99008` folder over your current one (for example `/data/homebrew/PPSA99008`), replacing the files.
-
-It keeps the official app's ID, so it replaces the official app, and your settings, saves, covers, games and forwarders stay as they are (they live in `/data/prosperoeden`). The home screen calls it **Nightshade**. To go back, copy an [official release](https://github.com/Swordpdf/ProsperoEden/releases) over it the same way.
-
-## Requests, bugs and support
-
-- **Ask for a fix, a feature or a mod for a game:** [open a request](https://github.com/Oliv3rmoon/Nightshade/issues/new/choose), or ask in **[nightly on Discord](https://discord.gg/pSqgRU3YP9)** (#requests).
-- **Bugs in my releases:** open an issue here with the logs from `/data/prosperoeden/logs`.
-- **If my work helps you,** you can [buy me a coffee](https://buymeacoffee.com/oliv3rmoon). It keeps the fixes coming.
-
-Nightshade is an unofficial release. ProsperoEden is made by BlackBearReloaded and its contributors, on the Eden emulator; neither project endorses Nightshade. Everything below is the official README.
-
----
+Nightshade runs your own Switch games on a jailbroken PS5. It is made by **[Oliv3rmoon](https://github.com/Oliv3rmoon)**: big games start right away, long sessions last, the emulator gives memory back to the console, and the launcher has a look of its own in black and red. Every release lists exactly what is in it: see [Releases](https://github.com/Oliv3rmoon/Nightshade/releases) and the [changelog](docs/CHANGELOG.md).
 
 <p align="center">
-  <img src="sce_sys/icon0.png" width="128" alt="ProsperoEden icon">
+  <img src="docs/images/launcher-home.png" width="32%" alt="Nightshade's home screen: the library beside the selected game's details">
+  <img src="docs/images/launcher-settings.png" width="32%" alt="Nightshade's settings list">
+  <img src="docs/images/launcher-game-settings.png" width="32%" alt="One game's own settings, with its mods and cheats">
 </p>
+<p align="center"><sub>The Nightshade theme, drawn by the launcher's host preview with sample games.</sub></p>
 
-<h1 align="center">ProsperoEden</h1>
+## Why Nightshade
 
-<p align="center">
-  <strong>An unofficial Eden emulator port for PlayStation 5 homebrew</strong>
-</p>
+- **A look of its own.** The Nightshade theme is the default: black and red, with accent presets (Red, Crimson, Rose, White, Violet, Ice), a red nightshade flower for the icon and home screen, and wallpapers of your own. Canopy and Slate are still there.
+- **Tears of the Kingdom that lasts, and amiibo.** Fixes for the crashes after 20 to 75 minutes of play: without mods the game gets the 4 GiB it was made for, 1 GiB of the console's memory is held back for its sudden needs, and its buffers are read correctly in long sessions (not yet confirmed on a console). Player 1's controller has an NFC reader, so a game that asks for an amiibo shows its own scan screen. Bring your own dumps.
+- **Big games start right away.** Tears of the Kingdom used to spend about 200 seconds building 16,000 saved pipelines before it played. Now a game starts as soon as its graphics are ready, and the shader cache is built behind it on the spare CPUs (Vulkan renderer; not measured on a console yet).
+- **Memory that comes back, and a GPU hang that stays contained.** What the emulator no longer needs goes back to the console, and a large request is filled in pieces when memory is fragmented (not measured on a console yet). When the GPU stops responding, Nightshade closes instead of starting again: the console stays responsive, with no power-cord pull (confirmed on a console), and `stderr.log` says where the GPU stopped.
+- **Its own Vulkan driver, and a picture you can tune.** Belladonna, Nightshade's fork of Mihawk's PS5 Mesa (RADV) driver, adds clean restarts, a shader cache that survives between starts and stall reports. On top: post-processing with six ReShade FX presets (or your own), frame generation (MihawkGen, or Lossless Scaling with your own copy), FSR and other upscaling filters, and 120 Hz output.
+- **Your library as it is.** NSZ and XCZ games play as they are. Games can sit on a USB drive or any drive the PS5 reads, while keys, firmware, mods and saves stay on the console. Each game keeps its update, DLC, mods and cheats in a folder of its own, with its own video, performance, audio, controls and language settings. The launcher follows the PS5's language (29 languages).
+- **Play together, play from your server (both experimental).** Local-wireless multiplayer through shared rooms (PS5 gameplay is not yet qualified), and download sources: the games on your RomM server appear in the Library, and a source can stream a game instead of downloading it first.
+- **Updates you can verify.** Nightshade asks its own releases for the next version, shows the notes and installs it with **Update now** after checking the ZIP against the release's `SHA256SUMS`. The companion apps in **Settings > Apps** are checked the same way.
 
-**ProsperoEden is an unofficial PlayStation 5 port of [Eden](https://github.com/eden-emulator/mirror)** - an accurate, high-performance emulator. All credit for the emulator core belongs to the Eden project and its contributors. ProsperoEden is not affiliated with or endorsed by the Eden team or Sony.
+<details>
+<summary>Also in the box</summary>
 
-This is an early alpha. Video, audio, controller input, and saves have been confirmed working. Compatibility and performance will vary between games. The current release is **v1.005.000**. What changed in it, and in every release before, is in the [changelog](docs/CHANGELOG.md#v1005000).
+- **Renderers and scaling:** Vulkan (recommended) or OpenGL; 0.5x to 4x resolution with Bilinear, AMD FSR, Bicubic or Nearest; output at 1080p, 1440p or 2160p.
+- **Library:** covers, **Continue Playing** and **Recently Played**, and a folder browser that counts the keys, firmware files and games in each folder.
+- **Players:** profiles with their own saves, settings and recent games; up to four DualSense controllers with rumble, HD rumble and motion; button mapping and a controller type for each game; the PS5's on-screen keyboard when a game asks for text.
+- **Saves:** import and export (a folder or a Ryujinx data folder), **Back up to USB** with a `SHA256SUMS` to check it on a PC, and save sync with a RomM server, paired by a QR code.
+- **Speed:** the Performance switches (compile ahead, asynchronous shaders, faster GPU, CPU and DMA emulation and more), a speed limit of 150%, 200%, 300% or none, and a shader cache loaded at every start.
+- **Everywhere:** accessibility settings (larger text, high contrast, reduced motion), crash reports, and forwarders that start a game from its own tile on the PS5's home screen.
 
-## Source code
+The guides under [Guides and docs](#guides-and-docs) have the details.
 
-The complete ProsperoEden source is in this repository: the PS5 frontend and launcher in `headless/`, and the build and packaging tools in `tools/`. To build it yourself, run `make` on Linux (Ubuntu 26.04; WSL works). It fetches every dependency at its pinned revision and writes the release files to `dist/`; `make help` lists the other targets. See [docs/BUILDING.md](docs/BUILDING.md). A release ZIP built by GitHub Actions can be checked with `gh attestation verify <ZIP> -R blackbearreloaded/ProsperoEden` (GitHub CLI); this covers releases built from now on (after v1.000.090), not earlier ones.
+</details>
 
-Local-wireless multiplayer through Eden rooms is new in v1.000.110 and experimental. See the
-[setup guide and current limitations](docs/MULTIPLAYER.md) and the
-[validation status](docs/MULTIPLAYER_IMPLEMENTATION.md); Tailscale forwarding is not yet qualified.
+## Nightshade, the official app and Encore
 
-## Project foundation
+All three are PS5 ports of the same Switch emulator, and they share a lot. This is where they differ today.
 
-> [!IMPORTANT]
-> **Built on the [PS5 Native App Boilerplate](https://github.com/blackbearreloaded/ps5-native-app-boilerplate), the same native foundation used by ProsperoLight.**
-> It provides the native PS5 application structure, runtime, packaging, and homebrew deployment foundation.
+| | **Nightshade** | ProsperoEden (official) | ProsperoEden Encore |
+|---|---|---|---|
+| Version compared | v1.010.006 (30 Oct 2026) | v1.005.000 (17 Oct 2026) | R1 (30 Oct 2026) |
+| Title ID and data | `PPSA99008`, `/data/prosperoeden` (own app `PPSA64448`, `/data/nightshade`, in testing) | `PPSA99008`, `/data/prosperoeden` | `PPSA99008`, `/data/prosperoeden` |
+| Launcher | Nightshade theme by default, plus Canopy and Slate, wallpapers | Canopy theme, wallpapers | TV-first launcher with game artwork, recents and quick settings |
+| Game formats | NSP, XCI, NSZ, XCZ | NSP, XCI | NSP, XCI, NSZ, XCZ (experimental reader), and NRO, NSO, NCA, NAX, KIP |
+| Switch 2 games | Experimental, test builds only | — | — |
+| Big games, long sessions, memory | Background shader cache, Tears of the Kingdom fixes, memory given back | — | — |
+| Amiibo | Yes | — | — |
+| Recovery | Crash reports; closes on a GPU hang, with a stall report | Crash reports; starts again | One-session Safe Launch, confirmed resets, guarded data migration |
+| Vulkan driver | Belladonna (Nightshade's fork of Mihawk's PS5 Mesa) | Mihawk's PS5 Mesa | Mihawk's PS5 Mesa |
+| Post-processing, frame generation | ReShade FX presets; MihawkGen or Lossless Scaling | ReShade FX presets; MihawkGen or Lossless Scaling | — (has upscaling, sharpening and anti-aliasing options) |
+| Per-game settings | Video, performance, audio, controls, language | Video, performance, audio, controls, language | Video profiles per title: Minimum, Recommended, High, Ultra |
+| Games from a server, save sync | RomM and other sources, streaming (experimental), save sync | RomM and other sources (download only), save sync | — |
+| Update check | Its own GitHub releases, ZIP checked against `SHA256SUMS` | The homebrew.page catalog, ZIP checked against its signed list | GitHub releases; its README says to verify checksums |
+| Companion apps from the menu | Physalis, Datura, Mandrake | — | — |
+| Tested firmware named | — | — | 13.60 is the hardware-tested target; others not claimed |
 
-> [!IMPORTANT]
-> **Graphics are powered by [ps5-opengl](https://github.com/blackbearreloaded/ps5-opengl).**
-> This OpenGL implementation provides the native PS5 rendering layer used by the Eden graphics backend.
+**—** means I couldn't find it in that project's README or release notes, not that it is missing. Compared on 30 Oct 2026 from each project's own README, changelog and release notes: Nightshade v1.010.006, ProsperoEden v1.005.000 (the release Nightshade is built on) and Encore R1. Check each project for anything newer. Encore says it is an unofficial community fork, as Nightshade is.
 
-> [!IMPORTANT]
-> **Vulkan is powered by Mihawk's [PS5 Mesa](https://github.com/mihawk-99/PS5_Mesa) and [PS5 Vulkan](https://github.com/mihawk-99/PS5_Vulkan).**
-> Mihawk's Mesa/RADV driver for the PS5 runs ProsperoEden's Vulkan renderer. Many thanks to Mihawk for this work and for [all of the PS5 projects](https://github.com/mihawk-99) behind it.
+<a name="apps"></a>
 
-> [!IMPORTANT]
-> **Thanks to [ps5-vulkan](https://github.com/mpereiraesaa/ps5-vulkan) by mpereiraesaa**, an experimental Vulkan graphics and compute API for native PS5 homebrew.
+## The Nightshade family
 
-## Features
+Nightshade comes with apps of its own, in the same black and red, each with its own releases.
 
-- **Vulkan renderer (recommended)** - the default backend, running on Mihawk's PS5 Mesa (RADV) driver.
-- **OpenGL renderer** - still available through ps5-opengl. Switch between them in **Settings > Video**.
-- **Resolution and upscaling** - render at 0.5x to 4x of the game's resolution and choose the filter that scales it to your TV (Bilinear, AMD FSR, Bicubic or Nearest) in **Settings > Video**. Textures in a format the PS5's GPU cannot read (ASTC) are kept compressed (as BC3), which takes a quarter of the graphics memory they would need decoded. **ASTC textures** in **Settings > Video**, and in each game's settings, can be set to **Full quality** instead: those textures are then kept decoded, which uses four times the graphics memory for them and can make a game run out of memory above 1x.
-- **Output resolution** - the picture is made at 1080p, 1440p or 2160p: **Output resolution** in **Settings > Video**. The menu is drawn at that size too, and the PS5 scales it to your TV.
-- **Optional frame-rate recovery** - some games drop from 30 to 20 FPS when frames are a little late. An advanced [per-game clock adjustment](docs/SETTINGS.md#adaptive-guest-clock) can help those games. It is off by default because it can slow games that pace their frames by the same clock.
-- **120 Hz output** - on a display that shows 120 Hz, games can run on a 120 Hz output: **Refresh rate** in **Settings > Video**, or in one game's settings. A frame that is a little late is then shown 8 ms later instead of 17 ms, and patches for more than 60 FPS need it. The menu stays at 60 Hz.
-- **Frame generation** - between two of a game's own pictures ProsperoEden can show one made up from them, so a 30 FPS game looks like 60: **Frame generation** in **Settings > Video**, or in one game's settings. Two methods: **MihawkGen**, which comes with the app, or Lossless Scaling with your own copy of it; see [Frame generation](docs/SETTINGS.md#frame-generation).
-- **Post-processing (ReShade FX)** - a look drawn over the game's picture: **Post-processing** in **Settings > Video**, or in one game's settings, with the Vulkan renderer. Six presets come with the app (Anime, Cinematic, Clean, Dreamy, Retro, Vivid). Presets of your own (`.fxp`) go in `/data/prosperoeden/user/post_presets/` and the ReShade FX effects they use (`.fx`, with any `.fxh` they include) in `/data/prosperoeden/user/post_shaders/`; a game's own presets and effects go in its game folder's `reshade/`, and are offered for that game only. They are listed after a restart. See [Post-processing](docs/SETTINGS.md#post-processing).
-- **Game files anywhere** - keys, firmware, and games can live in any folder the PS5 can read: internal storage, an M.2 or external drive, or a USB device.
-- **Folder browser** - pick the game files folder in **Settings > Game files**. It shows how many keys, firmware files, and games each folder holds. Hold L1/R1 to page quickly.
-- **Library** - your games as covers, with the selected game's details beside them. The home screen has **Continue Playing** and **Recently Played**, which keep working after you move your files.
-- **Launcher** - an animated interface drawn with OpenGL, with sound effects (their level is in **Settings > Audio**) and a loading screen that shows the game's cover while it starts. It opens from the console's own launch picture without a cut: the mark appears over the picture and goes to its place as the menu arrives (any button skips it). Its five sections (Home, Library, Multiplayer, Settings, About) are on a rail at the left: L1 and R1 go from one to the next, and Left from a screen's edge opens the rail. The home screen shows which controllers are connected.
-- **Themes** - the launcher's look is a theme, chosen in **Settings > Theme**. It comes with one, Canopy; [docs/THEMES.md](docs/THEMES.md) says what a theme is made of.
-- **Wallpapers** - an image of your own behind the menu instead of the theme's artwork: PNG or JPEG files (also BMP, GIF, TGA and DDS) in `/data/prosperoeden/wallpapers`, or in `wallpapers/` of the game files folder you copy from a PC, chosen in **Settings > Appearance > Wallpaper**; see [docs/WALLPAPERS.md](docs/WALLPAPERS.md).
-- **Profiles** - everyone who plays has their own save data, settings and recently played games: **Settings > Profiles**; see [Profiles](docs/SETTINGS.md#profiles).
-- **Settings per game** - a game can differ from Settings in its video, performance, audio, controls and language, and has its own Handheld / Docked mode (Triangle in the Library); see [Settings per game](docs/SETTINGS.md#settings-per-game).
-- **Button mapping** - choose which DualSense button presses each of the game's buttons, for every controller, in **Settings > Controls**, or for one game in its settings; see [Button mapping](docs/SETTINGS.md#button-mapping).
-- **Your language** - the launcher follows the language the PS5 is set to (29 languages; English otherwise).
-- **Accessibility** - larger text, high contrast and reduced motion, in **Settings > Accessibility**.
-- **Save data in and out** - import a game's save from a folder or from a Ryujinx data folder, and export a copy (Triangle in the Library, then **Save data**).
-- **Back up to USB** - the settings, profiles and every save copied to a USB drive at once, with a `SHA256SUMS` to check them on a PC: **Settings > Diagnostics > Back up to USB**; see [Backing up to a USB drive](docs/INSTALL.md#backing-up-to-a-usb-drive).
-- **Compressed games** - NSZ and XCZ files (NSPs and XCIs compressed with [nsz](https://github.com/nicoboss/nsz)) play as they are; see [Compressed games](docs/INSTALL.md#compressed-games-nsz-and-xcz).
-- **Game updates and DLC** - keep each game in a folder of its own in `roms`, with its update and DLC files (NSP, XCI, NSZ or XCZ) beside it; see [Game files folder](docs/INSTALL.md#game-files-folder). They apply when the game starts, and each game's details show the update version and DLC count.
-- **Download sources** - the games on servers in your network, such as a [RomM](https://github.com/rommapp/romm) server, appear in the Library next to the ones on the console. A game is downloaded when you play it, or ahead of time through a download queue, and then runs from the console like any other. A source can also be set to stream its games, which then play straight from it without being downloaded first ([Playing a game where it lies](docs/DOWNLOADS.md#playing-a-game-where-it-lies)). Downloads need an FTP server running on the console; see [Download sources](docs/DOWNLOADS.md#download-sources).
-- **Save sync** - each profile can keep its save data on a server, such as a [RomM](https://github.com/rommapp/romm) server, as Steam does: it is synced before a game starts and after it ended, and when it changed on two devices you choose which one stays. A profile is paired with its server by a QR code, no typing. See [Save sync](docs/SAVES.md#save-sync).
-- **Mods and cheats** - patches and replacement game files from the `mods` folder in the game's folder, and cheats from its `cheats` folder. Each has a list of its own in the game's settings (Triangle in the Library, then **Mods** or **Cheats**), where every mod and every cheat is switched on or off, and a switch for all of them at once.
-- **Performance switches** - seven switches that trade accuracy for speed (compiling a game's code ahead, asynchronous shaders, faster GPU, CPU and DMA emulation, and more) in **Settings > Performance**; see [Performance settings](docs/SETTINGS.md#performance-settings).
-- **Shader cache** - shaders compiled in earlier sessions are loaded when a game starts, so an effect stutters only the first time it appears.
-- **In-game shortcuts** - a performance overlay (Touchpad + R1), and Touchpad + L1 to end the game and return to the library. Leaving takes ten seconds at most, also while a game is still loading.
-- **Settings in one place** - a single JSON file under `/data/prosperoeden`, with game volume, mute, and detailed logging options. Logs keep the previous session.
-- **Speed limit** - **Settings > Performance > Speed limit** (and each game's own) lets a game run at 150%, 200%, 300% or without a limit: a game locked to 30 FPS can reach 60 at 200% when the console has time to spare, and a game timed by its frames plays faster with it; see [Speed limit](docs/SETTINGS.md#speed-limit).
-- **Updates from the menu** - when a newer release is listed on [homebrew.page](https://homebrew.page/ps5), ProsperoEden offers to install it each time it opens; **Skip** keeps the current version, and **Settings > Diagnostics > Update notices** off stops the offer (About still names the newer version); see [Updating](docs/INSTALL.md#updating). A build made with a GitHub repository set (`EDEN_UPDATE_REPOSITORY`, [docs/BUILDING.md](docs/BUILDING.md#make-targets)) checks that repository's releases instead.
-- **Apps** - Physalis, Datura and Mandrake, Nightshade's own apps, got, updated and opened from **Settings > Apps**; see [Apps](#apps).
-- **Crash reports** - if ProsperoEden stops because of an error, it saves a report with that session's logs, starts again and shows where the report is. When the GPU stopped responding it closes instead, since an app started again would find the GPU still stuck. **Settings > Diagnostics** also keeps the FTP log-folder path visible; attach the dated `crash-*.txt` report and its matching logs.
-- **Controllers, audio, and saves** - up to four DualSense controllers (one per signed-in PS5 user) with rumble and motion controls, game audio, and save data work out of the box. A game that gives a player a single Joy-Con is played with the whole DualSense: the shapes are that Joy-Con's four buttons, the D-pad and either stick are its stick, and L1/R1 and L2/R2 are its shoulder buttons. When the game has the Joy-Con held sideways, the DualSense is still held as usual: the stick, the buttons and the motion sensors are turned to match.
-- **Controller type per game** - some games take a Pro Controller and then only work with another controller. In **Library > Game settings > Controls**, **Controller type** gives the game a Pro Controller, the Handheld controller, Dual Joy-Cons, a Left Joy-Con or a Right Joy-Con. Left on **Automatic**, the game gets what it takes, a Pro Controller first.
-- **Typing text** - when a game asks for text (a character's name, an answer during an event), the PS5's own on-screen keyboard opens, and what you enter goes to the game. A USB or Bluetooth keyboard the PS5 supports types into it too.
+| App | What it is | Title ID |
+|---|---|---|
+| [**Physalis**](https://github.com/Oliv3rmoon/Physalis) (was Nightshade TV) | Live TV, movies and series from your own IPTV playlists and Xtream accounts, and Plex. | `PPSA99003` |
+| [**Datura**](https://github.com/Oliv3rmoon/Datura) (was Nightshade Stream) | Moonlight game streaming: play your PC's games on the PS5, up to 4K and 120 FPS. | `PPSA99002` |
+| [**Mandrake**](https://github.com/Oliv3rmoon/Mandrake) (was Nightshade Station) | PS1 emulation on SwanStation, with a cover-flow shelf, up to 16x resolution and save states. | `PPSA98510` |
+| [**Dulcamara**](https://github.com/Oliv3rmoon/Dulcamara) (was Nightshade Player) | RPG Maker 2000 and 2003 games on EasyRPG, on Mandrake's frontend. Ren'Py visual novels are in its 0.2.0 test release. | `PPSA99010` |
+| [**Solanum**](https://github.com/Oliv3rmoon/Solanum) ([website](https://oliv3rmoon.github.io/Solanum-Catalog/)) | A store for open-source PS5 homebrew. It installs, updates, rolls back and uninstalls apps from their own GitHub releases, each checked against the SHA-256 the open [catalog](https://github.com/Oliv3rmoon/Solanum-Catalog) pinned. | `PPSA76526` |
+| [**Belladonna**](https://github.com/Oliv3rmoon/Belladonna) | Nightshade's PS5 Vulkan driver: Mesa's RADV through Mihawk's PS5 port, plus Nightshade's fixes and stall reports. Nightshade has been built with it since v1.010.003. | not an app |
+
+**Settings > Apps** gets, updates and opens Physalis, Datura and Mandrake, and Solanum installs the rest. A new app goes in a folder beside Nightshade's, an update keeps your data, and every download is checked before it is installed; see [Nightshade's apps](docs/INSTALL.md#nightshades-apps). Physalis is based on [ProsperoTV](https://github.com/ThatGuyKalvin/ProsperoTV), Datura on [ProsperoLight](https://github.com/LedyBacer/ProsperoLight) (both first published under blackbearreloaded) and Mandrake on darkxex's [SwanStationPS5](https://github.com/darkxex/SwanStationPS5); Dulcamara and Solanum are built on Mandrake's frontend.
 
 ## Install
 
 > [!TIP]
-> **Use [ShadowMountPlus 1.7beta4](https://github.com/drakmor/ShadowMountPlus/releases/tag/1.7beta4) or newer.** It mounts ProsperoEden from the folder (or drive) you copy it to, and it also mounts `/data` and USB and extended storage drives into the app's sandbox, so ProsperoEden reaches its data and your game files with nothing else to load. With an older ShadowMountPlus, ProsperoEden falls back to its bundled [Lapy](https://github.com/blackbearreloaded/PS5-Lapy-JB-Daemon) helper (see [Elevation credits](#elevation-credits)).
+> **Use [ShadowMountPlus 1.7beta4](https://github.com/drakmor/ShadowMountPlus/releases/tag/1.7beta4) or newer.** It mounts Nightshade from the folder or drive you copy it to, and it mounts `/data` and USB and extended storage drives into the app's sandbox, so Nightshade reaches its data and your game files with nothing else to load. With an older ShadowMountPlus, Nightshade falls back to its bundled [Lapy](https://github.com/ArkSama/PS5-Lapy-JB-Daemon) helper, which is sent through your ELF loader.
 
-1. Download and extract the release ZIP.
-2. Copy the included `PPSA99008` folder to `/data/homebrew/PPSA99008` on the PS5 (or to another folder ShadowMountPlus scans, such as `/mnt/usb0/homebrew/PPSA99008`).
-3. Make sure your jailbreak environment's local ELF loader is listening on TCP port 9021 (most setups have it). [Updates from the menu](docs/INSTALL.md#updating) use it, and with a ShadowMountPlus older than 1.7beta4 ProsperoEden sends its bundled Lapy helper through it.
-4. Put your own legally dumped keys, firmware, and games in a **game files folder** ([its layout](docs/INSTALL.md#game-files-folder)). It can be anywhere the PS5 can read: internal storage, an M.2 or external drive, or a USB device.
-5. Launch **ProsperoEden**, open **Settings > Game files**, browse to that folder and select it. The default is `/data/prosperoeden`.
-6. Close and reopen ProsperoEden, then open **Library**. Setup is checked when the app opens, so reopen it after changing the folder or adding keys or firmware.
+1. Download the ZIP from the [latest release](https://github.com/Oliv3rmoon/Nightshade/releases/latest) and unzip it. Close Nightshade first if you are updating by hand.
+2. Copy its `PPSA99008` folder to `/data/homebrew/PPSA99008` on the PS5 (or to another folder ShadowMountPlus scans, such as `/mnt/usb0/homebrew/PPSA99008`), replacing the files if it is already there.
+3. Make sure your jailbreak's ELF loader is listening on TCP port 9021 (most setups have it). Updates from the menu use it, and so does the Lapy helper.
+4. Put your own legally dumped keys, firmware and games in a **game files folder** ([its layout](docs/INSTALL.md#game-files-folder)). It can be anywhere the PS5 can read: internal storage, an M.2 or external drive, or a USB device.
+5. Open **Nightshade**, go to **Settings > Game files**, browse to that folder and select it. The default is `/data/prosperoeden`.
+6. Close and reopen Nightshade, then open **Library**. Setup is checked when the app opens, so reopen it after changing the folder or adding keys or firmware.
 
-## Apps
+The released app (v1.010.x) installs as `PPSA99008` and keeps its data in `/data/prosperoeden`, so it replaces the official app on the console and your settings, saves, covers, games and forwarders stay as they are. Nightshade's own title ID, `PPSA64448`, with its data in `/data/nightshade`, is in testing (the v1.011.x test releases; see [Testing builds](#testing-builds)).
 
-**Settings > Apps** lists Nightshade's three companion apps. Each is Nightshade's own release line of
-another project, with that project's title ID:
+**Updating:** from 1.005.102 on, **Update now** in the app installs the next release. If it doesn't take, send `/data/prosperoeden/logs/updater.log`. **Going back:** the version an update replaces is kept, or copy an official release over the app the same way; see [Updating](docs/INSTALL.md#updating) and [Going back](docs/INSTALL.md#going-back-to-the-previous-version).
 
-| App | Title ID | Released in | Based on |
-|---|---|---|---|
-| Physalis (formerly Nightshade TV) | `PPSA99003` | [Oliv3rmoon/Physalis](https://github.com/Oliv3rmoon/Physalis) | [ProsperoTV](https://github.com/ThatGuyKalvin/ProsperoTV), an IPTV client |
-| Datura (formerly Nightshade Stream) | `PPSA99002` | [Oliv3rmoon/Datura](https://github.com/Oliv3rmoon/Datura) | [ProsperoLight](https://github.com/LedyBacer/ProsperoLight), game streaming with Moonlight |
-| Mandrake (formerly Nightshade Station) | `PPSA98510` | [Oliv3rmoon/Mandrake](https://github.com/Oliv3rmoon/Mandrake) | darkxex's [SwanStationPS5](https://github.com/darkxex/SwanStationPS5), a PS1 emulator |
+## Testing builds
 
-Each row says whether the app is installed and at which version, and which release is offered and
-from where.
+Test releases are marked **Pre-release** on the [Releases page](https://github.com/Oliv3rmoon/Nightshade/releases). They are for trying what is next and sending logs back; keep the latest normal release for playing.
 
-- **Open** (Cross on an installed app) closes Nightshade and starts the app. An app cannot start
-  another one itself, so Nightshade sends a small launch payload (`app-launch.elf`) to the
-  console's payload loader on port 9021; it waits for Nightshade to close and then opens the app.
-  With no payload loader listening, Nightshade says so and stays open: start the app from the PS5's
-  home screen instead.
-- **Get** (Cross on an app that isn't installed) and **Update** (Square, when a newer release is
-  out) download the app's release and install it with the same update helper as Nightshade's own
-  updates. A new app goes in a folder beside Nightshade's (`/data/homebrew/PPSA99003` next to
-  `/data/homebrew/PPSA99008`); an update replaces the app's files and keeps yours. The homebrew
-  loader puts a new app on the home screen after its next scan or a restart.
-- **Where the files come from:** the newest release of the app's Nightshade repository, its
-  `<title ID>.zip`. Until that repository has a release, the newest release of the project the app
-  is based on is offered, and the row says so. The ZIP is checked against the release's
-  `SHA256SUMS`, or against GitHub's own SHA-256 of the file when the release has none; a release
-  with neither is not offered. Nothing is installed from an account other than the one listed: a
-  repository GitHub says moved to another account is not offered. Triangle asks GitHub again.
+- **v1.011.x: Nightshade as its own app.** It runs under its own title ID, `PPSA64448`, with its own data folder, `/data/nightshade`, beside the official app instead of in its place. v1.011.002 has everything in v1.010.006. An earlier install moves over by itself: the old tile turns into a bridge that installs the new app, and the first start asks once whether to **Move** your data, **Copy** it or **Start fresh**. Nothing in `/data/prosperoeden` is ever deleted. See the notes of [v1.011.000](https://github.com/Oliv3rmoon/Nightshade/releases/tag/v1.011.000).
+- **v1.012.x: Switch 2 games, experimental.** These builds sit on Takoroka's [eden-nx2](https://git.eden-emu.dev/Takoroka/eden-nx2), the newer emulator core with experimental Switch 2 support. A Switch 2 game is a game folder with its ExeFS and RomFS, dumped from your own game. No Switch 2 game has been run on a PS5 yet, and Switch 1 games have not been played on the newer core on a console either. See the notes of [v1.012.000](https://github.com/Oliv3rmoon/Nightshade/releases/tag/v1.012.000).
 
-The details are in [Nightshade's apps](docs/INSTALL.md#nightshades-apps). Thanks to the projects
-the apps are based on, ProsperoTV and ProsperoLight (first published as blackbearreloaded/ProsperoTV
-and blackbearreloaded/ProsperoLight) and darkxex's SwanStationPS5, and to **Mihawk**, whose
-[PS5 RetroArch](https://github.com/mihawk-99/PS5_RetroArch) Game Forwarder the launch payload is
-based on (`forwarder/launch.c`).
+**Sending logs.** Play once with the settings as they are, quit with Touchpad + L1, then send `/data/nightshade/logs` (`eden_log.txt`, `stderr.log` and any crash report), or `/data/prosperoeden/logs` on v1.010 and earlier. Add the game's name and title ID, the Nightshade version, and how the same game went on the version before. For a big game, start it twice: the `EDEN_SHADER_START` and `heap:` lines in `stderr.log` say where the start's time and memory went. Post it as an issue here or in [nightly on Discord](https://discord.gg/pSqgRU3YP9).
 
-## Guides
+## Guides and docs
 
 <a name="game-files-folder"></a><a name="app-data"></a><a name="updating"></a><a name="going-back-to-the-previous-version"></a><a name="moving-save-data"></a><a name="mods"></a><a name="quick-start-with-romm"></a><a name="download-sources"></a><a name="romm"></a><a name="save-sync"></a><a name="romm-1"></a><a name="performance-settings"></a><a name="frame-generation"></a><a name="post-processing"></a><a name="profiles"></a><a name="settings-per-game"></a><a name="button-mapping"></a><a name="language-and-accessibility"></a><a name="upgrading-from-an-earlier-alpha"></a><a name="roadmap"></a>
 
@@ -185,7 +127,7 @@ based on (`forwarder/launch.c`).
 | [Download sources and RomM](docs/DOWNLOADS.md) | Games from a RomM server or another source in your network, and the download queue |
 | [Mods and cheats](docs/MODS.md) | Patches and replacement game files, and cheats, each in a list of their own |
 | [Smash Ultimate 13.0.4](docs/SMASH_MODS.md) | Tested Skyline/ARCropolis setup and moveset installation |
-| [Multiplayer](docs/MULTIPLAYER.md) | Local wireless play through Eden rooms: setup and current limits |
+| [Multiplayer](docs/MULTIPLAYER.md) | Local wireless play through shared rooms: setup and current limits |
 | [Forwarders](docs/FORWARDER.md) | Starting a game from its own tile on the PS5's home screen |
 | [Themes](docs/THEMES.md) | What a launcher theme is made of |
 | [Wallpapers](docs/WALLPAPERS.md) | Your own image behind the launcher's screens, the folders it reads and the formats it supports |
@@ -193,58 +135,56 @@ based on (`forwarder/launch.c`).
 | [Changelog](docs/CHANGELOG.md) | What changed in each release |
 | [Roadmap](docs/ROADMAP.md) | What is planned |
 
-Reading this from a release ZIP? The guides are at <https://github.com/blackbearreloaded/ProsperoEden/tree/main/docs>.
+Reading this from a release ZIP? The guides are at <https://github.com/Oliv3rmoon/Nightshade/tree/main/docs>.
 
-## In-game shortcuts
+### In-game shortcuts
 
-The touchpad is pressed as a button. On its own, clicking the left half of the touchpad presses Minus (or its configured [button mapping](docs/SETTINGS.md#button-mapping)); clicking the right half presses Plus. A tap is delivered on release, and a longer press holds the button. If touch coordinates are unavailable, the configured touchpad mapping is used. Touchpad + L1/R1 shortcuts work from either half and never reach the game.
+The touchpad is pressed as a button: its left half is Minus and its right half is Plus (or whatever your [button mapping](docs/SETTINGS.md#button-mapping) says). Touchpad + L1/R1 shortcuts work from either half and never reach the game.
 
 | Shortcut | Action |
 |---|---|
 | Touchpad + R1 | Toggle the performance HUD |
 | Touchpad + L1 | End the running game and return to the library |
 
-## Issues and reports
+## Support and reports
 
-Problems and ideas go to [GitHub issues](https://github.com/blackbearreloaded/ProsperoEden/issues). Reports about a particular game are welcome: name the game, and say what happens and where.
+<a name="issues-and-reports"></a>
 
-A report that can be acted on has:
+- **Ask for a fix, a feature or a mod for a game:** [open a request](https://github.com/Oliv3rmoon/Nightshade/issues/new/choose), or ask in **[nightly on Discord](https://discord.gg/pSqgRU3YP9)** (#requests).
+- **Report a bug:** open an issue here. A report that can be acted on has the game and its version (and any update or mod in use); Nightshade's version, the PS5 model and system software version, and what the console runs (kstuff-lite or etaHEN, ShadowMountPlus version); the renderer, resolution and Performance switches; and the logs as a ZIP. Turn on **Settings > Diagnostics > Detailed logging**, make the problem happen again, then zip `/data/prosperoeden/logs` (after a crash, the crash report and the logs beside it). Log lines are tagged `[ProsperoEden]`. For a problem at a certain spot, add your save data from just before it: Triangle on the game in the Library, **Save data**, **Export a copy**, then zip the folder it writes in `/data/prosperoeden/save-export`.
+- **If Nightshade helps you,** you can [buy me a coffee](https://buymeacoffee.com/oliv3rmoon). It keeps the fixes coming.
 
-- the game and its version (and any update or mod in use);
-- the ProsperoEden version, the PS5 model and system software version, and what the console runs (kstuff-lite or etaHEN, ShadowMountPlus version);
-- the renderer, resolution and Performance switches;
-- the debug logs, attached as a ZIP: turn on **Settings > Diagnostics > Detailed logging**, make the problem happen again, then zip `/data/prosperoeden/logs` (after a crash, the crash report and the logs beside it);
-- for a problem at a certain spot in a game, your save data from just before it, attached as a ZIP: Triangle on the game in the Library, **Save data**, **Export a copy**, then zip the folder it writes in `/data/prosperoeden/save-export`. With it the spot can be reached without playing the game up to there.
+**No piracy.** Nightshade is for games you own and dumped yourself. Do not ask for, post or link to game files, keys or firmware, here or in any of the project's channels, and do not ask where to find them. Such posts are removed.
 
-**No piracy.** ProsperoEden is for games you own and dumped yourself. Do not ask for, post or link to game files, keys or firmware, here or in any of the project's channels, and do not ask where to find them. Such posts are removed.
+## Built on
 
-## Elevation credits
+Nightshade is an unofficial release built on **ProsperoEden** by BlackBearReloaded and its contributors, the PS5 port of the **Eden** emulator. Neither project endorses Nightshade. Many thanks to everyone whose work is under it:
 
-Filesystem elevation uses [PS5-Lapy-JB-Daemon](https://github.com/ArkSama/PS5-Lapy-JB-Daemon),
-created by ArkSama. ProsperoEden follows the cooperative owned-root design and implementation
-from [ProsperoEden's Lapy fork](https://github.com/blackbearreloaded/PS5-Lapy-JB-Daemon), based on
-[mpereiraesaa's cooperative helper](https://github.com/mpereiraesaa/PS5-Lapy-JB-Daemon). The build
-pins that source, builds its exact-title one-shot helper without local payload changes,
-verifies the upstream-generated manifest, and includes the resulting ELF in the release.
-The donor-release and firmware 13.60 fixes pinned here were merged upstream in
-[PS5-Lapy-JB-Daemon PR #48](https://github.com/mpereiraesaa/PS5-Lapy-JB-Daemon/pull/48) and
-[PR #49](https://github.com/mpereiraesaa/PS5-Lapy-JB-Daemon/pull/49).
-The pinned `57fcc19` helper also includes the guarded target-lifetime and fail-closed accounting
-changes from [PR #50](https://github.com/mpereiraesaa/PS5-Lapy-JB-Daemon/pull/50). The previous
-`54a095c` helper passed five automated launch/elevate/close cycles on firmware 6.02 and five on
-12.70 with root access and balanced donor references. The pinned helper completed the target-exit
-stress and a full one-shot elevation on firmware 12.70; it still requires an attended
-ProsperoEden qualification run on firmware 6.02.
+- **[Eden](https://github.com/eden-emulator/mirror)** and its contributors, for the emulator core, and Takoroka's [eden-nx2](https://git.eden-emu.dev/Takoroka/eden-nx2) under the v1.012.x test builds.
+- **Mihawk**, for [PS5 Mesa](https://github.com/mihawk-99/PS5_Mesa) and [PS5 Vulkan](https://github.com/mihawk-99/PS5_Vulkan): Mihawk's Mesa/RADV driver runs the Vulkan renderer, and Belladonna is a fork of it. Thanks also for [all of the PS5 projects](https://github.com/mihawk-99) behind it, and for the Game Forwarder of [PS5 RetroArch](https://github.com/mihawk-99/PS5_RetroArch), which the app launch payload (`forwarder/launch.c`) is based on.
+- **BlackBearReloaded**, for the PS5 Native App Boilerplate (the native app structure, runtime, packaging and homebrew deployment foundation, also used by ProsperoLight) and for ps5-opengl, the OpenGL implementation that is the native PS5 rendering layer.
+- **[ps5-vulkan](https://github.com/mpereiraesaa/ps5-vulkan)** by mpereiraesaa, an experimental Vulkan graphics and compute API for native PS5 homebrew.
+- **[ShadowMountPlus](https://github.com/drakmor/ShadowMountPlus)** by drakmor, which mounts the app.
+- **[nsz](https://github.com/nicoboss/nsz)** by nicoboss, for the compressed games Nightshade plays, and **[RomM](https://github.com/rommapp/romm)**, for the download sources and save sync it works with.
+- **ProsperoTV, ProsperoLight and SwanStationPS5**, which Physalis, Datura and Mandrake are based on (see [the family](#the-nightshade-family)).
+
+<details>
+<summary>Elevation credits</summary>
+
+Filesystem elevation uses [PS5-Lapy-JB-Daemon](https://github.com/ArkSama/PS5-Lapy-JB-Daemon), created by ArkSama. Nightshade follows the cooperative owned-root design and implementation of the Lapy fork made for ProsperoEden by BlackBearReloaded, which is based on [mpereiraesaa's cooperative helper](https://github.com/mpereiraesaa/PS5-Lapy-JB-Daemon). The build pins that source, builds its exact-title one-shot helper without local payload changes, verifies the upstream-generated manifest, and includes the resulting ELF in the release. The donor-release and firmware 13.60 fixes pinned here were merged upstream in [PS5-Lapy-JB-Daemon PR #48](https://github.com/mpereiraesaa/PS5-Lapy-JB-Daemon/pull/48) and [PR #49](https://github.com/mpereiraesaa/PS5-Lapy-JB-Daemon/pull/49). The pinned `57fcc19` helper also includes the guarded target-lifetime and fail-closed accounting changes from [PR #50](https://github.com/mpereiraesaa/PS5-Lapy-JB-Daemon/pull/50). The previous `54a095c` helper passed five automated launch/elevate/close cycles on firmware 6.02 and five on 12.70 with root access and balanced donor references. The pinned helper completed the target-exit stress and a full one-shot elevation on firmware 12.70; it still requires an attended qualification run on firmware 6.02.
+
+</details>
 
 ## Thanks
 
-Thank you to the people who test ProsperoEden on their own consoles and report what they find:
+Thank you to the people who test on their own consoles and report what they find, here and in the project Nightshade is built on:
 
+- **uzzielchaidez, pankosoknap, pnvnd, yokozuna47 and RuiNelson**, who ran Nightshade's first builds.
 - **Jones** ([X](https://x.com/Jonesskulls), [GitHub](https://github.com/AgentJonesy)), for helping with testing.
 - **Phronesis**, for helping with testing.
 - **szampan** ([GitHub](https://github.com/heni0xyz)), for helping with testing.
 - **BunkinBacon**, for helping with testing.
-- **Cold** ([GitHub](https://github.com/JMUtechnologies)), for testing and for submitting a prototype of per-game presets and in-app compatibility reports ([#127](https://github.com/blackbearreloaded/ProsperoEden/pull/127), not merged).
+- **Cold** ([GitHub](https://github.com/JMUtechnologies)), for testing and for submitting a prototype of per-game presets and in-app compatibility reports (ProsperoEden pull request #127, not merged).
 
 Thank you also to the code, documentation and translation contributors (several also help with testing):
 
@@ -300,3 +240,10 @@ Copyright © 2026 BlackBearReloaded. Licensed under GPL-3.0-or-later; see [LICEN
 
 This project was developed with AI assistance from OpenAI and/or Anthropic tools.
 <!-- bbr-footer:end -->
+
+## Help Nightshade grow
+
+- **Star the repo.** It is the quickest way for other PS5 owners to find Nightshade. ⭐
+- **Join [nightly on Discord](https://discord.gg/pSqgRU3YP9)** to ask questions, follow test builds and request fixes.
+- **Share clips** and screenshots of games running on Nightshade, with the game and the version you played.
+- **Send logs** when something goes wrong. That is how the Tears of the Kingdom fixes were found.
