@@ -1,0 +1,68 @@
+{
+ "name": "Nightshade TOTK stability checks",
+ "on": {
+  "push": {
+   "branches": [
+    "test/totk-stability"
+   ]
+  },
+  "workflow_dispatch": {}
+ },
+ "permissions": {
+  "contents": "read"
+ },
+ "jobs": {
+  "host-tests": {
+   "runs-on": "ubuntu-24.04",
+   "timeout-minutes": 150,
+   "defaults": {
+    "run": {
+     "shell": "bash"
+    }
+   },
+   "env": {
+    "XDG_CACHE_HOME": "/tmp/prosperoeden-dev-host-cache",
+    "PROSPEROEDEN_DEPS_CACHE": "/tmp/prosperoeden-dev-downloads",
+    "DEV_HEAD": "c2a9ca2d732af2954af603677fca2f1a064367d4",
+    "GITHUB_TOKEN": "${{ github.token }}"
+   },
+   "steps": [
+    {
+     "name": "Check out the fix/totk-stability commit",
+     "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+     "with": {
+      "ref": "c2a9ca2d732af2954af603677fca2f1a064367d4",
+      "persist-credentials": false
+     }
+    },
+    {
+     "name": "Record revision",
+     "run": "test \"$(git rev-parse HEAD)\" = \"$DEV_HEAD\"\ngit log -1 --format=fuller\nnproc; free -h; df -h ."
+    },
+    {
+     "name": "Install Linux host tools",
+     "run": "sudo apt-get update\nsudo apt-get install --yes --no-install-recommends build-essential ca-certificates git curl wget unzip zip xz-utils file pkgconf patch bsdextrautils ninja-build ccache nasm rsync bison flex glslang-tools spirv-tools python3 python3-venv python3-pip python3-yaml clang-18 lld-18 llvm-18 libclang-rt-18-dev libexpat1-dev zlib1g-dev libssl-dev libvulkan-dev libudev-dev libasound2-dev libcurl4-openssl-dev nlohmann-json3-dev\ncmake --version\nclang++-18 --version"
+    },
+    {
+     "name": "Run the full Linux host make test suite",
+     "run": "set -o pipefail\nmake test 2>&1 | tee \"$RUNNER_TEMP/make-test.log\""
+    },
+    {
+     "name": "Apps, update helper and strings checks",
+     "if": "always()",
+     "run": "set -o pipefail\npython3 -B tools/check-apps.py 2>&1 | tee \"$RUNNER_TEMP/apps.log\"\npython3 -B tools/check-update-helper.py 2>&1 | tee \"$RUNNER_TEMP/helper.log\"\npython3 -B tools/check-update-check.py 2>&1 | tee \"$RUNNER_TEMP/update-check.log\""
+    },
+    {
+     "name": "Preserve logs",
+     "if": "always()",
+     "uses": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+     "with": {
+      "name": "host-logs",
+      "retention-days": 7,
+      "path": "${{ runner.temp }}/*.log"
+     }
+    }
+   ]
+  }
+ }
+}
