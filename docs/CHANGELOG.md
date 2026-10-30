@@ -2,6 +2,22 @@
 
 What changed in each release of ProsperoEden, newest first. A release's notes on GitHub are its section here.
 
+## v1.010.006
+
+**Big games start right away.** Tears of the Kingdom built the 16,000 pipelines it saved in earlier sessions for about 200 seconds at every start before it played, however often it had started before. Now a game starts as soon as its graphics are ready, and its saved pipelines are built while it plays. Not measured on a console yet: start TOTK twice, play a few minutes each time, and send `/data/prosperoeden/logs`. The new `EDEN_SHADER_START` lines in `stderr.log` say where the start's time went.
+
+### Fixes
+
+- **The game starts while its shader cache is built.** With the Vulkan renderer a game no longer waits for its saved pipelines: they are read and built behind it on the spare CPUs, and the game takes each one as soon as it is built. One it needs sooner it builds itself, as it does any new effect: with **Asynchronous shaders** on, that effect is missing for a moment; with them off, the game pauses for it. Leaving the game in the middle stops the build at once. `"background_shader_cache": false` in the settings file builds the whole cache before the game starts, as before (see [the settings](https://github.com/Oliv3rmoon/Nightshade/blob/v1.010.006/docs/SETTINGS.md#the-shader-cache-while-the-game-plays)). `stderr.log` says `Shader cache: the game starts now`, then how far the build is every 5 seconds, then `Shader cache ready: ... built while the game ran`.
+- **Building the cache should be faster.** In every TOTK log the build ran at about 200 pipelines a second for its first 3,000, then at about 60, and letting the builders use every CPU in v1.010.004 hardly helped. The most likely reason: each of the 15 building threads has 8 MiB of memory of its own for its small allocations, what it built filled that after a few thousand pipelines, and from then on all of them allocated through the one lock every thread shares. A thread whose memory is full now takes another 8 MiB of its own. `EDEN_SHADER_START_HEAP` in `stderr.log` counts the allocations that still go through the shared lock.
+- **The cache file is read in 8 MiB pieces, and only as fast as it is built.** It was read 4 KiB at a time, asking the file again for every entry: reading TOTK's took 15 seconds. And the whole file was queued at once, so the start held most of it in memory (the emulator's memory grew by 1.9 GB while TOTK's cache was built, and it keeps what it grows by); now at most a few pipelines per building thread wait to be built.
+- **Leaving a game while its cache is built before it starts** (with `background_shader_cache` off) now stops the build instead of waiting for it to finish.
+- **`stderr.log` shows where a start's time goes**, at the end of each cache build: `EDEN_SHADER_START` (the time, the reading, the sizes of the cache and of the driver's own pipeline cache), `EDEN_SHADER_START_STAGES` (how long the builds spent turning the game's shaders into Vulkan's, on layouts, and in the driver), `EDEN_SHADER_START_DRIVER` (how many pipelines the driver found in its cache and how many it had to compile) and `EDEN_SHADER_START_HEAP`.
+
+### Install
+
+From 1.005.102 or later, **Update now** applies it. If it doesn't, send `/data/prosperoeden/logs/updater.log`. From an older version, copy this ZIP's `PPSA99008` folder over yours.
+
 ## v1.010.005
 
 **Tears of the Kingdom: the crashes after 20 to 75 minutes, and amiibo.** A tester's TOTK ended five times on v1.010.002 to v1.010.004, each the same way: after 20 to 75 minutes of normal play the game suddenly wrote gigabytes of memory it had never used, until the console's memory ran out (the app closed) or the game stopped by itself ("jumped to an unmapped address"). All five ran with **Settings > Performance > Memory** at 8 GiB and no mods. Not confirmed on a console yet: play TOTK as you did, and send `/data/prosperoeden/logs` if it still ends.
