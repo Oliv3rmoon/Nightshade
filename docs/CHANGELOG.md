@@ -2,6 +2,37 @@
 
 What changed in each release of ProsperoEden, newest first. A release's notes on GitHub are its section here.
 
+## v1.012.000
+
+**Experimental test release: Switch 2 games, and a newer Eden under every game.** Nightshade now builds on Takoroka's [eden-nx2](https://git.eden-emu.dev/Takoroka/eden-nx2) (Eden master with experimental Switch 2 support, commit `50fa86bbbc`) instead of Eden `67bada77`, with everything in v1.011.001. No Switch 2 game has been run on a PS5 yet, and Switch 1 games have not been played on the newer Eden on a console either. This release is for testing: if v1.011.001 plays your games well, keep it for playing.
+
+### Switch 2 games (experimental)
+
+- **A Switch 2 game is a game folder with its ExeFS and RomFS.** Dump your own game into `roms/<the game's name>/exefs/` (`main`, `main.npdm`, `rtld`, `sdk` and every `subsdk*`) and `roms/<the game's name>/romfs/` (the whole RomFS). Switch 2 games as NSP or XCI files are not supported. The Library lists the folder as a game with **Switch 2** as its format, and its details say **Switch 2: experimental** and "Expect crashes, missing graphics and low frame rates." Keys and firmware are your own, as for Switch 1 games. See [Switch 2 titles](SETTINGS.md#switch-2-titles-experimental).
+- **None has been run on a console.** On a PC, eden-nx2 takes some titles to their menus, intros or first races. The PS5 has less memory and a slower CPU than the PCs it was measured on.
+- **A Switch 2 game starts with eden-nx2's own settings**, not those of **Settings > Performance**: the 12 GiB memory layout plus 8 GiB for its graphics server (the console backs only the memory the game writes), Eden's lowest GPU accuracy, no reactive flushing, ASTC textures decoded on the GPU, six emulated CPU cores and the split GPU thread. `"switch2"` in the settings file changes three of them (`gpu_split`, `exact_gpu`, `reactive_flushing`). The `Switch 2 title (experimental):` line in `stderr.log` says what the game got.
+- **Tears of the Kingdom's 4 GiB (v1.010.005) is for its Switch 1 version only.** A Switch 2 game always gets the 12 GiB layout, whatever its title ID.
+
+### The newer Eden, for Switch 1 games too
+
+eden-nx2 brings 28 newer commits of Eden master and changes of its own, and some of them apply to every game:
+
+- **Six emulated CPU cores instead of four.** Switch 1 games leave the two new ones idle; their threads sleep.
+- **A new kernel lock**: it spins first and then waits, spinning as many times as was measured on the console.
+- **The GPU's fences are released in batches**, under the fence manager's own lock.
+- **About 12 MiB more fixed memory for every game**: the GPU's address space grew from 16 to 64 GiB, and Eden's page counters for it with it.
+
+Two of eden-nx2's GPU changes that were measured only with Switch 2 games (dropping register writes of the same value, deferring the cache invalidation of inline uploads) apply to Switch 2 games only; Switch 1 games keep Eden's behaviour there. Nightshade's own fixes to Eden all carry over, and so do v1.010.005's: Tears of the Kingdom's 4 GiB, the 1 GiB held for the game's memory, the buffer reads in long sessions, and amiibo.
+
+### What to send
+
+- **Switch 2 games.** Play once with the settings as they are, as far as it goes, then quit with Touchpad + L1. Send `/data/nightshade/logs` (`eden_log.txt`, `stderr.log` and any crash report) with the game's name and title ID. If it stopped or crashed, try once more with `"switch2": {"gpu_split": false}` in `/data/nightshade/config/prosperoeden.json` and say which run was which. The lines that say the most: `Switch 2 title (experimental)`, `GPU thread split`, `EDEN_GUEST_MEMORY` (`sparse refused` means the console would not reserve the game's memory), `Draw skipped`, `Native compute shader rejected` and `Using auto stub fallback`.
+- **Switch 1 games.** Play what you played on v1.011.001. For a game that now plays worse, starts slower or stops where it didn't, send `/data/nightshade/logs` from this version and say how it went on v1.011.001.
+
+### Install
+
+From 1.005.102 or later, **Update now** applies it (from a Nightshade before v1.011.000, open the old tile once afterwards). If it doesn't, send `/data/nightshade/logs/updater.log` (`/data/prosperoeden/logs/updater.log` from a Nightshade before v1.011.000). By hand, copy this ZIP's `PPSA64448` folder to `/data/homebrew/PPSA64448`.
+
 ## v1.011.001
 
 **Nightshade's own app with v1.010.005's Tears of the Kingdom fixes and amiibo.** Everything in v1.011.000 (its own title ID, the bridge from the old tile) and everything in v1.010.005 below. With its own data folder, amiibo dumps go in `amiibo/` in the game files folder or in `/data/nightshade/amiibo/`.
