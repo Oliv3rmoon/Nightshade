@@ -89,7 +89,7 @@ std::uintptr_t SlotAddress(SparseRange& range, std::size_t slot) noexcept {
 // writes take when the pool has no block left. It used to be 32 MiB here, plus 1 GiB that the
 // graphics caches only counted as taken (headless/performance.cpp): that 1 GiB stayed in the pool,
 // where Eden's heap, the driver and the caches themselves could take it, and where 2 MiB blocks
-// could no longer be cut from what was left. Tears of the Kingdom's writes found no block three
+// could no longer be cut from what was left. Tears of the Kingdom's writes found no block four
 // times with the pool's largest free block at 1 or 2 MiB. Held here, nothing else can take it or
 // cut it up; the caches see the pool as it is, less what is not held yet, and evict as soon as a
 // burst of writes has used half of it (performance.h ViewOfPool). It is topped up every 100 ms

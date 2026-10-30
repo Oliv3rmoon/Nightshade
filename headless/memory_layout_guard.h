@@ -7,10 +7,10 @@
 // itself by what it is given uses it.
 //
 // Tears of the Kingdom does, and does not survive it. On a tester's console, with 8 GiB and no mods,
-// the four sessions that ended (v1.010.002 and .003, 19 to 48 minutes in) all ended the same way:
-// after holding about 2.7 GB of its memory for most of the session, the game wrote 0.4 to 3.4 GB of
+// the five sessions that ended (v1.010.002 to .004, 19 to 74 minutes in) all ended the same way:
+// after holding 2.7 to 2.9 GB of its memory for most of the session, the game wrote 0.4 to 3.4 GB of
 // memory it had never written before within seconds, mostly content that repeats, from its own
-// code (in the three where the console's memory ran out first, the write that found none came from
+// code (in the four where the console's memory ran out first, the write that found none came from
 // the same place, main+0x6E1404, every time), until either the console's memory ran out or, with
 // 6.1 GB of its 6.4 GiB written, one of the game's threads jumped to an address where nothing is
 // mapped. The console's 4 GiB is what the game was made for: a game here that runs without mods is
