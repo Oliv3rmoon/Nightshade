@@ -2,6 +2,24 @@
 
 What changed in each release of ProsperoEden, newest first. A release's notes on GitHub are its section here.
 
+## v1.010.005
+
+**Tears of the Kingdom: the crashes after 20 to 50 minutes, and amiibo.** A tester's TOTK ended four times on v1.010.002 and v1.010.003, each the same way: after 20 to 50 minutes of normal play the game suddenly wrote gigabytes of memory it had never used, until the console's memory ran out (the app closed) or the game stopped by itself ("jumped to an unmapped address"). All four ran with **Settings > Performance > Memory** at 8 GiB and no mods. Not confirmed on a console yet: play TOTK as you did, and send `/data/prosperoeden/logs` if it still ends.
+
+### Fixes
+
+- **Tears of the Kingdom without mods plays with 4 GiB, whatever Memory says.** The larger memory is for mods that need it. A game told it has 8 GiB is handed 6.4 GiB, twice what a Switch gives it, and TOTK fills it: in the three sessions where the memory ran out, the same piece of the game's own code was writing 0.4 to 1.8 GB of new memory within seconds, and in the fourth the game wrote 3.4 GB and then stopped. With 4 GiB it has the memory it was made for. With one of its mods switched on, the memory you chose stands, since the mod may need it; the `Memory layout:` line in `stderr.log` says when this applies.
+- **The game's own memory has 1 GiB that nothing else can take.** Nightshade kept 1 GiB of the console's memory free for the game's sudden needs, but only on paper: the graphics, the emulator's own memory and the driver could still take it, or leave it in pieces too small for the game (the crashes found pieces of 1 or 2 MiB). Nightshade now holds that 1 GiB itself, fills it up again ten times a second, and the graphics start giving memory back as soon as the game has used half of it, before the game has to wait. `stderr.log` shows what it holds (`reserve=` in the `EDEN_MEMORY` and `EDEN_CRAM` lines).
+- **The system reads the game's data from the right place in long sessions.** When a game hands the system a buffer (a sound to play, a request, a file to save), the emulator reads it where it lies if it is in one piece, and decided that by a number each piece of mapped memory gets. The numbers run out after 65,536 of them, 43 minutes into TOTK, and from then on part of a buffer could be read from the wrong memory. Every page of the buffer is now checked.
+
+### New
+
+- **Amiibo.** Player 1's controller now has an NFC reader, so a game that asks for an amiibo shows its own scan screen instead of error 2115-0064, and you can cancel it as on a Switch. To use one, put its dump (a 540-byte `.bin`) in `amiibo/` in your game files folder: each scan is shown the next dump there, in name order, a second after the game starts looking, and a game that writes to the amiibo writes to that file. With the console's amiibo key (`key_retail.bin` in `keys/`) a game reads everything on it; without it, what the game needs to know the figure. Nightshade includes no amiibo. See [Amiibo](https://github.com/Oliv3rmoon/Nightshade/blob/v1.010.005/docs/INSTALL.md#amiibo).
+
+### Install
+
+From 1.005.102 or later, **Update now** applies it. If it doesn't, send `/data/prosperoeden/logs/updater.log`. From an older version, copy this ZIP's `PPSA99008` folder over yours.
+
 ## v1.010.004
 
 **Faster starts for games with a big shader cache.** Every start of a large game builds its saved pipelines before it plays: Tears of the Kingdom's 14,000 took 552 s at a first start and 208 s at later ones. Not measured on a console yet: `stderr.log` has the new times.
