@@ -3,7 +3,7 @@
  "on": {
   "push": {
    "branches": [
-    "test/1.010.004-checks"
+    "test/1.010.004-memory"
    ]
   },
   "workflow_dispatch": {}
