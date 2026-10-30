@@ -16,9 +16,11 @@
 #include "self_update_helper/updater.hpp"
 #include "update_check/self_update_sha256.h"
 
+#include <algorithm>
 #include <chrono>
 #include <csignal>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>

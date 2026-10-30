@@ -79,7 +79,8 @@ with tempfile.TemporaryDirectory() as tmp:
     (tmp / 'user/app/PPSA64448').mkdir(parents=True)
     (tmp / 'stubs.c').write_text(STUBS)
     payload = tmp / 'app-launch'
-    defines = [f'-DLAUNCH_LOG="{tmp / "app-launch.log"}"', f'-DLAUNCH_USER="{tmp / "user"}"',
+    # _DEFAULT_SOURCE: glibc declares usleep under -std=c11 only with it (the console's libc always does).
+    defines = ['-D_DEFAULT_SOURCE', f'-DLAUNCH_LOG="{tmp / "app-launch.log"}"', f'-DLAUNCH_USER="{tmp / "user"}"',
                f'-DLAUNCHED="{tmp / "launched.txt"}"', '-DASKING="PPSA99008"']
     subprocess.run([os.environ.get('CC', 'cc'), '-std=c11', '-O1', '-Wall', '-Wextra', '-Werror', *defines,
                     str(headless / 'app_launch/main.c'), str(tmp / 'stubs.c'), '-o', str(payload)], check=True)

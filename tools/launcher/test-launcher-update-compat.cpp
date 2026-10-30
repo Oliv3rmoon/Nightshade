@@ -13,13 +13,17 @@
 #include "update_check.h"
 #include "self_update_sha256.h"
 #include "miniz/miniz.h"
+#include <algorithm>
 #include <cassert>
 #include <condition_variable>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <functional>
 #include <fstream>
 #include <iostream>
+#include <iterator>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
