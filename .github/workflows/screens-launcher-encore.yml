@@ -45,7 +45,7 @@
      "name": "Check out the release commit",
      "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
      "with": {
-      "ref": "a676f056d4c7d7300e2a145e8ce488e0c73900d2",
+      "ref": "b3d43243016efb3c9788a9eb3fdf1a44cc54d81a",
       "persist-credentials": false
      }
     },
