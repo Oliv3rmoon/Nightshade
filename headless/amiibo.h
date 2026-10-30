@@ -63,7 +63,7 @@ private:
     void Tapper();
     bool TapNext(std::unique_lock<std::mutex>& lock);
     void RemoveTag(std::unique_lock<std::mutex>& lock);
-    void Notify(std::unique_lock<std::mutex>& lock, const Common::Input::NfcStatus& status);
+    void Notify(std::unique_lock<std::mutex>& lock, Common::Input::NfcStatus value);
 
     const std::vector<std::string> folders;
     const std::chrono::milliseconds tap_delay;

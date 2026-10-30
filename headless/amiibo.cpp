@@ -83,8 +83,8 @@ AmiiboEngine::State AmiiboEngine::GetState() const {
 }
 
 // The engine's callbacks reach Eden's controller and NFC service, which may call back here: they
-// are made without the lock.
-void AmiiboEngine::Notify(std::unique_lock<std::mutex>& lock, const Common::Input::NfcStatus& value) {
+// are made without the lock, with a copy of the status taken under it.
+void AmiiboEngine::Notify(std::unique_lock<std::mutex>& lock, Common::Input::NfcStatus value) {
     lock.unlock();
     SetNfc(reader, value);
     lock.lock();
