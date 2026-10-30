@@ -227,7 +227,7 @@ roms/<the game's name>/romfs/...
 
 The Library lists such a folder as a game, says **Switch 2: experimental** in its details, and names it by its folder (or by a `control.nacp` put in the folder beside `exefs/`). Its title ID is the program ID in its `main.npdm`. Expect crashes, missing graphics and low frame rates: on a PC eden-nx2 takes some titles to their menus, intros or first races, and on the console none has been tried yet.
 
-A Switch 2 session starts with eden-nx2's own choices, not with **Settings > Performance**: the 12 GiB memory layout (and 8 GiB more for the title's graphics server; the console backs only the memory the game writes), Eden's lowest GPU accuracy, no reactive flushing, ASTC textures decoded on the GPU, unknown service commands answered with an empty success, six emulated CPU cores, and the split GPU thread. Three of them can be changed in the settings file only, as `"switch2"` at the top level for every Switch 2 title and in a game's entry under `"games"` for that game, whose values go first:
+A Switch 2 session starts with eden-nx2's own choices, not with **Settings > Performance**: the 12 GiB memory layout (and 8 GiB more for the title's graphics server; the console backs only the memory the game writes), Eden's lowest GPU accuracy, no reactive flushing, ASTC textures decoded on the GPU, unknown service commands answered with an empty success, six emulated CPU cores, and the split GPU thread. Three of them can be changed in the settings file only, `/data/nightshade/config/prosperoeden.json`, as `"switch2"` at the top level for every Switch 2 title and in a game's entry under `"games"` for that game, whose values go first:
 
 | In the file | Default | What it does |
 |---|---|---|

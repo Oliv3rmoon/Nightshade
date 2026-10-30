@@ -162,7 +162,7 @@ Nobody here has a Switch 2 dump or keys; the first console runs are the testers'
 2. Start Nightshade: the Library lists the folder with "Switch 2" under its name; its details say
    **Switch 2: experimental**. Leave Settings as they are (Vulkan renderer).
 3. Play it once without changing anything, as far as it goes, then quit with Touchpad + L1.
-4. Send `logs/` (`eden_log.txt`, `stderr.log`, the launch report and any crash report). What says
+4. Send `/data/nightshade/logs/` (`eden_log.txt`, `stderr.log`, the launch report and any crash report). What says
    the most: the line `Switch 2 title (experimental): ...` (what the session got), `GPU thread
    split`, `EDEN_GUEST_MEMORY ... bytes=21474836480` (the 20 GiB guest range; `sparse refused` means
    the console would not reserve it), `Draw skipped`, `Native compute shader rejected`, `Using auto
@@ -248,3 +248,10 @@ Nobody here has a Switch 2 dump or keys; the first console runs are the testers'
   three themes' screens on test/nx2 (c17314b pins 9eab461): **success**,
   <https://github.com/Oliv3rmoon/Nightshade/actions/runs/40987975328>. Nothing has run on a
   console: no Switch 2 dump or keys here.
+- 2026-10-30: merged into `release/1.012.000` (v1.012.000, a test release) on top of v1.011.001:
+  Nightshade's own title ID and data folder, v1.010.004's shader cache start and `EDEN_MEMORY`, and
+  v1.010.005's TOTK fixes and amiibo. The GetSpan fix still applies (eden-nx2 keeps the 16-bit
+  mapping number and the same `GetSpan`); amiibo needs nothing new (Eden's input engine and NFC
+  service are unchanged but for headers). The memory layout is set once the mods are known
+  (v1.010.005): a Switch 2 title gets the 12 GiB layout there, and the TOTK 4 GiB guard is asked
+  about Switch 1 titles only (`check-performance-settings.py`).
