@@ -23,7 +23,7 @@
    "env": {
     "XDG_CACHE_HOME": "/tmp/prosperoeden-dev-host-cache",
     "PROSPEROEDEN_DEPS_CACHE": "/tmp/prosperoeden-dev-downloads",
-    "DEV_HEAD": "d7428d9fd26221fce4efb446d66ad018b5979adc",
+    "DEV_HEAD": "fb4a5ffe6e68e5725ab0d0162ec4dfa0b81376b8",
     "GITHUB_TOKEN": "${{ github.token }}"
    },
    "steps": [
@@ -31,7 +31,7 @@
      "name": "Check out the feature/formats commit",
      "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
      "with": {
-      "ref": "d7428d9fd26221fce4efb446d66ad018b5979adc",
+      "ref": "fb4a5ffe6e68e5725ab0d0162ec4dfa0b81376b8",
       "persist-credentials": false
      }
     },
