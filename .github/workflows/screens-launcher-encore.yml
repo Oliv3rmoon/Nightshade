@@ -1,9 +1,9 @@
 {
- "name": "Nightshade launcher encore screens",
+ "name": "Nightshade discord-invite screens",
  "on": {
   "push": {
    "branches": [
-    "test/1.010.007"
+    "test/discord-invite"
    ]
   },
   "workflow_dispatch": {}
@@ -45,7 +45,7 @@
      "name": "Check out the release commit",
      "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
      "with": {
-      "ref": "5f59a76990ac5ba9a1f2786313cb8c751394507c",
+      "ref": "b46ac8b74b039a192d65005889ed0f0118f2b890",
       "persist-credentials": false
      }
     },
