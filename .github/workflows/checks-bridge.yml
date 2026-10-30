@@ -29,7 +29,7 @@
    "steps": [
     {
      "name": "Check out the bridge commit",
-     "uses": "actions/checkout@c4792f8f15be660e9a227db2665adb14e2808d9d",
+     "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
      "with": {
       "ref": "c4792f8f15be660e9a227db2665adb14e2808d9d",
       "persist-credentials": false
@@ -55,7 +55,7 @@
     {
      "name": "Preserve logs",
      "if": "always()",
-     "uses": "actions/upload-artifact@c4792f8f15be660e9a227db2665adb14e2808d9d",
+     "uses": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
      "with": {
       "name": "host-logs",
       "retention-days": 7,
@@ -95,7 +95,7 @@
    "steps": [
     {
      "name": "Check out the bridge commit",
-     "uses": "actions/checkout@c4792f8f15be660e9a227db2665adb14e2808d9d",
+     "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
      "with": {
       "ref": "c4792f8f15be660e9a227db2665adb14e2808d9d",
       "persist-credentials": false
@@ -116,7 +116,7 @@
     {
      "name": "Keep the screens",
      "if": "always()",
-     "uses": "actions/upload-artifact@c4792f8f15be660e9a227db2665adb14e2808d9d",
+     "uses": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
      "with": {
       "name": "screens-${{ strategy.job-index }}",
       "retention-days": 7,
