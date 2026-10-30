@@ -9,6 +9,7 @@ What changed in each release of ProsperoEden, newest first. A release's notes on
 ### Fixes
 
 - **The shader cache builds on every CPU at start.** Eden builds pipelines on 15 threads, but every background thread is placed on the console's five spare CPUs, so the builders shared five while the game's own cores and the GPU thread's sat idle before the game began. While the cache is built they may now use every CPU the app has (`EDEN_WORKER_PLACED name=VkPipelineBuilder ... startup=1` in `stderr.log`), and once the game runs each goes back to the spare CPUs, so play is as before.
+- **`stderr.log` shows what holds the console's memory, every 5 seconds** (`EDEN_MEMORY`): the game's own memory, Eden's heap and tables, the graphics allocator, the largest free block, and how the game's writes that had to wait for memory ended. Tears of the Kingdom still ran out of memory 45 minutes in on v1.010.003, and the next log will show which of these grows until it does.
 
 ### Install
 

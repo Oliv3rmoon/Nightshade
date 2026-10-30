@@ -681,6 +681,8 @@ inline void CountJit(std::atomic<unsigned long long>& counter) {
 // one line of the log. Called before a session's graphics start and after everything of the
 // session is gone, so two sessions of one run can be compared.
 void ReportSessionMemory(const char* phase, unsigned session);
+// Vulkan frame report, every build: what holds the memory pool now (EDEN_MEMORY).
+void ReportMemory();
 // GPU thread only (Vulkan frame report): cumulative GPU-thread idle/dispatch/wait
 // totals with the owner's CPU clock, then a guest-core CPU snapshot.
 void ReportGpuThread(unsigned frame);

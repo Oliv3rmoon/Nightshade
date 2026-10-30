@@ -457,6 +457,15 @@ extern "C" unsigned eden_guest_memory_wanted(void) noexcept {
     return memory_waiters.load(std::memory_order_acquire);
 }
 
+// How the waits ended so far, and the writes refused for want of a block (headless/performance.cpp
+// ReportMemory prints them beside what holds the pool).
+extern "C" void eden_guest_memory_waits(unsigned long long* won, unsigned long long* lost,
+                                        unsigned long long* refused) noexcept {
+    *won = memory_waits_won.load(std::memory_order_relaxed);
+    *lost = memory_waits_lost.load(std::memory_order_relaxed);
+    *refused = counters.failures.load(std::memory_order_relaxed);
+}
+
 // A write fault at `address`: true when it was a write to a slot of the guest's memory that is
 // now writable (the faulting instruction repeats), false for anything else.
 bool HandleGuestWriteFault(void* fault) noexcept {

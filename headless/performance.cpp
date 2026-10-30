@@ -40,6 +40,8 @@ extern "C" void eden_jit_path_counters(unsigned core, unsigned long long* out) _
 namespace Common {
 // Address space Eden's sparse tables span and the memory they hold (src/memory_pages.cpp).
 void SparseUsage(std::size_t* reserved, std::size_t* committed) noexcept;
+// The span of the guest's memory and the memory behind it (src/memory_pages.cpp).
+void GuestMemoryUsage(std::size_t* span, std::size_t* held) noexcept;
 } // namespace Common
 
 namespace Eden::Performance {
@@ -475,6 +477,8 @@ extern "C" unsigned eden_heap_arenas_created(void) __attribute__((weak));
 extern "C" std::size_t eden_heap_committed(void) __attribute__((weak));
 extern "C" std::size_t eden_heap_large_held(unsigned* blocks) __attribute__((weak));
 extern "C" unsigned eden_guest_memory_wanted(void) __attribute__((weak));
+extern "C" void eden_guest_memory_waits(unsigned long long* won, unsigned long long* lost,
+                                        unsigned long long* refused) __attribute__((weak));
 #ifdef PS5_NATIVE
 extern "C" std::int64_t sceKernelGetDirectMemorySize();
 extern "C" std::int32_t sceKernelAvailableDirectMemorySize(std::int64_t, std::int64_t, std::size_t, std::int64_t*,
@@ -760,6 +764,34 @@ void ReportSessionMemory(const char* phase, unsigned session) {
                 phase, session, total, free_bytes, largest, regions,
                 eden_heap_committed ? eden_heap_committed() : std::size_t{0}, large, large_blocks, table_held);
     std::fflush(stdout);
+}
+
+// Every 5 s of frames, in every build: who holds the pool when a long session runs out of it. The
+// guest's memory, the heap's pieces and large blocks, Eden's tables and the graphics allocator,
+// against the largest block left; and how the guest's writes that had to wait for a block ended.
+void ReportMemory() {
+    std::size_t span = 0, guest = 0, table_span = 0, tables = 0;
+    ::Common::GuestMemoryUsage(&span, &guest);
+    ::Common::SparseUsage(&table_span, &tables);
+    unsigned large_blocks = 0;
+    const std::size_t large = eden_heap_large_held ? eden_heap_large_held(&large_blocks) : 0;
+    const auto held = graphics_memory_held.load(std::memory_order_acquire);
+    unsigned long long won = 0, lost = 0, refused = 0;
+    if (eden_guest_memory_waits) eden_guest_memory_waits(&won, &lost, &refused);
+    unsigned long long free_bytes = 0, total = 0;
+    MemoryPool(&free_bytes, &total);
+    std::size_t largest = 0;
+#ifdef PS5_NATIVE
+    if (total != 0) {
+        std::int64_t start = 0;
+        (void)sceKernelAvailableDirectMemorySize(0, static_cast<std::int64_t>(total), 0x4000, &start, &largest);
+    }
+#endif
+    std::printf("EDEN_MEMORY guest=%zuMiB heap=%zuMiB large=%zuMiB/%u tables=%zuMiB graphics=%lluMiB "
+                "free=%lluMiB largest_free=%zuMiB short=%d waits_won=%llu waits_lost=%llu refused=%llu\n",
+                guest >> 20, (eden_heap_committed ? eden_heap_committed() : std::size_t{0}) >> 20, large >> 20,
+                large_blocks, tables >> 20, held ? held() >> 20 : 0ULL, free_bytes >> 20, largest >> 20,
+                int(graphics_memory_short.load(std::memory_order_relaxed)), won, lost, refused);
 }
 
 void ReportGpuThread(unsigned frame) {
