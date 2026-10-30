@@ -15,7 +15,15 @@ begin = main.index('#ifdef EDEN_DEV_PROFILE\n        // One-run A/B switches')
 end = main.index('#else', begin)
 release = main[:begin] + main[end:]  # what a release build compiles
 
-assert 'const auto speed = Eden::LoadPerformance(eden_game_title_id(guest));' in release
+assert 'auto speed = Eden::LoadPerformance(eden_game_title_id(guest));' in release
+# A safe start (Safe Launch, settings_store.h) takes the conservative values instead, for that
+# session only: right after they are read, before any of them reaches the emulator.
+safe = release.index('if (Eden::SafeLaunch::On()) Eden::SafeLaunch::Apply(speed);')
+assert release.index('auto speed = Eden::LoadPerformance(eden_game_title_id(guest));') < safe < \
+    release.index('Settings::values.use_asynchronous_shaders = speed.async_shaders;')
+assert 'if (Eden::SafeLaunch::On()) Eden::SafeLaunch::Apply(video);' in release
+assert 'if (Eden::SafeLaunch::Begin(eden_game_title_id(selected_game.c_str())))' in release
+assert '!safe_start && Eden::LoadModsEnabled(title)' in release and '!safe_start && Eden::LoadCheatsEnabled(title)' in release
 for statement in (
     'Settings::values.use_asynchronous_shaders = speed.async_shaders;',
     'Settings::values.gpu_accuracy.SetValue(Settings::GpuAccuracy::Low);',
@@ -38,7 +46,7 @@ for guard in ('if (speed.fast_gpu) {', 'if (speed.unsafe_cpu)', 'if (speed.unsaf
 # Every session starts at the exact levels, before the settings are read: one app run starts many
 # games, and a level the game before lowered would stay for the next one.
 start = release.index('Settings::values.cpu_accuracy = Settings::CpuAccuracy::Auto;')
-read = release.index('const auto speed = Eden::LoadPerformance(eden_game_title_id(guest));')
+read = release.index('auto speed = Eden::LoadPerformance(eden_game_title_id(guest));')
 for statement in (
     'Settings::values.gpu_accuracy.SetValue(Settings::GpuAccuracy::High);',
     'Settings::values.current_gpu_accuracy = Settings::GpuAccuracy::High;',

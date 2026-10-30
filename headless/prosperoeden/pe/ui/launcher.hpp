@@ -289,8 +289,8 @@ class Launcher
     void press_quick(Key key);
     void draw_quick(Canvas &c, float open);
     int quick_rows() const;
-    // The values a video profile tier sets for a game, on one line ("1.5x  /  Bicubic  /
-    // Compressed ASTC"), and what a game's profile row says it has.
+    // The values a video profile tier sets for a game, on one line ("1.5x, Bicubic, Compressed
+    // ASTC"), and what a game's profile row says it has.
     std::string profile_summary(std::uint64_t title_id, int tier) const;
     // What the explain pane and Quick settings say of a profile row: the tier's values, Custom,
     // or Settings' profile (tier -1).
@@ -531,6 +531,7 @@ class Launcher
     std::vector<int> home_recent_games_;
     bool home_on_recents_ = false;
     int home_recent_ = 0;
+    int home_grid_keep_ = -1; // the grid's own selection while the column has the focus
     tween::Spring home_recent_y_;
     void collect_home_recents();
     std::array<tween::Spring, 12> home_springs_{};

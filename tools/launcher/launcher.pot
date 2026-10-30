@@ -100,6 +100,7 @@ msgstr ""
 msgid "All credit for the Eden emulator goes to its developers and contributors."
 msgstr ""
 
+#. Button hint: open every setting of the game (its settings page).
 #: pe/ui/quick.cpp
 msgid "All settings"
 msgstr ""
@@ -169,6 +170,7 @@ msgstr ""
 msgid "Automatic"
 msgstr ""
 
+#. FPS overlay option: the average time between frames, shown before the worst one.
 #: pe/ui/settings.cpp
 msgid "Average frame time"
 msgstr ""
@@ -496,6 +498,7 @@ msgstr ""
 msgid "Cross"
 msgstr ""
 
+#. Video profile name: the player changed one of the profile's settings by hand.
 #: pe/ui/video_profiles.hpp
 msgid "Custom"
 msgstr ""
@@ -937,6 +940,7 @@ msgstr ""
 msgid "Handheld"
 msgstr ""
 
+#. Video profile name: higher picture quality.
 #: pe/ui/video_profiles.hpp
 msgid "High"
 msgstr ""
@@ -1186,6 +1190,7 @@ msgstr ""
 msgid "Memory"
 msgstr ""
 
+#. FPS overlay option: how close the console's memory is to running out.
 #: pe/ui/settings.cpp
 msgid "Memory pressure"
 msgstr ""
@@ -1202,6 +1207,7 @@ msgstr ""
 msgid "Menu sounds"
 msgstr ""
 
+#. Video profile name: the lightest settings (fastest).
 #: pe/ui/video_profiles.hpp
 msgid "Minimum"
 msgstr ""
@@ -1693,6 +1699,7 @@ msgstr ""
 msgid "Queued, from {0}"
 msgstr ""
 
+#. A panel of a game's most used settings, opened with the Options button.
 #: pe/ui/home.cpp, pe/ui/library.cpp, pe/ui/quick.cpp
 msgid "Quick settings"
 msgstr ""
@@ -1723,10 +1730,16 @@ msgstr ""
 msgid "Ready"
 msgstr ""
 
+#. Home screen: the label over a column of recently played games (short: it has little room).
+#: pe/ui/home.cpp
+msgid "RECENT"
+msgstr ""
+
 #: pe/ui/home.cpp
 msgid "RECENTLY PLAYED"
 msgstr ""
 
+#. Video profile name: the settings a new install has.
 #: pe/ui/video_profiles.hpp
 msgid "Recommended"
 msgstr ""
@@ -1981,6 +1994,7 @@ msgstr ""
 msgid "Several sources have this game. Which one should it come from?"
 msgstr ""
 
+#. FPS overlay option: how far the game's saved shaders are built while it plays.
 #: pe/ui/settings.cpp
 msgid "Shader cache progress"
 msgstr ""
@@ -2053,6 +2067,7 @@ msgstr ""
 msgid "Square again unlinks {0}. Its save data stays on the console and on the server."
 msgstr ""
 
+#. Button hint: start the game.
 #: pe/ui/quick.cpp
 msgid "Start"
 msgstr ""
@@ -2062,10 +2077,12 @@ msgstr ""
 msgid "Start any game once before importing a save."
 msgstr ""
 
+#. Starts the game once with conservative settings and its mods off; nothing saved changes.
 #: pe/ui/quick.cpp
 msgid "Start in safe mode"
 msgstr ""
 
+#. Under a message that a game failed to start: start that game once in safe mode.
 #: pe/ui/home.cpp
 msgid "Start it in safe mode"
 msgstr ""
@@ -2075,6 +2092,7 @@ msgstr ""
 msgid "STARTING"
 msgstr ""
 
+#. Shown while a game starts in safe mode (one time, conservative settings, mods off).
 #: pe/ui/launcher.cpp
 msgid "STARTING IN SAFE MODE"
 msgstr ""
@@ -2351,6 +2369,7 @@ msgstr ""
 msgid "UDP port"
 msgstr ""
 
+#. Video profile name: the highest picture quality.
 #: pe/ui/video_profiles.hpp
 msgid "Ultra"
 msgstr ""
@@ -2487,6 +2506,7 @@ msgstr ""
 msgid "Video"
 msgstr ""
 
+#. A setting: a set of video settings chosen at once (Minimum, Recommended, High, Ultra), like a game's graphics preset.
 #: pe/ui/game_options.cpp, pe/ui/quick.cpp, pe/ui/settings.cpp
 msgid "Video profile"
 msgstr ""
@@ -2589,6 +2609,7 @@ msgstr ""
 msgid "Your save data is checked against the server's."
 msgstr ""
 
+#. {0} is how ASTC textures are held, for example Compressed or Full quality. ASTC is a texture format's name.
 #: pe/ui/game_options.cpp
 msgid "{0} ASTC"
 msgstr ""

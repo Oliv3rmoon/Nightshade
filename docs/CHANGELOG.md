@@ -2,6 +2,24 @@
 
 What changed in each release of ProsperoEden, newest first. A release's notes on GitHub are its section here.
 
+## v1.010.007
+
+**Video profiles, Quick settings and Safe Launch.** Choose Minimum, Recommended, High or Ultra for every game or for one, change a game's video settings without opening its settings page, and start a game that could not start once in safe mode, without changing anything you saved. Nothing changes for you until you choose a profile: your settings are kept as they are. Not tried on a console yet: try a profile and safe mode on a game, and send `/data/prosperoeden/logs` if one does not start.
+
+### New
+
+- **Video profiles.** **Settings > Video > Video profile** sets the resolution, upscaling filter, ASTC textures, **Faster GPU emulation** and **Asynchronous shaders** at once: **Minimum** (0.75x with AMD FSR, the faster GPU accuracy, asynchronous shaders), **Recommended** (1x, Bilinear: what a new install has), **High** (1.5x, Bicubic) and **Ultra** (2x, Bicubic). Each turns frame generation and post-processing off, and keeps ASTC textures compressed. A game's own Video has the same row, first: a profile chosen there is that game's own. Change one of those settings by hand and the profile shows **Custom**. Tears of the Kingdom has profiles of its own that keep the console's 4 GiB and compressed textures in every one, what v1.010.005 found it needs. See [Video profiles](https://github.com/Oliv3rmoon/Nightshade/blob/v1.010.007/docs/SETTINGS.md#video-profiles).
+- **Quick settings.** Options on a game, in the Library, on the home screen or on its settings page, opens a panel with **Play**, **Start in safe mode**, its video profile, resolution, upscaling filter, renderer, FPS overlay and frame generation. A change is saved for that game at once; Triangle opens all of its settings.
+- **Safe Launch.** **Start in safe mode** starts a game once at 1x, Bilinear, compressed ASTC, a 1080p output at 60 Hz, with no frame generation or post-processing, every Performance switch at its default, 4 GiB, and its mods and cheats off. It keeps the renderer, the console mode, your controls and the language. Nothing is saved: the next start uses your settings as they are. When a game could not start, the home screen's message says **Start it in safe mode** (Options). The launch report says `Safe mode (this start only)`. See [Safe Launch](https://github.com/Oliv3rmoon/Nightshade/blob/v1.010.007/docs/SETTINGS.md#safe-launch).
+- **Recently played on the Nightshade and Slate home screens.** A column of the recent games' covers stands between the game's details and the grid: Right from the details reaches it, the details show the game focused there, and Cross plays it.
+- **The game's case.** A game you start comes forward as a case that turns to face you, its cover on the front and its edge on the spine. With **Reduce motion**, or for a game without a cover, the cover comes forward as before.
+- **More in the overlay.** The FPS overlay can say the last second's average frame time before its worst (`33.3/41.2MS`), the emulator's heap in use of what it holds (`HEAP 1.1/1.5G`) with `LOW` while the memory pool is short, and how far the game's saved shaders are built while it plays (`SHD 45%`). **Settings > Video > Overlay options** has a switch for each. They are on for a new install; settings saved by an earlier version keep the line as it was until you turn them on. See [The performance overlay](https://github.com/Oliv3rmoon/Nightshade/blob/v1.010.007/docs/SETTINGS.md#the-performance-overlay).
+- **A game's own console memory.** A game's own Performance settings have **Memory** after the speed limit, as **Settings > Performance** has for every game.
+
+### Install
+
+From 1.005.102 or later, **Update now** applies it. If it doesn't, send `/data/prosperoeden/logs/updater.log`. From an older version, copy this ZIP's `PPSA99008` folder over yours.
+
 ## v1.010.006
 
 **Big games start right away, and the emulator gives memory back.** Tears of the Kingdom built the 16,000 pipelines it saved in earlier sessions for about 200 seconds at every start before it played, however often it had started before. Now a game starts as soon as its graphics are ready, and its saved pipelines are built while it plays. And a TOTK session that ended after 1.5 hours on v1.010.005 ("heap exhausted") should no longer end that way. Not measured on a console yet: start TOTK twice, play as long as you can, and send `/data/prosperoeden/logs`. The new `EDEN_SHADER_START` lines in `stderr.log` say where the start's time went, and the `heap:` lines what the emulator holds of the console's memory.

@@ -113,7 +113,7 @@ A game's console has 4 GiB of memory, and its kernel divides them between the ga
 | 6 GiB | `6Gb` | 6 GiB | |
 | 8 GiB | `8Gb` | 8 GiB | |
 
-A mod that keeps memory of its own asks the kernel how much there is and takes what it wants from the answer. A mod that wants more than 4 GiB then finds less than it asked for, and the game stops before its first picture; that mod's game needs 6 or 8 GiB, as [Mods](MODS.md) describes.
+A game can have a memory of its own: **Memory** in its own Performance settings (Triangle in the Library), after the speed limit. A mod that keeps memory of its own asks the kernel how much there is and takes what it wants from the answer. A mod that wants more than 4 GiB then finds less than it asked for, and the game stops before its first picture; that mod's game needs 6 or 8 GiB, as [Mods](MODS.md) describes.
 
 **Tears of the Kingdom plays with 4 GiB unless a mod is switched on for it.** Told it has 8 GiB, it is handed 6.4 GiB (twice what a Switch gives it) and fills it: on a tester's console every session with 8 GiB and no mods ended 19 to 74 minutes in, after the game suddenly wrote gigabytes of memory it had never used. With one of its mods on, the layout chosen applies, since the mod may need it. The launch line says when this happens (`Memory layout: 4Gb (4 GiB), not the 8Gb chosen`).
 
@@ -192,6 +192,26 @@ Without the file, the three settings are greyed out and say **Unavailable**.
 
 A game that already fills the output, such as one at 60 FPS on the 60 Hz output, gains nothing from it. When it does not run, the log of the session says why, in the lines that start with `framegen:`.
 
+## The performance overlay
+
+The FPS overlay (Touchpad + R1 while playing, **FPS overlay** in **Settings > Video** or a game's own Video) is one line over the game: `VLK 1920x1080 30FPS 33.3/41.2MS CPU 55% 40% 12% GPU 43% MEM 4.1/8.0G LOW GFX 2.5G HEAP 1.1/1.5G SHD 45%`. **Settings > Video > Overlay options** turns each piece on or off:
+
+| Piece | What it says |
+|---|---|
+| Backend, Resolution | The renderer (`VLK`, `OGL`) and the size the game renders at |
+| FPS | The game's frames a second; with frame generation, the game's and the output's (`30/60FPS`) |
+| Frame time | The worst frame of the last second, in milliseconds |
+| Average frame time | Before the worst, the last second's average frame (`33.3/41.2MS`): a worst far above the average is a stutter, both high together a slow scene |
+| Speed | How far the emulation is behind 100%, when it is |
+| CPU, CPU by core | The emulated cores' work, each or only the busiest |
+| GPU | How busy the GPU is |
+| Memory | What is taken of the memory pool the CPU and the GPU share, of all of it, and the graphics' part (`GFX`) |
+| Memory pressure | `LOW` after the pool while it is short (the caches are giving memory back), and the emulator's heap: in use of what it holds of the pool (`HEAP 1.1/1.5G`, the `heap_used` and `heap` of the `EDEN_MEMORY` lines in `heap.log`) |
+| Shader cache progress | While the game's saved shaders are built as it plays ([The shader cache while the game plays](#the-shader-cache-while-the-game-plays)), how far that is (`SHD 45%`); gone once they are built |
+| Ping | The round trip to a multiplayer room's server |
+
+Average frame time, memory pressure and shader cache progress are on for a new install. Settings saved by an earlier version keep the pieces they had: turn them on in Overlay options.
+
 ## Profiles
 
 **Settings > Profiles** lists the people who play on this console, up to eight. Each profile keeps its own save data, its own settings (everything under Settings, and each game's own settings) and its own Continue Playing and Recently Played. The game files folder is the console's and is the same for everyone.
@@ -211,8 +231,8 @@ The menu opens with the profile that the PS5 user in front chose last. If you us
 
 | Kind | What a game can have of its own |
 |---|---|
-| Video | Renderer, resolution, upscaling filter, ASTC textures, refresh rate, FPS overlay, frame generation with its target and multiplier |
-| Performance | Each of the switches, and the speed limit. The game's console memory is one value for every game in **Settings > Performance > Memory**; a game's own is in the settings file ([Console memory](#console-memory)) |
+| Video | Video profile ([Video profiles](#video-profiles)), renderer, resolution, upscaling filter, ASTC textures, refresh rate, FPS overlay, frame generation with its target and multiplier |
+| Performance | Each of the switches, the speed limit, and the game's console memory ([Console memory](#console-memory)) |
 | Audio | Game volume, mute |
 | Controls | Vibration, and a button mapping of its own |
 | System | RNG seed: with a seed the game is loaded at the same place in memory at every start, which some mods need. Left and right switch between **Random** and the seed; Cross opens the keyboard to type another one. The game's own random numbers still change from start to start |
@@ -220,11 +240,40 @@ The menu opens with the profile that the PS5 user in front chose last. If you us
 
 The output resolution, the menu's sounds and the accessibility settings are the same for every game.
 
+**Quick settings.** Options on a game (in the Library, on the home screen, or on its settings page) opens a panel with **Play**, **Start in safe mode** ([Safe Launch](#safe-launch)), and the settings players change most: the video profile, resolution, upscaling filter, renderer, FPS overlay and frame generation. Each change is saved for that game at once, as on its settings page; Triangle opens that page for everything else.
+
 One more is in the settings file only, for a game whose graphics break with it: `"vertex_input_dynamic": false` in the game's entry under `"games"` makes the Vulkan renderer build each pipeline's vertex input into the pipeline instead of setting it while drawing (`VK_EXT_vertex_input_dynamic_state` off). On desktop RADV, Pokémon Legends: Z-A draws flashing colour after the train station with it on, and players fixed it this way ([#59](https://github.com/Swordpdf/ProsperoEden/issues/59), [#112](https://github.com/Swordpdf/ProsperoEden/issues/112)). A game with it off builds more pipelines, so it can stutter more the first time it draws something. The launch report says `dynamic vertex input on` or `off`. Changing the game's settings in the Library keeps it; take it out of the file to switch it back on.
 
 ```json
 { "games": { "<the game's title ID>": { "vertex_input_dynamic": false } } }
 ```
+
+## Video profiles
+
+A video profile sets several of the Video and Performance settings at once: **Settings > Video > Video profile** for every game, and **Video profile** in a game's own Video (or its Quick settings) for one game.
+
+| Profile | Resolution | Upscaling filter | ASTC textures | Faster GPU emulation | Asynchronous shaders |
+|---|---|---|---|---|---|
+| Minimum | 0.75x | AMD FSR | Compressed | On | On |
+| Recommended | 1x | Bilinear | Compressed | Off | Off |
+| High | 1.5x | Bicubic | Compressed | Off | Off |
+| Ultra | 2x | Bicubic | Compressed | Off | Off |
+
+Every profile also turns frame generation and post-processing off. Recommended is what a new install has. ASTC textures stay compressed in all of them: held decoded they take four times the graphics memory, and above 1x that is what a game runs out of.
+
+A profile is not saved as such: choosing one writes those settings, and the menu reads back which profile they match. Change one of them by hand (or turn frame generation on) and the profile shows **Custom**; choose a profile again to set them all back. Settings saved before profiles existed are not changed: they show as the profile they match, or Custom. In a game's own settings, **Default** keeps Settings' values (and shows Settings' profile), and choosing a profile gives the game those values of its own; going back to **Default** takes back only what a profile sets.
+
+Some games have profiles of their own. **Tears of the Kingdom** keeps the console's 4 GiB and compressed ASTC textures in every one (see [Console memory](#console-memory)): its profiles set the game's own memory to 4 GiB, so with a mod that needs more, set its **Memory** by hand afterwards (the profile then shows Custom).
+
+## Safe Launch
+
+**Start in safe mode** (in a game's [Quick settings](#settings-per-game), or **Options** under the home screen's message when a game could not start) starts the game once with settings that start nearly anything, and with its mods and cheats off:
+
+- 1x, Bilinear, ASTC textures compressed, a 1080p output at 60 Hz, no frame generation and no post-processing;
+- every Performance switch at its default, the console's 4 GiB of memory, a speed limit of 100%;
+- no mods and no cheats.
+
+It keeps the renderer, the console mode, the controls, the language, the audio and the overlay, and the settings file's own workarounds for the game (`gpu_debug`, `adaptive_clock`, `vertex_input_dynamic`). Nothing is written to the settings file: the next start of the game, or of any other, uses its settings as they are. If the game restarts on its own after an early fault, it stays in safe mode for that restart. The launch report says `Safe mode (this start only): ...`, and a crash report's session line ends with `safe mode`.
 
 ## For testing a game that stops the GPU
 

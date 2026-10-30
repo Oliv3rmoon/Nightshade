@@ -522,14 +522,14 @@ std::string Launcher::profile_summary(std::uint64_t title_id, int tier) const
 {
     const VideoProfile v = profile_for(title_id, tier);
     const std::string resolution = pick(services_.resolution_labels(), v.resolution);
-    std::string line = resolution.substr(0, resolution.find(' ')) + "  /  " + pick(services_.filter_labels(), v.filter) +
-                       "  /  " + fill(tr("{0} ASTC"), {pick(services_.astc_labels(), v.astc)});
+    std::string line = resolution.substr(0, resolution.find(' ')) + ", " + pick(services_.filter_labels(), v.filter) +
+                       ", " + fill(tr("{0} ASTC"), {pick(services_.astc_labels(), v.astc)});
     if (v.fast_gpu)
-        line += std::string{"  /  "} + tr("Faster GPU emulation");
+        line += std::string{", "} + tr("Faster GPU emulation");
     if (v.async_shaders)
-        line += std::string{"  /  "} + tr("Asynchronous shaders");
+        line += std::string{", "} + tr("Asynchronous shaders");
     if (v.memory_layout >= 0)
-        line += std::string{"  /  "} + kMemoryNames[std::clamp(v.memory_layout, 0, 2)];
+        line += std::string{", "} + kMemoryNames[std::clamp(v.memory_layout, 0, 2)];
     return line;
 }
 

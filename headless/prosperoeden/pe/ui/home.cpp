@@ -124,6 +124,12 @@ void Launcher::press_home(Key key)
     }
     // The recent games' column puts its game in the panel and the grid's selection: what the grid
     // does to its game, it does to that one.
+    // The grid keeps its own place: going back to it from the column finds it where it was.
+    const auto enter_recents = [&]
+    {
+        home_grid_keep_ = library_.selected;
+        home_on_recents_ = true;
+    };
     const auto select_recent = [&]
     {
         library_.selected = home_recent_games_[static_cast<std::size_t>(home_recent_)];
@@ -155,6 +161,12 @@ void Launcher::press_home(Key key)
         case Key::right:
             home_on_recents_ = false;
             home_on_grid_ = true;
+            if (home_grid_keep_ >= 0 && home_grid_keep_ < count)
+            {
+                library_.selected = home_grid_keep_;
+                refresh_selected_game();
+                sync_grid(false);
+            }
             cue(Cue::focus);
             return;
         default:
@@ -192,7 +204,7 @@ void Launcher::press_home(Key key)
                 home_on_grid_ = false;
                 if (!home_recent_games_.empty())
                 {
-                    home_on_recents_ = true;
+                    enter_recents();
                     select_recent();
                 }
                 cue(Cue::focus);
@@ -311,7 +323,7 @@ void Launcher::press_home(Key key)
             // The recent games' column first, when there is one; then the grid.
             if (!home_recent_games_.empty())
             {
-                home_on_recents_ = true;
+                enter_recents();
                 select_recent();
                 cue(Cue::focus);
             }
@@ -697,8 +709,8 @@ void Launcher::draw_home(Canvas &c)
         if (!home_recent_games_.empty())
         {
             begin_part(2, 18.0f);
-            kicker(c, tr("RECENTLY PLAYED"), kRecentLeft, baseline(80.0f, 30.0f, t.size_small), t.accent_pale,
-                   kRecentCover + 60.0f);
+            kicker(c, tr("RECENT"), kRecentLeft, baseline(80.0f, 30.0f, t.size_small), t.accent_pale,
+                   kRecentCover + 40.0f);
             const float ring = kRecentTop + home_recent_y_.value;
             for (int i = 0; i < static_cast<int>(home_recent_games_.size()); ++i)
             {

@@ -100,6 +100,11 @@ msgstr "Allt fusk"
 msgid "All credit for the Eden emulator goes to its developers and contributors."
 msgstr "All ära för Eden-emulatorn går till dess utvecklare och bidragsgivare."
 
+#. Button hint: open every setting of the game (its settings page).
+#: pe/ui/quick.cpp
+msgid "All settings"
+msgstr "Alla inställningar"
+
 #: settings_store.h
 msgid "AMD FSR"
 msgstr "AMD FSR"
@@ -164,6 +169,11 @@ msgstr "Automatiskt"
 #: pe/ui/game_options.cpp
 msgid "Automatic"
 msgstr "Automatiskt"
+
+#. FPS overlay option: the average time between frames, shown before the worst one.
+#: pe/ui/settings.cpp
+msgid "Average frame time"
+msgstr "Genomsnittlig bildtid"
 
 #. Button hint: go back one screen.
 #: pe/ui/browse.cpp, pe/ui/game_options.cpp, pe/ui/library.cpp, pe/ui/multiplayer.cpp, pe/ui/pairing.cpp, pe/ui/profiles.cpp, pe/ui/remote.cpp, pe/ui/save_sync.cpp, pe/ui/settings.cpp, pe/ui/update.cpp
@@ -489,6 +499,19 @@ msgstr "Medverkande och konfiguration"
 msgid "Cross"
 msgstr "Kryss"
 
+#. Video profile name: the player changed one of the profile's settings by hand.
+#: pe/ui/video_profiles.hpp
+msgid "Custom"
+msgstr "Anpassad"
+
+#: pe/ui/game_options.cpp
+msgid "Custom: this game's own values match none of the profiles. Choosing a profile sets them again."
+msgstr "Anpassad: det här spelets egna värden matchar ingen förinställning. Om du väljer en sätts de om."
+
+#: pe/ui/settings.cpp
+msgid "Custom: your values match none of the profiles."
+msgstr "Anpassad: dina värden matchar ingen förinställning."
+
 #: pe/ui/settings.cpp
 msgid "Default"
 msgstr "Standard"
@@ -730,6 +753,10 @@ msgid "Follows Settings"
 msgstr "Följer Inställningar"
 
 #: pe/ui/game_options.cpp
+msgid "Follows Settings, whose video profile is {0}. A profile chosen here is this game's own."
+msgstr "Följer Inställningar, vars grafikförinställning är {0}. En förinställning vald här gäller bara det här spelet."
+
+#: pe/ui/game_options.cpp
 msgid "For every controller. A game can have its own."
 msgstr "För alla handkontroller. Ett spel kan ha en egen."
 
@@ -765,9 +792,17 @@ msgstr "Bildgenerering kräver Lossless.dll från Lossless Scaling i mappen loss
 msgid "Frame generation needs MihawkGen weights (network.fgw)."
 msgstr "Bildgenerering kräver MihawkGen-vikterna (network.fgw)."
 
+#: pe/ui/quick.cpp
+msgid "Frame rate, frame time, CPU, GPU and memory over the game. Touchpad + R1 shows or hides it while playing."
+msgstr "Bildfrekvens, bildtid, CPU, GPU och minne över spelet. Styrplatta + R1 visar eller döljer räknaren medan du spelar."
+
 #: pe/ui/settings.cpp
 msgid "Frame time"
 msgstr "Bildtid"
+
+#: pe/ui/quick.cpp
+msgid "Frames made between the game's own, up to the output's rate (Vulkan)."
+msgstr "Bilder som skapas mellan spelets egna, upp till utdatans frekvens (Vulkan)."
 
 #. The console does not say how much room a USB drive has. Keep it short.
 #: pe/ui/backup.cpp
@@ -906,6 +941,11 @@ msgstr "Renderaren kunde inte initieras. Prova en annan i Inställningar; drivru
 msgid "Handheld"
 msgstr "Bärbart"
 
+#. Video profile name: higher picture quality.
+#: pe/ui/video_profiles.hpp
+msgid "High"
+msgstr "Hög"
+
 #. A switch: solid dark panels, brighter text.
 #: pe/ui/settings.cpp
 msgid "High contrast"
@@ -919,6 +959,14 @@ msgstr "Hem"
 #: pe/ui/library.cpp, pe/ui/settings.cpp
 msgid "How games are drawn and scaled to your TV."
 msgstr "Hur spel ritas och skalas till din tv."
+
+#: pe/ui/quick.cpp
+msgid "How many pixels the game is drawn with: above 1x is sharper and needs more of the GPU and its memory."
+msgstr "Med hur många pixlar spelet ritas: över 1x är skarpare och kräver mer av GPU:n och dess minne."
+
+#: pe/ui/quick.cpp
+msgid "How the game's picture is scaled to the output."
+msgstr "Hur spelets bild skalas till utdata."
 
 #: pe/ui/settings.cpp
 msgid "Images in this folder: {0}"
@@ -976,6 +1024,10 @@ msgstr "Ett nytt försök görs nästa gång menyn öppnas."
 #: pe/ui/save_sync.cpp
 msgid "It replaces this console's."
 msgstr "De ersätter konsolens."
+
+#: pe/ui/quick.cpp
+msgid "It stopped last time."
+msgstr "Det stannade förra gången."
 
 #: pe/ui/pairing.cpp
 msgid "It was declined on the server."
@@ -1139,6 +1191,11 @@ msgstr "Mellan"
 msgid "Memory"
 msgstr "Minne"
 
+#. FPS overlay option: how close the console's memory is to running out.
+#: pe/ui/settings.cpp
+msgid "Memory pressure"
+msgstr "Minnestryck"
+
 #: pe/ui/game_options.cpp, pe/ui/settings.cpp
 msgid "Menu keybinds"
 msgstr "Menyknappar"
@@ -1150,6 +1207,11 @@ msgstr "Menyns ljudeffekter är skapade med ElevenLabs."
 #: pe/ui/settings.cpp
 msgid "Menu sounds"
 msgstr "Menyljud"
+
+#. Video profile name: the lightest settings (fastest).
+#: pe/ui/video_profiles.hpp
+msgid "Minimum"
+msgstr "Minimum"
 
 #: eden_services.cpp, host/fake_services.cpp
 msgid "Missing or empty keys/prod.keys in {0}."
@@ -1639,6 +1701,11 @@ msgstr "I kö"
 msgid "Queued, from {0}"
 msgstr "I kö, från {0}"
 
+#. A panel of a game's most used settings, opened with the Options button.
+#: pe/ui/home.cpp, pe/ui/library.cpp, pe/ui/quick.cpp
+msgid "Quick settings"
+msgstr "Snabbinställningar"
+
 #. The usual value of RNG seed: no fixed seed, a new random one at every start of the game.
 #: pe/ui/game_options.cpp
 msgid "Random"
@@ -1665,9 +1732,19 @@ msgstr "Läser..."
 msgid "Ready"
 msgstr "Klar"
 
+#. Home screen: the label over a column of recently played games (short: it has little room).
+#: pe/ui/home.cpp
+msgid "RECENT"
+msgstr "SENAST"
+
 #: pe/ui/home.cpp
 msgid "RECENTLY PLAYED"
 msgstr "SENAST SPELADE"
+
+#. Video profile name: the settings a new install has.
+#: pe/ui/video_profiles.hpp
+msgid "Recommended"
+msgstr "Rekommenderad"
 
 #. A switch: no drifting, sliding or zooming on screen.
 #: pe/ui/settings.cpp
@@ -1919,6 +1996,11 @@ msgstr "Flera servrar kan lagra sparade data. Vilken ska den här profilen anvä
 msgid "Several sources have this game. Which one should it come from?"
 msgstr "Flera källor har det här spelet. Vilken ska det hämtas från?"
 
+#. FPS overlay option: how far the game's saved shaders are built while it plays.
+#: pe/ui/settings.cpp
+msgid "Shader cache progress"
+msgstr "Förlopp för shadercache"
+
 #: pe/ui/settings.cpp
 msgid "Show an image of your own behind the menu."
 msgstr "Visa en egen bild bakom menyn."
@@ -1987,15 +2069,39 @@ msgstr "Fyrkant igen tar bort {0} från listan. Sparfilerna stannar på konsolen
 msgid "Square again unlinks {0}. Its save data stays on the console and on the server."
 msgstr "Fyrkant igen kopplar från {0}. Dess sparade data stannar på konsolen och på servern."
 
+#. Button hint: start the game.
+#: pe/ui/quick.cpp
+msgid "Start"
+msgstr "Starta"
+
 #. The app creates its user the first time a game runs.
 #: eden_services.cpp
 msgid "Start any game once before importing a save."
 msgstr "Starta valfritt spel en gång innan du importerar sparade data."
 
+#. Starts the game once with conservative settings and its mods off; nothing saved changes.
+#: pe/ui/quick.cpp
+msgid "Start in safe mode"
+msgstr "Starta i felsäkert läge"
+
+#. Under a message that a game failed to start: start that game once in safe mode.
+#: pe/ui/home.cpp
+msgid "Start it in safe mode"
+msgstr "Starta det i felsäkert läge"
+
 #. Shown over a game's cover while it starts.
 #: pe/ui/launcher.cpp
 msgid "STARTING"
 msgstr "STARTAR"
+
+#. Shown while a game starts in safe mode (one time, conservative settings, mods off).
+#: pe/ui/launcher.cpp
+msgid "STARTING IN SAFE MODE"
+msgstr "STARTAR I FELSÄKERT LÄGE"
+
+#: pe/ui/quick.cpp
+msgid "Starts with: {0}"
+msgstr "Startar med: {0}"
 
 #: pe/ui/settings.cpp
 msgid "Stops the background drifting and the screens sliding, here and on the loading screen."
@@ -2029,6 +2135,10 @@ msgstr "Ta serverns"
 #: pe/ui/profiles.cpp
 msgid "Taken off the list. Its save data stays on the console."
 msgstr "Borttagen från listan. Sparfilerna stannar på konsolen."
+
+#: pe/ui/video_profiles.hpp
+msgid "Tears of the Kingdom: 4 GiB and compressed ASTC in every tier, what it needs to play for hours."
+msgstr "Tears of the Kingdom: 4 GiB och komprimerade ASTC på varje nivå, det som krävs för att spela i timmar."
 
 #: settings_store.h
 msgid "Thai"
@@ -2202,6 +2312,10 @@ msgstr "Inställningarna för det här spelet kan inte sparas (titel-ID saknas).
 msgid "This room uses a different protocol version."
 msgstr "Det här rummet använder en annan protokollversion."
 
+#: pe/ui/quick.cpp
+msgid "This start only: 1x, Bilinear, compressed ASTC, a 1080p output at 60 Hz, no frame generation or post-processing, Performance at its defaults, 4 GiB, mods and cheats off. Nothing you saved changes."
+msgstr "Bara den här starten: 1x, Bilinjär, komprimerade ASTC, en utdata på 1080p vid 60 Hz, ingen bildgenerering eller efterbehandling, Prestanda på standard, 4 GiB, moddar och fusk av. Inget du har sparat ändras."
+
 #. Exactly one file; {0} is a size such as 1.2 GB. See '{0} game'.
 #: pe/ui/backup.cpp
 msgid "To back up: {0} in {1} file"
@@ -2256,6 +2370,11 @@ msgstr "Slå på eller av"
 #: pe/ui/multiplayer.cpp
 msgid "UDP port"
 msgstr "UDP-port"
+
+#. Video profile name: the highest picture quality.
+#: pe/ui/video_profiles.hpp
+msgid "Ultra"
+msgstr "Ultra"
 
 #: pe/ui/game_options.cpp, pe/ui/library.cpp, pe/ui/settings.cpp
 msgid "Unavailable"
@@ -2385,6 +2504,11 @@ msgstr "Vibration, knapptilldelning och genvägarna under ett spel."
 msgid "Video"
 msgstr "Video"
 
+#. A setting: a set of video settings chosen at once (Minimum, Recommended, High, Ultra), like a game's graphics preset.
+#: pe/ui/game_options.cpp, pe/ui/quick.cpp, pe/ui/settings.cpp
+msgid "Video profile"
+msgstr "Grafikförinställning"
+
 #: pe/ui/home.cpp
 msgid "VIEW ALL GAMES"
 msgstr "VISA ALLA SPEL"
@@ -2393,6 +2517,10 @@ msgstr "VISA ALLA SPEL"
 #: pe/ui/settings.cpp
 msgid "Vulkan (recommended)"
 msgstr "Vulkan (rekommenderas)"
+
+#: pe/ui/quick.cpp
+msgid "Vulkan is faster and recommended; OpenGL is there for a game that needs it."
+msgstr "Vulkan är snabbare och rekommenderas; OpenGL finns för spel som behöver det."
 
 #: pe/ui/pairing.cpp
 msgid "Waiting for the approval  ·  the code works {0} more"
@@ -2478,6 +2606,11 @@ msgstr "Ditt nästa äventyr"
 #: pe/ui/save_sync.cpp
 msgid "Your save data is checked against the server's."
 msgstr "Dina sparade data jämförs med serverns."
+
+#. {0} is how ASTC textures are held, for example Compressed or Full quality. ASTC is a texture format's name.
+#: pe/ui/game_options.cpp
+msgid "{0} ASTC"
+msgstr "ASTC: {0}"
 
 #. How many settings of a kind this game has of its own; {0} is a number.
 #: pe/ui/library.cpp
@@ -2632,6 +2765,14 @@ msgstr "{0}/ (NSP eller XCI)"
 #: pe/ui/browse.cpp
 msgid "{0}/ (one folder per game ID)"
 msgstr "{0}/ (en mapp per titel-ID)"
+
+#: pe/ui/game_options.cpp, pe/ui/quick.cpp
+msgid "{0}: {1}. Applies on next launch."
+msgstr "{0}: {1}. Gäller från nästa start."
+
+#: pe/ui/game_options.cpp
+msgid "{0}: {1}. Frame generation and post-processing off; changing one of these makes it Custom."
+msgstr "{0}: {1}. Bildgenerering och efterbehandling av; ändrar du något av dem blir det Anpassad."
 
 #: pe/ui/settings.cpp
 msgid "Crash reports (FTP): {0}\nAttach crash-*.txt and its matching logs to your issue."

@@ -347,7 +347,7 @@ void pictures(Stage &s)
         }
         // A setting of the profile's changed by hand: the profile is Custom.
         pe::ui::GameSettings changed = game;
-        changed.resolution = 4;
+        changed.resolution = 5;  // 3x: High's 1.5x and Ultra's 2x are tiers of their own
         if (pe::ui::game_profile_of(changed, s.services.preferences(), 0) != pe::ui::kCustomProfile)
         {
             std::fprintf(stderr, "error: a changed profile did not read as Custom\n");
