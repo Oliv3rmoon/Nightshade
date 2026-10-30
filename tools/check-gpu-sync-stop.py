@@ -77,6 +77,8 @@ bool Wait(){
 struct Memory {std::atomic<u32> value{};template<class T>T Read(unsigned){return value.load();}};
 struct Raster {std::atomic_uint calls{};void ReleaseFences(){++calls;}};
 struct DmaPusher {System system;Memory memory_manager;Raster raster;Raster*rasterizer=&raster;};
+// eden-nx2: the acquire first waits for its split GPU thread (puller.cpp DrainBack); none here.
+static void DrainBack(){}
 struct Puller {struct Regs {struct Address{unsigned SemaphoreAddress(){return 0;}}semaphore_address;u32 semaphore_acquire=4,acquire_value{};bool acquire_active{},acquire_mode{},acquire_source{};}regs;
 void ProcessSemaphoreAcquire(DmaPusher&dma_pusher){
 '''+acquire+r'''

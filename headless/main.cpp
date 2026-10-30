@@ -1743,9 +1743,9 @@ int main(int argc, char** argv) {
 #endif
                 Eden::Loading::Set(Eden::Loading::Step::game);
                 Eden::BootTrace::Line("loading the game");
-                Core::SystemResultStatus loaded;
                 // eden-nx2's process-wide Switch 2 state from an earlier session (nx2_session.h).
                 Eden::Nx2::ResetForSession();
+                Core::SystemResultStatus loaded;
                 try {
                     loaded = system.Load(window, guest, params);
                 } catch (const std::exception& error) {
