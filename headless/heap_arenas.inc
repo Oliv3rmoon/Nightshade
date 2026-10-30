@@ -19,18 +19,48 @@
  * which made allocation-heavy shader compilation ~100-250x slower than on a
  * Zen 2 host. A fixed split of the heap into arenas (run 220741) exhausted a
  * partition at level load, so capacity is not partitioned here: each allocating thread (up to
- * EDEN_HEAP_MAX_ARENAS) gets a lazily created 8 MiB arena allocated *from* the heap, aligned to
+ * EDEN_HEAP_FIRST_ARENAS) gets a lazily created 8 MiB arena allocated *from* the heap, aligned to
  * its own 8 MiB slot. Small requests use the thread's arena and fall back to the heap's own
  * spaces; frees and reallocs find the owner in O(1) from the address.
+ *
+ * More than one arena a thread. A thread that keeps more than 8 MiB of small blocks filled its
+ * arena, and from then on every small request it made went to the heap's own spaces, under the
+ * lock that collapses. The threads that build a game's shader cache keep what they build (a
+ * pipeline and the driver's copy of its shaders, tens of KiB each): fifteen builders fill their
+ * arenas after a few thousand pipelines, which is where Tears of the Kingdom's build of 16,000
+ * fell from about 200 to 60 a second at every start, and where more CPUs stopped helping (that
+ * this is the cause is read from the logs, not yet measured: EDEN_SHADER_START_HEAP counts it). A
+ * thread whose arena is full now
+ * moves to another of its own arenas with room, and makes a new one when none has (up to
+ * EDEN_HEAP_THREAD_ARENAS, for requests under EDEN_HEAP_ARENA_GROW_REQUEST); a thread that
+ * shares an arena because the first ones were taken makes one of its own the same way. A thread's
+ * first arena is still one of EDEN_HEAP_FIRST_ARENAS: the many threads that allocate little do
+ * not each take 8 MiB of the heap. Its arenas stay with
+ * its record, so the next thread that takes the record uses them: they are made once for the
+ * most a thread ever held, not again for each session. The small requests that still reach the
+ * heap's own spaces, and the frees of blocks there, are counted with the time they took
+ * (eden_heap_spill_stats; EDEN_SHADER_START_HEAP in stderr.log).
  */
 #include <pthread.h>
 #include <string.h>
 
-#define EDEN_HEAP_ARENA_SHIFT 23u /* 8 MiB arenas and slots (<=256 MiB reserved) */
+#define EDEN_HEAP_ARENA_SHIFT 23u /* 8 MiB arenas and slots */
 #define EDEN_HEAP_ARENA_SIZE (1u << EDEN_HEAP_ARENA_SHIFT)
 /* Absolute 8 MiB slots covering the heap (+1: the base need not be slot aligned). */
 #define EDEN_HEAP_SLOTS ((PS5_OPENGL_HEAP_SIZE >> EDEN_HEAP_ARENA_SHIFT) + 1u)
-#define EDEN_HEAP_MAX_ARENAS 32u
+/* Threads that get an arena of their own at their first small request; later ones share them. */
+#define EDEN_HEAP_FIRST_ARENAS 32u
+/* Every arena, with those made because a thread's were full: at most 2 GiB of the heap's 6 GiB. An
+ * arena stays with its thread's record when its blocks are freed (the next thread on the record
+ * uses it), so this is also the most the heap keeps for small blocks alone. */
+#define EDEN_HEAP_MAX_ARENAS 256u
+/* One thread's arenas: at most 256 MiB of small blocks before they go to the heap's spaces. */
+#define EDEN_HEAP_THREAD_ARENAS 32u
+/* A request this large or larger that finds no room in the thread's arenas makes no new one. */
+#define EDEN_HEAP_ARENA_GROW_REQUEST (64u * 1024u)
+/* After a thread found all its arenas full and could make no other, the requests it makes before
+ * it looks through them again (they take room in the heap's spaces meanwhile). */
+#define EDEN_HEAP_ARENA_RETRY 256u
 /* Larger requests (and all over-aligned ones) always use the heap's own spaces. */
 #define EDEN_HEAP_SMALL_REQUEST (256u * 1024u)
 /* The heap grows by pieces of this size. */
@@ -44,6 +74,7 @@ int eden_heap_commit(void *address, size_t size); /* zeroed memory for a part of
 static void *_Atomic eden_heap_slots[EDEN_HEAP_SLOTS]; /* arena mspace owning each slot */
 static void *eden_heap_arena_list[EDEN_HEAP_MAX_ARENAS];
 static atomic_uint eden_heap_arena_count;
+static unsigned eden_heap_first_arenas; /* first arenas made (under the creation lock) */
 static atomic_uint eden_heap_next_shared;
 static pthread_key_t eden_heap_arena_key;
 static int eden_heap_arena_key_valid;
@@ -131,10 +162,16 @@ static void *eden_heap_owner(const void *address);
 #define EDEN_TCACHE_BINS 128u
 #define EDEN_TCACHE_LIMIT 64u
 struct eden_heap_thread {
-  void *arena;
+  void *arena;   /* the arena small requests try first: one of `own`, or one shared at the limit */
+  void *own[EDEN_HEAP_THREAD_ARENAS]; /* the arenas this record made, [0, owned) */
+  unsigned owned;
+  unsigned retry; /* requests to make before looking through `own` again (EDEN_HEAP_ARENA_RETRY) */
   long live;
   long blocks;
   unsigned pending;
+  /* Small requests that went to the heap's spaces, frees there, and their cycles: added to the
+   * process's totals with live and blocks (eden_heap_flush). */
+  unsigned long long spills, spill_cycles, shared_frees, shared_free_cycles;
   void *bins[EDEN_TCACHE_BINS];
   unsigned char counts[EDEN_TCACHE_BINS];
 };
@@ -151,11 +188,47 @@ static void eden_heap_apply(long bytes, long blocks) {
     ps5_heap_resize_stats((size_t)-bytes, 0);
 }
 
+/* The process's totals of the small requests the arenas could not take and of the frees of blocks
+ * in the heap's spaces (eden_heap_spill_stats), with their processor cycles. */
+static atomic_ullong eden_heap_spills, eden_heap_spill_cycles, eden_heap_shared_frees,
+    eden_heap_shared_free_cycles;
+
+/* The processor's cycle counter, where there is one (the console and the x86-64 host). */
+static unsigned long long eden_heap_cycles(void) {
+#if defined(__x86_64__)
+  return __builtin_ia32_rdtsc();
+#else
+  return 0;
+#endif
+}
+
 static void eden_heap_flush(struct eden_heap_thread *self) {
   eden_heap_apply(self->live, self->blocks);
   self->live = 0;
   self->blocks = 0;
   self->pending = 0;
+  if (self->spills | self->shared_frees) {
+    atomic_fetch_add_explicit(&eden_heap_spills, self->spills, memory_order_relaxed);
+    atomic_fetch_add_explicit(&eden_heap_spill_cycles, self->spill_cycles, memory_order_relaxed);
+    atomic_fetch_add_explicit(&eden_heap_shared_frees, self->shared_frees, memory_order_relaxed);
+    atomic_fetch_add_explicit(&eden_heap_shared_free_cycles, self->shared_free_cycles, memory_order_relaxed);
+    self->spills = self->spill_cycles = self->shared_frees = self->shared_free_cycles = 0;
+  }
+}
+
+/* Small requests that went to the heap's spaces and frees of blocks there since the process began,
+ * and the cycles they took (the counter's rate is the caller's to find). A thread's last 64
+ * operations may not be in them yet. */
+void eden_heap_spill_stats(unsigned long long *spills, unsigned long long *spill_cycles,
+                           unsigned long long *frees, unsigned long long *free_cycles) {
+  if (spills)
+    *spills = atomic_load_explicit(&eden_heap_spills, memory_order_relaxed);
+  if (spill_cycles)
+    *spill_cycles = atomic_load_explicit(&eden_heap_spill_cycles, memory_order_relaxed);
+  if (frees)
+    *frees = atomic_load_explicit(&eden_heap_shared_frees, memory_order_relaxed);
+  if (free_cycles)
+    *free_cycles = atomic_load_explicit(&eden_heap_shared_free_cycles, memory_order_relaxed);
 }
 
 static void eden_heap_thread_exit(void *value) {
@@ -453,12 +526,13 @@ static void *eden_heap_main(int kind, size_t a, size_t b) {
   }
 }
 
-/* Allocate and register one arena block from the heap (NULL on failure). */
-static void *eden_heap_create_arena(void) {
+/* Allocate and register one arena block from the heap (NULL on failure, or at the limit: of first
+ * arenas for a thread's first, of all arenas for another). */
+static void *eden_heap_create_arena(int first) {
   eden_heap_create_acquire();
   void *arena = NULL;
   const unsigned count = atomic_load_explicit(&eden_heap_arena_count, memory_order_relaxed);
-  if (count < EDEN_HEAP_MAX_ARENAS) {
+  if (count < EDEN_HEAP_MAX_ARENAS && (!first || eden_heap_first_arenas < EDEN_HEAP_FIRST_ARENAS)) {
     void *block = eden_heap_main(EDEN_HEAP_ALIGNED, EDEN_HEAP_ARENA_SIZE, EDEN_HEAP_ARENA_SIZE);
     if (block != NULL) {
       arena = sceLibcMspaceCreate("Eden-arena", block, EDEN_HEAP_ARENA_SIZE, 0);
@@ -467,6 +541,8 @@ static void *eden_heap_create_arena(void) {
         eden_heap_arena_list[count] = arena;
         atomic_store_explicit(&eden_heap_slots[slot], arena, memory_order_release);
         atomic_store_explicit(&eden_heap_arena_count, count + 1, memory_order_release);
+        if (first)
+          eden_heap_first_arenas++;
       } else {
         sceLibcMspaceFree(eden_heap_owner(block), block);
       }
@@ -492,6 +568,7 @@ static struct eden_heap_thread *eden_heap_self(void) {
     self->live = 0;
     self->blocks = 0;
     self->pending = 0;
+    self->retry = 0;  /* its arenas (own) stay: this thread uses them */
     if (pthread_setspecific(eden_heap_arena_key, self) != 0) {
       atomic_store_explicit(&eden_heap_thread_used[i], 0, memory_order_release);
       return NULL;
@@ -533,16 +610,102 @@ static void *eden_heap_thread_arena(void) {
     return NULL;
   if (self->arena != NULL)
     return self->arena;
-  void *arena = eden_heap_create_arena();
+  void *arena = eden_heap_create_arena(1);
   if (arena == NULL) {
     /* Arena limit reached: share the existing arenas round-robin. */
     const unsigned count = atomic_load_explicit(&eden_heap_arena_count, memory_order_acquire);
     if (count == 0)
       return NULL;
     arena = eden_heap_arena_list[atomic_fetch_add_explicit(&eden_heap_next_shared, 1, memory_order_relaxed) % count];
+  } else if (self->owned < EDEN_HEAP_THREAD_ARENAS) {
+    self->own[self->owned++] = arena;
   }
   self->arena = arena;
   return arena;
+}
+
+static void *eden_heap_arena_try(void *arena, size_t count, size_t size, int zero) {
+  return zero ? sceLibcMspaceCalloc(arena, count, size) : sceLibcMspaceMalloc(arena, count * size);
+}
+
+/* A small block from this thread's arenas: the one it uses; when that one is full, another of its
+ * own with room, which it then uses; when none has, a new one (for a request under
+ * EDEN_HEAP_ARENA_GROW_REQUEST, while the thread and the process are under their limits). NULL:
+ * the heap's own spaces take the request. */
+static void *eden_heap_arena_allocate(size_t count, size_t size, int zero) {
+  void *arena = eden_heap_thread_arena();
+  if (arena == NULL)
+    return NULL;
+  void *address = eden_heap_arena_try(arena, count, size, zero);
+  if (address != NULL)
+    return address;
+  struct eden_heap_thread *self = eden_heap_self();
+  if (self == NULL)
+    return NULL;
+  if (self->retry != 0) {
+    --self->retry;
+    return NULL;
+  }
+  for (unsigned i = 0; i < self->owned; ++i) {
+    void *other = self->own[i];
+    if (other == arena)
+      continue;
+    address = eden_heap_arena_try(other, count, size, zero);
+    if (address != NULL) {
+      self->arena = other;
+      return address;
+    }
+  }
+  if (count * size >= EDEN_HEAP_ARENA_GROW_REQUEST)
+    return NULL;
+  void *fresh = self->owned < EDEN_HEAP_THREAD_ARENAS ? eden_heap_create_arena(0) : NULL;
+  if (fresh == NULL) {
+    /* At a limit, or no memory for one: each look through the arenas costs a request to each,
+     * so the next few requests go straight to the heap's spaces. */
+    self->retry = EDEN_HEAP_ARENA_RETRY;
+    return NULL;
+  }
+  self->own[self->owned++] = fresh;
+  self->arena = fresh;
+  return eden_heap_arena_try(fresh, count, size, zero);
+}
+
+/* A small request no arena took, from the heap's spaces, counted with its cycles. */
+static void *eden_heap_spill(size_t count, size_t size, int zero) {
+  const unsigned long long start = eden_heap_cycles();
+  void *address = zero ? eden_heap_main(EDEN_HEAP_CALLOC, count, size)
+                       : eden_heap_main(EDEN_HEAP_MALLOC, count * size, 0);
+  const unsigned long long cycles = eden_heap_cycles() - start;
+  struct eden_heap_thread *self = eden_heap_self();
+  if (self != NULL) {
+    self->spills++;
+    self->spill_cycles += cycles;
+  } else {
+    atomic_fetch_add_explicit(&eden_heap_spills, 1, memory_order_relaxed);
+    atomic_fetch_add_explicit(&eden_heap_spill_cycles, cycles, memory_order_relaxed);
+  }
+  return address;
+}
+
+/* Gives an owned block back to its arena, or to the heap's space, counting the latter (its lock is
+ * the one every thread shares). */
+static void eden_heap_release(void *address) {
+  void *arena = atomic_load_explicit(&eden_heap_slots[eden_heap_slot(address)], memory_order_acquire);
+  if (arena != NULL) {
+    sceLibcMspaceFree(arena, address);
+    return;
+  }
+  const unsigned long long start = eden_heap_cycles();
+  sceLibcMspaceFree(eden_heap_owner(address), address);
+  const unsigned long long cycles = eden_heap_cycles() - start;
+  struct eden_heap_thread *self = eden_heap_self();
+  if (self != NULL) {
+    self->shared_frees++;
+    self->shared_free_cycles += cycles;
+  } else {
+    atomic_fetch_add_explicit(&eden_heap_shared_frees, 1, memory_order_relaxed);
+    atomic_fetch_add_explicit(&eden_heap_shared_free_cycles, cycles, memory_order_relaxed);
+  }
 }
 
 /* A cached block for bytes (0 < bytes <= 16 * (EDEN_TCACHE_BINS - 1)), charged as allocated. */
@@ -586,13 +749,8 @@ static void *eden_heap_allocate(size_t count, size_t size, int zero) {
       return block;
   }
   if (bytes < EDEN_HEAP_SMALL_REQUEST) {
-    void *arena = eden_heap_thread_arena();
-    if (arena != NULL) {
-      void *address = zero ? sceLibcMspaceCalloc(arena, count, size)
-                           : sceLibcMspaceMalloc(arena, bytes);
-      if (address != NULL)
-        return address;
-    }
+    void *address = eden_heap_arena_allocate(count, size, zero);
+    return address != NULL ? address : eden_heap_spill(count, size, zero);
   }
   return zero ? eden_heap_main(EDEN_HEAP_CALLOC, count, size) : eden_heap_main(EDEN_HEAP_MALLOC, bytes, 0);
 }
@@ -670,7 +828,7 @@ void __wrap_free(void *address) {
     if (eden_tcache_keep(address, usable))
       return;
     eden_heap_account(-(long)usable, -1);
-    sceLibcMspaceFree(eden_heap_owner(address), address);
+    eden_heap_release(address);
     return;
   }
   const int large = eden_heap_large_find(address);

@@ -213,6 +213,7 @@ size_t __wrap_malloc_usable_size(const void *);
 unsigned eden_heap_arenas_created(void);
 size_t eden_heap_committed(void);
 size_t eden_heap_large_held(unsigned *blocks);
+void eden_heap_spill_stats(unsigned long long *, unsigned long long *, unsigned long long *, unsigned long long *);
 
 static void fill(unsigned char *block, size_t size, unsigned seed) {
     // The start and the end of a large block are enough to see another owner writing into it.
@@ -224,6 +225,33 @@ static void verify(const unsigned char *block, size_t size, unsigned seed) {
         if (block[i] != (unsigned char)(seed + i * 131u)) { fprintf(stderr, "pattern damaged at %p+%zu\n", (void *)block, i); abort(); }
 }
 struct held { unsigned char *block; size_t size; unsigned seed; };
+static unsigned long long spills_now(void) {
+    unsigned long long spills = 0;
+    eden_heap_spill_stats(&spills, NULL, NULL, NULL);
+    return spills;
+}
+// A thread that keeps 13 MiB of small blocks (a shader cache builder keeps what it builds): more
+// than one arena holds, so it needs a second arena of its own, not the heap's shared spaces.
+enum { KEPT = 6500, KEPT_SIZE = 2100 };
+static void *keeper(void *argument) {
+    unsigned char **kept = argument;
+    for (int i = 0; i < KEPT; ++i) {
+        kept[i] = __wrap_malloc(KEPT_SIZE);
+        assert(kept[i] != NULL);
+        fill(kept[i], KEPT_SIZE, (unsigned)i);
+    }
+    return NULL;
+}
+static void keep_and_free(int threads, unsigned char *(*kept)[KEPT]) {
+    pthread_t ids[48];
+    assert(threads <= 48);
+    for (int t = 0; t < threads; ++t) assert(pthread_create(&ids[t], NULL, keeper, kept[t]) == 0);
+    for (int t = 0; t < threads; ++t) pthread_join(ids[t], NULL);
+    // Freed by another thread, as the GPU thread frees what the builders made.
+    for (int t = 0; t < threads; ++t)
+        for (int i = 0; i < KEPT; ++i) { verify(kept[t][i], KEPT_SIZE, (unsigned)i); __wrap_free(kept[t][i]); }
+}
+
 static atomic_ulong operations;
 static void *worker(void *argument) {
     unsigned state = (unsigned)(uintptr_t)argument * 2654435761u + 1;
@@ -293,6 +321,34 @@ int main(int argc, char **argv) {
     pthread_t threads[8];
     for (uintptr_t i = 0; i < 8; ++i) assert(pthread_create(&threads[i], NULL, worker, (void *)(i + 1)) == 0);
     for (int i = 0; i < 8; ++i) pthread_join(threads[i], NULL);
+    // Threads that keep more than an arena's worth of small blocks: arenas of their own take every
+    // one (none goes to the heap's shared spaces), and the next threads, which take their records,
+    // use those arenas again instead of making more.
+    static unsigned char *kept[4][KEPT];
+    const unsigned long long spills_before = spills_now();
+    const unsigned arenas_before = eden_heap_arenas_created();
+    keep_and_free(4, kept);
+    const unsigned arenas_kept = eden_heap_arenas_created();
+    if (!(arenas_kept > arenas_before && arenas_kept <= arenas_before + 4 * 3 && spills_now() == spills_before)) {
+        fprintf(stderr, "keepers: arenas %u -> %u, small requests in the shared spaces %llu -> %llu\n",
+                arenas_before, arenas_kept, spills_before, spills_now());
+        abort();
+    }
+    keep_and_free(4, kept);
+    if (!(eden_heap_arenas_created() == arenas_kept && spills_now() == spills_before)) {
+        fprintf(stderr, "keepers again: arenas %u -> %u, small requests in the shared spaces %llu -> %llu\n",
+                arenas_kept, eden_heap_arenas_created(), spills_before, spills_now());
+        abort();
+    }
+    // Forty at once: more threads than first arenas (32), so the last ones share one at first; each
+    // that fills it makes arenas of its own, and still none of its requests goes to the shared spaces.
+    static unsigned char *crowd[40][KEPT];
+    keep_and_free(40, crowd);
+    if (!(spills_now() == spills_before && eden_heap_arenas_created() <= arenas_kept + 40 * 3)) {
+        fprintf(stderr, "forty keepers: arenas %u -> %u, small requests in the shared spaces %llu -> %llu\n",
+                arenas_kept, eden_heap_arenas_created(), spills_before, spills_now());
+        abort();
+    }
     const size_t after_threads = eden_heap_committed();
     const size_t peak = atomic_load(&ps5_heap_peak_bytes);
     assert(eden_heap_arenas_created() >= 8);
@@ -367,10 +423,10 @@ int main(int argc, char **argv) {
     fill(again, 1000, 3); verify(again, 1000, 3);
     __wrap_free(again);
     __wrap_free(first);
-    printf("%s: %lu operations on 8 threads, %u arenas, most in use at once %zu MiB, %zu MiB of pieces after the threads, "
-           "%zu MiB when full (%d blocks of 24 MiB)\n",
+    printf("%s: %lu operations on 8 threads, %u arenas (%u for the keepers), most in use at once %zu MiB, "
+           "%zu MiB of pieces after the threads, %zu MiB when full (%d blocks of 24 MiB)\n",
            refuse_range ? "whole heap at once" : "heap by pieces", atomic_load(&operations), eden_heap_arenas_created(),
-           peak >> 20, after_threads >> 20, eden_heap_committed() >> 20, count);
+           arenas_kept - arenas_before, peak >> 20, after_threads >> 20, eden_heap_committed() >> 20, count);
     return 0;
 }
 '''
@@ -393,4 +449,5 @@ with tempfile.TemporaryDirectory(prefix='eden-heap-') as work:
                 sys.stderr.write(result.stderr[-3000:])
                 sys.exit(f'heap check failed ({label} {" ".join(mode)}): exit {result.returncode}')
 print('Heap by pieces: growth on demand, owners by address, requests larger than a piece, the 6 GiB limit, '
-      'the 3 GiB whole-heap fallback and eight threads under the thread sanitizer PASS')
+      'the 3 GiB whole-heap fallback, threads keeping more than an arena in arenas of their own (used again by '
+      'the next threads) and eight threads under the thread sanitizer PASS')
