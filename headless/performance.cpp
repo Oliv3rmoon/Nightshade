@@ -40,6 +40,8 @@ extern "C" void eden_jit_path_counters(unsigned core, unsigned long long* out) _
 namespace Common {
 // Address space Eden's sparse tables span and the memory they hold (src/memory_pages.cpp).
 void SparseUsage(std::size_t* reserved, std::size_t* committed) noexcept;
+// The span of the guest's memory and the memory behind it (src/memory_pages.cpp).
+void GuestMemoryUsage(std::size_t* span, std::size_t* held) noexcept;
 } // namespace Common
 
 namespace Eden::Performance {
@@ -289,14 +291,34 @@ void CheckWorkerTopology() {
         worker_topology_ready, count, worker_cpus[0], worker_cpus[1], worker_cpus[2], worker_cpus[3], worker_cpus[4],
         static_cast<int>(measured));
 }
+thread_local bool pipeline_builder = false;      // this thread builds pipelines
+thread_local bool pipeline_builder_settled = false; // and is on the spare CPUs
 void PlaceSecondary(const char* name) {
     if (!placement_secondary.load(std::memory_order_relaxed) || !secondary_cpus) return;
+    const bool builder = std::strcmp(name, "VkPipelineBuilder") == 0;
+    if (builder) pipeline_builder = true;
+    if (builder && pipeline_startup.load(std::memory_order_acquire) && topology_allowed_valid) {
+        // Every CPU the app has, while the cache is built before the guest runs.
+        const int result = cpuset_setaffinity(CPU_LEVEL_WHICH, CPU_WHICH_TID, -1, 8, &topology_allowed);
+        unsigned long long all = 0;
+        for (unsigned cpu = 0; cpu < 64; ++cpu)
+            if (CPU_ISSET(cpu, &topology_allowed)) all |= 1ULL << cpu;
+        if (secondary_reports.fetch_add(1, std::memory_order_relaxed) < 64)
+            std::printf("EDEN_WORKER_PLACED name=%s mask=%llx error=%d startup=1\n", name, all, result ? errno : 0);
+        if (result == 0) return;
+    }
+    if (builder) pipeline_builder_settled = true;
     cpuset_t mask{};
     for (unsigned cpu = 0; cpu < 64; ++cpu)
         if (secondary_cpus & (1ULL << cpu)) CPU_SET(cpu, &mask);
     const int result = cpuset_setaffinity(CPU_LEVEL_WHICH, CPU_WHICH_TID, -1, 8, &mask);
     if (secondary_reports.fetch_add(1, std::memory_order_relaxed) < 64)
         std::printf("EDEN_WORKER_PLACED name=%s mask=%llx error=%d\n", name, secondary_cpus, result ? errno : 0);
+}
+void SettlePipelineBuilderImpl() {
+    if (!pipeline_builder || pipeline_builder_settled || pipeline_startup.load(std::memory_order_acquire)) return;
+    PlaceSecondary("VkPipelineBuilder");
+    pipeline_builder_settled = true;
 }
 void PinWorker(unsigned index, cpuset_t& affinity) {
     if (!worker_topology_ready || index >= worker_cpus.size() ||
@@ -454,6 +476,9 @@ extern "C" void ps5_opengl_heap_snapshot(const char* phase, unsigned iteration);
 extern "C" unsigned eden_heap_arenas_created(void) __attribute__((weak));
 extern "C" std::size_t eden_heap_committed(void) __attribute__((weak));
 extern "C" std::size_t eden_heap_large_held(unsigned* blocks) __attribute__((weak));
+extern "C" unsigned eden_guest_memory_wanted(void) __attribute__((weak));
+extern "C" void eden_guest_memory_waits(unsigned long long* won, unsigned long long* lost,
+                                        unsigned long long* refused) __attribute__((weak));
 #ifdef PS5_NATIVE
 extern "C" std::int64_t sceKernelGetDirectMemorySize();
 extern "C" std::int32_t sceKernelAvailableDirectMemorySize(std::int64_t, std::int64_t, std::size_t, std::int64_t*,
@@ -466,6 +491,14 @@ extern "C" std::int32_t sceKernelDirectMemoryQuery(std::int64_t, int, DirectMemo
 #ifdef PS5_NATIVE
 // The largest free block of direct memory is what the next graphics allocation needs. Looked at
 // again every 100 ms; called on the GPU thread by the texture collector (KeepDirtyTextures).
+//
+// The guest's memory is taken only where it writes (src/guest_memory_service.inc), and a large
+// open-world game wrote 0.5 to 1.8 GB of it within seconds while it streamed in the textures of
+// the same new area: both went for the pool at once, the caches free at the end of a frame, and
+// the guest's next write found 1 MiB left (Tears of the Kingdom, 23 and 79 minutes in). So the
+// caches see 1 GiB less free than there is and give memory back that much sooner; the guest's
+// writes take it from the headroom (and wait for the caches when even that is gone).
+constexpr std::size_t kGuestReserve = std::size_t{1} << 30;
 static std::atomic<unsigned long long> largest_free_block{0};
 static void RefreshFreeMemory() {
     static std::atomic<long long> checked_ns{0};
@@ -477,18 +510,32 @@ static void RefreshFreeMemory() {
     std::size_t largest = 0;
     const std::int64_t total = sceKernelGetDirectMemorySize();
     const bool known = total > 0 && sceKernelAvailableDirectMemorySize(0, total, 0x4000, &start, &largest) == 0;
-    largest_free_block.store(known ? largest : 0, std::memory_order_relaxed);
-    graphics_memory_short.store(!known || largest < kShortMemory, std::memory_order_relaxed);
+    // Headroom kept for the guest's own memory (kGuestReserve): the caches see that much less free.
+    const std::size_t usable = known && largest > kGuestReserve ? largest - kGuestReserve : 0;
+    largest_free_block.store(known ? (usable != 0 ? usable : 1) : 0, std::memory_order_relaxed);
+    graphics_memory_short.store(!known || usable < kShortMemory, std::memory_order_relaxed);
+}
+// A write to the guest's memory waiting for a block (src/guest_memory_service.inc, WaitForBlock):
+// the game's own memory comes first, so while one waits the caches see memory short and none free,
+// and the texture collector evicts at its hardest until the write has its block.
+static bool GuestMemoryWanted() {
+    return eden_guest_memory_wanted && eden_guest_memory_wanted() != 0;
 }
 static bool GraphicsMemoryShort() {
+    if (GuestMemoryWanted()) return true;
     RefreshFreeMemory();
     return graphics_memory_short.load(std::memory_order_relaxed);
 }
 // What the caches' "memory in use" is measured against (performance.h, graphics_memory_free).
 static unsigned long long GraphicsMemoryFree() {
+    if (GuestMemoryWanted()) return 1; // not 0: the caches read 0 as "not known"
     RefreshFreeMemory();
     return largest_free_block.load(std::memory_order_relaxed);
 }
+// Pipeline builders (performance.h PipelineWorkers): the console's eight cores run the guest's
+// cores and the GPU thread too, but at start, while the cache is built, they are free.
+[[maybe_unused]] static const bool pipeline_workers_set =
+    (pipeline_workers_min.store(6, std::memory_order_relaxed), true);
 [[maybe_unused]] static const bool graphics_memory_probe_installed =
     (graphics_memory_probe.store(&GraphicsMemoryShort, std::memory_order_relaxed),
      graphics_memory_free.store(&GraphicsMemoryFree, std::memory_order_relaxed), true);
@@ -717,6 +764,34 @@ void ReportSessionMemory(const char* phase, unsigned session) {
                 phase, session, total, free_bytes, largest, regions,
                 eden_heap_committed ? eden_heap_committed() : std::size_t{0}, large, large_blocks, table_held);
     std::fflush(stdout);
+}
+
+// Every 5 s of frames, in every build: who holds the pool when a long session runs out of it. The
+// guest's memory, the heap's pieces and large blocks, Eden's tables and the graphics allocator,
+// against the largest block left; and how the guest's writes that had to wait for a block ended.
+void ReportMemory() {
+    std::size_t span = 0, guest = 0, table_span = 0, tables = 0;
+    ::Common::GuestMemoryUsage(&span, &guest);
+    ::Common::SparseUsage(&table_span, &tables);
+    unsigned large_blocks = 0;
+    const std::size_t large = eden_heap_large_held ? eden_heap_large_held(&large_blocks) : 0;
+    const auto held = graphics_memory_held.load(std::memory_order_acquire);
+    unsigned long long won = 0, lost = 0, refused = 0;
+    if (eden_guest_memory_waits) eden_guest_memory_waits(&won, &lost, &refused);
+    unsigned long long free_bytes = 0, total = 0;
+    MemoryPool(&free_bytes, &total);
+    std::size_t largest = 0;
+#ifdef PS5_NATIVE
+    if (total != 0) {
+        std::int64_t start = 0;
+        (void)sceKernelAvailableDirectMemorySize(0, static_cast<std::int64_t>(total), 0x4000, &start, &largest);
+    }
+#endif
+    std::printf("EDEN_MEMORY guest=%zuMiB heap=%zuMiB large=%zuMiB/%u tables=%zuMiB graphics=%lluMiB "
+                "free=%lluMiB largest_free=%zuMiB short=%d waits_won=%llu waits_lost=%llu refused=%llu\n",
+                guest >> 20, (eden_heap_committed ? eden_heap_committed() : std::size_t{0}) >> 20, large >> 20,
+                large_blocks, tables >> 20, held ? held() >> 20 : 0ULL, free_bytes >> 20, largest >> 20,
+                int(graphics_memory_short.load(std::memory_order_relaxed)), won, lost, refused);
 }
 
 void ReportGpuThread(unsigned frame) {
@@ -1421,6 +1496,14 @@ void PlatformChecks() {
     }
     std::fflush(stdout);
 }
+// performance.h SettlePipelineBuilder: a pipeline builder placed on every CPU while the shader
+// cache was built goes back to the spare CPUs once the game runs. Other threads are untouched.
+void SettlePipelineBuilder() {
+#ifdef PS5_NATIVE
+    SettlePipelineBuilderImpl();
+#endif
+}
+
 } // namespace Eden::Performance
 
 // dynarmic A64 hooks (weak there): whole-cache evacuations and block compilation time.

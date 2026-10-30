@@ -2,7 +2,7 @@
 
 What changed in each release of ProsperoEden, newest first. A release's notes on GitHub are its section here.
 
-## vNEXT
+## v1.011.000
 
 **Nightshade has its own app now, and an earlier install moves over by itself.** Nightshade runs under its own title ID, `PPSA64448`, with its own data folder, `/data/nightshade`, beside the official ProsperoEden app (`PPSA99008`, `/data/prosperoeden`) instead of in its place. An install of an earlier Nightshade updates as usual and then brings you to the new app.
 
@@ -13,9 +13,49 @@ What changed in each release of ProsperoEden, newest first. A release's notes on
 - **Forwarders made for the old title ID keep working.** The bridge passes `--rom` and `--exit-after-game` on to the new app. When that is its first start, the question about your data comes first, and the game starts after it: once Nightshade has started again after **Move** or **Copy**, at once after **Start fresh**. A forwarder's game inside `/data/prosperoeden` is found in `/data/nightshade` after a move.
 - **Afterwards the old tile can go.** Delete it, or use it for the official ProsperoEden app again; keep it while you use forwarders made for the old title ID.
 
+### Look
+
+- **The launcher says NIGHTSHADE.** The home screen's header, the menu's header and the opening no longer show ProsperoEden's name.
+
 ### Install
 
 From 1.005.102 or later, **Update now** applies it: then open the old tile once. If it doesn't, send `/data/prosperoeden/logs/updater.log`. By hand, copy this ZIP's `PPSA64448` folder to `/data/homebrew/PPSA64448` and open Nightshade from its new tile once the homebrew loader lists it.
+
+## v1.010.004
+
+**Faster starts for games with a big shader cache.** Every start of a large game builds its saved pipelines before it plays: Tears of the Kingdom's 14,000 took 552 s at a first start and 208 s at later ones. Not measured on a console yet: `stderr.log` has the new times.
+
+### Fixes
+
+- **The shader cache builds on every CPU at start.** Eden builds pipelines on 15 threads, but every background thread is placed on the console's five spare CPUs, so the builders shared five while the game's own cores and the GPU thread's sat idle before the game began. While the cache is built they may now use every CPU the app has (`EDEN_WORKER_PLACED name=VkPipelineBuilder ... startup=1` in `stderr.log`), and once the game runs each goes back to the spare CPUs, so play is as before.
+- **`stderr.log` shows what holds the console's memory, every 5 seconds** (`EDEN_MEMORY`): the game's own memory, Eden's heap and tables, the graphics allocator, the largest free block, and how the game's writes that had to wait for memory ended. Tears of the Kingdom still ran out of memory 45 minutes in on v1.010.003, and the next log will show which of these grows until it does.
+
+### Install
+
+From 1.005.102 or later, **Update now** applies it. If it doesn't, send `/data/prosperoeden/logs/updater.log`. From an older version, copy this ZIP's `PPSA99008` folder over yours.
+
+## v1.010.003
+
+**Tears of the Kingdom: no more crash when the game's memory runs out.** A tester's TOTK ended 23 minutes in on v1.010.002, when the game took 1.8 GB of new memory within seconds; this release gives the game that memory instead of ending the session. Not confirmed on a console yet: send `/data/prosperoeden/logs` after playing.
+
+### Fixes
+
+- **The game's memory comes first.** Nightshade gives the emulated console its memory as the game writes it. When none was left, the write was refused and the game closed: the graphics caches hold most of the console's memory and free textures only at the end of each frame, too late for a game that loads a big area at once. Now the write waits up to 2 seconds while the caches give memory back (they see none free and free at their hardest), and only then gives up (`EDEN_CRAM` lines in `stderr.log` say when it waited).
+- **1 GiB kept free for the game's own memory.** The graphics caches now treat 1 GiB less as free than there is, so they give textures back sooner and a game that loads a big area at once (its own memory and the area's textures together) has room. A second TOTK crash, 79 minutes in with ASTC textures compressed, came from exactly that.
+- **`stderr.log` says how many threads build the shader cache** (`EDEN_PIPELINE_WORKERS`). A large game's first start is still long (TOTK's 14,000 pipelines take minutes): the builders share the console's spare CPUs while the game's own cores sit idle at that point, and letting them use those too is the next step.
+- **ASTC textures at full quality take four times the memory.** If a large open-world game crashes after a while, set **Settings > Video > ASTC textures** back to the default first.
+
+### Under the hood
+
+- **Built with Belladonna,** Nightshade's own fork of Mihawk's PS5 Mesa (RADV) driver. The driver is the same as before, so the shaders your games already built stay built.
+
+### Apps
+
+- **Settings > Apps lists the companion apps by their new names:** Physalis (was Nightshade TV), Datura (was Nightshade Stream) and Mandrake (was Nightshade Station). Same apps, same title IDs; their settings stay.
+
+### Install
+
+From 1.005.102 or later, **Update now** applies it. If it doesn't, send `/data/prosperoeden/logs/updater.log`. From an older version, copy this ZIP's `PPSA99008` folder over yours.
 
 ## v1.010.002
 

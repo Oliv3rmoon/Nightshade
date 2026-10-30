@@ -126,13 +126,21 @@ Next to this repository (`../`), as git checkouts:
 
 - **ps5-native-app-boilerplate**: the PS5 Payload SDK v0.42, the runtime `libc.prx` and the
   native packaging tool;
-- **Mihawk's PS5_Vulkan, PS5_Mesa and PS5_PayloadSDK** (`../mihawk-*-review`): RADV and its
-  build recipe. `make prepare` builds RADV once and isolates it beside the OpenGL Mesa
-  (`tools/isolate-radv.py`). RADV's display code carries this repository's adaptation
-  (`tools/patch-radv-wsi.py`: the output's lifetime, and the 120 Hz output a game session can ask
-  for); when the adaptation changes, `make prepare` builds RADV again, which compiles only that
-  file. The three checkouts have to be at the commits `tools/deps.json` pins; when the Mesa pin
-  changes, `make prepare` builds RADV again from the new revision.
+- **[Belladonna](https://github.com/Oliv3rmoon/Belladonna)** (`../belladonna`): Nightshade's
+  RADV driver, a fork of Mihawk's PS5_Mesa. Its `nightshade` branch carries Nightshade's changes
+  to the driver as commits (the display's lifetime and the 120 Hz output a game session can ask
+  for, the shader cache on disk for an elevated app, the GPU stall report, and others; its README
+  lists them). The build uses the pinned commit as it is.
+- **Mihawk's PS5_Vulkan and PS5_PayloadSDK** (`../mihawk-vulkan-review`, `../mihawk-sdk-review`):
+  the recipe that builds RADV, and the SDK it is built with. `make prepare` builds RADV once and
+  isolates it beside the OpenGL Mesa (`tools/isolate-radv.py`). The three checkouts have to be at
+  the commits `tools/deps.json` pins; when Belladonna's pin changes, `make prepare` builds RADV
+  again from the new commit (only what changed compiles).
+
+RADV's shader cache on disk is keyed by the driver's build id, `shader_cache_id` in
+`tools/deps.json`. It is Mihawk's `1ba9874`, the revision the caches players have were made
+with, and changes only when a Belladonna commit changes how shaders compile: a driver update that
+compiles shaders as before keeps every game's cache.
 
 The `libSceAgcDriver` import facade both drivers link against is built from
 `tools/stubs/libSceAgcDriver.c`. Small contracts from our research repositories are in

@@ -283,8 +283,8 @@ The update will be offered again the next time ProsperoEden opens; choose **Skip
 
 ## Nightshade's apps
 
-**Settings > Apps** gets, updates and opens Nightshade TV (`PPSA99003`), Nightshade Stream
-(`PPSA99002`) and Nightshade Station (`PPSA98510`), Nightshade's own release lines of
+**Settings > Apps** gets, updates and opens Physalis (`PPSA99003`), Datura
+(`PPSA99002`) and Mandrake (`PPSA98510`), Nightshade's own release lines of
 [ProsperoTV](https://github.com/ThatGuyKalvin/ProsperoTV),
 [ProsperoLight](https://github.com/LedyBacer/ProsperoLight) and
 [SwanStationPS5](https://github.com/darkxex/SwanStationPS5). The list is

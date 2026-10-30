@@ -5,7 +5,7 @@
 // (tools/prepare-vulkan-port.py calls it from vk_graphics_pipeline.cpp and vk_compute_pipeline.cpp
 // once the pipeline exists).
 //
-// When the GPU stops, the driver's stall dump (tools/patch-radv-submission-dump.py) names the
+// When the GPU stops, the driver's stall dump (Belladonna, radv_ps5_winsys.c) names the
 // shader code each of the last draws and dispatches ran as "pipeline <RADV hash> vk=0x<handle>".
 // This line turns the handle into what the game's transferable shader cache (vulkan.bin) files the
 // pipeline under: a graphics pipeline's key hash and the unique hash of each stage's program

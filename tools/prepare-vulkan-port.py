@@ -1717,6 +1717,24 @@ for old, new in pipeline_cache_writes:
     if shader_source.count(old) != 1:
         raise RuntimeError(f'Pipeline cache write anchor changed: {old[:60]}')
     shader_source = shader_source.replace(old, new)
+# How many threads build pipelines (performance.h PipelineWorkers): at least a few on the console,
+# where Eden's own count (the processor count less one) gave a large game's 13,938 cached pipelines
+# about 25 a second at start, nine minutes of loading.
+workers_old = '#else\n    return max_core_threads;\n#endif\n}\n'
+if shader_source.count(workers_old) != 1:
+    raise RuntimeError('Pipeline worker count anchor changed')
+shader_source = shader_source.replace(workers_old,
+    '#else\n    return ::Eden::Performance::PipelineWorkers(max_core_threads);\n#endif\n}\n')
+# Pipeline builders placed on every CPU while the shader cache was built at start go back to the
+# spare CPUs the next time they build, once the game runs (performance.h SettlePipelineBuilder).
+for signature in (
+    '    std::span<Shader::Environment* const> envs, PipelineStatistics* statistics,\n'
+    '    bool build_in_parallel) try {\n',
+    '    PipelineStatistics* statistics, bool build_in_parallel) try {\n',
+):
+    if shader_source.count(signature) != 1:
+        raise RuntimeError(f'Pipeline builder settle anchor changed: {signature[:50]}')
+    shader_source = shader_source.replace(signature, signature + '    ::Eden::Performance::SettlePipelineBuilder();\n')
 shader_output = output / 'vk_pipeline_cache_cost.cpp'
 if not shader_output.exists() or shader_output.read_text() != shader_source:
     shader_output.write_text(shader_source)

@@ -128,7 +128,7 @@ Local-wireless multiplayer through Eden rooms is new in v1.000.110 and experimen
 - **Settings in one place** - a single JSON file under `/data/nightshade`, with game volume, mute, and detailed logging options. Logs keep the previous session.
 - **Speed limit** - **Settings > Performance > Speed limit** (and each game's own) lets a game run at 150%, 200%, 300% or without a limit: a game locked to 30 FPS can reach 60 at 200% when the console has time to spare, and a game timed by its frames plays faster with it; see [Speed limit](docs/SETTINGS.md#speed-limit).
 - **Updates from the menu** - when a newer release is listed on [homebrew.page](https://homebrew.page/ps5), ProsperoEden offers to install it each time it opens; **Skip** keeps the current version, and **Settings > Diagnostics > Update notices** off stops the offer (About still names the newer version); see [Updating](docs/INSTALL.md#updating). A build made with a GitHub repository set (`EDEN_UPDATE_REPOSITORY`, [docs/BUILDING.md](docs/BUILDING.md#make-targets)) checks that repository's releases instead.
-- **Apps** - Nightshade TV, Nightshade Stream and Nightshade Station, got, updated and opened from **Settings > Apps**; see [Apps](#apps).
+- **Apps** - Physalis, Datura and Mandrake, Nightshade's own apps, got, updated and opened from **Settings > Apps**; see [Apps](#apps).
 - **Crash reports** - if ProsperoEden stops because of an error, it saves a report with that session's logs, starts again and shows where the report is. When the GPU stopped responding it closes instead, since an app started again would find the GPU still stuck. **Settings > Diagnostics** also keeps the FTP log-folder path visible; attach the dated `crash-*.txt` report and its matching logs.
 - **Controllers, audio, and saves** - up to four DualSense controllers (one per signed-in PS5 user) with rumble and motion controls, game audio, and save data work out of the box. A game that gives a player a single Joy-Con is played with the whole DualSense: the shapes are that Joy-Con's four buttons, the D-pad and either stick are its stick, and L1/R1 and L2/R2 are its shoulder buttons. When the game has the Joy-Con held sideways, the DualSense is still held as usual: the stick, the buttons and the motion sensors are turned to match.
 - **Controller type per game** - some games take a Pro Controller and then only work with another controller. In **Library > Game settings > Controls**, **Controller type** gives the game a Pro Controller, the Handheld controller, Dual Joy-Cons, a Left Joy-Con or a Right Joy-Con. Left on **Automatic**, the game gets what it takes, a Pro Controller first.
@@ -153,9 +153,9 @@ another project, with that project's title ID:
 
 | App | Title ID | Released in | Based on |
 |---|---|---|---|
-| Nightshade TV | `PPSA99003` | [Oliv3rmoon/Nightshade-TV](https://github.com/Oliv3rmoon/Nightshade-TV) | [ProsperoTV](https://github.com/ThatGuyKalvin/ProsperoTV), an IPTV client |
-| Nightshade Stream | `PPSA99002` | [Oliv3rmoon/Nightshade-Stream](https://github.com/Oliv3rmoon/Nightshade-Stream) | [ProsperoLight](https://github.com/LedyBacer/ProsperoLight), game streaming with Moonlight |
-| Nightshade Station | `PPSA98510` | [Oliv3rmoon/Nightshade-Station](https://github.com/Oliv3rmoon/Nightshade-Station) | darkxex's [SwanStationPS5](https://github.com/darkxex/SwanStationPS5), a PS1 emulator |
+| Physalis (formerly Nightshade TV) | `PPSA99003` | [Oliv3rmoon/Physalis](https://github.com/Oliv3rmoon/Physalis) | [ProsperoTV](https://github.com/ThatGuyKalvin/ProsperoTV), an IPTV client |
+| Datura (formerly Nightshade Stream) | `PPSA99002` | [Oliv3rmoon/Datura](https://github.com/Oliv3rmoon/Datura) | [ProsperoLight](https://github.com/LedyBacer/ProsperoLight), game streaming with Moonlight |
+| Mandrake (formerly Nightshade Station) | `PPSA98510` | [Oliv3rmoon/Mandrake](https://github.com/Oliv3rmoon/Mandrake) | darkxex's [SwanStationPS5](https://github.com/darkxex/SwanStationPS5), a PS1 emulator |
 
 Each row says whether the app is installed and at which version, and which release is offered and
 from where.

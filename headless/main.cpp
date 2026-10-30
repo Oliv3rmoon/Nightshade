@@ -407,7 +407,7 @@ int main(int argc, char** argv) {
         });
         {
             // The ids too: Mesa's disk cache turned itself off when the effective and real ids differed
-            // (no longer: tools/patch-radv-disk-cache.py).
+            // (no longer in Belladonna: src/util/disk_cache_os.c).
             const std::string access = "status=" + std::to_string(Eden::FilesystemAccessStatus()) +
                 " elevation=" + elevation::path() +
                 " app=" + Eden::AppDir() + " data=" + Eden::UserDir() + " game_files=" + Eden::AssetsDir() + " games=" + Eden::GamesDir() +
@@ -437,7 +437,7 @@ int main(int argc, char** argv) {
             }
             // Where the driver keeps compiled shaders between starts. Without a folder it can write,
             // every start compiles all of a game's pipelines again (minutes for a large game). The
-            // driver no longer turns the cache off for differing ids (tools/patch-radv-disk-cache.py).
+            // driver no longer turns the cache off for differing ids (Belladonna, src/util/disk_cache_os.c).
             {
                 const char* folder = std::getenv("MESA_SHADER_CACHE_DIR");
                 std::string line = folder ? folder : "none: no access to the data folder, so shaders are compiled at every start";
@@ -1730,6 +1730,9 @@ int main(int argc, char** argv) {
 #endif
                 Eden::Loading::Set(Eden::Loading::Step::game);
                 Eden::BootTrace::Line("loading the game");
+                // Until the shader cache is built, pipeline builders may use every CPU: the guest
+                // has not started (performance.h pipeline_startup).
+                Eden::Performance::pipeline_startup.store(true, std::memory_order_release);
                 Core::SystemResultStatus loaded;
                 try {
                     loaded = system.Load(window, guest, params);
@@ -1873,6 +1876,8 @@ int main(int argc, char** argv) {
                     std::fflush(stdout);
                 }
 #endif
+                // The guest starts now: builders go back to the spare CPUs as they next build.
+                Eden::Performance::pipeline_startup.store(false, std::memory_order_release);
 #ifndef PS5_NATIVE
                 if (devices) Eden::Mock::BeginGuestCycle();
 #endif

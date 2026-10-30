@@ -89,23 +89,21 @@ fi
 step "libSceAgcDriver link stub"
 bash tools/build-agc-driver-stub.sh
 bash tools/build-common-dialog-stub.sh
-# The driver's display code carries this repository's adaptation (tools/patch-radv-wsi.py): a
-# driver built with another version of it is built again (only the changed file compiles).
-# So is a driver built from another Mesa revision than tools/deps.json pins.
+# The driver is Belladonna at the commit tools/deps.json pins, built with the RADV build id its
+# shader cache is keyed by (shader_cache_id there). A driver built from another commit, or with
+# another build id, is built again (only what changed compiles).
 radv_release=../mihawk-vulkan-review/.deps/native/radv-release
 mesa_pin=$(python3 -c 'import json; print(next(i["commit"] for i in json.load(open("tools/deps.json"))["items"] if i["name"] == "ps5-mesa"))')
+build_id=$(python3 -c 'import json; print(next(i["shader_cache_id"] for i in json.load(open("tools/deps.json"))["items"] if i["name"] == "ps5-mesa"))')
 if [[ -f $radv_release/lib/libvulkan_radeon.ps5.a ]]; then
     built=$(sed -n 's/^revision: //p' "$radv_release/PROVENANCE.txt" 2>/dev/null || true)
+    built_id=$(sed -n 's/^radv build id: //p' "$radv_release/PROVENANCE.txt" 2>/dev/null || true)
     if [[ $built != "$mesa_pin" ]]; then
-        step "RADV: built from Mesa ${built:0:12}, pinned ${mesa_pin:0:12}"
+        step "RADV: built from ${built:0:12}, pinned Belladonna ${mesa_pin:0:12}"
         bash tools/build-radv-dependencies.sh
         rm -f build/radv-isolated/libvulkan_radeon.ps5.a
-    elif ! python3 -B tools/patch-radv-wsi.py --check "$radv_release/EDEN_WSI_SHA256" ||
-         ! python3 -B tools/patch-radv-gs-compute.py --check "$radv_release/EDEN_GS_SHA256" ||
-         ! python3 -B tools/patch-radv-disk-cache.py --check "$radv_release/EDEN_DISK_CACHE_SHA256" ||
-         ! python3 -B tools/patch-radv-transfer-split.py --check "$radv_release/EDEN_TRANSFER_SPLIT_SHA256" ||
-         ! python3 -B tools/patch-radv-submission-dump.py --check "$radv_release/EDEN_SUBMISSION_DUMP_SHA256"; then
-        step "RADV: this repository's adaptation of the driver changed"
+    elif [[ $built_id != "$build_id" ]]; then
+        step "RADV: built with build id ${built_id:0:12}, pinned ${build_id:0:12}"
         bash tools/build-radv-dependencies.sh
         rm -f build/radv-isolated/libvulkan_radeon.ps5.a
     fi

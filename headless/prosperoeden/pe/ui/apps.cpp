@@ -289,7 +289,7 @@ void Launcher::draw_apps(Canvas &c, float open)
     list.push_transform(1.0f - 0.03f * (1.0f - open) * motion(), 960.0f, 540.0f, 0.0f, (1.0f - open) * 26.0f * motion());
     glass(c, kDialog, t.radius_panel, t.panel.with_alpha(0.97f), t.panel_edge.with_alpha(0.66f), 1.6f);
     text_shrink(c, tr("Apps"), kLeft, baseline(218.0f, 62.0f, t.size_display), t.size_display, t.title, kWidth);
-    text_shrink(c, tr("Get, update and open Nightshade TV, Stream and Station."), kLeft,
+    text_shrink(c, tr("Get, update and open Physalis, Datura and Mandrake."), kLeft,
                 baseline(291.0f, 32.0f, t.size_small), t.size_small, t.copy, kWidth);
     if (services_.filesystem_access() != 0)
         notice(c, tr("Without filesystem access Nightshade can't tell which apps are installed."), kLeft,

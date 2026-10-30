@@ -685,7 +685,7 @@ void NoteGpuStalled() noexcept {
 
 } // namespace Eden::Crash
 
-// The driver's stall dump (tools/patch-radv-submission-dump.py) calls this first, before anything
+// The driver's stall dump (Belladonna, radv_ps5_winsys.c) calls this first, before anything
 // there could fault: from here on a crash closes the app as VK_ERROR_DEVICE_LOST does, instead
 // of starting it again on the GPU that stopped.
 extern "C" void eden_gpu_stalled(void) {

@@ -15,6 +15,7 @@
 #include <mutex>
 #include <new>
 #include <sched.h>
+#include <time.h>
 #include <signal.h>
 #include <sys/mman.h>
 #include <thread>

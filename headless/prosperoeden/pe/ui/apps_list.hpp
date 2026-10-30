@@ -39,11 +39,11 @@ struct AppListing
 };
 
 inline constexpr AppListing kApps[] = {
-    {"Nightshade TV", "PPSA99003", "Oliv3rmoon/Nightshade-TV", "ThatGuyKalvin/ProsperoTV", "PPSA99003.zip",
+    {"Physalis", "PPSA99003", "Oliv3rmoon/Physalis", "ThatGuyKalvin/ProsperoTV", "PPSA99003.zip",
      TR("Live TV, films and series from your IPTV provider."), AppIcon::tv},
-    {"Nightshade Stream", "PPSA99002", "Oliv3rmoon/Nightshade-Stream", "LedyBacer/ProsperoLight",
+    {"Datura", "PPSA99002", "Oliv3rmoon/Datura", "LedyBacer/ProsperoLight",
      "PPSA99002.zip", TR("Play games streamed from your PC with Moonlight."), AppIcon::stream},
-    {"Nightshade Station", "PPSA98510", "Oliv3rmoon/Nightshade-Station", "darkxex/SwanStationPS5", "PPSA98510.zip",
+    {"Mandrake", "PPSA98510", "Oliv3rmoon/Mandrake", "darkxex/SwanStationPS5", "PPSA98510.zip",
      TR("Play PS1 games with the SwanStation emulator."), AppIcon::disc},
 };
 inline constexpr int kAppCount = static_cast<int>(sizeof(kApps) / sizeof(kApps[0]));

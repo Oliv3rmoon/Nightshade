@@ -1215,7 +1215,7 @@ void pictures(Stage &s)
         std::fprintf(stderr, "error: the app installed did not reach the list\n");
         s.ok = false;
     }
-    // Nightshade Stream: the original project's newer release, Square; it fails.
+    // Datura: the original project's newer release, Square; it fails.
     s.press({Key::up});
     s.wait(0.5f);
     s.shoot("N5-apps-update");

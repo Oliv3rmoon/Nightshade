@@ -422,6 +422,50 @@ extern "C" std::uintptr_t eden_guest_write_refused(unsigned* why, unsigned* stat
     return address;
 }
 
+namespace {
+// Writers waiting for a block (WaitForBlock), and how many waits ended with one.
+std::atomic<unsigned> memory_waiters{0};
+std::atomic<std::uint64_t> memory_waits_won{0}, memory_waits_lost{0};
+
+// No block was left for a written slot. Most of what the pool gives out is held by the graphics
+// caches, which free what is not drawn once they see memory short (headless/performance.cpp reads
+// eden_guest_memory_wanted, and while a writer waits the caches see no free memory at all). The
+// game's own memory comes first: a large open-world game wrote 1.8 GB of new memory within 10 s
+// after 23 minutes of play, faster than the caches free at the end of each frame, and the write
+// that found no block ended the session. So the writer waits here, in its fault handler, and tries
+// again every 20 ms for up to 2 s while the caches give memory back. Only then is it refused.
+template <typename Promote>
+bool WaitForBlock(Promote&& promote) noexcept {
+    memory_waiters.fetch_add(1, std::memory_order_acq_rel);
+    bool ok = false;
+    for (unsigned tries = 0; tries < 100 && !ok; ++tries) {
+        const timespec pause{0, 20'000'000};
+        nanosleep(&pause, nullptr);
+        ok = promote();
+    }
+    memory_waiters.fetch_sub(1, std::memory_order_acq_rel);
+    (ok ? memory_waits_won : memory_waits_lost).fetch_add(1, std::memory_order_relaxed);
+    Note(ok ? "EDEN_CRAM a written slot waited for the graphics caches to give memory back, and got a block\n"
+            : "EDEN_CRAM a written slot waited 2 s for memory and found no block\n");
+    return ok;
+}
+} // namespace
+
+// How many writes of the guest's memory are waiting for a block now (headless/performance.cpp):
+// while any is, the graphics caches are told no memory is free.
+extern "C" unsigned eden_guest_memory_wanted(void) noexcept {
+    return memory_waiters.load(std::memory_order_acquire);
+}
+
+// How the waits ended so far, and the writes refused for want of a block (headless/performance.cpp
+// ReportMemory prints them beside what holds the pool).
+extern "C" void eden_guest_memory_waits(unsigned long long* won, unsigned long long* lost,
+                                        unsigned long long* refused) noexcept {
+    *won = memory_waits_won.load(std::memory_order_relaxed);
+    *lost = memory_waits_lost.load(std::memory_order_relaxed);
+    *refused = counters.failures.load(std::memory_order_relaxed);
+}
+
 // A write fault at `address`: true when it was a write to a slot of the guest's memory that is
 // now writable (the faulting instruction repeats), false for anything else.
 bool HandleGuestWriteFault(void* fault) noexcept {
@@ -454,15 +498,20 @@ bool HandleGuestWriteFault(void* fault) noexcept {
         UnlockSlot(*range, slot, state);
         return true;
     }
-    bool ok = true;
-    if (state == SlotFine) {
-        ok = PromoteFine(*range, slot);
-    } else if (state == SlotZero) {
-        ok = PromoteZero(*range, slot);
-        if (ok) counters.promotions.fetch_add(1, std::memory_order_relaxed);
-    } else if (state == SlotShared) {
-        ok = PromoteShared(*range, slot);
-    }
+    const auto promote = [&]() noexcept {
+        bool done = true;
+        if (state == SlotFine) {
+            done = PromoteFine(*range, slot);
+        } else if (state == SlotZero) {
+            done = PromoteZero(*range, slot);
+            if (done) counters.promotions.fetch_add(1, std::memory_order_relaxed);
+        } else if (state == SlotShared) {
+            done = PromoteShared(*range, slot);
+        }
+        return done;
+    };
+    bool ok = promote();
+    if (!ok) ok = WaitForBlock(promote);
     UnlockSlot(*range, slot, ok ? SlotOwn : state);
     if (!ok) {
         counters.failures.fetch_add(1, std::memory_order_relaxed);

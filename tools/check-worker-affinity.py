@@ -24,6 +24,7 @@ using cpuset_t=uint64_t;
 static uint64_t current=0x1fff, fail_mask=0;
 static unsigned max_leaf=0xb, level_type=1, apics[64];
 static bool fail_restore=false, timing_share=false;
+static std::atomic<bool> pipeline_startup{false}; // performance.h: builders on every CPU while the cache is built
 static bool AdjacentCpusShareCore(){return timing_share;}
 static constexpr std::array names{"CPUCore_0","CPUCore_1","CPUCore_2","CPUCore_3","GPU"};
 static unsigned __get_cpuid_max(unsigned,void*) {return max_leaf;}
@@ -70,6 +71,17 @@ int main(){
  // Probed once per process: a later game keeps the layout found by the first.
  fail_restore=false;current=0x1fff;worker_topology_ready=false;CheckWorkerTopology();assert(worker_topology_ready);
  current=3;CheckWorkerTopology();assert(worker_topology_ready && current==3);
+ // Pipeline builders: every CPU the app has while the shader cache is built, the spare CPUs once
+ // the game runs; other threads keep to the spare CPUs, and a thread that builds no pipelines is
+ // never moved by SettlePipelineBuilder.
+ placement_secondary=true;const uint64_t spare=secondary_cpus;assert(spare && spare!=0x1fff);
+ current=0x1fff;pipeline_startup=true;PlaceSecondary("VkPipelineBuilder");assert(current==0x1fff);
+ SettlePipelineBuilderImpl();assert(current==0x1fff);
+ pipeline_startup=false;SettlePipelineBuilderImpl();assert(current==spare);
+ current=0x1fff;SettlePipelineBuilderImpl();assert(current==0x1fff);
+ pipeline_builder=false;pipeline_builder_settled=false;pipeline_startup=true;current=0x1fff;
+ PlaceSecondary("TextureDecoder");assert(current==spare);
+ current=0x1fff;pipeline_startup=false;SettlePipelineBuilderImpl();assert(current==0x1fff);
  return 0;
 }
 '''
@@ -77,4 +89,4 @@ with tempfile.TemporaryDirectory() as tmp:
     exe=Path(tmp)/'affinity'
     subprocess.run(['c++','-std=c++20','-Wall','-Wextra','-Werror','-fsanitize=address,undefined','-x','c++','-','-o',str(exe)],input=code,text=True,check=True)
     subprocess.run([str(exe)],check=True)
-print('Worker topology: PASS physical sibling exclusion, OS/APIC permutations, allowed masks, the layout by timing, fallback and restoration failures, one probe per process')
+print('Worker topology: PASS physical sibling exclusion, OS/APIC permutations, allowed masks, the layout by timing, fallback and restoration failures, one probe per process, pipeline builders on every CPU only while the cache is built')

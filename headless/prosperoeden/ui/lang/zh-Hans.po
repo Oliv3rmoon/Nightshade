@@ -962,10 +962,10 @@ msgstr "德语"
 msgid "Get"
 msgstr "获取"
 
-#. Settings > Apps: what it is for. Nightshade TV, Stream and Station are the apps' names (unchanged).
+#. Settings > Apps: what it is for. Physalis, Datura and Mandrake are the apps' names (unchanged).
 #: pe/ui/apps.cpp, pe/ui/settings.cpp
-msgid "Get, update and open Nightshade TV, Stream and Station."
-msgstr "获取、更新并打开 Nightshade TV、Stream 和 Station。"
+msgid "Get, update and open Physalis, Datura and Mandrake."
+msgstr "获取、更新并打开 Physalis、Datura 和 Mandrake。"
 
 #: pe/ui/browse.cpp
 msgid "GETTING STARTED"
@@ -1222,7 +1222,7 @@ msgstr "游戏库"
 msgid "Linked"
 msgstr "已关联"
 
-#. Settings > Apps: what the Nightshade TV app is. IPTV is a kind of TV service delivered over the internet (unchanged).
+#. Settings > Apps: what the Physalis app is. IPTV is a kind of TV service delivered over the internet (unchanged).
 #: pe/ui/apps_list.hpp
 msgid "Live TV, films and series from your IPTV provider."
 msgstr "来自你的 IPTV 服务商的直播电视、电影和剧集。"
@@ -1592,12 +1592,12 @@ msgstr "仍要游玩"
 msgid "Play as"
 msgstr "以此游玩"
 
-#. Settings > Apps: what the Nightshade Stream app is. Moonlight is the name of the game streaming client (unchanged).
+#. Settings > Apps: what the Datura app is. Moonlight is the name of the game streaming client (unchanged).
 #: pe/ui/apps_list.hpp
 msgid "Play games streamed from your PC with Moonlight."
 msgstr "通过 Moonlight 玩从电脑串流的游戏。"
 
-#. Settings > Apps: what the Nightshade Station app is. PS1 is the first PlayStation, SwanStation the emulator's name (both unchanged).
+#. Settings > Apps: what the Mandrake app is. PS1 is the first PlayStation, SwanStation the emulator's name (both unchanged).
 #: pe/ui/apps_list.hpp
 msgid "Play PS1 games with the SwanStation emulator."
 msgstr "用 SwanStation 模拟器玩 PS1 游戏。"
@@ -1804,7 +1804,7 @@ msgstr "常规"
 msgid "Release {0} of the original project, {1}"
 msgstr "原项目的发行版 {0}，{1}"
 
-#. {0} is a release's name, such as v1.000.090 or 01.000.110; {1} a GitHub repository, such as Oliv3rmoon/Nightshade-TV (both unchanged).
+#. {0} is a release's name, such as v1.000.090 or 01.000.110; {1} a GitHub repository, such as Oliv3rmoon/Physalis (both unchanged).
 #: pe/ui/apps.cpp
 msgid "Release {0}, from {1}"
 msgstr "发行版 {0}，来自 {1}"

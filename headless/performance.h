@@ -511,6 +511,31 @@ inline bool KeepDirtyTextures() {
     const auto probe = graphics_memory_probe.load(std::memory_order_relaxed);
     return !probe || !probe();
 }
+// Threads that build pipelines (the Vulkan pipeline cache, GetTotalPipelineWorkers, through
+// tools/prepare-vulkan-port.py). Eden takes the processor count less one. On the console a large
+// game's 13,938 cached pipelines were built at about 25 a second at start: nine minutes before it
+// could be played, as one thread would. So the console build asks for at least
+// pipeline_workers_min (performance.cpp); a processor count above it still wins. The first call
+// says what it chose (EDEN_PIPELINE_WORKERS), so a log shows what the console reported.
+inline std::atomic<std::size_t> pipeline_workers_min{0};
+inline std::size_t PipelineWorkers(std::size_t upstream) {
+    const std::size_t minimum = pipeline_workers_min.load(std::memory_order_relaxed);
+    const std::size_t chosen = upstream < minimum ? minimum : upstream;
+    static std::atomic<bool> reported{false};
+    if (!reported.exchange(true, std::memory_order_relaxed)) {
+        std::printf("EDEN_PIPELINE_WORKERS processors_less_one=%zu minimum=%zu chosen=%zu\n", upstream, minimum,
+                    chosen);
+    }
+    return chosen;
+}
+// While a game's shader cache is built at start (headless/main.cpp), the threads that build
+// pipelines may run on every CPU the app has: the guest's cores and the GPU thread's are idle
+// until the game starts. Outside that time they keep to the spare CPUs (PlaceSecondary), as every
+// background worker does. A large game's 14,000 cached pipelines took 208 to 552 s on the spare
+// CPUs alone. SettlePipelineBuilder, called where a pipeline starts to build, moves a builder
+// placed during the start back to the spare CPUs once the game runs; other threads are untouched.
+inline std::atomic<bool> pipeline_startup{false};
+void SettlePipelineBuilder();
 // Signal the guest vsync first and compose 1.5 ms later, so a frame the game queues in response
 // to the vsync is latched at that same vsync (dev-settings compose_delay_us=N overrides it).
 inline std::atomic<int> compose_delay_us{1500};
@@ -656,6 +681,8 @@ inline void CountJit(std::atomic<unsigned long long>& counter) {
 // one line of the log. Called before a session's graphics start and after everything of the
 // session is gone, so two sessions of one run can be compared.
 void ReportSessionMemory(const char* phase, unsigned session);
+// Vulkan frame report, every build: what holds the memory pool now (EDEN_MEMORY).
+void ReportMemory();
 // GPU thread only (Vulkan frame report): cumulative GPU-thread idle/dispatch/wait
 // totals with the owner's CPU clock, then a guest-core CPU snapshot.
 void ReportGpuThread(unsigned frame);
