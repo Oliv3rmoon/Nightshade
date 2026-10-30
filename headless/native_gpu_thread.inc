@@ -58,5 +58,8 @@ void ThreadManager::Stop() {
         if (pthread_join(thread, nullptr)) std::terminate();
         thread_joinable = false;
     }
+    // eden-nx2's second GPU thread (Switch 2 titles, video_core/gpu_split.h) runs what the worker
+    // sent it: it ends after the worker, and the next session starts it afresh.
+    VideoCommon::GpuSplit::Get().Stop();
 }
 } // namespace VideoCommon::GPUThread

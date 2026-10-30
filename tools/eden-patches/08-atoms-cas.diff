@@ -1,6 +1,6 @@
 --- a/src/shader_recompiler/backend/glasm/emit_glasm_instructions.h
 +++ b/src/shader_recompiler/backend/glasm/emit_glasm_instructions.h
-@@ -377,8 +377,10 @@
+@@ -377,8 +377,10 @@ void EmitSharedAtomicXor32(EmitContext& ctx, IR::Inst& inst, ScalarU32 pointer_o
                             ScalarU32 value);
  void EmitSharedAtomicExchange32(EmitContext& ctx, IR::Inst& inst, ScalarU32 pointer_offset,
                                  ScalarU32 value);
@@ -13,57 +13,57 @@
  void EmitStorageAtomicIAdd32(EmitContext& ctx, IR::Inst& inst, const IR::Value& binding,
 --- a/src/shader_recompiler/backend/glasm/emit_glasm_memory.cpp
 +++ b/src/shader_recompiler/backend/glasm/emit_glasm_memory.cpp
-@@ -304,11 +304,19 @@
- void EmitSharedAtomicExchange32(EmitContext& ctx, IR::Inst& inst, ScalarU32 pointer_offset,
-                                 ScalarU32 value) {
+@@ -306,11 +306,19 @@ void EmitSharedAtomicExchange32(EmitContext& ctx, IR::Inst& inst, ScalarU32 poin
      ctx.Add("ATOMS.EXCH.U32 {},{},shared_mem[{}];", inst, value, pointer_offset);
-+}
-+
-+void EmitSharedAtomicCompareExchange32(EmitContext&) {
-+    throw NotImplementedException("GLASM instruction");
  }
  
++void EmitSharedAtomicCompareExchange32(EmitContext&) {
++    throw NotImplementedException("GLASM instruction");
++}
++
  void EmitSharedAtomicExchange64(EmitContext& ctx, IR::Inst& inst, ScalarU32 pointer_offset,
                                  Register value) {
      ctx.LongAdd("ATOMS.EXCH.U64 {}.x,{},shared_mem[{}];", inst, value, pointer_offset);
-+}
-+
-+void EmitSharedAtomicCompareExchange64(EmitContext&) {
-+    throw NotImplementedException("GLASM instruction");
  }
  
- void EmitSharedAtomicExchange32x2([[maybe_unused]] EmitContext& ctx,
---- a/src/shader_recompiler/backend/glsl/emit_glsl_atomic.cpp
-+++ b/src/shader_recompiler/backend/glsl/emit_glsl_atomic.cpp
-@@ -93,6 +93,12 @@
- void EmitSharedAtomicExchange32(EmitContext& ctx, IR::Inst& inst, std::string_view pointer_offset,
-                                 std::string_view value) {
-     ctx.AddU32("{}=atomicExchange(smem[{}>>2],{});", inst, pointer_offset, value);
++void EmitSharedAtomicCompareExchange64(EmitContext&) {
++    throw NotImplementedException("GLASM instruction");
 +}
 +
+ void EmitSharedAtomicExchange32x2([[maybe_unused]] EmitContext& ctx,
+                                   [[maybe_unused]] IR::Inst& inst,
+                                   [[maybe_unused]] ScalarU32 pointer_offset,
+--- a/src/shader_recompiler/backend/glsl/emit_glsl_atomic.cpp
++++ b/src/shader_recompiler/backend/glsl/emit_glsl_atomic.cpp
+@@ -95,6 +95,12 @@ void EmitSharedAtomicExchange32(EmitContext& ctx, IR::Inst& inst, std::string_vi
+     ctx.AddU32("{}=atomicExchange(smem[{}>>2],{});", inst, pointer_offset, value);
+ }
+ 
 +void EmitSharedAtomicCompareExchange32(EmitContext& ctx, IR::Inst& inst,
 +                                       std::string_view pointer_offset, std::string_view compare,
 +                                       std::string_view value) {
 +    ctx.AddU32("{}=atomicCompSwap(smem[{}>>2],{},{});", inst, pointer_offset, compare, value);
- }
- 
- void EmitSharedAtomicExchange64(EmitContext& ctx, IR::Inst& inst, std::string_view pointer_offset,
-@@ -102,6 +108,12 @@
-                pointer_offset);
-     ctx.Add("smem[{}>>2]=unpackUint2x32({}).x;smem[({}+4)>>2]=unpackUint2x32({}).y;",
-             pointer_offset, value, pointer_offset, value);
 +}
 +
+ void EmitSharedAtomicExchange64(EmitContext& ctx, IR::Inst& inst, std::string_view pointer_offset,
+                                 std::string_view value) {
+     LOG_WARNING(Shader_GLSL, "Int64 atomics not supported, fallback to non-atomic");
+@@ -104,6 +110,12 @@ void EmitSharedAtomicExchange64(EmitContext& ctx, IR::Inst& inst, std::string_vi
+             pointer_offset, value, pointer_offset, value);
+ }
+ 
 +void EmitSharedAtomicCompareExchange64(EmitContext&) {
 +    // Shared memory is a uint array: two 32-bit halves can't be compared and exchanged as one
 +    // atomic operation
 +    throw NotImplementedException("GLSL Instruction");
- }
- 
++}
++
  void EmitSharedAtomicExchange32x2(EmitContext& ctx, IR::Inst& inst, std::string_view pointer_offset,
+                                   std::string_view value) {
+     LOG_WARNING(Shader_GLSL, "Int64 atomics not supported, fallback to non-atomic");
 --- a/src/shader_recompiler/backend/glsl/emit_glsl_instructions.h
 +++ b/src/shader_recompiler/backend/glsl/emit_glsl_instructions.h
-@@ -447,8 +447,12 @@
+@@ -447,8 +447,12 @@ void EmitSharedAtomicXor32(EmitContext& ctx, IR::Inst& inst, std::string_view po
                             std::string_view value);
  void EmitSharedAtomicExchange32(EmitContext& ctx, IR::Inst& inst, std::string_view pointer_offset,
                                  std::string_view value);
@@ -78,7 +78,7 @@
  void EmitStorageAtomicIAdd32(EmitContext& ctx, IR::Inst& inst, const IR::Value& binding,
 --- a/src/shader_recompiler/backend/spirv/emit_spirv_atomic.cpp
 +++ b/src/shader_recompiler/backend/spirv/emit_spirv_atomic.cpp
-@@ -157,6 +157,13 @@
+@@ -157,6 +157,13 @@ Id EmitSharedAtomicExchange32(EmitContext& ctx, Id offset, Id value) {
      return SharedAtomicU32(ctx, offset, value, &Sirit::Module::OpAtomicExchange);
  }
  
@@ -92,7 +92,7 @@
  Id EmitSharedAtomicExchange64(EmitContext& ctx, Id offset, Id value) {
      if (ctx.profile.support_shared_int64_atomics && ctx.uses_explicit_workgroup_layout) {
          const Id shift_id{ctx.Const(3U)};
-@@ -177,6 +184,22 @@
+@@ -177,6 +184,22 @@ Id EmitSharedAtomicExchange64(EmitContext& ctx, Id offset, Id value) {
      return ctx.OpBitcast(ctx.U64, ctx.OpCompositeConstruct(ctx.U32[2], value_1, value_2));
  }
  
@@ -117,7 +117,7 @@
      const Id pointer_1{SharedPointer(ctx, offset, 0)};
 --- a/src/shader_recompiler/backend/spirv/emit_spirv_instructions.h
 +++ b/src/shader_recompiler/backend/spirv/emit_spirv_instructions.h
-@@ -341,7 +341,9 @@
+@@ -341,7 +341,9 @@ Id EmitSharedAtomicAnd32(EmitContext& ctx, Id pointer_offset, Id value);
  Id EmitSharedAtomicOr32(EmitContext& ctx, Id pointer_offset, Id value);
  Id EmitSharedAtomicXor32(EmitContext& ctx, Id pointer_offset, Id value);
  Id EmitSharedAtomicExchange32(EmitContext& ctx, Id pointer_offset, Id value);
@@ -129,7 +129,7 @@
                             Id value);
 --- a/src/shader_recompiler/frontend/ir/ir_emitter.cpp
 +++ b/src/shader_recompiler/frontend/ir/ir_emitter.cpp
-@@ -1411,6 +1411,21 @@
+@@ -1411,6 +1411,21 @@ U32U64 IREmitter::SharedAtomicExchange(const U32& pointer_offset, const U32U64&
      }
  }
  
@@ -153,7 +153,7 @@
      case Type::U32:
 --- a/src/shader_recompiler/frontend/ir/ir_emitter.h
 +++ b/src/shader_recompiler/frontend/ir/ir_emitter.h
-@@ -267,6 +267,8 @@
+@@ -267,6 +267,8 @@ public:
      [[nodiscard]] U32 SharedAtomicOr(const U32& pointer_offset, const U32& value);
      [[nodiscard]] U32 SharedAtomicXor(const U32& pointer_offset, const U32& value);
      [[nodiscard]] U32U64 SharedAtomicExchange(const U32& pointer_offset, const U32U64& value);
@@ -164,7 +164,7 @@
      [[nodiscard]] U32U64 GlobalAtomicSMin(const U64& pointer_offset, const U32U64& value);
 --- a/src/shader_recompiler/frontend/ir/microinstruction.cpp
 +++ b/src/shader_recompiler/frontend/ir/microinstruction.cpp
-@@ -116,7 +116,9 @@
+@@ -116,7 +116,9 @@ bool Inst::MayHaveSideEffects() const noexcept {
      case Opcode::SharedAtomicOr32:
      case Opcode::SharedAtomicXor32:
      case Opcode::SharedAtomicExchange32:
@@ -176,7 +176,7 @@
      case Opcode::GlobalAtomicSMin32:
 --- a/src/shader_recompiler/frontend/ir/opcodes.cpp
 +++ b/src/shader_recompiler/frontend/ir/opcodes.cpp
-@@ -10,7 +10,7 @@
+@@ -10,7 +10,7 @@ namespace Shader::IR {
  
  namespace Detail {
  
@@ -185,7 +185,7 @@
  #define OPCODE(name_token, type_token, ...)                                                        \
      {                                                                                              \
          .name{#name_token},                                                                        \
-@@ -21,7 +21,7 @@
+@@ -21,7 +21,7 @@ OpcodeMeta META_TABLE[538] = {
  #undef OPCODE
  };
  
@@ -196,7 +196,7 @@
  #undef OPCODE
 --- a/src/shader_recompiler/frontend/ir/opcodes.h
 +++ b/src/shader_recompiler/frontend/ir/opcodes.h
-@@ -57,12 +57,12 @@
+@@ -57,12 +57,12 @@ static constexpr Type F64x2{Type::F64x2};
  static constexpr Type F64x3{Type::F64x3};
  static constexpr Type F64x4{Type::F64x4};
  
@@ -213,7 +213,7 @@
  /// Get return type of an opcode
 --- a/src/shader_recompiler/frontend/ir/opcodes.inc
 +++ b/src/shader_recompiler/frontend/ir/opcodes.inc
-@@ -347,7 +347,9 @@
+@@ -347,7 +347,9 @@ OPCODE(SharedAtomicAnd32,                                   U32,            U32,
  OPCODE(SharedAtomicOr32,                                    U32,            U32,            U32,                                                            )
  OPCODE(SharedAtomicXor32,                                   U32,            U32,            U32,                                                            )
  OPCODE(SharedAtomicExchange32,                              U32,            U32,            U32,                                                            )
@@ -225,7 +225,7 @@
  OPCODE(GlobalAtomicIAdd32,                                  U32,            U64,            U32,                                                            )
 --- a/src/shader_recompiler/frontend/maxwell/translate/impl/atomic_operations_shared_memory.cpp
 +++ b/src/shader_recompiler/frontend/maxwell/translate/impl/atomic_operations_shared_memory.cpp
-@@ -25,6 +25,18 @@
+@@ -25,6 +25,18 @@ enum class AtomsSize : u64 {
      U64,
  };
  
@@ -244,7 +244,7 @@
  IR::U32U64 ApplyAtomsOp(IR::IREmitter& ir, const IR::U32& offset, const IR::U32U64& op_b, AtomOp op,
                          bool is_signed) {
      switch (op) {
-@@ -106,4 +118,34 @@
+@@ -106,4 +118,34 @@ void TranslatorVisitor::ATOMS(u64 insn) {
      StoreResult(*this, atoms.dest_reg, result, atoms.size);
  }
  
@@ -281,20 +281,20 @@
  } // namespace Shader::Maxwell
 --- a/src/shader_recompiler/frontend/maxwell/translate/impl/not_implemented.cpp
 +++ b/src/shader_recompiler/frontend/maxwell/translate/impl/not_implemented.cpp
-@@ -13,10 +13,6 @@
- 
- [[noreturn]] static void ThrowNotImplemented(Opcode opcode) {
+@@ -15,10 +15,6 @@ namespace Shader::Maxwell {
      throw NotImplementedException("Instruction {} is not implemented", opcode);
--}
--
--void TranslatorVisitor::ATOMS_cas(u64) {
--    ThrowNotImplemented(Opcode::ATOMS_cas);
  }
  
+-void TranslatorVisitor::ATOMS_cas(u64) {
+-    ThrowNotImplemented(Opcode::ATOMS_cas);
+-}
+-
  void TranslatorVisitor::B2R(u64) {
+     ThrowNotImplemented(Opcode::B2R);
+ }
 --- a/src/shader_recompiler/ir_opt/collect_shader_info_pass.cpp
 +++ b/src/shader_recompiler/ir_opt/collect_shader_info_pass.cpp
-@@ -346,6 +346,7 @@
+@@ -346,6 +346,7 @@ void VisitUsages(Info& info, IR::Inst& inst) {
      case IR::Opcode::ConvertF32U64:
      case IR::Opcode::ConvertF64U64:
      case IR::Opcode::SharedAtomicExchange64:
@@ -302,7 +302,7 @@
      case IR::Opcode::GlobalAtomicIAdd64:
      case IR::Opcode::GlobalAtomicSMin64:
      case IR::Opcode::GlobalAtomicUMin64:
-@@ -749,6 +750,7 @@
+@@ -749,6 +750,7 @@ void VisitUsages(Info& info, IR::Inst& inst) {
          info.uses_shared_decrement = true;
          break;
      case IR::Opcode::SharedAtomicExchange64:
@@ -312,7 +312,7 @@
      case IR::Opcode::GlobalAtomicInc32:
 --- a/src/shader_recompiler/ir_opt/lower_int64_to_int32.cpp
 +++ b/src/shader_recompiler/ir_opt/lower_int64_to_int32.cpp
-@@ -305,6 +305,7 @@
+@@ -305,6 +305,7 @@ void Lower(IR::Block& block, IR::Inst& inst) {
          return inst.ReplaceOpcode(IR::Opcode::StorageAtomicXor32x2);
      case IR::Opcode::StorageAtomicExchange64:
          return inst.ReplaceOpcode(IR::Opcode::StorageAtomicExchange32x2);

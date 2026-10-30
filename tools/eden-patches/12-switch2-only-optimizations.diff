@@ -1,0 +1,51 @@
+--- a/src/video_core/engines/maxwell_3d.h
++++ b/src/video_core/engines/maxwell_3d.h
+@@ -26,6 +26,7 @@
+ #include "video_core/engines/engine_upload.h"
+ #include "video_core/gpu.h"
+ #include "video_core/macro.h"
++#include "video_core/nx2.h"
+ #include "video_core/textures/texture.h"
+ #include "video_core/engines/maxwell_3d.h"
+ 
+@@ -3269,12 +3270,13 @@ private:
+     void CallMacroMethod(Core::System& system, u32 method, std::span<const u32> parameters);
+ 
+     /// Whether state register writes that keep the register's value are dropped (CallMethod).
++    /// Measured with Switch 2 titles; a Switch 1 game keeps every write (Tegra::g_nx2_ampere).
+     static bool SkipSameValueWrites() {
+         static const bool skip = [] {
+             const char* value = std::getenv("EDEN_NX2_SKIP_SAME");
+             return value == nullptr || value[0] != '0';
+         }();
+-        return skip;
++        return skip && Tegra::g_nx2_ampere.load(std::memory_order_relaxed);
+     }
+ 
+     /// Handles writes to the macro uploading register.
+--- a/src/video_core/renderer_vulkan/vk_rasterizer.cpp
++++ b/src/video_core/renderer_vulkan/vk_rasterizer.cpp
+@@ -50,6 +50,7 @@
+ #include "video_core/vulkan_common/vulkan_device.h"
+ #include "video_core/vulkan_common/vulkan_wrapper.h"
+ #include "video_core/nx2_profile.h"
++#include "video_core/nx2.h"
+ 
+ namespace Vulkan {
+ 
+@@ -1250,11 +1251,13 @@ void RasterizerVulkan::AccelerateInlineToMemory(GPUVAddr address, size_t copy_si
+         return;
+     }
+     gpu_memory->WriteBlockUnsafe(address, memory.data(), copy_size);
+-    // EDEN_NX2_INLINE_DEFER=0: invalidate every cache at once (for comparisons).
+-    static const bool defer = [] {
++    // EDEN_NX2_INLINE_DEFER=0: invalidate every cache at once (for comparisons). Measured with
++    // Switch 2 titles; a Switch 1 game invalidates at once, as before (Tegra::g_nx2_ampere).
++    static const bool defer_wanted = [] {
+         const char* value = std::getenv("EDEN_NX2_INLINE_DEFER");
+         return value == nullptr || value[0] != '0';
+     }();
++    const bool defer = defer_wanted && Tegra::g_nx2_ampere.load(std::memory_order_relaxed);
+     // One cache at a time: holding both while waiting for either (std::lock) waited longer, the
+     // fencing thread and CPU write traps holding one of them most of the time.
+     bool uploaded;

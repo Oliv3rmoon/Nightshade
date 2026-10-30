@@ -38,7 +38,8 @@ constexpr Sample kSamples[] = {
     {"Starfall Odyssey", "NSP", "6.4 GB", "1.2.0", 2, "English (US)", "", 0x1b2a6b, 0x40b3c8, 0xffd166, true},
     {"Moss & Lantern", "XCI", "2.1 GB", "", 0, "English (US)", "", 0x16402f, 0x7bc86c, 0xf4e285},
     {"Kart Carnival Deluxe", "NSP", "7.8 GB", "3.0.1", 48, "English (US)", "", 0xb3261e, 0xffb238, 0xffffff},
-    {"Tiny Harbor", "NSP", "512.0 MB", "", 0, "English (US)", "", 0x256d8f, 0x9bd8e6, 0xfff3d6},
+    // A Switch 2 title, held as its ExeFS and RomFS folders (game_files.h).
+    {"Tiny Harbor", "Switch 2", "11.6 GB", "", 0, "English (US)", "", 0x256d8f, 0x9bd8e6, 0xfff3d6},
     {"Echoes of the Valley", "XCI", "14.2 GB", "1.1.0", 0, "Spanish",
      "Portuguese (Brazil)", 0x3b1f5e, 0xc77dff, 0xffe0f5, true},
     {"Pocket Rally Turbo", "NSP", "1.9 GB", "", 0, "English (US)", "", 0x202020, 0xe85d04, 0xf8f9fa},
@@ -161,6 +162,12 @@ FakeServices::FakeServices(const std::string &covers_directory)
         game.file = std::string(sample.name) + " [" + id + "]." +
                     (std::string(sample.format) == "NSP" ? "nsp" : "xci");
         game.title_id = 0x0100A00000001000ull + static_cast<std::uint64_t>(index) * 0x10000;
+        if (std::string(sample.format) == "Switch 2")
+        {
+            game.switch2 = true;
+            game.file = std::string(sample.name) + "/exefs/main";
+            game.title_id = 0x0400A00000001000ull;
+        }
         if (sample.update[0] != 0)
         {
             game.addons = fill(tr("Update {0}"), {sample.update});

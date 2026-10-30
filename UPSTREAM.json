@@ -1,7 +1,8 @@
 {
-  "eden_commit": "67bada77f8a43a90da2e94e89b8e7da73c256989",
+  "eden_commit": "50fa86bbbc403ad565eb44fcc281f16f77c69e15",
+  "eden_source": "https://git.eden-emu.dev/Takoroka/eden-nx2 (branch eden-nx2), branched from Eden master at 26a03d2473, with Switch 2 support",
   "archives": {
-    "eden-67bada77.tar.gz": "d42b6fb492c65eb5e98ab72a786dff01fd64384d073a739b9c9ff475414366ee",
+    "eden-50fa86bb.tar.gz": "54c7b3c5fc6c5eb7fe0c212d7e10f8b8b206f6f0eff3fb758d0922574a295b62",
     "fmt-12.1.0.tar.gz": "ea7de4299689e12b6dddd392f9896f08fb0777ac7168897a244a6d6085043fea",
     "xbyak-7.40.1.tar.gz": "2af7aee286b0ce94422b7894de4308d26eba06ef63c1c80a3bd9719b5d798fe2",
     "libboost1.90-dev_1.90.0-6ubuntu1_amd64.deb": "7b89698c907fd5d33ccd439674fa53803139923822181c87b910579827aca379",

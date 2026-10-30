@@ -3,13 +3,14 @@
   "items": [
     {
       "name": "eden",
-      "about": "Eden emulator source at the pinned commit (GitHub mirror archive)",
+      "about": "Eden emulator source: Takoroka's eden-nx2 (Eden master with Switch 2 support) at the pinned commit, as git.eden-emu.dev archives it",
       "kind": "archive",
-      "url": "https://github.com/eden-emulator/mirror/archive/67bada77f8a43a90da2e94e89b8e7da73c256989.tar.gz",
-      "sha256": "d42b6fb492c65eb5e98ab72a786dff01fd64384d073a739b9c9ff475414366ee",
-      "save": ".deps/eden-67bada77.tar.gz",
-      "extract": ".deps",
-      "creates": ".deps/mirror-67bada77f8a43a90da2e94e89b8e7da73c256989/CMakeLists.txt"
+      "url": "https://git.eden-emu.dev/Takoroka/eden-nx2/archive/50fa86bbbc403ad565eb44fcc281f16f77c69e15.tar.gz",
+      "sha256": "54c7b3c5fc6c5eb7fe0c212d7e10f8b8b206f6f0eff3fb758d0922574a295b62",
+      "save": ".deps/eden-50fa86bb.tar.gz",
+      "extract": ".deps/eden-50fa86bbbc403ad565eb44fcc281f16f77c69e15",
+      "strip": 1,
+      "creates": ".deps/eden-50fa86bbbc403ad565eb44fcc281f16f77c69e15/CMakeLists.txt"
     },
     {
       "name": "ffmpeg",

@@ -35,22 +35,6 @@ function(write_derived path content)
     file(WRITE "${path}.in" "${content}")
     configure_file("${path}.in" "${path}" COPYONLY)
 endfunction()
-# Eden's helper that hands a small vector on (FixSmallVectorADL, texture_cache/util.h) has two
-# forms: the vector itself, or - for a GCC 12 bug with an old Boost - a copy of it on the heap.
-# Boost's version chooses, and the header reads it without including <boost/version.hpp>: where
-# nothing else has, the version reads as 0 and the copy is made. That was every draw that follows
-# a guest write of GPU memory, every texture upload and every buffer copy: 2,300 of the GPU
-# thread's 3,400 allocations a frame in a large open-world game. With the include, the vector
-# itself (the bundled Boost is recent).
-file(READ "${PROJECT_SOURCE_DIR}/src/video_core/texture_cache/util.h" texture_util_header)
-string(REPLACE "#include <boost/container/small_vector.hpp>"
-    "#include <boost/container/small_vector.hpp>\n#include <boost/version.hpp>"
-    texture_util_derived "${texture_util_header}")
-if(texture_util_derived STREQUAL texture_util_header OR NOT texture_util_header MATCHES "FixSmallVectorADL")
-    message(FATAL_ERROR "Pinned texture cache util.h layout changed")
-endif()
-write_derived("${PORT_BUILD_DIR}/small-vector/video_core/texture_cache/util.h" "${texture_util_derived}")
-target_include_directories(video_core BEFORE PRIVATE "${PORT_BUILD_DIR}/small-vector")
 # Each Vulkan pipeline locks its own std::mutex and signals its own std::condition_variable once,
 # when its build ends, and keeps both while it is cached. On the PS5 those are thread library
 # objects, of which a process has only so many: a game with thousands of pipelines used them up
@@ -1000,8 +984,26 @@ endif()
 # Guest core idle: count each wait and how long it lasted, and poll the interrupt flag before
 # sleeping on the condition variable, because waking a sleeping host thread puts the host
 # scheduler's latency on the guest's critical path. How long each core polls follows its recent
-# waits (performance.h, AdaptIdlePoll).
-set(idle_old "void PhysicalCore::Idle() {\n    std::unique_lock lk{m_guard};\n    m_on_interrupt.wait(lk, [this] { return m_is_interrupted; });\n}")
+# waits (performance.h, AdaptIdlePoll). eden-nx2's fixed poll (EDEN_NX2_IDLE_SPIN_US, off unless set;
+# its notes found no gain from it) gives way to this one; the flag is eden-nx2's std::atomic<bool>.
+set(idle_old [=[void PhysicalCore::Idle() {
+    // Guest job systems hand work between cores many times per frame; blocking at once adds the
+    // host's thread wake-up latency to every handoff. EDEN_NX2_IDLE_SPIN_US=<n>: poll for that
+    // many microseconds before blocking.
+    static const auto spin = std::chrono::microseconds{[] {
+        const char* text = std::getenv("EDEN_NX2_IDLE_SPIN_US");
+        return text ? std::strtoll(text, nullptr, 10) : 0LL;
+    }()};
+    if (spin.count() > 0) {
+        const auto deadline = std::chrono::steady_clock::now() + spin;
+        while (!m_is_interrupted.load(std::memory_order_acquire) &&
+               std::chrono::steady_clock::now() < deadline) {
+            std::this_thread::yield();
+        }
+    }
+    std::unique_lock lk{m_guard};
+    m_on_interrupt.wait(lk, [this] { return m_is_interrupted.load(); });
+}]=])
 string(FIND "${physical_core_source}" "${idle_old}" idle_at)
 if(idle_at LESS 0)
     message(FATAL_ERROR "Pinned PhysicalCore::Idle changed")
@@ -1010,7 +1012,7 @@ string(REPLACE "${idle_old}" [=[void PhysicalCore::Idle() {
     const long long start = ::Eden::Performance::NowNs();
     const long long poll = ::Eden::Performance::IdlePollBudget(m_core_index);
     if (poll > 0)
-        for (unsigned i = 1; !__atomic_load_n(&m_is_interrupted, __ATOMIC_ACQUIRE); ++i) {
+        for (unsigned i = 1; !m_is_interrupted.load(std::memory_order_acquire); ++i) {
             ::Eden::CpuRelax();
             if ((i & 63) == 0 && ::Eden::Performance::NowNs() - start >= poll) break;
         }
@@ -1019,8 +1021,8 @@ string(REPLACE "${idle_old}" [=[void PhysicalCore::Idle() {
     long long raised;
     {
         std::unique_lock lk{m_guard};
-        slept = !m_is_interrupted;
-        m_on_interrupt.wait(lk, [this] { return m_is_interrupted; });
+        slept = !m_is_interrupted.load(std::memory_order_relaxed);
+        m_on_interrupt.wait(lk, [this] { return m_is_interrupted.load(std::memory_order_relaxed); });
         raised = ::Eden::Performance::RaisedNs(m_core_index);
     }
     const long long waited = ::Eden::Performance::NowNs() - start;
@@ -1040,19 +1042,21 @@ foreach(pinned_text IN ITEMS interrupt_old clear_old is_interrupted_old)
     endif()
 endforeach()
 string(REPLACE "${interrupt_old}"
-    "    // Add interrupt flag.\n    if (!m_is_interrupted) ::Eden::Performance::NoteInterrupt(m_core_index);\n    __atomic_store_n(&m_is_interrupted, true, __ATOMIC_RELEASE);"
+    "    // Add interrupt flag.\n    if (!m_is_interrupted.load(std::memory_order_relaxed)) ::Eden::Performance::NoteInterrupt(m_core_index);\n    m_is_interrupted.store(true, std::memory_order_release);"
     physical_core_source "${physical_core_source}")
 string(REPLACE "${clear_old}"
-    "    std::scoped_lock lk{m_guard};\n    __atomic_store_n(&m_is_interrupted, false, __ATOMIC_RELAXED);"
+    "    std::scoped_lock lk{m_guard};\n    m_is_interrupted.store(false, std::memory_order_relaxed);"
     physical_core_source "${physical_core_source}")
 string(REPLACE "${is_interrupted_old}"
-    "bool PhysicalCore::IsInterrupted() const {\n    return __atomic_load_n(&m_is_interrupted, __ATOMIC_ACQUIRE);\n}"
+    "bool PhysicalCore::IsInterrupted() const {\n    return m_is_interrupted.load(std::memory_order_acquire);\n}"
     physical_core_source "${physical_core_source}")
 string(REPLACE "${prefetch_old}"
     "            } else {\n                interface->LogBacktrace(process);\n                if (prefetch_abort)\n                    ::Eden::RecordGuestFault(\"guest thread \" + Core::GetThreadName(thread).value_or(\"?\") +\n                                             \" jumped to an unmapped address\");\n            }\n            thread->RequestSuspend(kernel, SuspendType::Debug);"
     physical_core_source "${physical_core_source}")
+# Every emulated core has its own idle poll (performance.h kGuestCores).
+string(APPEND physical_core_source "\nstatic_assert(::Eden::Performance::kGuestCores >= ::Core::Hardware::NUM_CPU_CORES);\n")
 write_derived("${PORT_BUILD_DIR}/physical_core.cpp"
-    "#include \"${EDEN_PORT_DIR}/guest_fault.h\"\n#include \"${EDEN_PORT_DIR}/performance.h\"\n#include \"core/arm/debug.h\"\n${physical_core_source}")
+    "#include \"${EDEN_PORT_DIR}/guest_fault.h\"\n#include \"${EDEN_PORT_DIR}/performance.h\"\n#include \"core/arm/debug.h\"\n#include \"core/hardware_properties.h\"\n${physical_core_source}")
 # The guest's tick counter gives when a frame is a little late (headless/guest_clock.h): its
 # rate is applied where Eden applies its own clock settings, and it follows the frames the
 # game hands in (BufferQueueProducer::QueueBuffer, below).
@@ -1108,14 +1112,19 @@ string(REPLACE "${guard_retry_old}"
 write_derived("${PORT_BUILD_DIR}/k_scheduler.cpp" "#include \"${EDEN_PORT_DIR}/kernel_spin_lock.h\"\n${scheduler_source}")
 list(REMOVE_ITEM core_sources "hle/kernel/k_scheduler.cpp")
 list(APPEND core_sources "${PORT_BUILD_DIR}/k_scheduler.cpp")
-# Guest kernel spin locks spin before blocking (performance.h kernel_spin_iterations).
+# Guest kernel spin locks spin before blocking (performance.h kernel_spin_iterations). eden-nx2's
+# KSpinLock is its own spin-then-wait lock (an atomic word, no std::mutex); it spins for a fixed
+# 128 pauses. On the console the count measured for these locks is kernel_spin_iterations
+# (dev-settings spins=N), so that is what it spins.
 file(READ "${PROJECT_SOURCE_DIR}/src/core/hle/kernel/k_spin_lock.cpp" spin_source)
-set(spin_old "void KSpinLock::Lock() {\n    m_lock.lock();\n}")
+set(spin_old "    for (int spin = 0; spin < SpinCount; ++spin) {\n        Pause();")
 string(FIND "${spin_source}" "${spin_old}" spin_at)
-if(spin_at LESS 0)
+if(spin_at LESS 0 OR NOT spin_source MATCHES "m_state.wait\\(2, std::memory_order_relaxed\\)")
     message(FATAL_ERROR "Pinned KSpinLock::Lock changed")
 endif()
-string(REPLACE "${spin_old}" "void KSpinLock::Lock() {\n    ::Eden::Performance::SpinAcquire(m_lock);\n}" spin_source "${spin_source}")
+string(REPLACE "${spin_old}"
+    "    const int spins = static_cast<int>(::Eden::Performance::kernel_spin_iterations.load(std::memory_order_relaxed));\n    for (int spin = 0; spin < spins; ++spin) {\n        Pause();"
+    spin_source "${spin_source}")
 write_derived("${PORT_BUILD_DIR}/k_spin_lock.cpp" "#include \"${EDEN_PORT_DIR}/performance.h\"\n${spin_source}")
 list(REMOVE_ITEM core_sources "hle/kernel/k_spin_lock.cpp")
 list(APPEND core_sources "${PORT_BUILD_DIR}/k_spin_lock.cpp")
@@ -1126,12 +1135,13 @@ list(APPEND core_sources "${PORT_BUILD_DIR}/k_spin_lock.cpp")
 # folder held hundreds of them on top of the game's own (#169). A file closed here is opened again
 # when it is next read.
 file(READ "${PROJECT_SOURCE_DIR}/src/core/file_sys/vfs/vfs_real.cpp" vfs_real_source)
-set(open_files_old "constexpr size_t MaxOpenFiles = 8192;")
+# (eden-nx2 made the cap a function for Windows' C runtime limit; elsewhere it is still 8,192.)
+set(open_files_old "#else\n    return 8192;\n#endif")
 string(FIND "${vfs_real_source}" "${open_files_old}" open_files_at)
-if(open_files_at LESS 0)
+if(open_files_at LESS 0 OR NOT vfs_real_source MATCHES "size_t MaxOpenFiles\\(\\) {")
     message(FATAL_ERROR "Pinned vfs_real.cpp MaxOpenFiles changed")
 endif()
-string(REPLACE "${open_files_old}" "constexpr size_t MaxOpenFiles = 512;" vfs_real_source "${vfs_real_source}")
+string(REPLACE "${open_files_old}" "#else\n    return 512;\n#endif" vfs_real_source "${vfs_real_source}")
 write_derived("${PORT_BUILD_DIR}/vfs_real.cpp" "${vfs_real_source}")
 list(REMOVE_ITEM core_sources "file_sys/vfs/vfs_real.cpp")
 list(APPEND core_sources "${PORT_BUILD_DIR}/vfs_real.cpp")
@@ -1359,7 +1369,8 @@ if(EDEN_A32_FASTMEM)
 endif()
 # Unmapped reads and writes: a session's first 64 logged, then every power of two with its
 # count (headless/unmapped_log.h), not one line for each of a game's millions.
-set(unmapped_read_old "            LOG_ERROR(HW_Memory, \"Unmapped Read{} @ {:#016x}\", sizeof(T) * 8, addr);")
+# (eden-nx2 samples the read line itself, its first 1,000 then one in 100,000: replaced the same way.)
+set(unmapped_read_old "            static std::atomic<u64> unmapped_reads{};\n            if (const u64 count = unmapped_reads.fetch_add(1); count < 1000 || count % 100000 == 0) {\n                LOG_ERROR(HW_Memory, \"Unmapped Read{} @ {:#016x} (#{})\", sizeof(T) * 8, addr, count);\n            }")
 set(unmapped_read_new "            if (u64 eden_seen; ::Eden::UnmappedLog::Wanted(&eden_seen))\n                LOG_ERROR(HW_Memory, \"Unmapped Read{} @ {:#016x} (unmapped access {})\", sizeof(T) * 8, addr, eden_seen);")
 set(unmapped_write_old "            LOG_ERROR(HW_Memory, \"Unmapped Write{} @ {:#016x} = {:#016x}\", sizeof(T) * 8, addr, u64(data));")
 set(unmapped_write_new "            if (u64 eden_seen; ::Eden::UnmappedLog::Wanted(&eden_seen))\n                LOG_ERROR(HW_Memory, \"Unmapped Write{} @ {:#016x} = {:#016x} (unmapped access {})\", sizeof(T) * 8, addr, u64(data), eden_seen);")
@@ -1428,19 +1439,6 @@ write_derived("${PORT_BUILD_DIR}/deconstructed_rom_directory.cpp"
     "#include \"${EDEN_PORT_DIR}/load_address.h\"\n${aslr_source}")
 list(REMOVE_ITEM core_sources "loader/deconstructed_rom_directory.cpp")
 list(APPEND core_sources "${PORT_BUILD_DIR}/deconstructed_rom_directory.cpp")
-# GetPseudoDeviceId read the seed through the control data without checking that there is
-# any (a game without control data, such as a homebrew NRO): seed 0 then, as for other
-# NACP fields Eden defaults when the metadata is missing.
-file(READ "${PROJECT_SOURCE_DIR}/src/core/hle/service/am/service/application_functions.cpp" app_functions_source)
-set(app_functions_old "    auto const seed = res.first->raw.seed_for_pseudo_device_id;")
-string(FIND "${app_functions_source}" "${app_functions_old}" app_functions_at)
-if(app_functions_at LESS 0)
-    message(FATAL_ERROR "Pinned GetPseudoDeviceId changed")
-endif()
-string(REPLACE "${app_functions_old}" "    auto const seed = res.first != nullptr ? res.first->raw.seed_for_pseudo_device_id : u64_le{0};" app_functions_source "${app_functions_source}")
-write_derived("${PORT_BUILD_DIR}/application_functions.cpp" "${app_functions_source}")
-list(REMOVE_ITEM core_sources "hle/service/am/service/application_functions.cpp")
-list(APPEND core_sources "${PORT_BUILD_DIR}/application_functions.cpp")
 set_property(TARGET core PROPERTY SOURCES "${core_sources}")
 # Core's NS query service owns this implementation from frontend_common.
 target_sources(core PRIVATE "${PROJECT_SOURCE_DIR}/src/frontend_common/play_time_manager.cpp")
@@ -1688,11 +1686,19 @@ eden_patch(xci_source [=[    for (const VirtualFile& partition_file : partition-
             listed_file->GetExtension() == "ncz" ? ::Eden::Ncz::Open(listed_file) : listed_file;
         if (partition_file == nullptr || partition_file->GetExtension() != "nca") {
 ]=])
+# Eden now reads block NCZs itself (upstream #4552, core/crypto/ncz_decompressor) and names .xcz and
+# .nsz as types of their own; it rejects solid ones, which nsz writes by default and which these
+# read (unpacked once while their game runs). The names stay those of the XCI and NSP they hold, so
+# a game is read as before; Eden's own block reader is left behind ours, for what ours refuses.
 file(READ "${PROJECT_SOURCE_DIR}/src/core/loader/loader.cpp" loader_source)
 eden_patch(loader_source [=[    else if (extension == "xci")
         return FileType::XCI;
+    else if (extension == "xcz")
+        return FileType::XCZ;
     else if (extension == "nsp")
         return FileType::NSP;
+    else if (extension == "nsz")
+        return FileType::NSZ;
 ]=] [=[    else if (extension == "xci" || extension == "xcz")
         return FileType::XCI;
     else if (extension == "nsp" || extension == "nsz")
@@ -1705,7 +1711,9 @@ eden_patch(nsp_loader_source [=[        if (name.size() >= 4 && name.substr(name
 ]=])
 # Updates and DLC beside a game may be NSZ or XCZ too.
 file(READ "${PROJECT_SOURCE_DIR}/src/core/file_sys/registered_cache.cpp" content_source)
-eden_patch(content_source [=[        if (extension == "nsp") {
+eden_patch(content_source [=[        // .xcz is an XCI container, but its updates only work through the NSP/PFS0 path
+        // (DecompressNCZ), not ProcessXCI. So route .xcz here on purpose.
+        if (extension == "nsp" || extension == "nsz" || extension == "xcz") {
             ProcessNSP(file);
         } else if (extension == "xci") {
             ProcessXCI(file);
@@ -1713,6 +1721,12 @@ eden_patch(content_source [=[        if (extension == "nsp") {
             ProcessNSP(file);
         } else if (extension == "xci" || extension == "xcz") {
             ProcessXCI(file);
+]=])
+# A container with a solid NCZ is not left out: ours reads it.
+eden_patch(content_source [=[        if (!Core::Crypto::IsBlockCompressedNCZ(entry)) {
+            return false; // solid NCZ -> reject the whole container
+        }
+]=] [=[        // Solid NCZs are read too (headless/ncz.h).
 ]=])
 # A game with several updates beside it (in updates/ or in its game folder) runs the newest: the
 # patch manager takes its code and data by version (ListUpdateVersions, newest first). Eden kept
@@ -2597,6 +2611,16 @@ else()
 endif()
 list(REMOVE_ITEM video_sources video_core.cpp gpu.cpp)
 list(APPEND video_sources "${PORT_BUILD_DIR}/video_core.cpp")
+# Texture transcoding threads (ASTC decoded on the CPU, astc_policy.h): eden-nx2 takes a quarter of
+# the hardware threads instead of half, measured on an 8-core PC with Switch 2 titles. On the
+# console the count stays what Switch 1 games were measured with; dev-settings
+# env=EDEN_NX2_TRANSCODE_THREADS=<n> sets another (read once, when the first game starts).
+file(READ "${PROJECT_SOURCE_DIR}/src/video_core/textures/workers.cpp" transcode_workers_source)
+eden_patch(transcode_workers_source "        return (std::max)(std::thread::hardware_concurrency() / 4, 2U);\n"
+    "        return (std::max)(std::thread::hardware_concurrency(), 2U) / 2;\n")
+write_derived("${PORT_BUILD_DIR}/texture_workers.cpp" "${transcode_workers_source}")
+list(REMOVE_ITEM video_sources textures/workers.cpp)
+list(APPEND video_sources "${PORT_BUILD_DIR}/texture_workers.cpp")
 # A game's own post-processing (headless/reshade_folder.h): its game folder's reshade/ is read
 # before post_presets/ and post_shaders/. Presets: listed first. Effects: listed first, and one of
 # the same name in post_shaders/ is left out; the renderer reads a chain's effect from the game's
@@ -2830,8 +2854,9 @@ if(EDEN_PS5_OPENGL)
         string(REPLACE "    });\n}" "}" gpu_worker "${gpu_worker}")
         string(REPLACE "thread.get_stop_token()" "stop_source.get_token()" gpu_worker "${gpu_worker}")
         string(REPLACE "ThreadManager::~ThreadManager() = default;" "ThreadManager::~ThreadManager() { Stop(); }" gpu_worker "${gpu_worker}")
-        # Eden's own shutdown of its std::jthread worker: the worker here is a pthread, ended by Stop.
-        set(worker_shutdown "void ThreadManager::NotifyShutdown() {\n    if (thread.joinable()) {\n        thread.request_stop();\n        thread.join();\n    }\n}")
+        # Eden's own shutdown of its std::jthread worker: the worker here is a pthread, ended by Stop
+        # (which also ends eden-nx2's split GPU thread, native_gpu_thread.inc).
+        set(worker_shutdown "void ThreadManager::NotifyShutdown() {\n    if (thread.joinable()) {\n        thread.request_stop();\n        thread.join();\n    }\n    VideoCommon::GpuSplit::Get().Stop();\n}")
         string(FIND "${gpu_worker}" "${worker_shutdown}" worker_shutdown_at)
         if(worker_shutdown_at LESS 0)
             message(FATAL_ERROR "Pinned GPU worker shutdown changed")
@@ -2889,6 +2914,99 @@ if(EDEN_PS5_OPENGL)
         write_derived("${PORT_BUILD_DIR}/gpu_thread.cpp" "${gpu_worker}")
         list(REMOVE_ITEM video_sources gpu_thread.cpp)
         list(APPEND video_sources "${PORT_BUILD_DIR}/gpu_thread.cpp")
+        # eden-nx2's split GPU thread (Switch 2 titles, video_core/gpu_split.h): its second thread runs
+        # engine methods, draws and the rasterizer. An exception there (out of graphics memory, a
+        # lost device) would end the app; as on the worker, it is recorded and the session ends with
+        # its message (main.cpp TakeGpuFailure), and the thread goes on taking what the first sends,
+        # so the first is not left waiting for it. The app runs one session after another: Stop
+        # leaves the split as it was before its first start.
+        file(READ "${PROJECT_SOURCE_DIR}/src/video_core/gpu_split.cpp" gpu_split_source)
+        eden_patch(gpu_split_source [=[            const size_t size = Execute(&ring[index]);
+]=] [=[            size_t size;
+            try {
+                size = Execute(&ring[index]);
+            } catch (...) {
+                try {
+                    std::rethrow_exception(std::current_exception());
+                } catch (const std::exception& error) {
+                    ::Eden::Report("GPU back thread", error.what());
+                } catch (...) {
+                    ::Eden::Report("GPU back thread", "Unknown exception");
+                }
+                ::Eden::RecordGpuFailure(std::current_exception());
+                // The entry's length, as Execute gives it.
+                const u64 head = ring[index];
+                switch (static_cast<Kind>(head & 0xf)) {
+                case Kind::Wrap:
+                    size = 0;
+                    break;
+                case Kind::Engine:
+                    size = 2;
+                    break;
+                case Kind::Method:
+                    size = (head & HasSegment) != 0 ? 2 : 1;
+                    break;
+                case Kind::Multi:
+                    size = ((head & HasSegment) != 0 ? 3 : 2) + ((head >> 32) + 1) / 2;
+                    break;
+                case Kind::Call:
+                    size = 2 + static_cast<size_t>((head >> 8) & 0xffffff);
+                    break;
+                default:
+                    size = 1;
+                    break;
+                }
+            }
+]=])
+        # Whether a session splits is the game's (settings_store.h Switch2Settings, main.cpp sets
+        # EDEN_NX2_SPLIT before it starts): read once per session instead of once per run.
+        eden_patch(gpu_split_source [=[    static const char mode = [] {
+        const char* value = std::getenv("EDEN_NX2_SPLIT");
+        return value != nullptr ? value[0] : '2';
+    }();
+]=] [=[    if (session_split_mode == 0) {
+        const char* value = std::getenv("EDEN_NX2_SPLIT");
+        session_split_mode = value != nullptr && value[0] != 0 ? value[0] : '2';
+    }
+    const char mode = session_split_mode;
+]=])
+        eden_patch(gpu_split_source [=[GpuSplit GpuSplit::instance;
+]=] [=[GpuSplit GpuSplit::instance;
+
+namespace {
+// EDEN_NX2_SPLIT as this session read it (0: not read yet). The GPU thread reads it; Stop, after
+// that thread has ended, clears it.
+char session_split_mode = 0;
+} // Anonymous namespace
+]=])
+        eden_patch(gpu_split_source [=[void GpuSplit::Stop() {
+    if (!back_thread.joinable()) {
+]=] [=[void GpuSplit::Stop() {
+    session_split_mode = 0;
+    if (!back_thread.joinable()) {
+]=])
+        eden_patch(gpu_split_source [=[    back_thread.join();
+    active = false;
+}
+]=] [=[    back_thread.join();
+    active = false;
+    front_macros = false;
+    ring.reset();
+    write_position = 0;
+    published_local = 0;
+    consumed_cache = 0;
+    publish_every = PublishEvery;
+    front_engine = nullptr;
+    back_engine = nullptr;
+    published.store(0, std::memory_order_relaxed);
+    consumed.store(0, std::memory_order_relaxed);
+    back_waiting.store(false, std::memory_order_relaxed);
+}
+]=])
+        write_derived("${PORT_BUILD_DIR}/gpu_split.cpp"
+            "#include \"${EDEN_PORT_DIR}/diagnostics.h\"\n#include \"${EDEN_PORT_DIR}/gpu_failure.h\"\n${gpu_split_source}")
+        list(REMOVE_ITEM video_sources gpu_split.cpp)
+        list(APPEND video_sources "${PORT_BUILD_DIR}/gpu_split.cpp")
     endif()
     string(PREPEND gpu_source "#include <glad/glad.h>\n")
     write_derived("${PORT_BUILD_DIR}/include/video_core/gpu_thread.h" "${gpu_thread_header}")
@@ -3144,9 +3262,16 @@ ${paths_source}")
     if(tsc_offset LESS 0)
         message(FATAL_ERROR "Pinned TSC frequency detection changed")
     endif()
+    # eden-nx2 measures it after that branch when the frequency is 0 (AMD has no leaf 0x15 either);
+    # here also when CPUID gives an implausible one, below 1 GHz.
+    set(nx2_tsc_fallback "    if (caps.invariant_tsc && caps.tsc_frequency == 0) {\n        caps.tsc_frequency = X64::EstimateRDTSCFrequency();\n    }")
+    string(FIND "${features_source}" "${nx2_tsc_fallback}" nx2_tsc_offset)
+    if(nx2_tsc_offset LESS 0)
+        message(FATAL_ERROR "Pinned TSC frequency detection changed")
+    endif()
     string(REPLACE "${old_tsc_fallback}" "        }" features_source "${features_source}")
-    string(REPLACE "    if (max_std_fn >= 0x16) {"
-        "    if (caps.invariant_tsc && caps.tsc_frequency < 1'000'000'000ULL) {\n        caps.tsc_frequency = X64::EstimateRDTSCFrequency();\n    }\n\n    if (max_std_fn >= 0x16) {" features_source "${features_source}")
+    string(REPLACE "${nx2_tsc_fallback}"
+        "    if (caps.invariant_tsc && caps.tsc_frequency < 1'000'000'000ULL) {\n        caps.tsc_frequency = X64::EstimateRDTSCFrequency();\n    }" features_source "${features_source}")
     write_derived("${PORT_BUILD_DIR}/cpu_features.cpp" "${features_source}")
     list(REMOVE_ITEM common_sources cpu_features.cpp)
     list(APPEND common_sources "${PORT_BUILD_DIR}/cpu_features.cpp")

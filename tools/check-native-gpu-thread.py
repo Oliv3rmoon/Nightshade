@@ -12,16 +12,20 @@ source = (upstream / 'video_core/gpu_thread.cpp').read_text()
 worker = generated.read_text()
 body = source.split('thread = std::jthread([&](std::stop_token stop_token) {', 1)[1].split('\n    });', 1)[0]
 dispatch_call = '                scheduler.Push(system.GPU(), submit_list->channel, std::move(submit_list->entries));'
+# eden-nx2's worker pushes in two places: on its own, and before handing the rest to the split
+# GPU thread (one indentation deeper, which the text above is part of). Both get the markers.
+dispatches = body.count(dispatch_call)
+assert dispatches in (1, 2), dispatches
 development = 'EDEN_DEV_PROFILE:BOOL=ON' in (cache / 'native-local/CMakeCache.txt').read_text()
 # The producer-side waits are timed in every build (Timer's `always`), the per-dispatch scope only
 # in a development one, so each wrap is asserted at the count its build must produce, then undone.
-for call, timer, indent, always in (
-    (dispatch_call, 'dispatch_timer(::Eden::Performance::gpu_dispatch)', '                ', False),
+for call, timer, indent, always, times in (
+    (dispatch_call, 'dispatch_timer(::Eden::Performance::gpu_dispatch)', '                ', False, dispatches),
     ('            state.queue.PopWait(next, stop_token);',
-     'idle_timer(::Eden::Performance::gpu_queue_wait, 0, true)', '            ', True),
+     'idle_timer(::Eden::Performance::gpu_queue_wait, 0, true)', '            ', True, 1),
 ):
     wrapped = indent + '{ ::Eden::Performance::Timer ' + timer + ';\n' + call + '\n' + indent + '}'
-    assert worker.count(wrapped) == int(development or always)
+    assert worker.count(wrapped) == int(development or always) * times
     worker = worker.replace(wrapped, call)
 
 # Likewise the wrap around the push that found the queue full; its body is the plain spin the
@@ -41,7 +45,7 @@ dispatch_trace = ('                const auto count = ++dispatches;\n'
                   f'                if ({trace_when}) LOG_INFO(Render_OpenGL, "EDEN_GPU_DISPATCH_BEGIN count={{}}", count);\n'
                   + dispatch_call + '\n'
                   f'                if ({trace_when}) LOG_INFO(Render_OpenGL, "EDEN_GPU_DISPATCH_END count={{}}", count);')
-assert worker.count(dispatch_trace) == 1
+assert worker.count(dispatch_trace) == dispatches
 untraced = worker.replace(dispatch_trace, dispatch_call).replace('        unsigned dispatches = 0;\n', '')
 loading_wait = """            if (Eden::LoadingTick(renderer, false)) {
                 if (!state.queue.TryPop(next)) {
@@ -100,6 +104,14 @@ static int join(pthread_t t, void** out) {
 namespace VideoCore { struct RendererBase { void* ReadRasterizer() { return this; } }; }
 namespace Core::Frontend { struct GraphicsContext {}; }
 namespace Tegra::Control { struct Scheduler {}; }
+// eden-nx2's split GPU thread (video_core/gpu_split.h): Stop ends it after the worker.
+namespace VideoCommon {
+struct GpuSplit {
+    static GpuSplit& Get() { static GpuSplit split; return split; }
+    void Stop() { ++stops; }
+    int stops = 0;
+};
+}
 namespace VideoCommon::GPUThread {
 class ThreadManager {
 public:
@@ -165,7 +177,9 @@ int main(int argc, char**) {
         manager.queue.EmplaceWait(42);
         manager.StartThread(renderer, context, scheduler);
         manager.ready.acquire();
+        const int split_stops = VideoCommon::GpuSplit::Get().stops;
         manager.Stop();
+        assert(VideoCommon::GpuSplit::Get().stops == split_stops + 1);
         manager.Stop();
         assert(manager.finished && joins == i && attributes_live == 0);
     }

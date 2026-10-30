@@ -1,6 +1,6 @@
 --- a/src/video_core/buffer_cache/buffer_cache.h
 +++ b/src/video_core/buffer_cache/buffer_cache.h
-@@ -701,7 +701,19 @@
+@@ -763,7 +763,19 @@ void BufferCache<P>::PopAsyncBuffers() {
                                             end - start);
          });
          async_downloads.Subtract(device_addr, copy.size, [&](DAddr start, DAddr end) {
@@ -23,7 +23,7 @@
      async_buffers_death_ring.emplace_back(*async_buffer);
 --- a/src/video_core/engines/maxwell_3d.cpp
 +++ b/src/video_core/engines/maxwell_3d.cpp
-@@ -223,9 +223,8 @@
+@@ -249,9 +249,8 @@ void Maxwell3D::ProcessMacro(Core::System& system, u32 method, const u32* base_s
  }
  
  void Maxwell3D::RefreshParametersImpl() {
@@ -37,7 +37,7 @@
          if (segment.first == 0) {
 --- a/src/video_core/engines/maxwell_3d.h
 +++ b/src/video_core/engines/maxwell_3d.h
-@@ -3180,6 +3180,11 @@
+@@ -3220,6 +3220,11 @@ public:
          return current_macro_dirty;
      }
  
@@ -51,16 +51,16 @@
      size_t EstimateIndexBufferSize();
 --- a/src/video_core/macro.cpp
 +++ b/src/video_core/macro.cpp
-@@ -4,6 +4,8 @@
- // SPDX-FileCopyrightText: Copyright 2020 yuzu Emulator Project
+@@ -5,6 +5,8 @@
  // SPDX-License-Identifier: GPL-2.0-or-later
  
+ #include <array>
 +#include <atomic>
 +#include <cstdio>
+ #include <cstdlib>
+ #include <unordered_set>
  #include <cstring>
- #include <fstream>
- #include <optional>
-@@ -62,6 +64,23 @@
+@@ -68,6 +70,23 @@ bool IsTopologySafe(Maxwell3D::Regs::PrimitiveTopology topology) {
      }
  }
  
@@ -84,7 +84,7 @@
  } // Anonymous namespace
  
  void HLE_DrawArraysIndirect::Execute(Core::System& system, Engines::Maxwell3D& maxwell3d, std::span<const u32> parameters, [[maybe_unused]] u32 method) {
-@@ -101,6 +120,14 @@
+@@ -107,6 +126,14 @@ void HLE_DrawArraysIndirect::Fallback(Core::System& system, Engines::Maxwell3D&
          }
      };
      maxwell3d.RefreshParameters();
@@ -99,7 +99,7 @@
      const u32 instance_count = (maxwell3d.GetRegisterValue(0xD1B) & parameters[2]);
      auto topology = Maxwell3D::Regs::PrimitiveTopology(parameters[0]);
      const u32 vertex_first = parameters[3];
-@@ -163,6 +190,14 @@
+@@ -169,6 +196,14 @@ void HLE_DrawIndexedIndirect::Execute(Core::System& system, Engines::Maxwell3D&
  }
  void HLE_DrawIndexedIndirect::Fallback(Core::System& system, Engines::Maxwell3D& maxwell3d, std::span<const u32> parameters) {
      maxwell3d.RefreshParameters();
@@ -114,7 +114,7 @@
      const u32 instance_count = (maxwell3d.GetRegisterValue(0xD1B) & parameters[2]);
      const u32 element_base = parameters[4];
      const u32 base_instance = parameters[5];
-@@ -254,8 +289,20 @@
+@@ -260,8 +295,20 @@ void HLE_MultiDrawIndexedIndirectCount::Fallback(Core::System& system, Engines::
      const std::size_t first_draw = start_indirect;
      const std::size_t effective_draws = end_indirect - start_indirect;
      const std::size_t last_draw = start_indirect + (std::min)(effective_draws, max_draws);

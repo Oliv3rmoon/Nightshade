@@ -24,7 +24,7 @@ assert 'list(REMOVE_ITEM core_sources hle/service/ns/platform_service_manager.cp
 assert 'Common::FS::SetEdenPath(Common::FS::EdenPath::LoadDir, mods);' in (root / 'headless/main.cpp').read_text()
 
 manifest = json.loads((root / 'UPSTREAM.json').read_text())
-loaders = glob.glob(str(root / f'.deps/mirror-{manifest["eden_commit"]}/src/core/hle/service/ns/platform_service_manager.cpp'))
+loaders = glob.glob(str(root / f'.deps/eden-{manifest["eden_commit"]}/src/core/hle/service/ns/platform_service_manager.cpp'))
 if loaders:
     source = Path(loaders[0]).read_text()
     assert source.count(anchor.replace('\\n', '\n')) == 1

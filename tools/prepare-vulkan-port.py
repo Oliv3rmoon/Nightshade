@@ -105,7 +105,10 @@ void RasterizerVulkan::DispatchCompute() {"""),
     # command buffer submission: 4,096 exceeds the PS5 GPU watchdog timeout in shader-heavy
     # scenes (VK_ERROR_DEVICE_LOST in one game's cities). CHECK_MASK is the configurable
     # dispatch interval (dev-settings dispatch_draws=N); default 64 draws between hand-offs.
-    ('#ifdef __ANDROID__\n    static constexpr u32 DRAWS_TO_DISPATCH = 512;\n    static constexpr u32 CHECK_MASK = 3;\n#else\n    static constexpr u32 DRAWS_TO_DISPATCH = 4096;\n    static constexpr u32 CHECK_MASK = 7;\n#endif // __ANDROID__\n\n    static_assert(DRAWS_TO_DISPATCH % (CHECK_MASK + 1) == 0);\n',
+    ('#ifdef __ANDROID__\n    static constexpr u32 DRAWS_TO_DISPATCH = 512;\n    static constexpr u32 CHECK_MASK = 3;\n#else\n'
+     '    // Every 32 draws (was 8): each dispatch woke the worker thread, and Switch 2 titles make\n'
+     '    // ~55,000 draws a second. A full chunk is dispatched on its own (Scheduler::Record).\n'
+     '    static constexpr u32 DRAWS_TO_DISPATCH = 4096;\n    static constexpr u32 CHECK_MASK = 31;\n#endif // __ANDROID__\n\n    static_assert(DRAWS_TO_DISPATCH % (CHECK_MASK + 1) == 0);\n',
      '    static constexpr u32 DRAWS_TO_DISPATCH = 512;\n    const u32 CHECK_MASK = ::Eden::Performance::dispatch_mask.load(std::memory_order_relaxed);\n    recorded_tick = scheduler.CurrentTick();\n\n'),
     # A guest fence with something to wait for submits twice in a row: its own Flush
     # (InnerFence::Queue, vk_fence_manager.cpp), then the fence manager's FlushCommands, which
@@ -122,54 +125,84 @@ void RasterizerVulkan::DispatchCompute() {"""),
     # so a draw that returns early is charged for its unmarked tail and the sum of the six falls
     # short by that amount plus two clock reads per phase. control/scheduler.cpp aside, this is the
     # only place the dispatch's time can be spent - so its six numbers should add up to it.
-    ('''    FlushWork();
-    gpu_memory->FlushCaching();
-
-    GraphicsPipeline* const pipeline{pipeline_cache.CurrentGraphicsPipeline()};
+    # eden-nx2 times the same steps with its own zones (video_core/nx2_profile.h,
+    # EDEN_NX2_GPU_PROFILE); the marks go between them.
+    ('''    namespace Profile = VideoCommon::Nx2Profile;
+    {
+        Profile::Scope scope{Profile::Zone::FlushWork};
+        FlushWork();
+        gpu_memory->FlushCaching();
+    }
+''',
+     '''    namespace Profile = VideoCommon::Nx2Profile;
+    const ::Eden::Performance::Timer rasterizer_draw_timer(::Eden::Performance::rasterizer_draw);
+    auto phase = ::Eden::Performance::MarkStart();
+    {
+        Profile::Scope scope{Profile::Zone::FlushWork};
+        FlushWork();
+        gpu_memory->FlushCaching();
+    }
+    ::Eden::Performance::Mark(::Eden::Performance::draw_flush, phase);
+'''),
+    ('''        return pipeline_cache.CurrentGraphicsPipeline();
+    }()};
     if (!pipeline) {
+        report_failure("no pipeline");
         return;
     }
-    std::scoped_lock lock{buffer_cache.mutex, texture_cache.mutex};
-    // update engine as channel may be different.
-    pipeline->SetEngine(maxwell3d, gpu_memory);
-    if (!pipeline->Configure(is_indexed))
+''',
+     '''        return pipeline_cache.CurrentGraphicsPipeline();
+    }()};
+    ::Eden::Performance::Mark(::Eden::Performance::draw_pipeline, phase);
+    if (!pipeline) {
+        report_failure("no pipeline");
         return;
+    }
+'''),
+    ('''    pipeline->SetEngine(maxwell3d, gpu_memory);
+    if (Profile::Scope scope{Profile::Zone::Configure}; !pipeline->Configure(is_indexed)) {
+        report_failure("configure failed");
+        return;
+    }
 
-    UpdateDynamicStates();
+    {
+        Profile::Scope scope{Profile::Zone::DynamicState};
+        UpdateDynamicStates();
+    }
 
     query_cache.NotifySegment(true);
     HandleTransformFeedback();
     query_cache.CounterEnable(VideoCommon::QueryType::ZPassPixelCount64, maxwell3d->regs.zpass_pixel_count_enable);
-    draw_func();''',
-     '''    const ::Eden::Performance::Timer rasterizer_draw_timer(::Eden::Performance::rasterizer_draw);
-    auto phase = ::Eden::Performance::MarkStart();
-    FlushWork();
-    gpu_memory->FlushCaching();
-    ::Eden::Performance::Mark(::Eden::Performance::draw_flush, phase);
-
-    GraphicsPipeline* const pipeline{pipeline_cache.CurrentGraphicsPipeline()};
-    ::Eden::Performance::Mark(::Eden::Performance::draw_pipeline, phase);
-    if (!pipeline) {
-        return;
+    {
+        Profile::Scope scope{Profile::Zone::DrawRecord};
+        draw_func();
     }
-    std::scoped_lock lock{buffer_cache.mutex, texture_cache.mutex};
-    // update engine as channel may be different.
-    pipeline->SetEngine(maxwell3d, gpu_memory);
+''',
+     '''    pipeline->SetEngine(maxwell3d, gpu_memory);
     // Waiting for both cache mutexes. SetEngine between them and here is two pointer assignments,
     // and the hold itself carries on through what follows: the phases below measure it.
     ::Eden::Performance::Mark(::Eden::Performance::draw_lock_wait, phase);
-    if (!pipeline->Configure(is_indexed))
+    if (Profile::Scope scope{Profile::Zone::Configure}; !pipeline->Configure(is_indexed)) {
+        report_failure("configure failed");
         return;
+    }
     ::Eden::Performance::Mark(::Eden::Performance::draw_config, phase);
 
-    UpdateDynamicStates();
+    {
+        Profile::Scope scope{Profile::Zone::DynamicState};
+        UpdateDynamicStates();
+    }
 
     query_cache.NotifySegment(true);
     HandleTransformFeedback();
     query_cache.CounterEnable(VideoCommon::QueryType::ZPassPixelCount64, maxwell3d->regs.zpass_pixel_count_enable);
     ::Eden::Performance::Mark(::Eden::Performance::draw_state, phase);
-    draw_func();
-    ::Eden::Performance::Mark(::Eden::Performance::draw_record, phase);'''),
+    {
+        Profile::Scope scope{Profile::Zone::DrawRecord};
+        draw_func();
+    }
+    ::Eden::Performance::Mark(::Eden::Performance::draw_record, phase);
+'''),
     # Development: where OnCPUWrite spends its time (performance.h CpuWriteDetail).
     ("""    DEBUG_ASSERT(addr != 0 || size != 0);
     {
@@ -325,8 +358,13 @@ void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func) {'''),
      '        }\n    });\n    SyncProbe(scheduler, "draw", probe_pipeline);\n}\n\nvoid RasterizerVulkan::DrawIndirect() {'),
     ('void RasterizerVulkan::DrawTexture() {', 'void RasterizerVulkan::DrawTexture() {\n    SCOPE_EXIT { SyncProbe(scheduler, "draw_texture", nullptr); };'),
     ('void RasterizerVulkan::Clear(u32 layer_count) {', 'void RasterizerVulkan::Clear(u32 layer_count) {\n    SCOPE_EXIT { SyncProbe(scheduler, "clear", nullptr); };'),
-    ('    ComputePipeline* const pipeline{pipeline_cache.CurrentComputePipeline()};\n    if (!pipeline) {\n        return;\n    }',
-     '    ComputePipeline* const pipeline{pipeline_cache.CurrentComputePipeline()};\n    if (!pipeline) {\n        return;\n    }\n'
+    # eden-nx2: a Switch 2 (native) compute dispatch with no pipeline throws instead of returning.
+    ('    ComputePipeline* const pipeline{pipeline_cache.CurrentComputePipeline()};\n    if (!pipeline) {\n'
+     '        if (kepler_compute->IsNativeMode()) throw Shader::RuntimeError("Native compute pipeline unavailable");\n'
+     '        return;\n    }',
+     '    ComputePipeline* const pipeline{pipeline_cache.CurrentComputePipeline()};\n    if (!pipeline) {\n'
+     '        if (kepler_compute->IsNativeMode()) throw Shader::RuntimeError("Native compute pipeline unavailable");\n'
+     '        return;\n    }\n'
      '    SCOPE_EXIT { SyncProbe(scheduler, "dispatch", pipeline); };'),
     # Guest writes while the GPU thread holds a cache lock are queued instead of waiting
     # (performance.h cpu_write_defer); the GPU thread runs them before its next draw.
@@ -931,8 +969,35 @@ if not path.exists() or path.read_text() != shader_header:
 # refuses is asked for again outside it, as Commit does; the driver refuses when the pool has no
 # room, and that is still the session's end.
 allocator = (source / 'src/video_core/vulkan_common/vulkan_memory_allocator.cpp').read_text()
-for call in ('vmaCreateImage(allocator, &ci, &alloc_ci, &handle, &allocation, &alloc_info)',
-             'vmaCreateBuffer(allocator, &ci, &alloc_ci, &handle, &allocation, &alloc_info)',
+# Images: eden-nx2 already asks again outside the budget when the budget refuses (and creates images
+# of more than 2^28 texels as unbacked sparse images). Its retry is counted and reported the same way.
+POOL_REPORT = (
+    '            VmaBudget held[VK_MAX_MEMORY_HEAPS]{};\n'
+    '            vmaGetHeapBudgets(allocator, held);\n'
+    '            unsigned long long blocks = 0, used = 0;\n'
+    '            for (const VmaBudget& heap : held) {\n'
+    '                blocks += heap.statistics.blockBytes;\n'
+    '                used += heap.statistics.allocationBytes;\n'
+    '            }\n'
+    '            const auto free_block = ::Eden::Performance::graphics_memory_free.load(std::memory_order_relaxed);\n'
+    '            std::fprintf(stderr, "[ProsperoEden] graphics memory: refused outside the budget too (result %d): the pool\'s "\n'
+    '                         "largest free block is %llu MiB; the allocator holds %llu MiB in blocks, %llu MiB of it in use\\n",\n'
+    '                         int(RESULT), free_block ? free_block() >> 20 : 0ull, blocks >> 20, used >> 20);\n')
+for old, new in (
+        ('        result = vmaCreateImage(allocator, &ci, &relaxed, &handle, &allocation, &alloc_info);\n    }\n',
+         '        result = vmaCreateImage(allocator, &ci, &relaxed, &handle, &allocation, &alloc_info);\n'
+         '        const auto times = ::Eden::Performance::outside_budget.fetch_add(1, std::memory_order_relaxed) + 1;\n'
+         '        if ((times & (times - 1)) == 0)  // the 1st, 2nd, 4th, 8th ... time\n'
+         '            std::fprintf(stderr, "[ProsperoEden] graphics memory: the allocator\'s budget refused %llu requests; "\n'
+         '                         "asked again outside it (result %d): image %ux%ux%u, %u layers, %u levels, %u samples, format %d\\n",\n'
+         '                         static_cast<unsigned long long>(times), int(result), ci.extent.width, ci.extent.height,\n'
+         '                         ci.extent.depth, ci.arrayLayers, ci.mipLevels, unsigned(ci.samples), int(ci.format));\n'
+         '        if (result != VK_SUCCESS) {\n' + POOL_REPORT.replace('RESULT', 'result') + '        }\n'
+         '    }\n'),):
+    if allocator.count(old) != 1:
+        raise RuntimeError(f'Pinned Vulkan allocator changed: {old[:40]} is there {allocator.count(old)} times')
+    allocator = allocator.replace(old, new)
+for call in ('vmaCreateBuffer(allocator, &ci, &alloc_ci, &handle, &allocation, &alloc_info)',
              'vmaCreateBufferWithAlignment(allocator, &ci, &alloc_ci, min_alignment, &handle,\n'
              '                                           &allocation, &alloc_info)'):
     old = '    vk::Check(' + call + ');\n'
@@ -950,19 +1015,7 @@ for call in ('vmaCreateImage(allocator, &ci, &alloc_ci, &handle, &allocation, &a
         '                         "asked again outside it (result %d): DETAIL\\n", static_cast<unsigned long long>(times), int(created),\n'
         '                         VALUES);\n'
         # Refused outside the budget too: the session ends here, and its log says what there was.
-        '        if (created != VK_SUCCESS) {\n'
-        '            VmaBudget held[VK_MAX_MEMORY_HEAPS]{};\n'
-        '            vmaGetHeapBudgets(allocator, held);\n'
-        '            unsigned long long blocks = 0, used = 0;\n'
-        '            for (const VmaBudget& heap : held) {\n'
-        '                blocks += heap.statistics.blockBytes;\n'
-        '                used += heap.statistics.allocationBytes;\n'
-        '            }\n'
-        '            const auto free_block = ::Eden::Performance::graphics_memory_free.load(std::memory_order_relaxed);\n'
-        '            std::fprintf(stderr, "[ProsperoEden] graphics memory: refused outside the budget too (result %d): the pool\'s "\n'
-        '                         "largest free block is %llu MiB; the allocator holds %llu MiB in blocks, %llu MiB of it in use\\n",\n'
-        '                         int(created), free_block ? free_block() >> 20 : 0ull, blocks >> 20, used >> 20);\n'
-        '        }\n'
+        '        if (created != VK_SUCCESS) {\n' + POOL_REPORT.replace('RESULT', 'created') + '        }\n'
         '    }\n'
         '    vk::Check(created);\n'
         ).replace('CALL', call).replace('AGAIN', call.replace('&alloc_ci', '&outside_budget'))
@@ -1366,8 +1419,12 @@ configure_phases = [
      '    buffer_cache.SetUniformBuffersState(enabled_uniform_buffer_masks, &uniform_buffer_sizes);\n'
      '    // Sampler and image tables synced, uniform-buffer state set.\n'
      '    ::Eden::Performance::Mark(::Eden::Performance::cfg_sync, since);'),
-    ('    texture_cache.FillImageViews(std::span(views.data(), views.size()), false, Spec::has_images);',
-     '    texture_cache.FillImageViews(std::span(views.data(), views.size()), false, Spec::has_images);\n'
+    ('    {\n        Profile::Scope scope{Profile::Zone::FillImageViews};\n'
+     '        texture_cache.FillImageViews(std::span(views.data(), views.size()), false,\n'
+     '                                     Spec::has_images);\n    }',
+     '    {\n        Profile::Scope scope{Profile::Zone::FillImageViews};\n'
+     '        texture_cache.FillImageViews(std::span(views.data(), views.size()), false,\n'
+     '                                     Spec::has_images);\n    }\n'
      '    // Every texture handle read out of guest memory, every sampler and view filled.\n'
      '    ::Eden::Performance::Mark(::Eden::Performance::cfg_read, since);\n'
      '    long long since_bind = ::Eden::Performance::MarkStart();'),
@@ -1924,22 +1981,26 @@ adapt('src/video_core/renderer_vulkan/present/frame_gen.cpp', 'vulkan_frame_gen.
 # call from gpu_thread.cpp, so these say which of the three it is spent in.
 adapt('src/video_core/control/scheduler.cpp', 'control_scheduler.cpp', [
     ('#include <memory>', '#include <memory>\n#include "performance.h"'),
+    # eden-nx2 binds the channel outside the lock (Scheduler::BindChannel takes it, or defers the
+    # bind to the split GPU thread's back); the lock phase still counts both.
     ('        std::unique_lock lk(scheduling_guard);\n'
      '        auto it = channels.find(channel);\n'
      '        ASSERT(it != channels.end());\n'
      '        channel_state = it->second;\n'
-     '        gpu.BindChannel(channel_state->bind_id);\n'
      '    }\n'
+     '    BindChannel(gpu, channel_state->bind_id);\n'
      '    // Process commands outside the lock to reduce contention.\n'
      '    // Multiple channels can prepare their commands in parallel.\n'
      '    channel_state->payload->dma_pusher.Push(std::move(entries));\n'
      '    channel_state->payload->dma_pusher.DispatchCalls();',
      '        const ::Eden::Performance::Timer sched_lock_timer(::Eden::Performance::gpu_sched_lock);\n'
-     '        std::unique_lock lk(scheduling_guard);\n'
-     '        auto it = channels.find(channel);\n'
-     '        ASSERT(it != channels.end());\n'
-     '        channel_state = it->second;\n'
-     '        gpu.BindChannel(channel_state->bind_id);\n'
+     '        {\n'
+     '            std::unique_lock lk(scheduling_guard);\n'
+     '            auto it = channels.find(channel);\n'
+     '            ASSERT(it != channels.end());\n'
+     '            channel_state = it->second;\n'
+     '        }\n'
+     '        BindChannel(gpu, channel_state->bind_id);\n'
      '    }\n'
      '    // Process commands outside the lock to reduce contention.\n'
      '    // Multiple channels can prepare their commands in parallel.\n'

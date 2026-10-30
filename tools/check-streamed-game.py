@@ -29,7 +29,7 @@ console its file, one on download sources only its streamed path when a source o
 so it is downloaded first; and the Library's, the home screen's and the launcher packs' play
 actions start what play_file says.
 
-The pinned Eden's sources come from .deps/mirror-<commit>/ when it is there, else from the
+The pinned Eden's sources come from .deps/eden-<commit>/ when it is there, else from the
 build's unpacked tree, else from .deps/eden-<commit>.tar.gz (checked against UPSTREAM.json).
 Without any of them the check says so and is skipped.
 """
@@ -44,7 +44,7 @@ commit = upstream['eden_commit']
 
 def eden_sources(work):
     """The pinned Eden's src/ folder (from the mirror, the build's tree or the archive), or None."""
-    mirror = root / '.deps' / f'mirror-{commit}' / 'src'
+    mirror = root / '.deps' / f'eden-{commit}' / 'src'
     if (mirror / 'core/core.cpp').is_file():
         return mirror
     cache = root / '.local/headless-cache'
@@ -381,7 +381,7 @@ with tempfile.TemporaryDirectory(prefix='streamed-game-') as tmp:
     work = Path(tmp)
     eden = eden_sources(work)
     if eden is None:
-        print('check-streamed-game: SKIPPED (no pinned Eden source: .deps/mirror-*, the build tree or '
+        print('check-streamed-game: SKIPPED (no pinned Eden source: .deps/eden-<commit>, the build tree or '
               f'.deps/eden-{commit[:8]}.tar.gz)')
         sys.exit(0)
     # Eden's loader of unpacked games asks the folder of any file it is shown, without looking

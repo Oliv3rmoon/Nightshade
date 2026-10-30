@@ -102,7 +102,9 @@ Downloads are cached in `~/.cache/prosperoeden-deps` (`PROSPEROEDEN_DEPS_CACHE`)
 
 Inside this repository, in `.deps/`:
 
-- **Eden** at commit `67bada77f8a43a90da2e94e89b8e7da73c256989` (GitHub mirror archive), with
+- **Eden** as Takoroka's [eden-nx2](https://git.eden-emu.dev/Takoroka/eden-nx2) (Eden master with
+  experimental Switch 2 support, docs/NX2_PORT.md) at commit
+  `50fa86bbbc403ad565eb44fcc281f16f77c69e15` (the archive git.eden-emu.dev makes of it), with
   Eden's own hash-pinned packages, which its configure step downloads. The PS5 frontend in
   `headless/` replaces and derives sources at configure time (`headless/inject.cmake`). This
   fork also patches a few of Eden's files when `make prepare` extracts them

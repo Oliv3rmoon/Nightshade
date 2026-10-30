@@ -1,23 +1,6 @@
---- a/src/common/fs/file.h
-+++ b/src/common/fs/file.h
-@@ -289,6 +289,14 @@
-     }
- 
-     /**
-+     * Reads length bytes at offset without the stdio buffer (which splits a read into
-+     * buffer-sized system calls) and without moving the file pointer.
-+     *
-+     * @returns Count of bytes successfully read.
-+     */
-+    [[nodiscard]] size_t ReadAt(void* data, size_t length, s64 offset) const;
-+
-+    /**
-      * Writes a span of T data to a file sequentially.
-      * This function writes from the current position of the file pointer and
-      * advances it by the (count of T * sizeof(T)) bytes successfully written.
 --- a/src/common/fs/file.cpp
 +++ b/src/common/fs/file.cpp
-@@ -427,6 +427,33 @@
+@@ -427,6 +427,33 @@ u64 IOFile::GetSize() const {
      return file_size;
  }
  
@@ -51,32 +34,23 @@
  bool IOFile::Seek(s64 offset, SeekOrigin origin) const {
      if (!IsOpen()) {
          return false;
---- a/src/core/file_sys/vfs/vfs_real.h
-+++ b/src/core/file_sys/vfs/vfs_real.h
-@@ -10,6 +10,7 @@
- #include <mutex>
- #include <optional>
- #include <string_view>
-+#include <vector>
- #include "common/intrusive_list.h"
- #include "core/file_sys/fs_filesystem.h"
- #include "core/file_sys/vfs/vfs.h"
-@@ -22,6 +23,15 @@
+--- a/src/common/fs/file.h
++++ b/src/common/fs/file.h
+@@ -288,6 +288,14 @@ public:
+         return std::fread(data.data(), sizeof(T), data.size(), file);
+     }
  
- struct FileReference : public Common::IntrusiveListBaseNode<FileReference> {
-     std::shared_ptr<Common::FS::IOFile> file{};
-+    // Read-only files: recently read 1 MiB blocks. Each system call on the console's storage
-+    // costs about the same whatever its size, so a game's small reads are served from whole blocks.
-+    struct Block {
-+        u64 index;
-+        u64 used;
-+        std::vector<u8> data;
-+    };
-+    std::vector<Block> blocks{};
-+    u64 block_clock{};
- };
- 
- class RealVfsFile;
++    /**
++     * Reads length bytes at offset without the stdio buffer (which splits a read into
++     * buffer-sized system calls) and without moving the file pointer.
++     *
++     * @returns Count of bytes successfully read.
++     */
++    [[nodiscard]] size_t ReadAt(void* data, size_t length, s64 offset) const;
++
+     /**
+      * Writes a span of T data to a file sequentially.
+      * This function writes from the current position of the file pointer and
 --- a/src/core/file_sys/vfs/vfs_real.cpp
 +++ b/src/core/file_sys/vfs/vfs_real.cpp
 @@ -6,9 +6,11 @@
@@ -91,7 +65,7 @@
  #include "common/fs/file.h"
  #include "common/fs/fs.h"
  #include "common/fs/path_util.h"
-@@ -332,12 +334,60 @@
+@@ -345,12 +347,60 @@ bool RealVfsFile::IsReadable() const {
      return True(perms & OpenMode::Read);
  }
  
@@ -154,3 +128,29 @@
  }
  
  std::size_t RealVfsFile::Write(const u8* data, std::size_t length, std::size_t offset) {
+--- a/src/core/file_sys/vfs/vfs_real.h
++++ b/src/core/file_sys/vfs/vfs_real.h
+@@ -10,6 +10,7 @@
+ #include <mutex>
+ #include <optional>
+ #include <string_view>
++#include <vector>
+ #include "common/intrusive_list.h"
+ #include "core/file_sys/fs_filesystem.h"
+ #include "core/file_sys/vfs/vfs.h"
+@@ -22,6 +23,15 @@ namespace FileSys {
+ 
+ struct FileReference : public Common::IntrusiveListBaseNode<FileReference> {
+     std::shared_ptr<Common::FS::IOFile> file{};
++    // Read-only files: recently read 1 MiB blocks. Each system call on the console's storage
++    // costs about the same whatever its size, so a game's small reads are served from whole blocks.
++    struct Block {
++        u64 index;
++        u64 used;
++        std::vector<u8> data;
++    };
++    std::vector<Block> blocks{};
++    u64 block_clock{};
+ };
+ 
+ class RealVfsFile;

@@ -250,6 +250,12 @@ void pictures(Stage &s)
     s.walk(0, 9);
     s.wait(0.8f);
     s.shoot("07-library-scrolled");
+    // A Switch 2 title (Tiny Harbor, the last of the 64): its details say support is experimental.
+    s.walk(9, 63);
+    s.wait(0.8f);
+    s.shoot("07b-library-switch2");
+    s.walk(63, 9);
+    s.wait(0.8f);
     // The Library's Mods switch: all of this game's mods off, and on again.
     s.press({Key::square});
     s.wait(0.6f);

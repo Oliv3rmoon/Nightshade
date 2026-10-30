@@ -144,6 +144,10 @@ NOTES = {
         "Shown on the home screen after the app crashed and started again; {0} is a file.",
     "Sandboxed (code {0}): app folder only": "The app can read only its own folder; {0} is a number.",
     "Full filesystem": "The app can read every folder of the console.",
+    "Switch 2: experimental": "Tag in a game's details: the game is a Nintendo Switch 2 title, played by "
+                              "experimental support. Switch 2 is a product name and stays as it is.",
+    "Expect crashes, missing graphics and low frame rates.":
+        "Warning in a Switch 2 game's details: what experimental support means for playing it.",
     "END GAME": "Label of the shortcut that ends the running game.",
     "FPS OVERLAY": "Label: the frames-per-second counter drawn over a game.",
     "SETUP": "Label: whether keys and firmware are in place.",

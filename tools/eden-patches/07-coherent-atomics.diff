@@ -1,6 +1,6 @@
 --- a/src/shader_recompiler/backend/glsl/glsl_emit_context.cpp
 +++ b/src/shader_recompiler/backend/glsl/glsl_emit_context.cpp
-@@ -468,11 +468,12 @@
+@@ -468,11 +468,12 @@ void EmitContext::DefineStorageBuffers(Bindings& bindings) {
      if (info.storage_buffers_descriptors.empty()) {
          return;
      }
@@ -18,7 +18,7 @@
      }
 --- a/src/shader_recompiler/backend/spirv/spirv_emit_context.cpp
 +++ b/src/shader_recompiler/backend/spirv/spirv_emit_context.cpp
-@@ -317,6 +317,11 @@
+@@ -317,6 +317,11 @@ void DefineSsbos(EmitContext& ctx, StorageTypeDefinition& type_def,
          const Id id{ctx.AddGlobalVariable(struct_pointer, spv::StorageClass::StorageBuffer)};
          ctx.Decorate(id, spv::Decoration::Binding, binding);
          ctx.Decorate(id, spv::Decoration::DescriptorSet, 0U);
@@ -30,7 +30,7 @@
          ctx.Name(id, fmt::format("ssbo{}", index));
          if (ctx.profile.supported_spirv >= 0x00010400) {
              ctx.interfaces.push_back(id);
-@@ -397,8 +402,15 @@
+@@ -397,8 +402,15 @@ Id CasLoop(EmitContext& ctx, Operation operation, Id array_pointer, Id element_p
      ctx.AddLabel(continue_block);
      const Id word_pointer{is_struct ? ctx.OpAccessChain(element_pointer, base, zero, index)
                                      : ctx.OpAccessChain(element_pointer, base, index)};
@@ -47,7 +47,7 @@
          const Id value{ctx.OpUnpackHalf2x16(ctx.F32[2], u32_value)};
          const Id new_value{ctx.OpFunctionCall(value_type, cas_func, value, op_b)};
          const Id u32_new_value{ctx.OpPackHalf2x16(ctx.U32[1], new_value)};
-@@ -410,7 +422,7 @@
+@@ -410,7 +422,7 @@ Id CasLoop(EmitContext& ctx, Operation operation, Id array_pointer, Id element_p
          ctx.AddLabel(merge_block);
          ctx.OpReturnValue(ctx.OpUnpackHalf2x16(ctx.F32[2], atomic_res));
      } else {
@@ -58,15 +58,10 @@
          const Id cal_res{ctx.OpFunctionCall(value_type, cas_func, bitcast_value, op_b)};
 --- a/src/shader_recompiler/ir_opt/collect_shader_info_pass.cpp
 +++ b/src/shader_recompiler/ir_opt/collect_shader_info_pass.cpp
-@@ -434,6 +434,88 @@
-     case IR::Opcode::LoadLocal:
-     case IR::Opcode::WriteLocal:
-         info.uses_local_memory = true;
-+        break;
-+    default:
-+        break;
-+    }
-+    switch (inst.GetOpcode()) {
+@@ -439,6 +439,88 @@ void VisitUsages(Info& info, IR::Inst& inst) {
+         break;
+     }
+     switch (inst.GetOpcode()) {
 +    case IR::Opcode::GlobalAtomicIAdd32:
 +    case IR::Opcode::GlobalAtomicSMin32:
 +    case IR::Opcode::GlobalAtomicUMin32:
@@ -144,12 +139,17 @@
 +    case IR::Opcode::StorageAtomicMaxF16x2:
 +    case IR::Opcode::StorageAtomicMaxF32x2:
 +        info.uses_storage_atomics = true;
-         break;
-     default:
++        break;
++    default:
++        break;
++    }
++    switch (inst.GetOpcode()) {
+     case IR::Opcode::DemoteToHelperInvocation:
+         info.uses_demote_to_helper_invocation = true;
          break;
 --- a/src/shader_recompiler/shader_info.h
 +++ b/src/shader_recompiler/shader_info.h
-@@ -310,6 +310,7 @@
+@@ -310,6 +310,7 @@ struct Info {
      bool uses_atomic_s32_min{};
      bool uses_atomic_s32_max{};
      bool uses_int64_bit_atomics{};

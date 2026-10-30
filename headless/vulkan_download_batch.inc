@@ -11,7 +11,7 @@
             runtime.Finish();
             for (auto& [image_id, map] : pending) {
                 Image& image = slot_images[image_id];
-                const auto copies = FixSmallVectorADL(FullDownloadCopies(image.info));
+                const auto copies = FullDownloadCopies(image.info);
                 SwizzleImage(*gpu_memory, image.gpu_addr, image.info, copies, map.mapped_span,
                              swizzle_data_buffer);
             }
@@ -24,7 +24,7 @@
             if (pending.size() == 16 || bytes > batch_limit - batch_bytes)
                 finish_batch();
             auto map = runtime.DownloadStagingBuffer(bytes);
-            const auto copies = FixSmallVectorADL(FullDownloadCopies(image.info));
+            const auto copies = FullDownloadCopies(image.info);
             image.DownloadMemory(map, copies);
             pending.emplace_back(image_id, std::move(map));
             // Oversized images retain the original one-image allocation/wait.

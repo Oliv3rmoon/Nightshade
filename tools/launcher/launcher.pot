@@ -693,6 +693,11 @@ msgstr ""
 msgid "Europe"
 msgstr ""
 
+#. Warning in a Switch 2 game's details: what experimental support means for playing it.
+#: pe/ui/home.cpp, pe/ui/library.cpp
+msgid "Expect crashes, missing graphics and low frame rates."
+msgstr ""
+
 #. Button hint: copy the game's save out to a folder.
 #: pe/ui/library.cpp
 msgid "Export a copy"
@@ -2104,6 +2109,11 @@ msgstr ""
 
 #: pe/ui/browse.cpp
 msgid "Supply your own files"
+msgstr ""
+
+#. Tag in a game's details: the game is a Nintendo Switch 2 title, played by experimental support. Switch 2 is a product name and stays as it is.
+#: pe/ui/home.cpp, pe/ui/library.cpp
+msgid "Switch 2: experimental"
 msgstr ""
 
 #: pe/ui/save_sync.cpp

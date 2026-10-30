@@ -20,6 +20,10 @@ int eden_extract_game_metadata(const char* rom_path, const char* keys_dir,
                                const char* cover_tga_path, char* title,
                                size_t title_capacity);
 
+// Nonzero for a Switch 2 title (experimental, docs/NX2_PORT.md): a game folder's ExeFS main
+// (game_files.h) whose main.npdm has the Switch 2 layout.
+int eden_game_is_switch2(const char* rom_path);
+
 // A cover in a picture file's bytes (PNG or JPEG, as a download source sends it) as the TGA the
 // launcher draws, at most 512 pixels a side. Nonzero when it was written.
 int eden_write_cover_tga(const unsigned char* encoded, size_t size, const char* cover_tga_path);

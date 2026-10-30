@@ -27,7 +27,7 @@ assert '#include "core/crypto/key_manager.h"' in main
 
 # The pinned Eden: the statuses main.cpp names, and the numbers players see.
 manifest = json.loads((root / 'UPSTREAM.json').read_text())
-mirrors = sorted(glob.glob(str(root / f'.deps/mirror-{manifest["eden_commit"]}/src/core/loader/loader.h')))
+mirrors = sorted(glob.glob(str(root / f'.deps/eden-{manifest["eden_commit"]}/src/core/loader/loader.h')))
 if mirrors:
     header = Path(mirrors[0]).read_text()
     body = header[header.index('enum class ResultStatus'):]

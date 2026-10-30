@@ -24,6 +24,7 @@ Nightshade is **[Oliv3rmoon](https://github.com/Oliv3rmoon)**'s release of [Pros
 - **Play from your server.** A download source can stream its games instead of downloading them first (experimental).
 - **Games on a USB drive** while keys, firmware, mods and saves stay on the console.
 - **Logs that say why.** When something still goes wrong, the logs name the cause, so it can be fixed.
+- **Switch 2 titles (experimental).** Your own Switch 2 game's ExeFS and RomFS in a game folder start with Takoroka's [eden-nx2](https://git.eden-emu.dev/Takoroka/eden-nx2) support. Expect crashes, missing graphics and low frame rates; see [Switch 2 titles](docs/SETTINGS.md#switch-2-titles-experimental).
 
 Every release lists exactly what's in it: see [Releases](https://github.com/Oliv3rmoon/Nightshade/releases) and the [changelog](docs/CHANGELOG.md).
 

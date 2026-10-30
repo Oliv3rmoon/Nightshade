@@ -36,7 +36,9 @@
 //                                      "cheats_on": ["A mod's folder name#A cheat's name"],
 //                                      "cheats_off": ["A mod's folder name#Its one cheat's name"],
 //                                      "performance": { "fast_gpu": true },
-//                                      "gpu_debug": { "coherent_storage": "compute" } } }
+//                                      "gpu_debug": { "coherent_storage": "compute" },
+//                                      "switch2": { "gpu_split": false } } },
+//     "switch2": { "gpu_split": true, "exact_gpu": false, "reactive_flushing": false }
 //   }
 //
 // Missing or mistyped values read as their defaults. Writes replace the file atomically. The
@@ -190,12 +192,18 @@ inline int KeyIndex(const std::string& value, const char* const* keys, int count
 
 // A game's file as the Library names it: its path in the game files folder's roms/, either its
 // name ("Game.nsp"; .xci, .nsz and .xcz too) or a game folder and its name ("Game/Game.nsp", the
-// game's update and DLC beside it). Readable characters, one folder at most, never a hidden
+// game's update and DLC beside it), or a game folder's ExeFS main ("Game/exefs/main", a Switch 2
+// title, game_files.h). Readable characters, one folder at most (besides exefs/), never a hidden
 // folder, "." or "..".
 inline bool ValidRomPath(std::string_view name) {
     if (name.size() < 5 || name.size() > 511) return false;
     for (unsigned char c : name)
         if (c < 32 || c == 127 || c == '\\') return false;
+    if (IsExeFsMain(name)) {
+        const std::string_view folder = ExeFsGameFolder(name);
+        return folder.size() <= 255 && folder[0] != '.' && folder.find('/') == std::string_view::npos &&
+               folder != "." && folder != "..";
+    }
     if (const auto slash = name.find('/'); slash != std::string_view::npos) {
         if (slash == 0 || name[0] == '.' || name.find('/', slash + 1) != std::string_view::npos) return false;
         if (slash > 255 || name.size() - slash - 1 < 5 || name.size() - slash - 1 > 255) return false;
@@ -811,6 +819,39 @@ inline Preferences PreferencesFor(uint64_t title_id, const std::string& file = S
 // The game the running session belongs to (0 at the launcher): what the audio and the renderer
 // read their game's settings for.
 inline std::atomic<uint64_t> session_title{0};
+
+// Switch 2 titles (experimental, eden-nx2, docs/NX2_PORT.md and docs/SETTINGS.md), in the settings
+// file only: "switch2" for every Switch 2 title, and one in a game's entry under "games" for that
+// game, whose values go first:
+//   "switch2": { "gpu_split": true, "exact_gpu": false, "reactive_flushing": false }
+// A Switch 2 session starts with eden-nx2's own choices (these defaults); a Switch 1 game reads none.
+struct Switch2Settings {
+    // eden-nx2's split GPU thread: command lists are read on one thread, engine methods and draws
+    // run on a second. More throughput where the GPU thread is the limit, one more busy CPU core.
+    bool gpu_split = true;
+    // Eden's exact GPU accuracy instead of its lowest, which eden-nx2 measured Switch 2 titles at.
+    // The split GPU thread runs only without it.
+    bool exact_gpu = false;
+    // Eden's reactive flushing; eden-nx2 runs Switch 2 titles without it (no difference seen).
+    bool reactive_flushing = false;
+};
+
+inline Switch2Settings LoadSwitch2(uint64_t title_id, const std::string& file = SettingsFile()) {
+    using Settings::Json;
+    const Json document = Settings::Load(file);
+    Switch2Settings result;
+    const auto read = [&](const std::string& base) {
+        const auto value = [&](const char* name, bool& out) {
+            out = Settings::Bool(document, Json::json_pointer(base + "/switch2/" + name), out);
+        };
+        value("gpu_split", result.gpu_split);
+        value("exact_gpu", result.exact_gpu);
+        value("reactive_flushing", result.reactive_flushing);
+    };
+    read("");
+    if (title_id) read("/games/" + Settings::TitleKey(title_id));
+    return result;
+}
 
 // Advanced, file-only workaround, deliberately per game: reducing the guest's tick rate helps
 // some dynamic frame-rate games but also slows games that pace themselves by that counter.

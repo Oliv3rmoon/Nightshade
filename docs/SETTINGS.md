@@ -1,6 +1,6 @@
 # Settings
 
-The settings that take more than a line to explain: the Performance switches and speed limit, frame generation, profiles, settings per game, the switches for testing a game that stops the GPU, button mapping, language, accessibility and update notices.
+The settings that take more than a line to explain: the Performance switches and speed limit, frame generation, profiles, settings per game, Switch 2 titles, the switches for testing a game that stops the GPU, button mapping, language, accessibility and update notices.
 
 ## Performance settings
 
@@ -215,6 +215,32 @@ One more is in the settings file only, for a game whose graphics break with it: 
 ```json
 { "games": { "<the game's title ID>": { "vertex_input_dynamic": false } } }
 ```
+
+## Switch 2 titles (experimental)
+
+Nightshade plays Switch 2 titles with the experimental support of Takoroka's eden-nx2 (see [NX2_PORT.md](NX2_PORT.md)). A Switch 2 title is a game folder in `roms/` that holds the game's ExeFS and RomFS as folders, dumped from your own game and console:
+
+```
+roms/<the game's name>/exefs/main        (with main.npdm, rtld, sdk, subsdk0... beside it)
+roms/<the game's name>/romfs/...
+```
+
+The Library lists such a folder as a game, says **Switch 2: experimental** in its details, and names it by its folder (or by a `control.nacp` put in the folder beside `exefs/`). Its title ID is the program ID in its `main.npdm`. Expect crashes, missing graphics and low frame rates: on a PC eden-nx2 takes some titles to their menus, intros or first races, and on the console none has been tried yet.
+
+A Switch 2 session starts with eden-nx2's own choices, not with **Settings > Performance**: the 12 GiB memory layout (and 8 GiB more for the title's graphics server; the console backs only the memory the game writes), Eden's lowest GPU accuracy, no reactive flushing, ASTC textures decoded on the GPU, unknown service commands answered with an empty success, six emulated CPU cores, and the split GPU thread. Three of them can be changed in the settings file only, as `"switch2"` at the top level for every Switch 2 title and in a game's entry under `"games"` for that game, whose values go first:
+
+| In the file | Default | What it does |
+|---|---|---|
+| `gpu_split` | `true` | eden-nx2's split GPU thread: one thread reads the game's command lists, a second runs what they do (draws, state, the renderer). On a PC it gave 1.46 times the draws a second where the GPU thread was the limit; it keeps one more CPU core busy, which the console has few of. Only with the Vulkan renderer and without `exact_gpu`. |
+| `exact_gpu` | `false` | `true`: Eden's exact GPU accuracy instead of its lowest. Slower, and the split GPU thread does not run. |
+| `reactive_flushing` | `false` | `true`: Eden's reactive flushing, as Switch 1 games have it by default. eden-nx2 saw no difference without it. |
+
+```json
+{ "switch2": { "gpu_split": true },
+  "games": { "<the game's title ID>": { "switch2": { "gpu_split": false } } } }
+```
+
+The launch report says `Switch 2 title (experimental)` with what the session got. Switch 1 games read none of these.
 
 ## For testing a game that stops the GPU
 

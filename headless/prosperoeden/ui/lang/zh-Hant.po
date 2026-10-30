@@ -386,6 +386,16 @@ msgstr "全新開始"
 msgid "The console ran out of space (copying needs about {0}). What was copied was removed."
 msgstr "主機空間已用完（複製約需 {0}）。已複製的內容已刪除。"
 
+#. Warning in a Switch 2 game's details: what experimental support means for playing it.
+#: pe/ui/home.cpp, pe/ui/library.cpp
+msgid "Expect crashes, missing graphics and low frame rates."
+msgstr "可能會當機、缺少畫面，影格率也較低。"
+
+#. Tag in a game's details: the game is a Nintendo Switch 2 title, played by experimental support. Switch 2 is a product name and stays as it is.
+#: pe/ui/home.cpp, pe/ui/library.cpp
+msgid "Switch 2: experimental"
+msgstr "Switch 2：實驗性"
+
 #. Names the mod made of the files put straight into a game's mods folder, without a folder of their own.
 #: pe/ui/library.cpp
 msgid "Unnamed mod"

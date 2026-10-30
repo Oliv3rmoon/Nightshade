@@ -792,6 +792,40 @@ int main() {
             entry.erase("gpu_debug");
             assert(Eden::Settings::Write(document, file));
         }
+        // Switch 2 titles (settings_store.h Switch2Settings): eden-nx2's choices without a file
+        // entry; "switch2" at the top level for every Switch 2 title, the game's own first; a
+        // value of the wrong kind reads as absent; a save from the Library keeps them.
+        {
+            const Eden::Switch2Settings none = Eden::LoadSwitch2(quest, file);
+            assert(none.gpu_split && !none.exact_gpu && !none.reactive_flushing);
+            auto document = Eden::Settings::Load(file);
+            document["switch2"] = {{"gpu_split", false}, {"reactive_flushing", true}};
+            document["games"][Eden::Settings::TitleKey(quest)]["switch2"] = {{"gpu_split", true},
+                                                                              {"exact_gpu", "yes"}};
+            assert(Eden::Settings::Write(document, file));
+            const Eden::Switch2Settings own = Eden::LoadSwitch2(quest, file);
+            assert(own.gpu_split && !own.exact_gpu && own.reactive_flushing);
+            const Eden::Switch2Settings other = Eden::LoadSwitch2(racer, file);
+            assert(!other.gpu_split && !other.exact_gpu && other.reactive_flushing);
+            assert(Eden::SaveGameSettings(quest, Eden::GameSettings{}, file));
+            assert(Eden::LoadSwitch2(quest, file).gpu_split && Eden::LoadSwitch2(quest, file).reactive_flushing);
+            document = Eden::Settings::Load(file);
+            document.erase("switch2");
+            document["games"][Eden::Settings::TitleKey(quest)].erase("switch2");
+            assert(Eden::Settings::Write(document, file));
+            assert(Eden::LoadSwitch2(0, file).gpu_split && !Eden::LoadSwitch2(0, file).reactive_flushing);
+        }
+        // A Switch 2 title goes by the path of its game folder's ExeFS main (game_files.h): the last
+        // game and the recent games keep it like a file in a game folder.
+        {
+            assert(Eden::ValidRomPath("Lumen Drift/exefs/main") && Eden::ValidRomPath("Lumen Drift/ExeFS/main"));
+            assert(!Eden::ValidRomPath("exefs/main") && !Eden::ValidRomPath("A/B/exefs/main") &&
+                   !Eden::ValidRomPath(".hidden/exefs/main") && !Eden::ValidRomPath("Lumen Drift/exefs/rtld"));
+            assert(Eden::SaveLastGame("Lumen Drift/exefs/main", file) &&
+                   Eden::LoadLastGame(file) == "Lumen Drift/exefs/main");
+            assert(Eden::SaveRecentGame("Lumen Drift/exefs/main", file) &&
+                   Eden::LoadRecentGames(file).front() == "Lumen Drift/exefs/main");
+        }
         wrong = game;
         wrong.mapping[Eden::game_b] = wrong.mapping[Eden::game_a];
         assert(!Eden::SaveGameSettings(quest, wrong, file));

@@ -1,6 +1,7 @@
 --- a/src/video_core/post_processing/fx_effect.cpp
 +++ b/src/video_core/post_processing/fx_effect.cpp
-@@ -163,4 +163,9 @@
+@@ -162,7 +162,12 @@ FxUniformDesc DescribeUniform(const reshadefx::uniform& info) {
+ 
  FxEffectDesc DescribeEffect(const std::filesystem::path& path, const std::filesystem::path& root) {
      FxEffectDesc desc;
 -    desc.file = Common::FS::PathToUTF8String(std::filesystem::relative(path, root));
@@ -11,3 +12,5 @@
 +    }
 +    desc.file = Common::FS::PathToUTF8String(relative_path);
      desc.name = Common::FS::PathToUTF8String(path.stem());
+ 
+     const auto compiled =

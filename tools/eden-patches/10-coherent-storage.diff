@@ -1,6 +1,6 @@
 --- a/src/shader_recompiler/backend/spirv/emit_spirv_memory.cpp
 +++ b/src/shader_recompiler/backend/spirv/emit_spirv_memory.cpp
-@@ -49,12 +49,17 @@
+@@ -49,12 +49,17 @@ bool IsCoherent(IR::Inst* inst) {
      return inst->Flags<IR::MemoryInstInfo>().coherent;
  }
  
@@ -21,7 +21,7 @@
      return ctx.OpLoad(result_type, pointer);
 --- a/src/shader_recompiler/backend/spirv/spirv_emit_context.cpp
 +++ b/src/shader_recompiler/backend/spirv/spirv_emit_context.cpp
-@@ -317,9 +317,10 @@
+@@ -317,9 +317,10 @@ void DefineSsbos(EmitContext& ctx, StorageTypeDefinition& type_def,
          const Id id{ctx.AddGlobalVariable(struct_pointer, spv::StorageClass::StorageBuffer)};
          ctx.Decorate(id, spv::Decoration::Binding, binding);
          ctx.Decorate(id, spv::Decoration::DescriptorSet, 0U);
@@ -34,7 +34,7 @@
              ctx.Decorate(id, spv::Decoration::Coherent);
          }
          ctx.Name(id, fmt::format("ssbo{}", index));
-@@ -476,7 +477,11 @@
+@@ -476,7 +477,11 @@ void VectorTypes::Define(Sirit::Module& sirit_ctx, Id base_type, std::string_vie
  EmitContext::EmitContext(const Profile& profile_, const RuntimeInfo& runtime_info_,
                           IR::Program& program, Bindings& bindings)
      : Sirit::Module(profile_.supported_spirv), profile{profile_}, runtime_info{runtime_info_},
@@ -47,7 +47,7 @@
        image_rescaling_index{bindings.image_scaling_index} {
      const bool is_unified{profile.unified_descriptor_binding};
      u32& uniform_binding{is_unified ? bindings.unified : bindings.uniform_buffer};
-@@ -996,13 +1001,15 @@
+@@ -996,13 +1001,15 @@ void EmitContext::DefineGlobalMemoryFunctions(const Info& info) {
      // A global access the guest marked device-coherent (LDG .CG and the like) shares these
      // functions with every other one: all of their accesses are then Volatile.
      const bool coherent{info.uses_coherent_global_memory};
@@ -67,7 +67,7 @@
          OpFunctionEnd();
 --- a/src/shader_recompiler/backend/spirv/spirv_emit_context.h
 +++ b/src/shader_recompiler/backend/spirv/spirv_emit_context.h
-@@ -214,6 +214,9 @@
+@@ -214,6 +214,9 @@ public:
      const Profile& profile;
      const RuntimeInfo& runtime_info;
      Stage stage{};
@@ -79,7 +79,7 @@
      Id U1{};
 --- a/src/shader_recompiler/profile.h
 +++ b/src/shader_recompiler/profile.h
-@@ -12,6 +12,13 @@
+@@ -12,6 +12,13 @@ namespace Shader {
  
  enum class Stage : u32;
  
@@ -93,7 +93,7 @@
  struct Profile {
      u32 supported_spirv{0x00010000};
      bool unified_descriptor_binding{};
-@@ -111,6 +118,10 @@
+@@ -114,6 +121,10 @@ struct Profile {
      u64 min_ssbo_alignment{};
      u32 max_user_clip_distances{};
  

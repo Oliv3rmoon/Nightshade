@@ -20,6 +20,7 @@
 #include <filesystem>
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <vector>
@@ -43,6 +44,7 @@
 #include "core/file_sys/content_archive.h"
 #include "core/file_sys/control_metadata.h"
 #include "core/file_sys/nca_metadata.h"
+#include "core/file_sys/program_metadata.h"
 #include "core/file_sys/registered_cache.h"
 #include "core/file_sys/romfs.h"
 #include "core/file_sys/vfs/vfs_vector.h"
@@ -147,6 +149,26 @@ uint32_t ReadLanguages(const FileSys::VirtualDir& game, const FileSys::VirtualDi
     return game ? ReadLanguages(game) : 0;
 }
 
+// A game folder's ExeFS (game_files.h, a Switch 2 title): its main.npdm, read as Eden reads it.
+// Empty when the folder has none that Eden can read.
+std::optional<FileSys::ProgramMetadata> ExeFsMetadata(FileSys::RealVfsFilesystem& vfs, const std::string& main) {
+    const auto exefs = std::filesystem::path(main).parent_path().string();
+    const auto npdm = vfs.OpenFile(exefs + "/main.npdm", FileSys::OpenMode::Read);
+    if (!npdm) return std::nullopt;
+    FileSys::ProgramMetadata metadata;
+    if (metadata.Load(npdm) != Loader::ResultStatus::Success) return std::nullopt;
+    return metadata;
+}
+
+// A game folder's control data when it has it beside its ExeFS (a control.nacp a dump may hold;
+// none is needed to play): the folder itself, to be read as a control RomFS is.
+FileSys::VirtualDir ExeFsControl(FileSys::RealVfsFilesystem& vfs, const std::string& main) {
+    const std::string folder{Eden::ExeFsGameFolder(main)};
+    auto directory = vfs.OpenDirectory(folder, FileSys::OpenMode::Read);
+    if (!directory || (!directory->GetFile("control.nacp") && !directory->GetFile("Control.nacp"))) return {};
+    return directory;
+}
+
 // Game file -> its language flags, kept from the Library's metadata pass over the same data.
 std::map<std::string, uint32_t>& GameLanguages() {
     static std::map<std::string, uint32_t> languages;
@@ -220,6 +242,18 @@ bool WriteTga(const FileSys::VirtualFile& icon, const char* output) {
 }
 }
 
+int eden_game_is_switch2(const char* rom_path) {
+    if (!rom_path || !Eden::IsExeFsMain(rom_path)) return 0;
+    try {
+        FileSys::RealVfsFilesystem vfs;
+        const auto metadata = ExeFsMetadata(vfs, rom_path);
+        return metadata && metadata->IsSwitch2() ? 1 : 0;
+    } catch (const std::exception& error) {
+        std::fprintf(stderr, "[ProsperoEden] library: %s\n", error.what());
+        return 0;
+    }
+}
+
 int eden_write_cover_tga(const unsigned char* encoded, size_t size, const char* cover_tga_path) {
     if (!encoded || !size || size > (64u << 20) || !cover_tga_path) return 0;
     // Written beside, then moved into place: the menu may be drawing the old one.
@@ -238,6 +272,11 @@ uint64_t eden_game_title_id(const char* rom_path) {
         return streamed->title_id;
     Common::FS::SetEdenPath(Common::FS::EdenPath::KeysDir, Eden::AssetsPath("keys"));
     FileSys::RealVfsFilesystem vfs;
+    // A game folder's ExeFS: the program ID its main.npdm declares.
+    if (Eden::IsExeFsMain(rom_path)) {
+        const auto metadata = ExeFsMetadata(vfs, rom_path);
+        return metadata ? metadata->GetTitleID() : 0;
+    }
     std::string path;
     const auto file = OpenGame(vfs, rom_path, &path);
     if (!file) return 0;
@@ -261,6 +300,17 @@ int eden_extract_game_metadata(const char* rom_path, const char* keys_dir,
     title[0] = '\0';
     Common::FS::SetEdenPath(Common::FS::EdenPath::KeysDir, keys_dir);
     FileSys::RealVfsFilesystem vfs;
+    // A game folder's ExeFS has no package to read: its name from a control.nacp beside it, when
+    // there is one (the Library names it by its folder otherwise), and no cover.
+    if (Eden::IsExeFsMain(rom_path)) {
+        const auto control = ExeFsControl(vfs, rom_path);
+        if (!control) return 0;
+        GameLanguages()[rom_path] = ReadLanguages(control);
+        const auto extracted_title = ReadTitle(control);
+        if (extracted_title.empty()) return 0;
+        std::snprintf(title, title_capacity, "%s", extracted_title.c_str());
+        return EDEN_METADATA_TITLE;
+    }
     const auto file = vfs.OpenFile(rom_path, FileSys::OpenMode::Read);
     if (!file) return 0;
     std::string path = rom_path;
@@ -289,6 +339,10 @@ uint32_t eden_game_supported_languages(const char* rom_path, const char* keys_di
     try {
         Common::FS::SetEdenPath(Common::FS::EdenPath::KeysDir, keys_dir);
         FileSys::RealVfsFilesystem vfs;
+        if (Eden::IsExeFsMain(rom_path)) {
+            const auto control = ExeFsControl(vfs, rom_path);
+            return GameLanguages()[rom_path] = control ? ReadLanguages(control) : 0;
+        }
         std::string path;
         const auto file = OpenGame(vfs, rom_path, &path);
         if (!file) return 0;
@@ -322,6 +376,8 @@ int eden_rom_content(const char* rom_path, const char* keys_dir) {
     try {
         Common::FS::SetEdenPath(Common::FS::EdenPath::KeysDir, keys_dir);
         FileSys::RealVfsFilesystem vfs;
+        if (Eden::IsExeFsMain(rom_path))
+            return ExeFsMetadata(vfs, rom_path) ? EDEN_CONTENT_GAME : EDEN_CONTENT_UNKNOWN;
         const auto file = vfs.OpenFile(rom_path, FileSys::OpenMode::Read);
         if (!file) return EDEN_CONTENT_UNKNOWN;
         std::string path = rom_path;
@@ -350,14 +406,27 @@ int eden_rom_content(const char* rom_path, const char* keys_dir) {
 }
 
 namespace {
+// A game folder that holds its game as an ExeFS and a RomFS (a Switch 2 title, game_files.h): its
+// RomFS can be thousands of files, and none of them is an update or DLC to look for.
+bool HoldsExeFs(const FileSys::VirtualDir& folder) {
+    for (const auto& part : folder->GetSubdirectories()) {
+        std::string name = part->GetName();
+        std::transform(name.begin(), name.end(), name.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        if (name == "exefs" && part->GetFile("main") && part->GetFile("main.npdm")) return true;
+    }
+    return false;
+}
+
 // The folders of roms/ that are game folders (one per game, its update and DLC beside it):
-// every folder in it but hidden ones.
+// every folder in it but hidden ones, and those holding an ExeFS.
 std::vector<FileSys::VirtualDir> GameFolders(FileSys::RealVfsFilesystem& vfs, const char* roms_dir) {
     std::vector<FileSys::VirtualDir> folders;
     if (!roms_dir) return folders;
     if (const auto roms = vfs.OpenDirectory(roms_dir, FileSys::OpenMode::Read)) {
         for (auto& folder : roms->GetSubdirectories())
-            if (!folder->GetName().empty() && folder->GetName().front() != '.') folders.push_back(std::move(folder));
+            if (!folder->GetName().empty() && folder->GetName().front() != '.' && !HoldsExeFs(folder))
+                folders.push_back(std::move(folder));
         // The updates and DLC left directly in roms/ beside their games, by their names
         // (loose_addons.h), as one more folder.
         std::vector<FileSys::VirtualFile> loose;
@@ -436,7 +505,14 @@ int FindAddOnFiles(const FileSys::VirtualDir& directory, uint64_t base, eden_fou
             found(user, file->GetFullPath().c_str());
             ++count;
         }
-    for (const auto& folder : directory->GetSubdirectories()) count += FindAddOnFiles(folder, base, found, user, depth + 1);
+    for (const auto& folder : directory->GetSubdirectories()) {
+        // A game's own ExeFS and RomFS (a Switch 2 title's folder, a mod's parts) hold no update.
+        std::string name = folder->GetName();
+        std::transform(name.begin(), name.end(), name.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        if (name == "exefs" || name == "romfs") continue;
+        count += FindAddOnFiles(folder, base, found, user, depth + 1);
+    }
     return count;
 }
 } // namespace
