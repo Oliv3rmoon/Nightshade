@@ -223,3 +223,11 @@ Nobody here has a Switch 2 dump or keys; the first console runs are the testers'
   tree): the derived Vulkan files, `gpu_split.cpp`, `physical_core.cpp`, `k_spin_lock.cpp`,
   `gpu_thread.cpp`, `metadata_bridge.cpp`, `eden_services.cpp`, `library.cpp` and the host path of
   `main.cpp` compile.
+- 2026-10-30: 45bc4a5 green on both. PS5 build (`gh workflow run 389325104 --ref feature/nx2`):
+  <https://github.com/Oliv3rmoon/Nightshade/actions/runs/40981539705>, success: the release ZIP
+  (`Nightshade-v1.010.003.zip`, 77 entries) built and checked, with every check of the native
+  build (generated GPU worker, GPU sync stop, TSC selector...). Linux host suite and launcher
+  screens on test/nx2: <https://github.com/Oliv3rmoon/Nightshade/actions/runs/40981562851>,
+  success (`make test`: settings store, guest idle, kernel spin lock, NCZ, GC scan, streamed game,
+  the 30 catalogs...). The preview tour now also shoots a Switch 2 title's details
+  (`07b-library-switch2`).
