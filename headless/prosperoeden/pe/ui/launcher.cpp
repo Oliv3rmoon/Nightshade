@@ -366,6 +366,8 @@ void Launcher::press(Key key)
         return press_sync_setup(key);
     if (modal_ == Modal::pairing)
         return press_pairing(key);
+    if (modal_ == Modal::community)
+        return press_community(key);
     if (modal_ != Modal::none)
         return press_dialog(key);
     // The rail, and the sections it holds: L1 and R1 go from one to the next.
@@ -551,6 +553,8 @@ void Launcher::update(float dt)
     // A newer release: the update dialog, or a notification when the app cannot install it.
     update_offer(dt);
     update_install(dt);
+    // The community's card, once, when nothing else wants the screen.
+    offer_community();
     if (update_notice_left_ > 0.0f)
         update_notice_left_ = std::max(0.0f, update_notice_left_ - dt);
     // It slides away over its last moments.
@@ -933,6 +937,8 @@ void Launcher::draw(gfx::DrawList &list)
             draw_backup(c, opened);
         else if (modal_shown_ == Modal::quick)
             draw_quick(c, opened);
+        else if (modal_shown_ == Modal::community)
+            draw_community(c, opened);
         else
             draw_dialog(c, modal_shown_, opened);
     }

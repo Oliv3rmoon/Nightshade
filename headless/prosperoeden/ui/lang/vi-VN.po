@@ -889,6 +889,11 @@ msgstr "Tiếng Đức"
 msgid "Get"
 msgstr "Tải về"
 
+#. On the same card, under its title. Discord is a name (unchanged).
+#: pe/ui/community.cpp
+msgid "Get help, hear about new releases and meet other players on Discord."
+msgstr "Nhận trợ giúp, cập nhật các bản phát hành mới và gặp gỡ những người chơi khác trên Discord."
+
 #. Settings > Apps: what it is for. Physalis, Datura and Mandrake are the apps' names (unchanged).
 #: pe/ui/apps.cpp, pe/ui/settings.cpp
 msgid "Get, update and open Physalis, Datura and Mandrake."
@@ -1056,6 +1061,16 @@ msgstr "Vào phòng hoặc rời phòng trước khi bắt đầu trò chơi."
 #: pe/ui/multiplayer.cpp
 msgid "Join room"
 msgstr "Vào phòng"
+
+#. Title of a card shown once when the app starts: the community's Discord server, with its name (nightly), its address and a QR code that opens it.
+#: pe/ui/community.cpp
+msgid "Join the community"
+msgstr "Tham gia cộng đồng"
+
+#. Label on the About screen over the community's Discord server: its name (nightly), its address and a QR code that opens it. Keep it uppercase.
+#: pe/ui/browse.cpp
+msgid "JOIN THE COMMUNITY"
+msgstr "THAM GIA CỘNG ĐỒNG"
 
 #. keys, firmware and roms are folder names (unchanged). TRIANGLE is the controller's triangle button, in capitals.
 #: pe/ui/browse.cpp
@@ -2592,6 +2607,11 @@ msgstr "Lần sau bạn sẽ được hỏi lại."
 #: pe/ui/save_sync.cpp
 msgid "You are told again at the next sync."
 msgstr "Bạn sẽ được báo lại ở lần đồng bộ tới."
+
+#. On the same card: the About screen (the menu's last section; use its translation) shows the server too.
+#: pe/ui/community.cpp
+msgid "You can find it again in About."
+msgstr "Bạn có thể xem lại trong mục Giới thiệu."
 
 #. Update dialog: installing the new app version keeps the player's files.
 #: pe/ui/update.cpp

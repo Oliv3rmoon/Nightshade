@@ -13,7 +13,7 @@
 //                   "mapping": { "a": "cross", "b": "circle" } },
 //     "system": { "language": "en-US", "update_notices": true },
 //     "accessibility": { "large_text": false, "high_contrast": false, "reduce_motion": false },
-//     "launcher": { "theme": "nightly" },
+//     "launcher": { "theme": "nightly", "community_seen": true },
 //     "diagnostics": { "detailed_logging": false, "immediate_logs": false },
 //     "performance": { "block_list": false, "async_shaders": false, "fast_gpu": false,
 //                      "unsafe_cpu": false, "unsafe_dma": false, "reactive_flushing": true,
@@ -181,6 +181,9 @@ struct Preferences {
     // Settings > Diagnostics > Update notices: off, the launcher keeps a newer release to itself at
     // its start (About still names it).
     bool update_notices = true;
+    // The card naming the community (its Discord server) was closed: it shows once, at a start of
+    // the app, and never again (pe/ui/community.cpp). About names the server whatever this says.
+    bool community_seen = false;
 };
 
 inline int KeyIndex(const std::string& value, const char* const* keys, int count, int fallback) {
@@ -459,6 +462,8 @@ inline Preferences LoadPreferences(const std::string& file = SettingsFile()) {
         result.accent = accent;
     const std::string wallpaper = Settings::String(document, Json::json_pointer("/launcher/wallpaper"));
     if (ValidWallpaperName(wallpaper)) result.wallpaper = wallpaper;
+    result.community_seen = Settings::Bool(document, Json::json_pointer("/launcher/community_seen"),
+                                           result.community_seen);
     result.detailed_logging = Settings::Bool(document, Json::json_pointer("/diagnostics/detailed_logging"),
                                              result.detailed_logging);
     result.immediate_logs = Settings::Bool(document, Json::json_pointer("/diagnostics/immediate_logs"),
@@ -556,6 +561,7 @@ inline bool SavePreferences(const Preferences& value, const std::string& file = 
     document["accessibility"]["reduce_motion"] = value.reduce_motion;
     document["launcher"]["theme"] = value.theme;
     document["launcher"]["wallpaper"] = value.wallpaper;
+    document["launcher"]["community_seen"] = value.community_seen;
     if (document["launcher"].contains("wallpaper_blur"))
         document["launcher"].erase("wallpaper_blur"); // a switch this build no longer has
     if (!value.accent.empty())

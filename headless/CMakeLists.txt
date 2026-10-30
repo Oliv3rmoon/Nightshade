@@ -3702,6 +3702,7 @@ endif()
                 "${launcher_dir}/pe/ui/apps.cpp"
                 "${launcher_dir}/pe/ui/backup.cpp"
                 "${launcher_dir}/pe/ui/browse.cpp"
+                "${launcher_dir}/pe/ui/community.cpp"
                 "${launcher_dir}/pe/ui/game_options.cpp"
                 "${launcher_dir}/pe/ui/profiles.cpp"
                 "${launcher_dir}/pe/ui/remote.cpp"

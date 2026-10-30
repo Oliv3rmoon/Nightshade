@@ -102,6 +102,8 @@ python3 -B "$root/tools/check-update-helper.py"
 python3 -B "$root/tools/check-apps.py"
 python3 -B "$root/tools/check-wallpapers.py"
 python3 -B "$root/tools/check-video-profiles.py"
+# The community's invite in About and on the first start's card: its QR code read as a phone would.
+python3 -B "$root/tools/check-community.py"
 python3 -B "$root/tools/check-backup.py"
 "$scratch/build/bin/eden-profiles-check"
 "$scratch/build/bin/eden-save-sync-check"

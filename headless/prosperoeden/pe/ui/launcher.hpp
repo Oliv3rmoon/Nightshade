@@ -77,6 +77,11 @@ class Launcher
     {
         return home_on_recents_;
     }
+    // Whether the card naming the community shows (community.cpp). For the preview's checks.
+    bool community_open() const
+    {
+        return modal_ == Modal::community;
+    }
 
   private:
     bool launcher_picker_ = false;
@@ -121,6 +126,7 @@ class Launcher
         apps,         // Settings > Apps: Nightshade's own apps, got, updated and opened (apps.cpp)
         backup,       // Settings > Diagnostics > Back up to USB: the app's data to a USB drive (backup.cpp)
         quick,        // a game's Quick settings: Play, Start in safe mode, its common video settings (quick.cpp)
+        community,    // the community's Discord server, named once at a start of the app (community.cpp)
     };
     // The update dialog's steps: the offer, installing, stopping it, closing for the helper to
     // finish, and a failure.
@@ -438,6 +444,15 @@ class Launcher
     void draw_about(Canvas &c);
     // An update text with the place the check asks in it (Services::update_source).
     std::string update_text(std::string_view text);
+
+    // ---- the community (community.cpp) ----
+    // The card that names the community's Discord server (Modal::community): its name, its
+    // address and a QR code that opens it. It opens by itself once, at a start of the app when the
+    // home screen is free; any button closes it, and it never shows again
+    // (Preferences::community_seen). About names the server always (draw_about).
+    void offer_community();
+    void press_community(Key key);
+    void draw_community(Canvas &c, float open);
 
     Services &services_;
     Textures &textures_;

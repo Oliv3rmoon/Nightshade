@@ -6,6 +6,7 @@
 
 #include "pe/core/strings.hpp"
 #include "pe/core/tween.hpp"
+#include "pe/ui/qr_code.hpp"
 #include "pe/ui/textures.hpp"
 #include "pe/ui/theme.hpp"
 
@@ -151,6 +152,11 @@ void focus_ring(Canvas &c, const Rect &r, float radius, float amount);
 
 // A cover (or the app icon while it loads or when there is none), with rounded corners.
 void cover(Canvas &c, const std::string &path, const Rect &r, float radius, float shadow = 0.0f);
+// A QR code for a phone to read: dark modules on a white rounded `box`, centred in it with at
+// least `quiet` modules of white around them inside a 12-pixel edge (the white margin a scanner
+// finds the code by). Modules are whole pixels where the box is drawn, so no seams show between
+// them.
+void qr_code(Canvas &c, const QrCode &code, const Rect &box, int quiet = 4);
 // An arc from `start` (radians, 0 at the right, clockwise on screen) over `sweep`: a ring that
 // fills, or a part of one that turns while something works.
 void arc(gfx::DrawList &list, float cx, float cy, float radius, float width, float start, float sweep, Color color);

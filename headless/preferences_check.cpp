@@ -89,6 +89,15 @@ int main() {
     assert(Read(file).find("\"update_notices\": false") != std::string::npos);
     saved.update_notices = true;
     assert(Eden::SavePreferences(saved, file) && Eden::LoadPreferences(file).update_notices);
+    // The card naming the community: not closed yet in a new install or in a file an earlier
+    // version wrote, closed for good once saved so, under "launcher".
+    assert(!saved.community_seen);
+    const std::string earlier = std::string(directory) + "/earlier.json";
+    std::ofstream(earlier) << R"({"launcher": {"theme": "nightly"}, "system": {"update_notices": false}})";
+    assert(!Eden::LoadPreferences(earlier).community_seen && !Eden::LoadPreferences(earlier).update_notices);
+    saved.community_seen = true;
+    assert(Eden::SavePreferences(saved, file) && Eden::LoadPreferences(file).community_seen);
+    assert(Read(file).find("\"community_seen\": true") != std::string::npos);
     assert(!Eden::SavePreferences({true, 101, false, false}, file));
     assert(Eden::LoadPreferences(file).volume == 40);
     assert(Read(file).find("\"renderer\": \"opengl\"") != std::string::npos);

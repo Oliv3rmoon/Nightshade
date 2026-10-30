@@ -1213,6 +1213,7 @@ pe::ui::Preferences EdenServices::preferences() {
     result.accent = saved.accent;
     result.wallpaper = saved.wallpaper;
     result.update_notices = saved.update_notices;
+    result.community_seen = saved.community_seen;
     // Settings > Performance: the general values (settings_store.h).
     const Eden::PerformanceSettings speed = Eden::LoadPerformance(0);
     result.block_list = speed.block_list;
@@ -1263,6 +1264,7 @@ bool EdenServices::set_preferences(const pe::ui::Preferences& preferences) {
     value.accent = preferences.accent;
     value.wallpaper = preferences.wallpaper;
     value.update_notices = preferences.update_notices;
+    value.community_seen = preferences.community_seen;
     value.mapping = preferences.mapping;
     value.menu_bind = preferences.menu_bind;
     Eden::PerformanceSettings speed = Eden::LoadPerformance(0);

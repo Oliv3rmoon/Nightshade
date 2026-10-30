@@ -889,6 +889,11 @@ msgstr "Duits"
 msgid "Get"
 msgstr "Ophalen"
 
+#. On the same card, under its title. Discord is a name (unchanged).
+#: pe/ui/community.cpp
+msgid "Get help, hear about new releases and meet other players on Discord."
+msgstr "Krijg hulp, hoor over nieuwe versies en ontmoet andere spelers op Discord."
+
 #. Settings > Apps: what it is for. Physalis, Datura and Mandrake are the apps' names (unchanged).
 #: pe/ui/apps.cpp, pe/ui/settings.cpp
 msgid "Get, update and open Physalis, Datura and Mandrake."
@@ -1056,6 +1061,16 @@ msgstr "Betreed een kamer of verlaat die voordat je een spel start."
 #: pe/ui/multiplayer.cpp
 msgid "Join room"
 msgstr "Kamer betreden"
+
+#. Title of a card shown once when the app starts: the community's Discord server, with its name (nightly), its address and a QR code that opens it.
+#: pe/ui/community.cpp
+msgid "Join the community"
+msgstr "Word lid van de community"
+
+#. Label on the About screen over the community's Discord server: its name (nightly), its address and a QR code that opens it. Keep it uppercase.
+#: pe/ui/browse.cpp
+msgid "JOIN THE COMMUNITY"
+msgstr "WORD LID VAN DE COMMUNITY"
 
 #. keys, firmware and roms are folder names (unchanged). TRIANGLE is the controller's triangle button, in capitals.
 #: pe/ui/browse.cpp
@@ -2592,6 +2607,11 @@ msgstr "De volgende keer krijg je de vraag opnieuw."
 #: pe/ui/save_sync.cpp
 msgid "You are told again at the next sync."
 msgstr "Bij de volgende synchronisatie krijg je dit opnieuw te zien."
+
+#. On the same card: the About screen (the menu's last section; use its translation) shows the server too.
+#: pe/ui/community.cpp
+msgid "You can find it again in About."
+msgstr "Je vindt het later terug onder Over."
 
 #. Update dialog: installing the new app version keeps the player's files.
 #: pe/ui/update.cpp

@@ -342,7 +342,7 @@ msgstr ""
 msgid "Circle"
 msgstr ""
 
-#: pe/ui/launcher.cpp, pe/ui/remote.cpp, pe/ui/update.cpp
+#: pe/ui/community.cpp, pe/ui/launcher.cpp, pe/ui/remote.cpp, pe/ui/update.cpp
 msgid "Close"
 msgstr ""
 
@@ -888,6 +888,11 @@ msgstr ""
 msgid "Get"
 msgstr ""
 
+#. On the same card, under its title. Discord is a name (unchanged).
+#: pe/ui/community.cpp
+msgid "Get help, hear about new releases and meet other players on Discord."
+msgstr ""
+
 #. Settings > Apps: what it is for. Physalis, Datura and Mandrake are the apps' names (unchanged).
 #: pe/ui/apps.cpp, pe/ui/settings.cpp
 msgid "Get, update and open Physalis, Datura and Mandrake."
@@ -1054,6 +1059,16 @@ msgstr ""
 
 #: pe/ui/multiplayer.cpp
 msgid "Join room"
+msgstr ""
+
+#. Label on the About screen over the community's Discord server: its name (nightly), its address and a QR code that opens it. Keep it uppercase.
+#: pe/ui/browse.cpp
+msgid "JOIN THE COMMUNITY"
+msgstr ""
+
+#. Title of a card shown once when the app starts: the community's Discord server, with its name (nightly), its address and a QR code that opens it.
+#: pe/ui/community.cpp
+msgid "Join the community"
 msgstr ""
 
 #. keys, firmware and roms are folder names (unchanged). TRIANGLE is the controller's triangle button, in capitals.
@@ -1924,7 +1939,7 @@ msgstr ""
 msgid "Says when homebrew.page has a newer version. Off, only About names it."
 msgstr ""
 
-#: pe/ui/pairing.cpp
+#: pe/ui/browse.cpp, pe/ui/community.cpp, pe/ui/pairing.cpp
 msgid "Scan the code with your phone, or open the address below."
 msgstr ""
 
@@ -2595,6 +2610,11 @@ msgstr ""
 msgid "You are told again at the next sync."
 msgstr ""
 
+#. On the same card: the About screen (the menu's last section; use its translation) shows the server too.
+#: pe/ui/community.cpp
+msgid "You can find it again in About."
+msgstr ""
+
 #. Update dialog: installing the new app version keeps the player's files.
 #: pe/ui/update.cpp
 msgid "Your games, saves and settings are kept."
@@ -2612,6 +2632,7 @@ msgstr ""
 #. Library: a file's format, such as NSO or NCA, for a program file that runs only with what it needs beside it (for experienced users). {0} stays as it is.
 #: eden_services.cpp
 msgid "{0} (advanced)"
+msgstr ""
 
 #. {0} is how ASTC textures are held, for example Compressed or Full quality. ASTC is a texture format's name.
 #: pe/ui/game_options.cpp

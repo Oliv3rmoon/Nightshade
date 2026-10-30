@@ -17,6 +17,7 @@ What changed in each release of ProsperoEden, newest first. A release's notes on
 - **A game's own console memory.** A game's own Performance settings have **Memory** after the speed limit, as **Settings > Performance** has for every game.
 - **Homebrew (NRO) in the Library.** `.nro` files in `roms/`, or together in a folder of it such as `roms/homebrew/`, are listed with the name and icon in their assets (else by their file name) and start like a game. See [Homebrew and advanced files](https://github.com/Oliv3rmoon/Nightshade/blob/v1.010.007/docs/INSTALL.md#homebrew-and-advanced-files).
 - **Advanced files: NSO, NCA, NAX, KIP and unpacked ExeFS.** The Library also lists programs on their own, marked **(advanced)** after their format: a lone NSO; a Program NCA, with its game's name, icon and control data from the Control NCA beside it when an NSP was unpacked into a folder; a NAX copied off an SD card under its content ID; a KIP; and a folder holding `main` and `main.npdm`, listed as `EXEFS`. Each starts only with what it needs beside it, and most games do not start from one. Only the NCAs and NAXs the keys read as programs are listed, so an unpacked NSP's other NCAs are not.
+- **The community in About.** About now names the community's Discord server, **nightly**, with its address (`discord.gg/pSqgRU3YP9`) and a QR code your phone opens it with. The first time Nightshade opens with this version, a card shows the same once over the home screen; any button closes it, and it doesn't come back.
 
 ### Fixes
 

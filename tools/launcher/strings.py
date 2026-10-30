@@ -301,6 +301,10 @@ NOTES = {
     "Without filesystem access there is nothing to back up.": "Filesystem access is what the app asks the console for when it starts (as in 'Without filesystem access Nightshade can't tell which apps are installed.').",
     "Nightshade's data could not be read: {0}": "{0} is why (English, technical).",
     "Images in {0} and in {1}": "Under the Wallpaper list: {0} and {1} are the two folders the images are read from (the game files folder's wallpapers folder, then /data/prosperoeden/wallpapers).",
+    "JOIN THE COMMUNITY": "Label on the About screen over the community's Discord server: its name (nightly), its address and a QR code that opens it. Keep it uppercase.",
+    "Join the community": "Title of a card shown once when the app starts: the community's Discord server, with its name (nightly), its address and a QR code that opens it.",
+    "Get help, hear about new releases and meet other players on Discord.": "On the same card, under its title. Discord is a name (unchanged).",
+    "You can find it again in About.": "On the same card: the About screen (the menu's last section; use its translation) shows the server too.",
 }
 
 
