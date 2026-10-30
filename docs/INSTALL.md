@@ -32,6 +32,7 @@ Only these subfolders matter; the folder itself can have any name and location.
 ├── ryujinx/                            # optional: a Ryujinx data folder to import saves from
 ├── save-export/                        # written by "Export a copy"
 ├── wallpapers/                         # optional: images for Settings > Appearance > Wallpaper (WALLPAPERS.md)
+├── amiibo/                             # optional: amiibo dumps, *.bin (see Amiibo)
 └── .remote-downloads/                  # downloads that are not finished yet (see Download sources)
 ```
 
@@ -46,6 +47,12 @@ The folder browser shows how many keys, firmware files, and games each folder ho
 ```
 
 It applies from the next start, and the Library, the home page, downloads and forwarders then use its `roms/` and `updates/`; the GAMES and UPDATES lines in Settings > Game files and in About show where they are (the folder browser still counts each folder's own `roms/`). When the folder is not there at start (a drive not plugged in), the Library lists no games from it and downloads wait; the log says `games folder: Not found`. Without it, or when it does not name an absolute folder, the games are in the game files folder as before. Whatever the folders, the shader caches, saves and everything else written during play stay in `/data/prosperoeden` on the console (see App data).
+
+### Amiibo
+
+Player 1's controller has an NFC reader, as a Switch's controller does. A game that asks for an amiibo shows its own scan screen, which you can cancel as on a Switch.
+
+To use an amiibo, put its dump in `amiibo/` in the game files folder (or in `/data/prosperoeden/amiibo/`): a `.bin` file of 540 bytes (532 and 572 work too), or 1 KiB for a MIFARE tag. Each time a game starts scanning, the next dump there is shown to it a second later, in name order, then the first again; keep only the one you want in the folder to always show that one. A game that writes to the amiibo (its own save data on the figure) writes to that file. With the console's amiibo key, `key_retail.bin`, in `keys/`, a game reads and writes everything on the figure; without it, what it needs to know which figure it is. With no dumps the scan waits until you cancel it. `stderr.log` says which dump was shown (`amiibo:`). ProsperoEden does not include any amiibo: dump your own.
 
 ### Compressed games (NSZ and XCZ)
 
