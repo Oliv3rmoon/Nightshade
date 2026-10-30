@@ -139,6 +139,65 @@ What the host does for them (docs/SETTINGS.md has the player's side):
   fixes or keep order): the fence manager's own lock and batched release, the device memory
   translation cache per thread, the spin-then-wait kernel lock (with the console's spin count).
 
+## For a tester with their own Switch 2 game
+
+Nobody here has a Switch 2 dump or keys; the first console runs are the testers'.
+
+1. Dump your own game's ExeFS and RomFS (with your own keys, from your own cartridge or download)
+   into a game folder: `roms/<name>/exefs/` with `main`, `main.npdm`, `rtld`, `sdk` and every
+   `subsdk*`, and `roms/<name>/romfs/` with the whole RomFS. Splatoon Raiders (`0400380020056000`)
+   is the title eden-nx2 gets furthest in on a PC (menus, then its intro); Pokopia
+   (`0400A3A01EE4C000`) is the one ProsperoEden's demo showed.
+2. Start Nightshade: the Library lists the folder with "Switch 2" under its name; its details say
+   **Switch 2: experimental**. Leave Settings as they are (Vulkan renderer).
+3. Play it once without changing anything, as far as it goes, then quit with Touchpad + L1.
+4. Send `logs/` (`eden_log.txt`, `stderr.log`, the launch report and any crash report). What says
+   the most: the line `Switch 2 title (experimental): ...` (what the session got), `GPU thread
+   split`, `EDEN_GUEST_MEMORY ... bytes=21474836480` (the 20 GiB guest range; `sparse refused` means
+   the console would not reserve it), `Draw skipped`, `Native compute shader rejected`, `Using auto
+   stub fallback`, and the memory lines of the FPS overlay.
+5. If it stops or crashes on the way, try once more with `"switch2": {"gpu_split": false}` in the
+   settings file (docs/SETTINGS.md), and say which run was which.
+
+## PS5 risks
+
+- **Memory.** The 12 GiB layout plus nx2's 8 GiB for the graphics server's GPU-only regions is
+  20 GiB of guest DRAM. The PS5's pool is ~12.4 GiB for everything. It only works because guest
+  RAM is backed where the guest writes (`src/guest_memory_service.inc`), and only while a title
+  touches less than what is left after the GPU caches, the JIT and the host heap. Title 1 (Mario
+  Kart World) asks gpu 214 for two 5.7 GiB regions.
+- **Address space.** The 20 GiB guest range is reserved and mapped to the zero block slot by slot
+  (10,240 mappings of 2 MiB, against 4,096 at 8 GiB); a kernel limit on map entries would refuse
+  it, and the log then says `EDEN_GUEST_MEMORY sparse refused`.
+- **CPU.** eden-nx2 emulates six cores for every title (Switch 1 titles leave 4 and 5 idle; their
+  threads sleep), the split GPU thread needs two host threads (its second thread is placed on the
+  secondary CPUs, not pinned), and the console's Zen 2 at 3.5 GHz is slower than the PCs nx2 was
+  measured on. Expect CPU-bound frame rates, like the demo. `"switch2": {"gpu_split": false}` trades
+  the split for one free core.
+- **Executable memory.** nx2's Turing MME JIT allocates with plain Xbyak (mprotect RX), which the
+  console refuses: off on the PS5 (interpreter with the call memo). With it off the split GPU thread
+  runs macros on its second thread (eden-nx2's mode 1), not on the first (mode 2, its measured best).
+  Next step: give it Nightshade's JIT allocator (`headless/jit-allocator.h`, aliased RW/RX views)
+  with commits as the code grows, then test it on a console.
+- **RADV features.** Shaders are SM86 SASS lowered to Maxwell and compiled by Eden's SPIR-V
+  backend, so the features are the ones Switch 1 games use. New: sparse residency images for
+  "unbacked" huge textures (2^28+ texels), the `bc_encoder.comp` compute pass (ASTC to BC1/BC3),
+  64 MiB VMA blocks. Task/mesh programs are rejected by nx2 itself.
+- **Sparse images.** Images over 2^28 texels (Mario Kart World's virtual textures) become sparse
+  images with nothing bound; that needs sparse residency in the console's RADV. Where it is missing
+  the image fails and the session ends with the out-of-memory message.
+- **Driver budget.** nx2 allocates images past the Vulkan budget when the budget refuses; on the
+  console the budget is not the pool's real state, which Nightshade already handles by asking again
+  outside it.
+- **Video.** Switch 2 movies are decoded with FFmpeg's VP9 decoder, which the console's FFmpeg build
+  has (H.264, VP8, VP9).
+- **Fixed costs for every game.** The GPU's device address space grew from 16 to 64 GiB: Eden's
+  page-cache counters for it are a dense 16 MiB array (4 MiB before). Its other tables are sparse.
+- **Switch 1 behaviour.** Upstream's 28 commits and eden-nx2's changes for every title (six cores,
+  the kernel lock, the fence manager's batched release, the per-thread device translation cache)
+  reach Switch 1 games too. The two that change GPU state handling are kept to Switch 2 (patch 12);
+  the rest is checked only by the existing checks, not on a console.
+
 ## Progress log
 
 - 2026-10-29: worktree `checkouts/nightshade-nx2` on `feature/nx2`; eden-nx2 cloned to
