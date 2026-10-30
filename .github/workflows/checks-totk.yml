@@ -23,7 +23,7 @@
    "env": {
     "XDG_CACHE_HOME": "/tmp/prosperoeden-dev-host-cache",
     "PROSPEROEDEN_DEPS_CACHE": "/tmp/prosperoeden-dev-downloads",
-    "DEV_HEAD": "c2a9ca2d732af2954af603677fca2f1a064367d4",
+    "DEV_HEAD": "30caa37296a55248916109e4d57dbdce4831f89e",
     "GITHUB_TOKEN": "${{ github.token }}"
    },
    "steps": [
@@ -31,7 +31,7 @@
      "name": "Check out the fix/totk-stability commit",
      "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
      "with": {
-      "ref": "c2a9ca2d732af2954af603677fca2f1a064367d4",
+      "ref": "30caa37296a55248916109e4d57dbdce4831f89e",
       "persist-credentials": false
      }
     },
