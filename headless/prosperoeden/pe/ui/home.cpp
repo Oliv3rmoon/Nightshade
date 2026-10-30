@@ -431,7 +431,7 @@ void Launcher::draw_home(Canvas &c)
         begin_part(0, -16.0f);
         {
             const float line = baseline(layout::kTop, 64.0f, t.size_text);
-            float x = left + text(c, "PROSPEROEDEN", left, line, t.size_text, t.title, Align::left, 7.0f) + 28.0f;
+            float x = left + text(c, "NIGHTSHADE", left, line, t.size_text, t.title, Align::left, 7.0f) + 28.0f;
             x += text(c, version_, x, line, t.size_small, t.muted);
             x += text(c, std::string("  /  ") + kBuildLabel, x, line, t.size_small, t.accent_pale);
             if (profiles_.size() > 1 && !playing_.empty())

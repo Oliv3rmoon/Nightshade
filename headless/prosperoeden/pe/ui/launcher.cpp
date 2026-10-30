@@ -742,7 +742,7 @@ void Launcher::draw_opening(Canvas &c)
     list.push_transform(1.0f, 0.0f, 0.0f, 0.0f, (1.0f - named) * 16.0f - gone * 10.0f);
     {
         const Heavy heavy(c);
-        text(c, "PROSPEROEDEN", 960.0f, 706.0f, 40.0f, t.title, Align::center, 12.0f);
+        text(c, "NIGHTSHADE", 960.0f, 706.0f, 40.0f, t.title, Align::center, 12.0f);
     }
     list.pop_transform();
     list.pop_opacity();
