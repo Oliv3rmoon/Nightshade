@@ -676,6 +676,10 @@ int main(int argc, char** argv) {
             if (!Eden::StreamedGame::Open(selected_game, &error)) throw std::runtime_error(error);
         }
 #endif
+        // Safe Launch (settings_store.h): the launcher armed this start of this game. The session
+        // reads its settings below and takes the safe ones where it does; the file is not touched.
+        if (Eden::SafeLaunch::Begin(eden_game_title_id(selected_game.c_str())))
+            Eden::Report("launch", Eden::SafeLaunch::kReport);
 #ifdef EDEN_DEV_VULKAN
         Eden::Performance::vulkan_cost_enabled = std::filesystem::exists(Eden::AppFile("cost-run.txt"));
         if (Eden::Performance::vulkan_cost_enabled) Eden::Performance::timers_on = true;  // a cost run
@@ -1174,7 +1178,9 @@ int main(int argc, char** argv) {
                 Settings::ScalingFilter::Bilinear, Settings::ScalingFilter::Fsr, Settings::ScalingFilter::Bicubic,
                 Settings::ScalingFilter::NearestNeighbor};
             // Settings > Video, with what the game does differently (Library > Game settings > Video).
-            const auto video = Eden::PreferencesFor(eden_game_title_id(guest));
+            auto video = Eden::PreferencesFor(eden_game_title_id(guest));
+            // A safe start (Safe Launch): 1x, Bilinear, BC3, 1080p, 60 Hz, nothing added.
+            if (Eden::SafeLaunch::On()) Eden::SafeLaunch::Apply(video);
             const int resolution = video.resolution;
             const int filter = video.upscaling_filter;
             Settings::values.resolution_setup.SetValue(resolutions[resolution]);
@@ -1336,7 +1342,9 @@ int main(int argc, char** argv) {
             // Speed against accuracy ("performance" in the settings file, settings_store.h): each
             // one is off unless chosen there, for every game or for this one. The levels start
             // every session at their exact values (above), so one that is not chosen is off.
-            const auto speed = Eden::LoadPerformance(eden_game_title_id(guest));
+            auto speed = Eden::LoadPerformance(eden_game_title_id(guest));
+            // A safe start: every switch at its default, 4 GiB, 100% (Safe Launch).
+            if (Eden::SafeLaunch::On()) Eden::SafeLaunch::Apply(speed);
             // Clock adjustment is an explicit per-game workaround, not a default speed change.
             // This runs before Core::System creates any of the new guest's threads.
             Eden::GuestClock::Reset(Eden::LoadAdaptiveClock(eden_game_title_id(guest)));
@@ -1344,6 +1352,8 @@ int main(int argc, char** argv) {
             // A game's saved pipelines are built while it plays (shader_start.h), unless the settings
             // file says otherwise: Vulkan only, the OpenGL renderer builds them before the game starts.
             Eden::ShaderStart::background = speed.background_shader_cache && backend == Eden::GraphicsBackend::Vulkan;
+            // The overlay's SHD piece reads this build's progress, not one an earlier game left.
+            Eden::ShaderStart::SetProgress({});
             if (speed.fast_gpu) {
                 // Nothing calls UpdateGPUAccuracy() here; set the live value too.
                 Settings::values.gpu_accuracy.SetValue(Settings::GpuAccuracy::Low);
@@ -1429,11 +1439,13 @@ int main(int argc, char** argv) {
             const auto all_mods = Eden::Mods::List(
                 {Eden::AssetsPath("mods"), Eden::AssetsPath("cheats"), Eden::Mods::SessionGameFolder()}, title);
             // Of a mod that lists several cheats, only the ones chosen there run (cheats.h).
-            const bool cheats_enabled = Eden::LoadCheatsEnabled(title);
+            // A safe start has neither (Safe Launch): as the game's Mods and Cheats switches off.
+            const bool safe_start = Eden::SafeLaunch::On();
+            const bool cheats_enabled = !safe_start && Eden::LoadCheatsEnabled(title);
             const auto cheats_on = cheats_enabled ? Eden::LoadChosenCheats(title) : std::vector<std::string>{};
             auto switched = Eden::Mods::Switches(all_mods, Eden::LoadDisabledMods(title), cheats_on,
-                                                 Eden::LoadCheatsOff(title), Eden::LoadModsEnabled(title),
-                                                 cheats_enabled);
+                                                 Eden::LoadCheatsOff(title),
+                                                 !safe_start && Eden::LoadModsEnabled(title), cheats_enabled);
             Eden::Cheats::Off() = std::move(switched.cheats_off);
             const auto& mods_off = switched.mods_off;
             const std::string mods = Eden::Mods::Summary(all_mods, mods_off, cheats_on);
@@ -1470,7 +1482,8 @@ int main(int argc, char** argv) {
                                     "), " + Eden::BackendName(backend) + ", resolution " +
                                     Eden::kResolutionKeys[resolution] + ", " + Eden::kUpscalingFilterLabels[filter] +
                                     ", output " + Eden::kOutputKeys[video.output] + ", " +
-                                    Eden::kRefreshKeys[refresh] + " Hz, mods: " + mods,
+                                    Eden::kRefreshKeys[refresh] + " Hz, mods: " + mods +
+                                        (Eden::SafeLaunch::On() ? ", safe mode" : ""),
                                     true);
         }
 #endif
@@ -2325,6 +2338,7 @@ int main(int argc, char** argv) {
                     if (game && session_seconds < 60 && guest_fault_retries < 4) {
                         ++guest_fault_retries;
                         relaunch_game = selected_game;
+                        Eden::SafeLaunch::Again();  // a safe start stays safe when it starts again
                         return_to_menu = true;
                         LOG_WARNING(Frontend, "EDEN_GUEST_FAULT_RETRY {} after {:.1f} s: {}", guest_fault_retries,
                                     session_seconds, completion->guest_fault);

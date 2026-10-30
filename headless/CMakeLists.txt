@@ -3583,6 +3583,7 @@ endif()
                 "${launcher_dir}/pe/ui/pairing.cpp"
                 "${launcher_dir}/pe/ui/multiplayer.cpp"
                 "${launcher_dir}/pe/ui/qr_code.cpp"
+                "${launcher_dir}/pe/ui/quick.cpp"
                 "${launcher_dir}/pe/ui/update.cpp"
                 "${launcher_dir}/pe/ui/home.cpp"
                 "${launcher_dir}/pe/ui/launcher.cpp"

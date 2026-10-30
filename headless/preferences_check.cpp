@@ -446,6 +446,71 @@ int main() {
         assert(Guard::Layout(racer, 2, false) == 2 && Guard::Layout(racer, 1, false) == 1 &&
                Guard::Layout(quest, 0, false) == 0);
     }
+    // A game's own memory ("performance/memory_layout"): Library > Game settings > Performance >
+    // Memory and a video profile that names one. Read for the session before the general value,
+    // written and taken back by the Library, and a value that is not a layout refused.
+    {
+        const std::string memory_file = std::string(directory) + "/memory.json";
+        std::ofstream(memory_file) << R"({"performance": {"memory_layout": "8Gb"},
+            "games": {"0100000000010000": {"performance": {"memory_layout": "4Gb", "fast_gpu": true}}}})";
+        assert(Eden::LoadGameSettings(racer, memory_file).memory_layout == 0);
+        assert(Eden::LoadGameSettings(quest, memory_file).memory_layout == -1);
+        assert(Eden::LoadPerformance(racer, memory_file).memory_layout == 0);
+        assert(Eden::LoadPerformance(quest, memory_file).memory_layout == 2);
+        auto own = Eden::LoadGameSettings(quest, memory_file);
+        own.memory_layout = 1;
+        assert(Eden::SaveGameSettings(quest, own, memory_file));
+        assert(Eden::LoadPerformance(quest, memory_file).memory_layout == 1);
+        own.memory_layout = int(std::size(Eden::kMemoryLayoutKeys));
+        assert(!Eden::SaveGameSettings(quest, own, memory_file));
+        // Taken back: the game follows Settings again; its other Performance values stay.
+        auto racer_own = Eden::LoadGameSettings(racer, memory_file);
+        racer_own.memory_layout = -1;
+        assert(Eden::SaveGameSettings(racer, racer_own, memory_file));
+        assert(Eden::LoadPerformance(racer, memory_file).memory_layout == 2);
+        assert(Eden::LoadPerformance(racer, memory_file).fast_gpu);
+    }
+    // Safe Launch: armed for one title by the launcher, taken by the session that starts it, used up
+    // either way; conservative values for that session only, nothing in the file changed.
+    {
+        namespace Safe = Eden::SafeLaunch;
+        Safe::Arm(racer);
+        assert(!Safe::Begin(quest) && !Safe::On());  // another game: not safe, and the arming is gone
+        assert(!Safe::Begin(racer));
+        Safe::Arm(racer);
+        assert(Safe::Begin(racer) && Safe::On());
+        Safe::Again();                                // a retry of the same session stays safe
+        assert(Safe::Begin(racer) && Safe::On());
+        assert(!Safe::Begin(racer) && !Safe::On());   // the next start is as the settings say
+        Safe::Arm(0);
+        assert(!Safe::Begin(0));
+        Eden::Preferences video;
+        video.resolution = 6;
+        video.upscaling_filter = 1;
+        video.astc_textures = 1;
+        video.refresh = 1;
+        video.output = 2;
+        video.frame_gen = true;
+        video.post_processing = "Cinematic";
+        video.backend = Eden::GraphicsBackend::OpenGL;
+        video.volume = 30;
+        Safe::Apply(video);
+        assert(video.resolution == Eden::kNativeResolution && video.upscaling_filter == 0 &&
+               video.astc_textures == 0 && video.refresh == 0 && video.output == 0 && !video.frame_gen &&
+               video.post_processing.empty());
+        // What it keeps: the renderer, the audio, the rest.
+        assert(video.backend == Eden::GraphicsBackend::OpenGL && video.volume == 30);
+        Eden::PerformanceSettings speed;
+        speed.fast_gpu = speed.unsafe_cpu = speed.async_shaders = speed.compact_memory = true;
+        speed.reactive_flushing = false;
+        speed.memory_layout = 2;
+        speed.speed_limit = 4;
+        speed.background_shader_cache = false;
+        Safe::Apply(speed);
+        assert(!speed.fast_gpu && !speed.unsafe_cpu && !speed.async_shaders && !speed.compact_memory &&
+               speed.reactive_flushing && speed.memory_layout == 0 && speed.speed_limit == 0);
+        assert(!speed.background_shader_cache);  // the file's own choice for the cache build stays
+    }
     // Speed limit ("performance/speed_limit"): 100% without a file, a game's own before the general
     // one, a value that is not one of the steps read as 100%, and both kinds of write keep it.
     {

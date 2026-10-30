@@ -48,6 +48,14 @@ Rect card_rect(int index)
             kCardHeight};
 }
 
+// Nightshade's and Slate's home screen: the recent games, a column of covers between the game's
+// panel and the grid. Five at most: they fit the panel's height.
+constexpr int kRecentColumn = 5;
+constexpr float kRecentCover = 136.0f;
+constexpr float kRecentPitch = 164.0f;
+constexpr float kRecentTop = 110.0f;
+constexpr float kRecentLeft = 764.0f;
+
 // The four controllers, under the cover.
 Rect pad_rect(int player)
 {
@@ -57,6 +65,30 @@ Rect pad_rect(int player)
 }
 
 } // namespace
+
+void Launcher::collect_home_recents()
+{
+    // The recent games the Library has (on the console, or played where they lie), newest first.
+    home_recent_games_.clear();
+    for (const Recent &recent : home_.recents)
+    {
+        for (int i = 0; i < static_cast<int>(games_.size()); ++i)
+        {
+            const Game &game = games_[static_cast<std::size_t>(i)];
+            if (game.file == recent.file && !play_file(game).empty())
+            {
+                home_recent_games_.push_back(i);
+                break;
+            }
+        }
+        if (static_cast<int>(home_recent_games_.size()) == kRecentColumn)
+            break;
+    }
+    home_recent_ = std::clamp(home_recent_, 0, std::max(0, static_cast<int>(home_recent_games_.size()) - 1));
+    if (home_recent_games_.empty())
+        home_on_recents_ = false;
+    home_recent_y_.snap(kRecentPitch * static_cast<float>(home_recent_));
+}
 
 void Launcher::open_game_settings_from_home(const std::string &file)
 {
@@ -82,8 +114,55 @@ void Launcher::press_home(Key key)
     const bool ready = home_.setup_ready;
     const bool minimal = th().minimal_home;
     const int count = static_cast<int>(games_.size());
+    // The game the home screen's failure notice is about (Safe Launch): Options offers it the safe
+    // start, whatever has the focus.
+    if (key == Key::options && home_.launch_failed && home_.last_exists && home_.last_title_id != 0)
+    {
+        for (int i = 0; i < count; ++i)
+            if (games_[static_cast<std::size_t>(i)].file == home_.last_file)
+                return open_quick(i, true);
+    }
+    // The recent games' column puts its game in the panel and the grid's selection: what the grid
+    // does to its game, it does to that one.
+    const auto select_recent = [&]
+    {
+        library_.selected = home_recent_games_[static_cast<std::size_t>(home_recent_)];
+        refresh_selected_game();
+        sync_grid(false);
+        home_recent_y_.target = kRecentPitch * static_cast<float>(home_recent_);
+    };
+    if (minimal && home_on_recents_ && !home_recent_games_.empty())
+    {
+        const int recents = static_cast<int>(home_recent_games_.size());
+        switch (key)
+        {
+        case Key::up:
+        case Key::down:
+        {
+            const int next = std::clamp(home_recent_ + (key == Key::down ? 1 : -1), 0, recents - 1);
+            if (next != home_recent_)
+            {
+                home_recent_ = next;
+                select_recent();
+                cue(Cue::focus);
+            }
+            return;
+        }
+        case Key::left:
+            home_on_recents_ = false;
+            cue(Cue::focus);
+            return;
+        case Key::right:
+            home_on_recents_ = false;
+            home_on_grid_ = true;
+            cue(Cue::focus);
+            return;
+        default:
+            break; // Cross, Triangle, Square and Options: as the grid's (below)
+        }
+    }
 
-    if (minimal && home_on_grid_)
+    if (minimal && (home_on_grid_ || home_on_recents_))
     {
         const auto go = [&](int next)
         {
@@ -109,7 +188,13 @@ void Launcher::press_home(Key key)
         case Key::left:
             if (count == 0 || library_.selected % kGridColumns == 0)
             {
+                // The recent games' column first, when there is one; then the game's panel.
                 home_on_grid_ = false;
+                if (!home_recent_games_.empty())
+                {
+                    home_on_recents_ = true;
+                    select_recent();
+                }
                 cue(Cue::focus);
                 return;
             }
@@ -193,6 +278,10 @@ void Launcher::press_home(Key key)
             cue(saved ? Cue::toggle : Cue::error);
             return;
         }
+        case Key::options:
+            if (count > 0)
+                open_quick(library_.selected, false);
+            return;
         default:
             return;
         }
@@ -219,13 +308,26 @@ void Launcher::press_home(Key key)
             }
             return;
         case Key::right:
-            if (count > 0)
+            // The recent games' column first, when there is one; then the grid.
+            if (!home_recent_games_.empty())
+            {
+                home_on_recents_ = true;
+                select_recent();
+                cue(Cue::focus);
+            }
+            else if (count > 0)
             {
                 home_on_grid_ = true;
                 cue(Cue::focus);
             }
             return;
         case Key::left:
+            return;
+        case Key::options:
+            if (has_game && !game->remote)
+                open_quick(library_.selected, false);
+            else
+                cue(Cue::error);
             return;
         case Key::cross:
             press_ = 1.0f;
@@ -289,6 +391,19 @@ void Launcher::press_home(Key key)
             focus = focus - kFirstRecent + 1 < recent_count ? focus + 1 : kViewAll;
         }
         break;
+    case Key::options:
+    {
+        // Quick settings of the game focused: the one to continue, or a recent one.
+        const std::string file = focus <= kGameSettings && continue_ready ? home_.last_file :
+                                 focus >= kFirstRecent && focus < kFirstRecent + recent_count ?
+                                     home_.recents[static_cast<std::size_t>(focus - kFirstRecent)].file :
+                                     std::string{};
+        for (int i = 0; i < count && !file.empty(); ++i)
+            if (games_[static_cast<std::size_t>(i)].file == file)
+                return open_quick(i, false);
+        cue(Cue::error);
+        return;
+    }
     case Key::triangle:
         if (focus <= kGameSettings && continue_ready)
             open_game_settings_from_home(home_.last_file);
@@ -393,11 +508,19 @@ void Launcher::draw_home_status(Canvas &c)
                          (t.minimal_home ? 960.0f : kShelfTop + 12.0f);
     const float sw = over_library ? layout::kPanelWidth :
                                     (t.minimal_home ? 520.0f : layout::kWidth);
-    const Rect scard{sx, sy, sw, 164.0f};
+    // A game that stopped can be started again in safe mode (Options): the card says so under why.
+    const bool offer_safe = home_.launch_failed && home_.last_exists && home_.last_title_id != 0;
+    const float height = offer_safe ? 204.0f : 164.0f;
+    const Rect scard{sx, over_library ? sy - (height - 164.0f) * 0.5f : sy, sw, height};
     const Color accent = home_.launch_failed ? t.warning : t.accent;
     glass(c, scard, t.radius_card, t.panel.with_alpha(0.78f), accent.with_alpha(0.45f), 0.6f);
     notice_block(c, home_.status, scard.x + 32.0f, baseline(scard.y + 26.0f, 36.0f, t.size_text), t.size_text, 36.0f,
                  t.text, scard.w - 64.0f, 3, home_.launch_failed);
+    if (offer_safe)
+    {
+        static constexpr Hint kSafe[] = {{Pad::options, TR("Start it in safe mode")}};
+        draw_menu_hints(c, kSafe, 1, scard.x + 32.0f, scard.y + scard.h - 34.0f, t.accent_pale, scard.w - 64.0f);
+    }
 }
 
 void Launcher::draw_home(Canvas &c)
@@ -569,6 +692,32 @@ void Launcher::draw_home(Canvas &c)
                              focus(kGameSettings), press_, has_game && game->title_id != 0);
         }
         end_part();
+
+        // ---- the recent games: a column of covers between the panel and the grid ----
+        if (!home_recent_games_.empty())
+        {
+            begin_part(2, 18.0f);
+            kicker(c, tr("RECENTLY PLAYED"), kRecentLeft, baseline(80.0f, 30.0f, t.size_small), t.accent_pale,
+                   kRecentCover + 60.0f);
+            const float ring = kRecentTop + home_recent_y_.value;
+            for (int i = 0; i < static_cast<int>(home_recent_games_.size()); ++i)
+            {
+                const Game &recent = games_[static_cast<std::size_t>(home_recent_games_[static_cast<std::size_t>(i)])];
+                const Rect r{kRecentLeft, kRecentTop + kRecentPitch * static_cast<float>(i), kRecentCover,
+                             kRecentCover};
+                const float near = tween::clamp01(1.0f - std::fabs(r.y - ring) / 120.0f);
+                const float f = home_on_recents_ ? near : 0.0f;
+                const float sc = 1.0f + (0.05f * f - 0.035f * press_ * f) * motion();
+                list.push_transform(sc, r.x + r.w * 0.5f, r.y + r.h * 0.5f, 0.0f, 0.0f);
+                focus_ring(c, r, t.radius_card, f);
+                if (recent.remote)
+                    remote_cover(c, recent.cover, r, t.radius_card, 0.3f + 0.5f * f);
+                else
+                    cover(c, recent.cover, r, t.radius_card, 0.3f + 0.5f * f);
+                list.pop_transform();
+            }
+            end_part();
+        }
     }
     else
     {
@@ -695,20 +844,22 @@ void Launcher::draw_home(Canvas &c)
     if (screen_ == Screen::home)
     {
         begin_part(6, 0.0f);
-        if (minimal && home_on_grid_)
+        if (minimal && (home_on_grid_ || home_on_recents_))
         {
             static constexpr Hint kGridHints[] = {{Pad::cross, TR("Play")},
                                                   {Pad::triangle, TR("Game settings")},
+                                                  {Pad::options, TR("Quick settings")},
                                                   {Pad::square, TR("Mods")},
                                                   {Pad::l1, TR("Sections"), Pad::r1}};
-            draw_footer(c, kGridHints, 4, home_.system_status);
+            draw_footer(c, kGridHints, 5, home_.system_status);
         }
         else
         {
             static constexpr Hint kHints[] = {{Pad::cross, TR("Select")},
                                               {Pad::triangle, TR("Game settings")},
+                                              {Pad::options, TR("Quick settings")},
                                               {Pad::l1, TR("Sections"), Pad::r1}};
-            draw_footer(c, kHints, 3, home_.system_status);
+            draw_footer(c, kHints, 4, home_.system_status);
         }
         end_part();
     }

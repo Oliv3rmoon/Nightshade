@@ -75,7 +75,7 @@ int changes_of(const GameSettings &game)
            (game.frame_gen_multiplier >= 0) +
            static_cast<int>(std::count_if(game.performance.begin(), game.performance.end(),
                                           [](int value) { return value >= 0; })) +
-           (game.speed_limit >= 0) + (game.volume >= 0) + (game.mute >= 0) + (game.vibration >= 0) + (game.own_mapping ? 1 : 0) +
+           (game.speed_limit >= 0) + (game.memory_layout >= 0) + (game.volume >= 0) + (game.mute >= 0) + (game.vibration >= 0) + (game.own_mapping ? 1 : 0) +
            (game.controller >= 0) + (game.rng_seed >= 0) + (game.language >= 0);
 }
 
@@ -174,6 +174,7 @@ void Launcher::name_home_games()
             if (recent.file == game.file)
                 recent.title = game.name;
     }
+    collect_home_recents();
 }
 
 void Launcher::read_home()
@@ -182,6 +183,7 @@ void Launcher::read_home()
     home_.last_title = shown_name(fonts_.font, home_.last_title, home_.last_file);
     for (Recent &recent : home_.recents)
         recent.title = shown_name(fonts_.font, recent.title, recent.file);
+    collect_home_recents();
     if (home_.last_title_id == 0)
         return;
     const std::vector<Mod> mods = game_mods(home_.last_title_id);
@@ -441,6 +443,11 @@ void Launcher::press_library(Key key)
         cue(saved ? Cue::toggle : Cue::error);
         return;
     }
+    case Key::options:
+        // Quick settings: Play, Start in safe mode, the video settings players change most.
+        if (game != nullptr)
+            open_quick(library_.selected, false);
+        return;
     case Key::triangle:
         if (game == nullptr)
             return;
@@ -564,9 +571,10 @@ void Launcher::draw_library(Canvas &c)
         {
             static constexpr Hint kHints[] = {{Pad::cross, TR("Play")},
                                               {Pad::triangle, TR("Game settings")},
+                                              {Pad::options, TR("Quick settings")},
                                               {Pad::circle, TR("Home")},
                                               {Pad::l1, TR("Sections"), Pad::r1}};
-            draw_footer(c, kHints, 4, count > 0 ? list_position(library_.selected + 1, count) : std::string{});
+            draw_footer(c, kHints, 5, count > 0 ? list_position(library_.selected + 1, count) : std::string{});
         }
         return;
     }
@@ -823,10 +831,11 @@ void Launcher::draw_library(Canvas &c)
     }
     static constexpr Hint kHints[] = {{Pad::cross, TR("Play")},
                                       {Pad::triangle, TR("Game settings")},
+                                      {Pad::options, TR("Quick settings")},
                                       {Pad::square, TR("Mods")},
                                       {Pad::circle, TR("Back")},
                                       {Pad::l1, TR("Sections"), Pad::r1}};
-    draw_footer(c, kHints, 5, count > 0 ? list_position(library_.selected + 1, count) : std::string{});
+    draw_footer(c, kHints, 6, count > 0 ? list_position(library_.selected + 1, count) : std::string{});
 }
 
 // ---------------------------------------------------------------- game settings dialog
@@ -878,6 +887,10 @@ void Launcher::press_game(Key key)
         if (kind != row_save)
             return;
         break;
+    case Key::options:
+        // Quick settings over this page: Play, Start in safe mode, the common video settings.
+        open_quick(library_.selected, false);
+        return;
     case Key::left:
     case Key::right:
     case Key::cross:
@@ -1176,26 +1189,29 @@ void Launcher::draw_game_page(Canvas &c, float open)
     }
     else if (kind == row_delete)
     {
-        static constexpr Hint kDelete[] = {{Pad::cross, TR("Delete")}, {Pad::circle, TR("Back")}};
-        hints(kDelete, 2);
+        static constexpr Hint kDelete[] = {
+            {Pad::cross, TR("Delete")}, {Pad::options, TR("Quick settings")}, {Pad::circle, TR("Back")}};
+        hints(kDelete, 3);
     }
     else if (kind == row_save)
     {
         static constexpr Hint kTransfer[] = {{Pad::cross, TR("Import")},
                                              {Pad::square, TR("Export a copy")},
+                                             {Pad::options, TR("Quick settings")},
                                              {Pad::circle, TR("Back")}};
-        hints(kTransfer, 3);
+        hints(kTransfer, 4);
     }
     else if (kind != row_mode)
     {
-        static constexpr Hint kOpen[] = {{Pad::updown, TR("Select")}, {Pad::cross, TR("Open")}, {Pad::circle, TR("Back")}};
-        hints(kOpen, 3);
+        static constexpr Hint kOpen[] = {{Pad::updown, TR("Select")}, {Pad::cross, TR("Open")},
+                                         {Pad::options, TR("Quick settings")}, {Pad::circle, TR("Back")}};
+        hints(kOpen, 4);
     }
     else
     {
-        static constexpr Hint kHints[] = {
-            {Pad::updown, TR("Select")}, {Pad::leftright, TR("Change")}, {Pad::circle, TR("Back")}};
-        hints(kHints, 3);
+        static constexpr Hint kHints[] = {{Pad::updown, TR("Select")}, {Pad::leftright, TR("Change")},
+                                          {Pad::options, TR("Quick settings")}, {Pad::circle, TR("Back")}};
+        hints(kHints, 4);
     }
     list.pop_transform();
     list.pop_opacity();

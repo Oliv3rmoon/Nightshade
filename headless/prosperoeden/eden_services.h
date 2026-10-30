@@ -147,6 +147,7 @@ public:
     std::optional<std::string> room_text(int, const std::string&, const std::atomic<bool>&) override;
     std::optional<std::int64_t> ask_seed(std::int64_t, const std::atomic<bool>&) override;
     bool can_launch_game() override;
+    void arm_safe_launch(std::uint64_t title_id) override;
 private:
     // Post-processing: the presets as the menu lists them, and a name's place among them.
     // The presets for the general settings and the game whose settings were read last (title_id,

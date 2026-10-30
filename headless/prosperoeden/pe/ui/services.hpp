@@ -483,8 +483,9 @@ struct Preferences
     int hud_corner = 0; // 0 top left, 1 top right, 2 bottom left, 3 bottom right
     bool hud_colors = true;  // the line in its inks rather than one
     // What the overlay's line may say, bit by bit (hud.h's kHudField*): the pieces the user has
-    // chosen to show. All of them by default, the game's own resolution (bit 9) with the rest.
-    int hud_fields = 0x2ff;
+    // chosen to show. All of them by default (kHudFieldDefault): the game's own resolution (bit 9),
+    // the frame-time window (10), memory pressure (11) and shader building (12) with the rest.
+    int hud_fields = 0x1eff;
     // Which face button presses each core menu action (Settings > Controls > Menu keybinds).
     MenuBinding menu_bind = kDefaultMenuBinding;
     // Settings > Appearance > Wallpaper: the image file's name in the wallpapers folder ("" when
@@ -524,6 +525,7 @@ struct GameSettings
     std::array<int, 8> performance{-1, -1, -1, -1, -1, -1, -1, -1};
     int64_t rng_seed = -1;
     int speed_limit = -1; // index into kSpeedLimitPercents
+    int memory_layout = -1; // index into the memory layouts (4, 6, 8 GiB): Performance > Memory
 };
 
 // One cheat of a mod that lists several: each is chosen on its own.
@@ -937,6 +939,12 @@ class Services
     virtual std::optional<std::int64_t> ask_seed(std::int64_t /*current*/, const std::atomic<bool>& /*stop*/)
     { return std::nullopt; }
     virtual bool can_launch_game() { return true; }
+    // Safe Launch: the next start of this game (title ID) runs once with conservative settings and
+    // its mods and cheats off; nothing saved changes (settings_store.h, SafeLaunch). 0 takes it back.
+    virtual void arm_safe_launch(std::uint64_t title_id)
+    {
+        (void)title_id;
+    }
 
     // ---- Settings > Apps: Nightshade's own apps (pe/ui/apps_list.hpp, headless/apps.h) ----
     // Each app of kApps in its order, as last looked at: where it is, and its newest release once

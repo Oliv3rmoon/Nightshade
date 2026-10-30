@@ -71,6 +71,12 @@ class Launcher
     {
         return selected_game_;
     }
+    // Where the home screen's focus is in a theme with the game panel and the grid (Nightshade's,
+    // Slate's): on the recent games' column between them. For the preview's walk to the grid.
+    bool home_recents_focused() const
+    {
+        return home_on_recents_;
+    }
 
   private:
     bool launcher_picker_ = false;
@@ -114,6 +120,7 @@ class Launcher
         cheats,       // a game's cheats, opened from its settings
         apps,         // Settings > Apps: Nightshade's own apps, got, updated and opened (apps.cpp)
         backup,       // Settings > Diagnostics > Back up to USB: the app's data to a USB drive (backup.cpp)
+        quick,        // a game's Quick settings: Play, Start in safe mode, its common video settings (quick.cpp)
     };
     // The update dialog's steps: the offer, installing, stopping it, closing for the helper to
     // finish, and a failure.
@@ -137,9 +144,13 @@ class Launcher
     void close_modal();
     void say(const std::string &text, bool warning = false);
     // Starts a game: its save data is synced first when the profile syncs it (save_sync.cpp).
-    void launch(const std::string &file, const std::string &title, const std::string &cover);
+    // safe_title: the game's title ID for a start in safe mode (Safe Launch, this start only); 0 for
+    // a start as its settings say.
+    void launch(const std::string &file, const std::string &title, const std::string &cover,
+                std::uint64_t safe_title = 0);
     // Starts it now.
-    void start_game(const std::string &file, const std::string &title, const std::string &cover);
+    void start_game(const std::string &file, const std::string &title, const std::string &cover,
+                    std::uint64_t safe_title = 0);
     void draw_screen(Canvas &c, Screen screen);
     // A screen's title and the line beside it, at the top; its hints at the bottom, with what the
     // menu last said (or `status`) at their right.
@@ -267,6 +278,27 @@ class Launcher
     static const char *performance_about(int row);
     // How many of a category's settings the game has of its own.
     int game_overrides(int category) const;
+    // The title ID of the game whose settings are shown (the Library's selection).
+    std::uint64_t option_title() const;
+    // ---- Quick settings and Safe Launch (quick.cpp) ----
+    // A game's Quick settings (Modal::quick): Play, Start in safe mode, then its video profile and
+    // the video settings players change most, each saved for the game at once. Options opens it on
+    // a game in the Library, on the home screen and on the game's settings page. after_failure:
+    // the game stopped last time (the home screen's notice): the safe start has the focus.
+    void open_quick(int game, bool after_failure);
+    void press_quick(Key key);
+    void draw_quick(Canvas &c, float open);
+    int quick_rows() const;
+    // The values a video profile tier sets for a game, on one line ("1.5x  /  Bicubic  /
+    // Compressed ASTC"), and what a game's profile row says it has.
+    std::string profile_summary(std::uint64_t title_id, int tier) const;
+    // What the explain pane and Quick settings say of a profile row: the tier's values, Custom,
+    // or Settings' profile (tier -1).
+    std::string profile_about(std::uint64_t title_id, int tier) const;
+    std::string profile_name(int tier) const;
+    // Starts a game in safe mode: settings that start nearly anything, mods off, this start only.
+    void launch_safe(const Game &game);
+
     // ---- profiles (profiles.cpp) ----
     void read_profiles();
     int profile_row_count() const;
@@ -480,6 +512,7 @@ class Launcher
     std::string selected_game_;
     std::string launch_title_;
     std::string launch_cover_;
+    bool launch_safe_ = false; // the game starting runs in safe mode
     tween::Timer launch_;
     Rect launch_from_{790.0f, 250.0f, 340.0f, 340.0f}; // where its cover was when it was started
     bool done_ = false;
@@ -493,6 +526,13 @@ class Launcher
     std::array<float, 4> controller_pop_{}; // 1 when a controller appears, then decays
     int home_focus_ = 0;
     bool home_on_grid_ = false;
+    // Nightshade's and Slate's home screen: the recent games, a column of covers between the game's
+    // panel and the grid (indexes into games_), and the one focused there.
+    std::vector<int> home_recent_games_;
+    bool home_on_recents_ = false;
+    int home_recent_ = 0;
+    tween::Spring home_recent_y_;
+    void collect_home_recents();
     std::array<tween::Spring, 12> home_springs_{};
     float intro_ = 0.0f;
     bool first_start_ = true;
@@ -591,6 +631,13 @@ class Launcher
     // language
     ListView language_;
 
+    // Quick settings (quick.cpp): the game (an index into games_), its rows, and where it was
+    // opened from.
+    int quick_game_ = -1;
+    ListView quick_rows_;
+    bool quick_from_page_ = false;  // the game's settings page: Circle goes back there
+    bool quick_after_failure_ = false;
+
     // the download sources
     Sources sources_;
     std::vector<Download> downloads_;
@@ -635,6 +682,7 @@ class Launcher
     std::string sync_file_;         // the game that starts once its save data is in step
     std::string sync_title_;
     std::string sync_cover_;
+    std::uint64_t sync_safe_ = 0;   // ... in safe mode (its title ID), else 0
     bool sync_launch_ = false;      // the dialog is for a game about to start
     bool sync_started_ = false;     // its sync was asked for (after the one before it ended)
     ListView sync_rows_;            // the answers to a conflict or a failure

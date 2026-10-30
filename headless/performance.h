@@ -46,6 +46,9 @@ inline std::atomic<bool> gpu_time_wanted{false};
 inline std::atomic<unsigned long long> gpu_time_busy_ns{0}, gpu_time_results{0};
 inline std::atomic<bool> gpu_time_failed{false};
 void MemoryPool(unsigned long long* free_bytes, unsigned long long* total_bytes);
+// What the heap holds of the pool (its pieces and large blocks) and what of that is in use, as
+// EDEN_MEMORY says it: both 0 in a build without the app's heap. Cheap: a few atomics.
+void HeapUsage(unsigned long long* held, unsigned long long* in_use);
 #ifdef EDEN_DEV_PROFILE
 void BeginPcSampling();
 void PollGpuPc();

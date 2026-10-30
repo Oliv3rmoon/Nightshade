@@ -43,15 +43,24 @@ assert "vulkan_guest_resolution.inc" in port_script
 assert 'void RendererVulkan::Composite(std::span<const Tegra::FramebufferConfig> framebuffers) {' in port_script
 assert 'Hud::ForgetGuestScreen();' in graphics
 store = (root/'headless/settings_store.h').read_text()
-assert 'int hud_fields = 0x2ff;' in store and '!ValidHudFields(value.hud_fields)' in store
+assert 'int hud_fields = 0x1eff;' in store and '!ValidHudFields(value.hud_fields)' in store
 assert 'ValidHudFields(hud_fields)' in store
-# The three places that name the line's default all say the same: every piece, and the CPU piece
-# read as each of the four cores (bit 8 clear).
-assert 'std::atomic<int> hud_fields{0x2ff};' in graphics
-assert 'int hud_fields = 0x2ff;' in (root/'headless/prosperoeden/pe/ui/services.hpp').read_text()
+# The three places that name the line's default all say the same: every piece (kHudFieldDefault,
+# with the frame-time window, memory pressure and shader building), and the CPU piece read as each
+# of the four cores (bit 8 clear).
+assert 'std::atomic<int> hud_fields{0x1eff};' in graphics
+assert 'int hud_fields = 0x1eff;' in (root/'headless/prosperoeden/pe/ui/services.hpp').read_text()
+# The overlay reads the heap, the pool's pressure and the shaders built while playing.
+assert 'Performance::HeapUsage(&machine.heap_held, &machine.heap_used);' in graphics
+assert 'machine.pool_short = Performance::graphics_memory_short' in graphics
+assert 'ShaderStart::GetProgress()' in graphics
 launcher = (root/'headless/prosperoeden/pe/ui/settings.cpp').read_text()
 assert 'hud_resolution_row' in launcher and 'TR("Resolution")' in launcher
 assert '1 << (row - hud_backend_row)' in launcher
+# Settings > Video > Overlay options has a switch for each of the three new pieces, bits 10 to 12,
+# in the order of their bits after the resolution's.
+assert launcher.index('hud_resolution_row,') < launcher.index('hud_average_row,') < \
+    launcher.index('hud_pressure_row,') < launcher.index('hud_shaders_row,')
 # The line in its inks when colours are on, in the one ink when they are off.
 assert 'colors ? hud_ink(pick.ink) : kHudInk' in draw_hud
 # The Vulkan overlay draws that same line with that same font (vulkan_hud.frag, which the build
@@ -255,7 +264,7 @@ int main() {
         assert(std::string_view(Eden::FormatHudText(clock, 100, "VLK", known).data())
                == "VLK 60FPS 17.0MS CPU 55% GPU 43% MEM 4.1/8.0G");
         assert(Eden::kHudFieldResolution == (1u << 9));
-        assert(Eden::kHudFieldAll == 0x2ffu); // every piece; bit 8 is a mode, not a piece
+        assert(Eden::kHudFieldAll == 0x2ffu); // every earlier piece; bit 8 is a mode, not a piece
         // The whole line, with everything on, still fits in a snapshot's words.
         Eden::Hud::GuestScreen(3840, 2160);
         const auto widest = Eden::MakeHudSnapshot(clock, clock, 99, known, 119.88, 9999, 0, 0, false,
@@ -265,6 +274,57 @@ int main() {
                .starts_with("VLK 3840x2160 "));
         assert(std::string_view(reinterpret_cast<const char*>(widest.glyphs.data())).size()
                <= Eden::kHudTextMax);
+        Eden::Hud::ForgetGuestScreen();
+    }
+    // The frame-time window, memory pressure and the shaders built while playing (bits 10 to 12): a
+    // new install's line has them; a setting saved before them (kHudFieldAll) reads as it did.
+    {
+        assert(Eden::kHudFieldFrameAverage == (1u << 10) && Eden::kHudFieldPressure == (1u << 11) &&
+               Eden::kHudFieldShaders == (1u << 12));
+        assert(Eden::kHudFieldDefault == 0x1effu && Eden::ValidHudFields(0x1eff) && Eden::ValidHudFields(0x1fff));
+        assert(!Eden::ValidHudFields(1 << 13));
+        Eden::HudMachine pressed = known;
+        pressed.heap_held = 1610612736ULL;  // 1.5 GiB held, 1.1 of it in use
+        pressed.heap_used = 1181116006ULL;
+        pressed.pool_short = true;
+        pressed.shaders_active = true;
+        pressed.shaders_built = 450;
+        pressed.shaders_total = 1000;
+        assert(std::string_view(Eden::FormatHudText(clock, 100, "VLK", pressed, -1, Eden::kHudFieldDefault).data())
+               == "VLK 60FPS 16.7/17.0MS CPU 55% GPU 43% MEM 4.1/8.0G LOW HEAP 1.1/1.5G SHD 45%");
+        // As before for a line saved without them.
+        assert(std::string_view(Eden::FormatHudText(clock, 100, "VLK", pressed).data())
+               == "VLK 60FPS 17.0MS CPU 55% GPU 43% MEM 4.1/8.0G");
+        // Each on its own; nothing said of what is not known or not running.
+        assert(std::string_view(Eden::FormatHudText(clock, 100, "VLK", known, -1,
+                                                    Eden::kHudFieldMs | Eden::kHudFieldFrameAverage).data())
+               == "16.7/17.0MS");
+        pressed.pool_short = false;
+        pressed.shaders_active = false;
+        assert(std::string_view(Eden::FormatHudText(clock, 100, "VLK", pressed, -1,
+                                                    Eden::kHudFieldMem | Eden::kHudFieldPressure |
+                                                        Eden::kHudFieldShaders).data())
+               == "MEM 4.1/8.0G HEAP 1.1/1.5G");
+        assert(std::string_view(Eden::FormatHudText(clock, 100, "VLK", known, -1,
+                                                    Eden::kHudFieldPressure | Eden::kHudFieldShaders).data())
+               == "");
+        // A build whose total is not known yet still says it runs; the share never reads 100.
+        pressed.shaders_active = true;
+        pressed.shaders_total = 0;
+        assert(std::string_view(Eden::FormatHudText(clock, 100, "VLK", pressed, -1, Eden::kHudFieldShaders).data())
+               == "SHD --%");
+        pressed.shaders_total = pressed.shaders_built = 7;
+        assert(std::string_view(Eden::FormatHudText(clock, 100, "VLK", pressed, -1, Eden::kHudFieldShaders).data())
+               == "SHD 99%");
+        // The widest line a new install can have still fits a snapshot's words.
+        Eden::HudMachine widest = pressed;
+        widest.cores[0] = 100; widest.cores[1] = 100; widest.cores[2] = 100; widest.cores[3] = 100;
+        widest.graphics = 8589934592ULL;
+        widest.pool_short = true;
+        Eden::Hud::GuestScreen(3840, 2160);
+        const auto all = Eden::MakeHudSnapshot(clock, clock, 99, widest, 119.88, 9999, 0, 0, false,
+                                               Eden::kHudFieldSupported);
+        assert(std::string_view(reinterpret_cast<const char*>(all.glyphs.data())).size() <= Eden::kHudTextMax);
         Eden::Hud::ForgetGuestScreen();
     }
     // All four corners: each the same distance in from the two edges it stands against.
