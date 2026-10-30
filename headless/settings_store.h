@@ -18,7 +18,7 @@
 //     "performance": { "block_list": false, "async_shaders": false, "fast_gpu": false,
 //                      "unsafe_cpu": false, "unsafe_dma": false, "reactive_flushing": true,
 //                      "skip_invalidation": false, "compact_memory": false, "memory_layout": "4Gb",
-//                      "speed_limit": "100" },
+//                      "speed_limit": "100", "background_shader_cache": true },
 //     "game_files": "/mnt/ext1/eden",
 //     "games_folder": "/mnt/usb0/games",   (roms/ and updates/ apart from game_files; file only)
 //     "library": { "last_game": "Game [id].nsp", "recent": ["Game [id].nsp"] },
@@ -901,6 +901,9 @@ struct PerformanceSettings {
     bool compact_memory = false;     // the guest's memory in 16 KiB pages where it is mostly zeroes
     int memory_layout = 0;           // index into kMemoryLayoutKeys (0 is the Switch's own 4 GiB)
     int speed_limit = 0;             // index into kSpeedLimitKeys (0 is 100%, the console's own pace)
+    // The settings file's alone (no switch in the launcher): a game's saved pipelines are built while
+    // it plays instead of before it starts (shader_start.h). Vulkan only.
+    bool background_shader_cache = true;
 };
 
 inline PerformanceSettings LoadPerformance(uint64_t title_id, const std::string& file = SettingsFile()) {
@@ -919,6 +922,7 @@ inline PerformanceSettings LoadPerformance(uint64_t title_id, const std::string&
         value("reactive_flushing", result.reactive_flushing);
         value("skip_invalidation", result.skip_invalidation);
         value("compact_memory", result.compact_memory);
+        value("background_shader_cache", result.background_shader_cache);
         // A name that is not one of the layouts leaves the value the general settings gave.
         result.memory_layout = KeyIndex(Settings::String(document,
                                                          Json::json_pointer(base + "/performance/memory_layout")),
@@ -946,6 +950,7 @@ inline bool SavePerformance(uint64_t title_id, const PerformanceSettings& value,
                             {"unsafe_dma", value.unsafe_dma}, {"reactive_flushing", value.reactive_flushing},
                             {"skip_invalidation", value.skip_invalidation},
                             {"compact_memory", value.compact_memory},
+                            {"background_shader_cache", value.background_shader_cache},
                             {"memory_layout", kMemoryLayoutKeys[value.memory_layout]},
                             {"speed_limit", kSpeedLimitKeys[value.speed_limit]}};
     return Settings::Write(document, file);

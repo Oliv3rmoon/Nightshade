@@ -53,6 +53,14 @@ assert 'if (!dev_block_list) Eden::JitList::enabled = speed.block_list;' in rele
 store = (root / 'headless/settings_store.h').read_text()
 assert 'bool block_list = false;' in store and 'bool block_list = true;' not in store
 assert 'if (std::filesystem::exists(Eden::AppFile("block-list.txt"))) Eden::JitList::enabled = true;' in release
+# A game's saved pipelines are built while it plays unless the settings file says otherwise
+# ("background_shader_cache", shader_start.h): on by default, Vulkan only, kept when the launcher
+# saves its switches, and named in the launch report.
+assert 'Eden::ShaderStart::background = speed.background_shader_cache && backend == Eden::GraphicsBackend::Vulkan;' in release
+assert '", shader cache while playing " + on(Eden::ShaderStart::background) +' in release
+assert 'bool background_shader_cache = true;' in store
+assert 'value("background_shader_cache", result.background_shader_cache);' in store
+assert '{"background_shader_cache", value.background_shader_cache},' in store
 
 # Settings > Performance in the launcher: its eight switches are the general values.
 services = (root / 'headless/prosperoeden/eden_services.cpp').read_text()

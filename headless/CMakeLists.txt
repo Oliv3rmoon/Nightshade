@@ -3065,7 +3065,7 @@ if(shader_reader_begin LESS 0 OR shader_reader_end LESS shader_reader_begin)
 endif()
 string(SUBSTRING "${shader_environment_source}" 0 ${shader_reader_begin} shader_environment_head)
 string(SUBSTRING "${shader_environment_source}" ${shader_reader_end} -1 shader_environment_tail)
-string(PREPEND shader_environment_head "#include <cstdio>\n#include <new>\n#include <stdexcept>\n#include <system_error>\n")
+string(PREPEND shader_environment_head "#include <cerrno>\n#include <cstdio>\n#include <new>\n#include <stdexcept>\n#include <streambuf>\n#include <system_error>\n#include <fcntl.h>\n#include <sys/stat.h>\n#include <unistd.h>\n")
 write_derived("${PORT_BUILD_DIR}/shader_environment.cpp"
     "${shader_environment_head}#include \"${EDEN_PORT_DIR}/shader_cache_reader.inc\"\n\n${shader_environment_tail}")
 set_property(SOURCE "${PORT_BUILD_DIR}/shader_environment.cpp" APPEND PROPERTY OBJECT_DEPENDS
@@ -3110,7 +3110,11 @@ string(REPLACE "${recompress_old}" [=[            // A layer at a time (headless
 ]=] texture_util_source "${texture_util_source}")
 write_derived("${PORT_BUILD_DIR}/texture_cache_util.cpp" "${texture_util_source}")
 list(REMOVE_ITEM video_sources texture_cache/util.cpp)
-list(APPEND video_sources "${PORT_BUILD_DIR}/texture_cache_util.cpp")
+# The Vulkan port links its own copy of util.cpp (tools/prepare-vulkan-port.py, texture_util.cpp,
+# with the same layer-at-a-time recompression): with both in the library this one was never used.
+if(NOT "${PORT_BUILD_DIR}/texture_util.cpp" IN_LIST video_sources)
+    list(APPEND video_sources "${PORT_BUILD_DIR}/texture_cache_util.cpp")
+endif()
 list(REMOVE_ITEM video_sources shader_environment.cpp)
 list(APPEND video_sources "${PORT_BUILD_DIR}/shader_environment.cpp")
 set_property(TARGET video_core PROPERTY SOURCES "${video_sources}")

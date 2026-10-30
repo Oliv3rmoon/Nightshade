@@ -673,14 +673,69 @@ void SparseUsage(std::size_t* reserved, std::size_t* committed) noexcept {
 
 // ---- A range that grows: the heap ----
 //
+void* ReserveAddressRange(std::size_t size) noexcept;
+bool CommitMemoryRangeFrom(void* address, std::size_t size, bool high) noexcept;
+int DecommitMemoryRange(void* address, std::size_t size) noexcept;
+
 // ReserveMemoryRange takes address space only. CommitMemoryRange backs a part of it with zeroed
-// memory, for good. Both work in whole large pages; the heap commits its range from the start,
-// one piece after another, as allocations need it (headless/heap_arenas.inc).
+// memory; DecommitMemoryRange gives that memory back to the system and keeps the address space.
+// All work in whole large pages; the heap commits its range from the start, one piece after
+// another, as allocations need it, and gives back pieces that hold nothing
+// (headless/heap_arenas.inc).
+//
+// A range is committed in blocks of direct memory as large as the pool has room for, down to one
+// large page: the range is one in address, its memory need not be. Asked for in one block, a
+// 486 MiB request found no free block that large in a pool with a gigabyte free in pieces, and a
+// game's session ended (a Tears of the Kingdom tester, v1.010.005). Each block is recorded, so the
+// range can be given back block by block.
+namespace {
+struct CommittedBlock {
+    std::uintptr_t address; // 0: a free entry
+    std::size_t size;
+    std::int64_t physical;
+};
+constexpr std::size_t MostCommittedBlocks = 8192;
+CommittedBlock committed_blocks[MostCommittedBlocks];
+// A spin lock, as the heap's own: these run inside malloc, where a mutex could allocate.
+std::atomic_flag committed_lock = ATOMIC_FLAG_INIT;
+void LockCommitted() noexcept {
+    for (unsigned spins = 0; committed_lock.test_and_set(std::memory_order_acquire); ++spins) {
+        if (spins < 64) sched_yield();
+        else usleep(50);
+    }
+}
+void UnlockCommitted() noexcept {
+    committed_lock.clear(std::memory_order_release);
+}
+bool RecordCommitted(std::uintptr_t address, std::size_t size, std::int64_t physical) noexcept {
+    LockCommitted();
+    bool recorded = false;
+    for (auto& block : committed_blocks) {
+        if (block.address == 0) {
+            block = CommittedBlock{address, size, physical};
+            recorded = true;
+            break;
+        }
+    }
+    UnlockCommitted();
+    return recorded;
+}
+std::atomic<std::size_t> committed_split{0}; // ranges that took more than one block
+} // namespace
+
 void* ReserveMemoryRange(std::size_t size) noexcept {
     if (size == 0 || size % LargePage != 0) return nullptr;
 #ifdef PS5_NATIVE
     // Development A/B: dev-settings heap=whole takes the heap's memory at start, as before.
     if (DevSetting("heap=whole")) return nullptr;
+#endif
+    return ReserveAddressRange(size);
+}
+
+// Address space alone, whatever the heap's development switches say (the heap's large blocks).
+void* ReserveAddressRange(std::size_t size) noexcept {
+    if (size == 0 || size % LargePage != 0) return nullptr;
+#ifdef PS5_NATIVE
     void* address = reinterpret_cast<void*>(cpu_mapping_hint);
     if (sceKernelReserveVirtualRange(&address, size, 0, LargePage) != 0) return nullptr;
     if (!cpu_mapping_range(address, size)) {
@@ -695,28 +750,127 @@ void* ReserveMemoryRange(std::size_t size) noexcept {
 }
 
 bool CommitMemoryRange(void* address, std::size_t size) noexcept {
+    return CommitMemoryRangeFrom(address, size, true);
+}
+
+// `high`: from the top of the pool (memory that stays: the heap's pieces), else from where the
+// system places it (memory a session gives back: a large block).
+bool CommitMemoryRangeFrom(void* address, std::size_t size, bool high) noexcept {
     if (address == nullptr || size == 0 || size % LargePage != 0 ||
         reinterpret_cast<std::uintptr_t>(address) % LargePage != 0)
         return false;
 #ifdef PS5_NATIVE
-    std::int64_t physical = -1;
-    if (eden_direct_high(size, LargePage, 12, &physical) != 0) return false;
-    void* at = address;
-    if (sceKernelMapDirectMemory(&at, size, PROT_READ | PROT_WRITE, MAP_FIXED, physical, LargePage) != 0 ||
-        at != address) {
-        (void)sceKernelReleaseDirectMemory(physical, size);
+    const auto begin = reinterpret_cast<std::uintptr_t>(address);
+    std::size_t done = 0, block = size;
+    unsigned blocks = 0;
+    while (done < size) {
+        block = std::min(block, size - done);
+        std::int64_t physical = -1;
+        const int taken = high ? eden_direct_high(block, LargePage, 12, &physical)
+                               : eden_direct_low(block, LargePage, 12, &physical);
+        if (taken != 0) {
+            if (block == LargePage) break;  // not even one large page left
+            block = std::max(LargePage, block / 2 / LargePage * LargePage);
+            continue;
+        }
+        void* at = reinterpret_cast<void*>(begin + done);
+        if (sceKernelMapDirectMemory(&at, block, PROT_READ | PROT_WRITE, MAP_FIXED, physical, LargePage) != 0 ||
+            at != reinterpret_cast<void*>(begin + done)) {
+            (void)sceKernelReleaseDirectMemory(physical, block);
+            break;
+        }
+        if (!RecordCommitted(begin + done, block, physical)) {
+            // No entry left to give it back with: unmap it now, keeping the address space.
+            if (munmap(at, block) == 0) {
+                void* again = at;
+                (void)sceKernelReserveVirtualRange(&again, block, MAP_FIXED, LargePage);
+                (void)sceKernelReleaseDirectMemory(physical, block);
+            }
+            break;
+        }
+        done += block;
+        ++blocks;
+    }
+    if (done < size) {
+        // What was taken goes back: the caller has no use for part of a range.
+        if (done != 0) (void)DecommitMemoryRange(address, done);
         return false;
     }
+    if (blocks > 1) committed_split.fetch_add(1, std::memory_order_relaxed);
     // The heap grows through here: no stdio (it may allocate).
-    char line[96];
-    const int length = std::snprintf(line, sizeof(line), "EDEN_HEAP_PIECE bytes=%zu va=%p pa=%llx\n", size, address,
-                                     static_cast<unsigned long long>(physical));
+    char line[112];
+    const int length = std::snprintf(line, sizeof(line), "EDEN_HEAP_PIECE bytes=%zu va=%p blocks=%u%s\n", size,
+                                     address, blocks, high ? "" : " large");
     if (length > 0) Note(line);
     std::memset(address, 0, size);
     return true;
 #else
+    (void)high;
     return mprotect(address, size, PROT_READ | PROT_WRITE) == 0;
 #endif
+}
+
+// Gives back the memory of a committed part of a range, keeping its address space reserved (no
+// other mapping can land there). 1: given back; 0: nothing was done (the range stays as it was);
+// -1: given back in part (the range must not be used again). dev-settings heap_return=off keeps
+// everything (0).
+int DecommitMemoryRange(void* address, std::size_t size) noexcept {
+    if (address == nullptr || size == 0) return 0;
+#ifdef PS5_NATIVE
+    static const bool kept = DevSetting("heap_return=off");
+    if (kept) return 0;
+    const auto begin = reinterpret_cast<std::uintptr_t>(address);
+    const auto end = begin + size;
+    int result = 1;
+    std::size_t covered = 0;
+    LockCommitted();
+    for (auto& block : committed_blocks) {
+        if (block.address < begin || block.address >= end || block.address == 0) continue;
+        void* at = reinterpret_cast<void*>(block.address);
+        // As the guest's memory gives a block back (src/host_memory.cpp): unmapped, the address
+        // space reserved again at once, then the memory released.
+        if (munmap(at, block.size) != 0) {
+            result = -1;
+            continue;
+        }
+        void* again = at;
+        if (sceKernelReserveVirtualRange(&again, block.size, MAP_FIXED, LargePage) != 0 || again != at) result = -1;
+        if (sceKernelReleaseDirectMemory(block.physical, block.size) != 0) result = -1;
+        covered += block.size;
+        block = CommittedBlock{};
+    }
+    UnlockCommitted();
+    if (covered != size) result = covered == 0 ? 0 : -1;
+    return result;
+#else
+    void* at = mmap(address, size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED | MAP_NORESERVE, -1, 0);
+    return at == address ? 1 : 0;
+#endif
+}
+
+// A reserved range given back whole: its memory, then its address space.
+void ReleaseMemoryRange(void* address, std::size_t size) noexcept {
+    if (address == nullptr || size == 0) return;
+#ifdef PS5_NATIVE
+    // The release of a large block does not depend on the development switch.
+    const auto begin = reinterpret_cast<std::uintptr_t>(address);
+    const auto end = begin + size;
+    LockCommitted();
+    for (auto& block : committed_blocks) {
+        if (block.address < begin || block.address >= end || block.address == 0) continue;
+        if (munmap(reinterpret_cast<void*>(block.address), block.size) != 0 ||
+            sceKernelReleaseDirectMemory(block.physical, block.size) != 0)
+            std::abort();
+        block = CommittedBlock{};
+    }
+    UnlockCommitted();
+#endif
+    (void)munmap(address, size);
+}
+
+// Ranges committed in more than one block of memory since the app started.
+std::size_t CommittedSplit() noexcept {
+    return committed_split.load(std::memory_order_relaxed);
 }
 
 // ---- A range that fills: a JIT code cache ----

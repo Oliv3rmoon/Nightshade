@@ -72,6 +72,8 @@ python3 -B "$root/tools/check-guest-hooks.py"
 python3 -B "$root/tools/check-sparse-header.py" "$scratch/build"
 python3 -B "$root/tools/check-multiplayer-headers.py" "$scratch/build"
 python3 -B "$root/tools/check-heap-growth.py"
+# The shader cache built while a game plays: its shared state, and the Vulkan port that uses it.
+python3 -B "$root/tools/check-shader-start.py" "$scratch/source"
 python3 -B "$root/tools/check-crash-report.py"
 python3 -B "$root/tools/check-stop-limit.py"
 python3 -B "$root/tools/check-image-pages.py"
