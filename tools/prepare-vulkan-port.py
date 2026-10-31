@@ -1304,11 +1304,38 @@ texture_partial = [
 adapt('src/video_core/texture_cache/texture_cache.h',
       'vulkan-cache/video_core/texture_cache/texture_cache.h', [
     ('namespace VideoCommon {', '#include "performance.h"\n#include "texture_partial.h"\n#include "image_pages.h"\n#include "astc_policy.h"\n#include "texture_evictions.h"\n#include "common/scope_exit.h"\nnamespace Vulkan { class TextureCacheRuntime; }\n\nnamespace VideoCommon {'),
-    # An ASTC texture kept as BC3 is converted in the background in a busy frame only, and in
-    # place on a light screen (headless/astc_policy.h). The frame is counted where the texture
-    # cache ends its own.
+    # An ASTC texture kept as BC3 is converted in the background in a busy frame, and on a light
+    # one when it is larger than a screen picture; otherwise in place (headless/astc_policy.h). A
+    # light frame's background conversions and the conversions in place that held the frame for
+    # 16 ms or more are logged (EDEN_ASTC_BACKGROUND, EDEN_ASTC_IN_PLACE; Oliv3rmoon/Nightshade#3).
+    # The frame is counted where the texture cache ends its own.
     ('    if (True(image.flags & ImageFlagBits::AsynchronousDecode)) {\n        QueueAsyncDecode(image, image_id);\n        return;\n    }',
-     '    if (True(image.flags & ImageFlagBits::AsynchronousDecode) && ::Eden::AstcPolicy::InBackground()) {\n        QueueAsyncDecode(image, image_id);\n        return;\n    }'),
+     '    if (True(image.flags & ImageFlagBits::AsynchronousDecode) && ::Eden::AstcPolicy::InBackground(MapSizeBytes(image))) {\n'
+     '        if (!::Eden::AstcPolicy::Busy() && ::Eden::AstcPolicy::ReportLightBackground()) {\n'
+     '            std::printf("EDEN_ASTC_BACKGROUND texels=%u size=%ux%u layers=%u levels=%u draws=%u count=%u\\n",\n'
+     '                        MapSizeBytes(image), image.info.size.width, image.info.size.height,\n'
+     '                        static_cast<unsigned>(image.info.resources.layers),\n'
+     '                        static_cast<unsigned>(image.info.resources.levels),\n'
+     '                        ::Eden::AstcPolicy::Draws(), ::Eden::AstcPolicy::light_background);\n'
+     '        }\n'
+     '        QueueAsyncDecode(image, image_id);\n'
+     '        return;\n'
+     '    }\n'
+     '    const long long eden_astc_start =\n'
+     '        True(image.flags & ImageFlagBits::AsynchronousDecode) ? ::Eden::Performance::NowNs() : 0;\n'
+     '    SCOPE_EXIT {\n'
+     '        if (eden_astc_start == 0) return;\n'
+     '        const long long held = ::Eden::Performance::NowNs() - eden_astc_start;\n'
+     '        if (::Eden::AstcPolicy::ReportSlowInPlace(held)) {\n'
+     '            std::printf("EDEN_ASTC_IN_PLACE ms=%.1f texels=%u size=%ux%u layers=%u levels=%u draws=%u "\n'
+     '                        "slow=%u slow_ms=%.0f\\n", static_cast<double>(held) / 1e6, MapSizeBytes(image),\n'
+     '                        image.info.size.width, image.info.size.height,\n'
+     '                        static_cast<unsigned>(image.info.resources.layers),\n'
+     '                        static_cast<unsigned>(image.info.resources.levels), ::Eden::AstcPolicy::Draws(),\n'
+     '                        ::Eden::AstcPolicy::slow_in_place,\n'
+     '                        static_cast<double>(::Eden::AstcPolicy::slow_in_place_ns) / 1e6);\n'
+     '        }\n'
+     '    };'),
     ('    TickAsyncDecode();\n    TickAsyncUnswizzle();', '    ::Eden::AstcPolicy::Frame();\n    TickAsyncDecode();\n    TickAsyncUnswizzle();'),
     # Every 10 s at most, what the collector freed because memory was short (texture_evictions.h).
     ('    sentenced_images.Tick();\n',

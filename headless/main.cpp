@@ -1204,8 +1204,10 @@ int main(int argc, char** argv) {
             // 121 layers. New scenery brought several such frames in a row (41 in a session of
             // five minutes), the drops to 10 or 15 frames a second. On another thread (Eden's own
             // asynchronous mode) the texture shows a moment later and no frame waits for it: 6
-            // such frames in the same play. A light screen (loading, a menu) still converts in
-            // place, so nothing is drawn there before it is ready (headless/astc_policy.h, which the
+            // such frames in the same play. A light screen (loading, a menu) still converts a
+            // texture up to a screen picture's size in place, so that picture is not drawn before it
+            // is ready, and a larger one in the background, as a light game in play needs
+            // (Oliv3rmoon/Nightshade#3; headless/astc_policy.h, which the
             // Vulkan texture cache asks; the OpenGL one has no such rule and keeps converting in
             // place). At full quality nothing is compressed, and the GPU decodes the texture.
             Settings::values.accelerate_astc.SetValue(!astc_full && backend == Eden::GraphicsBackend::Vulkan

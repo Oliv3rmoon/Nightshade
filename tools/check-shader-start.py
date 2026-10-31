@@ -50,6 +50,15 @@ with tempfile.TemporaryDirectory(prefix='eden-shader-start-') as work:
         graphics = (port / 'vk_graphics_pipeline_cost.cpp').read_text()
         compute = (port / 'vk_compute_pipeline_cost.cpp').read_text()
         wrapper = (port / 'vulkan_wrapper.cpp').read_text()
+        # A crash while the driver compiles a pipeline names it (headless/crash_report.h, Doing).
+        for text, doing, call in (
+                (compute, '            const ::Eden::Crash::Doing eden_doing{"the driver compiling compute pipeline cs", '
+                          'shader_hash};\n',
+                 '            pipeline = device.GetLogical().CreateComputePipeline(compute_ci, *pipeline_cache);\n'),
+                (graphics, '    const ::Eden::Crash::Doing eden_doing{"the driver compiling graphics pipeline key", '
+                           'key.Hash()};\n',
+                 '    pipeline = device.GetLogical().CreateGraphicsPipeline({\n')):
+            assert text.count(doing + call) == 1 and '#include "crash_report.h"' in text, call
 
         def section(text, begin, end):
             start = text.index(begin)
