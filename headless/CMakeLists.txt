@@ -248,7 +248,16 @@ function(eden_ipc_ring_service var)
         message(FATAL_ERROR "Pinned service reply write changed; review the service call record.")
     endif()
     string(REPLACE "${site}" "${site}        {\n            std::array<u32, 64> eden_reply{};\n            auto& eden_thread = ctx.GetThread();\n            eden_thread.GetOwnerProcess()->GetMemory().ReadBlock(eden_thread.GetTlsAddress(), eden_reply.data(),\n                                                                 sizeof(eden_reply));\n            ::Eden::IpcRing::Record(service_name, eden_thread.GetThreadId(), ctx.GetCommand(),\n                                    static_cast<u32>(ctx.GetCommandType()), eden_reply.data(), eden_reply.size());\n        }\n" source "${source}")
-    set(${var} "#include <array>\n#include \"${EDEN_PORT_DIR}/ipc_ring.h\"\n#include \"core/hle/kernel/k_process.h\"\n#include \"core/memory.h\"\n${source}" PARENT_SCOPE)
+    # The request in progress, from before it waits for its service's lock to its reply, for the
+    # freeze watchdog (headless/guest_progress.h): a request that never ends names its service and
+    # command, and whether it is held behind another one.
+    set(watch_site "                                               HLERequestContext& ctx) {\n    const auto guard = LockService();\n")
+    string(FIND "${source}" "${watch_site}" watch_at)
+    if(watch_at LESS 0)
+        message(FATAL_ERROR "Pinned service request handling changed; review the freeze watchdog's requests.")
+    endif()
+    string(REPLACE "${watch_site}" "                                               HLERequestContext& ctx) {\n    ::Eden::Progress::RequestScope eden_request{service_name, ctx.GetCommand(), ctx.GetThread().GetThreadId()};\n    const auto guard = LockService();\n    eden_request.Locked();\n" source "${source}")
+    set(${var} "#include <array>\n#include \"${EDEN_PORT_DIR}/guest_progress.h\"\n#include \"${EDEN_PORT_DIR}/ipc_ring.h\"\n#include \"core/hle/kernel/k_process.h\"\n#include \"core/memory.h\"\n${source}" PARENT_SCOPE)
 endfunction()
 
 # An abandoned fiber stack is not unwound. Empty the by-value weak reference
@@ -1051,8 +1060,39 @@ string(REPLACE "${is_interrupted_old}"
 string(REPLACE "${prefetch_old}"
     "            } else {\n                interface->LogBacktrace(process);\n                if (prefetch_abort)\n                    ::Eden::RecordGuestFault(\"guest thread \" + Core::GetThreadName(thread).value_or(\"?\") +\n                                             \" jumped to an unmapped address\");\n            }\n            thread->RequestSuspend(kernel, SuspendType::Debug);"
     physical_core_source "${physical_core_source}")
+# Each core's state for the freeze watchdog (headless/guest_progress.h): in the guest's code, in a
+# system call, in the emulator between threads, or idle, with a count of its changes. A core that
+# stays in one busy state names where a frozen game's thread is held (tools/check-guest-progress.py
+# reads these sites). The idle marks go into the Idle body written above, after its first line and
+# before its end, so tools/check-guest-idle.py still reads that body as it is.
+set(progress_enter_old "        // Mark that we are running.\n        m_arm_interface = interface;\n        m_current_thread = thread;\n")
+set(progress_exit_old "            ExitContext();\n        }\n")
+set(progress_svc_old "            // Perform call.\n            Svc::Call(system, interface->GetSvcNumber());")
+set(progress_idle_begin_old "void PhysicalCore::Idle() {\n    const long long start = ::Eden::Performance::NowNs();\n")
+set(progress_idle_end_old "    ::Eden::Performance::AdaptIdlePoll(m_core_index, raised > start ? raised - start : 0, slept);\n}")
+foreach(pinned_text IN ITEMS progress_enter_old progress_exit_old progress_svc_old progress_idle_begin_old progress_idle_end_old)
+    string(FIND "${physical_core_source}" "${${pinned_text}}" pinned_at)
+    if(pinned_at LESS 0)
+        message(FATAL_ERROR "Pinned PhysicalCore run loop changed; review the freeze watchdog's core marks (${pinned_text}).")
+    endif()
+endforeach()
+string(REPLACE "${progress_enter_old}"
+    "${progress_enter_old}        ::Eden::Progress::CoreGuest(m_core_index, thread->GetThreadId());\n"
+    physical_core_source "${physical_core_source}")
+string(REPLACE "${progress_exit_old}"
+    "            ExitContext();\n            ::Eden::Progress::CoreHost(m_core_index);\n        }\n"
+    physical_core_source "${physical_core_source}")
+string(REPLACE "${progress_svc_old}"
+    "            // Perform call.\n            ::Eden::Progress::CoreSvc(m_core_index, interface->GetSvcNumber());\n            Svc::Call(system, interface->GetSvcNumber());"
+    physical_core_source "${physical_core_source}")
+string(REPLACE "${progress_idle_begin_old}"
+    "${progress_idle_begin_old}    ::Eden::Progress::CoreIdle(m_core_index);\n"
+    physical_core_source "${physical_core_source}")
+string(REPLACE "${progress_idle_end_old}"
+    "    ::Eden::Performance::AdaptIdlePoll(m_core_index, raised > start ? raised - start : 0, slept);\n    ::Eden::Progress::CoreHost(m_core_index);\n}"
+    physical_core_source "${physical_core_source}")
 write_derived("${PORT_BUILD_DIR}/physical_core.cpp"
-    "#include \"${EDEN_PORT_DIR}/guest_fault.h\"\n#include \"${EDEN_PORT_DIR}/performance.h\"\n#include \"core/arm/debug.h\"\n${physical_core_source}")
+    "#include \"${EDEN_PORT_DIR}/guest_fault.h\"\n#include \"${EDEN_PORT_DIR}/guest_progress.h\"\n#include \"${EDEN_PORT_DIR}/performance.h\"\n#include \"core/arm/debug.h\"\n${physical_core_source}")
 # The guest's tick counter gives when a frame is a little late (headless/guest_clock.h): its
 # rate is applied where Eden applies its own clock settings, and it follows the frames the
 # game hands in (BufferQueueProducer::QueueBuffer, below).
@@ -1135,27 +1175,20 @@ string(REPLACE "${open_files_old}" "constexpr size_t MaxOpenFiles = 512;" vfs_re
 write_derived("${PORT_BUILD_DIR}/vfs_real.cpp" "${vfs_real_source}")
 list(REMOVE_ITEM core_sources "file_sys/vfs/vfs_real.cpp")
 list(APPEND core_sources "${PORT_BUILD_DIR}/vfs_real.cpp")
-if(EDEN_DEV_PROFILE)
-    # Guest-visible waits: syncpoint event registration to signal (GPU-pipeline latency
-    # the game waits on) and buffer-queue dequeue waits (presentation back-pressure).
-    file(READ "${PROJECT_SOURCE_DIR}/src/core/hle/service/nvdrv/devices/nvhost_ctrl.cpp" ctrl_source)
-    set(ctrl_old "    event.wait_handle =\n        host1x_syncpoint_manager.RegisterHostAction(fence_id, target_value, [this, slot]() {\n            auto& event_ = events[slot];")
-    string(FIND "${ctrl_source}" "${ctrl_old}" ctrl_at)
-    if(ctrl_at LESS 0)
-        message(FATAL_ERROR "Pinned nvhost_ctrl event wait changed")
-    endif()
-    string(REPLACE "${ctrl_old}" "    const auto wait_start = ::Eden::Performance::NowNs();\n    event.wait_handle =\n        host1x_syncpoint_manager.RegisterHostAction(fence_id, target_value, [this, slot, wait_start]() {\n            ::Eden::Performance::AddSince(::Eden::Performance::guest_sync_wait, wait_start);\n            auto& event_ = events[slot];" ctrl_source "${ctrl_source}")
-    # Development: Eden stalls the guest when a syncpoint event wait failed three times; log the
-    # stall and its length (a stall that never ends leaves only the begin line).
-    set(stall_old [=[                auto lk = system.StallApplication();
+file(READ "${PROJECT_SOURCE_DIR}/src/core/hle/service/nvdrv/devices/nvhost_ctrl.cpp" ctrl_source)
+# Eden stalls the guest when a syncpoint event wait failed three times, until the GPU reaches the
+# fence; log the stall and its length in every build (a stall that never ends leaves only the
+# begin line). Release logs said only "shutdown: Completed kernel.SuspendEmulation(true)" for it,
+# which read like a stop and could not say whether the stall ended.
+set(stall_old [=[                auto lk = system.StallApplication();
                 host1x_syncpoint_manager.WaitHost(fence_id, target_value);
                 system.UnstallApplication();
 ]=])
-    string(FIND "${ctrl_source}" "${stall_old}" stall_at)
-    if(stall_at LESS 0)
-        message(FATAL_ERROR "Pinned nvhost_ctrl stall changed")
-    endif()
-    string(REPLACE "${stall_old}" [=[                const long long stall_start = ::Eden::Performance::NowNs();
+string(FIND "${ctrl_source}" "${stall_old}" stall_at)
+if(stall_at LESS 0)
+    message(FATAL_ERROR "Pinned nvhost_ctrl stall changed")
+endif()
+string(REPLACE "${stall_old}" [=[                const long long stall_start = ::Eden::Performance::NowNs();
                 std::fprintf(stderr, "EDEN_GPU_STALL begin fence=%u target=%u fails=%u mono_ns=%lld\n",
                              unsigned(fence_id), unsigned(target_value), unsigned(events[slot].fails), stall_start);
                 auto lk = system.StallApplication();
@@ -1164,6 +1197,20 @@ if(EDEN_DEV_PROFILE)
                 std::fprintf(stderr, "EDEN_GPU_STALL end fence=%u ms=%lld\n", unsigned(fence_id),
                              (::Eden::Performance::NowNs() - stall_start) / 1000000);
 ]=] ctrl_source "${ctrl_source}")
+if(NOT EDEN_DEV_PROFILE)
+    write_derived("${PORT_BUILD_DIR}/nvhost_ctrl.cpp" "#include <cstdio>\n#include \"${EDEN_PORT_DIR}/performance.h\"\n${ctrl_source}")
+    list(REMOVE_ITEM core_sources "hle/service/nvdrv/devices/nvhost_ctrl.cpp")
+    list(APPEND core_sources "${PORT_BUILD_DIR}/nvhost_ctrl.cpp")
+endif()
+if(EDEN_DEV_PROFILE)
+    # Guest-visible waits: syncpoint event registration to signal (GPU-pipeline latency
+    # the game waits on) and buffer-queue dequeue waits (presentation back-pressure).
+    set(ctrl_old "    event.wait_handle =\n        host1x_syncpoint_manager.RegisterHostAction(fence_id, target_value, [this, slot]() {\n            auto& event_ = events[slot];")
+    string(FIND "${ctrl_source}" "${ctrl_old}" ctrl_at)
+    if(ctrl_at LESS 0)
+        message(FATAL_ERROR "Pinned nvhost_ctrl event wait changed")
+    endif()
+    string(REPLACE "${ctrl_old}" "    const auto wait_start = ::Eden::Performance::NowNs();\n    event.wait_handle =\n        host1x_syncpoint_manager.RegisterHostAction(fence_id, target_value, [this, slot, wait_start]() {\n            ::Eden::Performance::AddSince(::Eden::Performance::guest_sync_wait, wait_start);\n            auto& event_ = events[slot];" ctrl_source "${ctrl_source}")
     write_derived("${PORT_BUILD_DIR}/nvhost_ctrl.cpp" "#include <cstdio>\n#include \"${EDEN_PORT_DIR}/performance.h\"\n${ctrl_source}")
     list(REMOVE_ITEM core_sources "hle/service/nvdrv/devices/nvhost_ctrl.cpp")
     list(APPEND core_sources "${PORT_BUILD_DIR}/nvhost_ctrl.cpp")
@@ -1516,7 +1563,16 @@ string(REPLACE "    std::optional<Core::DeviceMemory> device_memory;\n" "" syste
 string(REPLACE "    Kernel::KernelCore kernel;"
     "    std::optional<Core::DeviceMemory> device_memory;\n    Kernel::KernelCore kernel;" system_source "${system_source}")
 if(PS5_NATIVE)
-    foreach(stage "gpu_core->NotifyShutdown();" "if (audio_core) audio_core->Shutdown();" "kernel.SuspendEmulation(true);" "kernel.CloseServices();" "kernel.ShutdownCores();" "services.reset();" "gpu_core.reset();" "cpu_manager.Shutdown();" "kernel.Shutdown();")
+    # The stop's own suspension only: Pause and StallApplication suspend the cores with the same
+    # call, and a GPU stall then read "shutdown: Completed kernel.SuspendEmulation(true)" in the
+    # middle of a game (EDEN_GPU_STALL says those now).
+    set(stop_suspend_old "        Network::CancelPendingSocketOperations();\n        kernel.SuspendEmulation(true);\n")
+    string(FIND "${system_source}" "${stop_suspend_old}" stop_suspend_at)
+    if(stop_suspend_at LESS 0)
+        message(FATAL_ERROR "Pinned ShutdownMainProcess changed; review the stop's report steps.")
+    endif()
+    string(REPLACE "${stop_suspend_old}" "${stop_suspend_old}        ::Eden::ReportStep(\"shutdown\", \"Completed kernel.SuspendEmulation(true)\");\n" system_source "${system_source}")
+    foreach(stage "gpu_core->NotifyShutdown();" "if (audio_core) audio_core->Shutdown();" "kernel.CloseServices();" "kernel.ShutdownCores();" "services.reset();" "gpu_core.reset();" "cpu_manager.Shutdown();" "kernel.Shutdown();")
         string(REPLACE ";" "" stage_label "${stage}")
         string(REPLACE "${stage}" "${stage}\n        ::Eden::ReportStep(\"shutdown\", \"Completed ${stage_label}\");" system_source "${system_source}")
     endforeach()

@@ -144,6 +144,7 @@ extern "C" unsigned long long eden_dmb_dropped, eden_checkbit_fused;
 #endif
 #include "profiles.h"
 #include "stop_limit.h"
+#include "guest_progress.h"
 namespace Common {
 bool SparseTablesAvailable() noexcept; // src/memory_pages.cpp
 void SetGuestMemoryService(bool on, bool scan, bool dedup) noexcept; // src/guest_memory_service.inc
@@ -2035,6 +2036,9 @@ int main(int argc, char** argv) {
                         completion->wake.notify_one();
                     });
                 system.Run();
+                // While it runs: EDEN_STUCK and EDEN_PROGRESS in stderr.log say what a frozen game's
+                // cores and service requests are held in (guest_progress.h).
+                Eden::Progress::Start();
 #if defined(EDEN_DEV_PROFILE) && defined(PS5_NATIVE)
                 Eden::Stall::Trace("main running");
                 Eden::Stall::Disarm();
@@ -2327,6 +2331,8 @@ int main(int argc, char** argv) {
                 // A read that waits for a stalled network, or for this stop after its source failed,
                 // must not hold it: the reads of a game played where it lies end now, with what is kept
                 // (streamed_game.h).
+                // Before the cores are suspended, which would read as cores held in the emulator.
+                Eden::Progress::Stop();
                 if (streamed) streamed->stop();
                 system.ShutdownMainProcess();
                 Eden::Report("shutdown", "Game stopped; releasing renderer");

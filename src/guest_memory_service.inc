@@ -493,6 +493,29 @@ extern "C" void eden_guest_memory_waits(unsigned long long* won, unsigned long l
     *refused = counters.failures.load(std::memory_order_relaxed);
 }
 
+namespace {
+// Threads inside the write fault handler now, and since when the first of them has been (steady
+// clock, ns): headless/guest_progress.h reports a handler that never returns (a slot whose lock
+// is never let go, a wait that never ends) instead of a core that only looks busy in the game.
+std::atomic<unsigned> fault_inside{0};
+std::atomic<long long> fault_since{0};
+struct FaultInside {
+    FaultInside() noexcept {
+        if (fault_inside.fetch_add(1, std::memory_order_acq_rel) == 0)
+            fault_since.store(std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                  std::chrono::steady_clock::now().time_since_epoch()).count(),
+                              std::memory_order_release);
+    }
+    ~FaultInside() { fault_inside.fetch_sub(1, std::memory_order_acq_rel); }
+};
+} // namespace
+
+extern "C" unsigned eden_guest_fault_busy(long long* since_ns) noexcept {
+    const unsigned inside = fault_inside.load(std::memory_order_acquire);
+    if (since_ns) *since_ns = inside ? fault_since.load(std::memory_order_acquire) : 0;
+    return inside;
+}
+
 // A write fault at `address`: true when it was a write to a slot of the guest's memory that is
 // now writable (the faulting instruction repeats), false for anything else.
 bool HandleGuestWriteFault(void* fault) noexcept {
@@ -503,6 +526,7 @@ bool HandleGuestWriteFault(void* fault) noexcept {
     }
     SparseRange* const range = WriteRangeOf(address);
     if (range == nullptr) return false;
+    const FaultInside inside;
     const std::size_t slot = (address - range->begin.load(std::memory_order_relaxed)) / SparseSlot;
     // The same address faulting again and again with nothing to change is not a slot to promote
     // but a real fault. A promotion starts the count again (below).

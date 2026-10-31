@@ -97,6 +97,9 @@ python3 -B "$root/tools/check-astc-policy.py" "$scratch/source"
 python3 -B "$root/tools/check-indexed-storage-images.py"
 python3 -B "$root/tools/check-guest-clock.py"
 python3 -B "$root/tools/check-guest-idle.py" "$scratch/source/src/core/hle/kernel/physical_core.cpp"
+# The freeze watchdog (headless/guest_progress.h): its marks at their sites in the pinned source,
+# and a frozen load with its frames still coming named three ways.
+python3 -B "$root/tools/check-guest-progress.py" "$scratch/source"
 python3 -B "$root/tools/check-ncz.py"
 python3 -B "$root/tools/check-gc-scan.py"
 "$scratch/build/bin/eden-scalar-check"
