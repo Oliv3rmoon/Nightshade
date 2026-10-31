@@ -29,7 +29,7 @@
  
 --- a/src/video_core/engines/maxwell_dma.cpp
 +++ b/src/video_core/engines/maxwell_dma.cpp
-@@ -4,6 +4,13 @@
+@@ -4,6 +4,14 @@
  // SPDX-FileCopyrightText: Copyright 2018 yuzu Emulator Project
  // SPDX-License-Identifier: GPL-2.0-or-later
  
@@ -37,13 +37,14 @@
 +#include <array>
 +#include <atomic>
 +#include <cstdio>
++#include <cstring>
 +#include <numeric>
 +#include <optional>
 +#include <utility>
  #include "common/algorithm.h"
  #include "common/assert.h"
  #include "common/logging.h"
-@@ -21,6 +28,107 @@ namespace Tegra::Engines {
+@@ -21,6 +29,145 @@ namespace Tegra::Engines {
  
  using namespace Texture;
  
@@ -115,6 +116,44 @@
 +    return fill;
 +}
 +
++// The fill's bytes from `offset` bytes after its start, `size` of them, into `out`; every byte of
++// the fill is written (no NO_WRITE component). A fill that repeats an 8-byte word (a 1, 2, 4 or
++// 8-byte one among them) is stored a word at a time; any other gets one element, then copies of
++// what is already there, each twice as long as the one before.
++void FillBytes(const ConstantFill& fill, u64 offset, u8* out, u64 size) {
++    const u32 element = fill.element_size;
++    if (size == 0 || element == 0) {
++        return;
++    }
++    const auto byte = [&](u64 at) { return fill.pattern[at % element]; };
++    bool repeats_word = true;
++    for (u64 i = 0; i < std::lcm(u64{element}, u64{8}) && repeats_word; ++i) {
++        repeats_word = byte(i) == byte(i % 8);
++    }
++    if (repeats_word) {
++        // The word, eight times over: stored 64 bytes at a time.
++        u8 block[64];
++        for (u64 i = 0; i < sizeof(block); ++i) {
++            block[i] = byte(offset + i % 8);
++        }
++        u64 done = 0;
++        for (; done + sizeof(block) <= size; done += sizeof(block)) {
++            std::memcpy(out + done, block, sizeof(block));
++        }
++        std::memcpy(out + done, block, size - done);
++        return;
++    }
++    u64 done = (std::min)(size, u64{element});
++    for (u64 i = 0; i < done; ++i) {
++        out[i] = byte(offset + i);
++    }
++    while (done < size) {
++        const u64 copy = (std::min)(done, size - done);
++        std::memcpy(out + done, out, copy);
++        done += copy;
++    }
++}
++
 +// The whole pages of [begin, end): the first and the end of them (equal when there are none).
 +std::pair<u64, u64> WholePages(u64 begin, u64 end, u64 page) {
 +    const u64 first = (std::min)(end, (begin + page - 1) / page * page);
@@ -151,7 +190,7 @@
  MaxwellDMA::MaxwellDMA(MemoryManager& memory_manager_)
      : memory_manager{memory_manager_}
  {
-@@ -64,6 +172,11 @@ void MaxwellDMA::Launch() {
+@@ -64,6 +211,11 @@ void MaxwellDMA::Launch() {
      const LaunchDMA& launch = regs.launch_dma;
      ASSERT(launch.interrupt_type == LaunchDMA::InterruptType::NONE);
  
@@ -163,7 +202,7 @@
      if (launch.multi_line_enable) {
          const bool is_src_pitch = launch.src_memory_layout == LaunchDMA::MemoryLayout::PITCH;
          const bool is_dst_pitch = launch.dst_memory_layout == LaunchDMA::MemoryLayout::PITCH;
-@@ -153,6 +266,101 @@ void MaxwellDMA::Launch() {
+@@ -153,6 +305,114 @@ void MaxwellDMA::Launch() {
      ReleaseSemaphore();
  }
  
@@ -211,53 +250,66 @@
 +            }
 +            continue;
 +        }
-+        // Otherwise every cache gets the fill, as for an inline-to-memory write. Writing guest
-+        // memory alone left the buffer cache's copy as it was, which the GPU went on using: a
-+        // counter a game cleared this way and a shader then added to kept its old value.
++        // Otherwise guest memory and the buffer cache's copy get the fill. Writing guest memory
++        // alone left the buffer cache's copy as it was, which the GPU went on using: a counter a
++        // game cleared this way and a shader then added to kept its old value. The texture cache
++        // is not told, as it never was of these fills: an image the fill covers only in part would
++        // take guest memory's older copy of the rest of it at its next upload, losing what the GPU
++        // drew there.
 +        const GPUVAddr end = dst + line_bytes;
-+        // A page the fill only partly covers, or a fill that keeps some bytes, goes through the
-+        // inline-to-memory path, a piece at a time within a page: the buffer cache writes the
-+        // bytes into its copy in order with the GPU's work, so GPU data beside them stays.
-+        const auto fill_inline = [&](GPUVAddr begin, GPUVAddr stop) {
++        // A page the fill only partly covers, or a fill that keeps some bytes: a piece at a time
++        // within a page, which the buffer cache writes into its copy in order with the GPU's
++        // work, so GPU data beside them stays.
++        const auto fill_pieces = [&](GPUVAddr begin, GPUVAddr stop) {
 +            for (GPUVAddr at = begin; at < stop;) {
 +                const u64 piece = (std::min)(stop - at, PIECE - (at & (PIECE - 1)));
 +                write_buffer.resize_destructive(piece);
 +                if (fill->keeps_bytes) {
 +                    memory_manager.ReadBlock(at, write_buffer.data(), piece);
-+                }
-+                for (u64 i = 0; i < piece; ++i) {
-+                    const u64 in_element = (at - dst + i) % fill->element_size;
-+                    if (fill->written[in_element]) {
-+                        write_buffer[i] = fill->pattern[in_element];
++                    u64 in_element = (at - dst) % fill->element_size;
++                    for (u64 i = 0; i < piece; ++i) {
++                        if (fill->written[in_element]) {
++                            write_buffer[i] = fill->pattern[in_element];
++                        }
++                        if (++in_element == fill->element_size) {
++                            in_element = 0;
++                        }
 +                    }
++                } else {
++                    FillBytes(*fill, at - dst, write_buffer.data(), piece);
 +                }
-+                rasterizer->AccelerateInlineToMemory(
-+                    at, piece, std::span<const u8>(write_buffer.data(), piece));
++                memory_manager.WriteBlockUnsafe(at, write_buffer.data(), piece);
++                if (const std::optional<DAddr> device = memory_manager.GpuToCpuAddress(at)) {
++                    accelerate.BufferWritten(*device,
++                                             std::span<const u8>(write_buffer.data(), piece));
++                }
++                memory_manager.InvalidateRegion(at, piece, VideoCommon::CacheType::QueryCache |
++                                                               VideoCommon::CacheType::ShaderCache);
 +                at += piece;
 +            }
 +        };
 +        if (fill->keeps_bytes) {
-+            fill_inline(dst, end);
++            fill_pieces(dst, end);
 +            continue;
 +        }
 +        const auto [whole_begin, whole_end] = WholePages(dst, end, PIECE);
-+        fill_inline(dst, whole_begin);
++        fill_pieces(dst, whole_begin);
 +        if (whole_end > whole_begin) {
-+            // Whole pages: guest memory, then every cache invalidates them, so the buffer
-+            // cache uploads them (the fill covers each page, so nothing of the GPU's is lost)
-+            // and drops a download of them still on its way.
-+            write_buffer.resize_destructive(PIECE * 16);
-+            for (GPUVAddr at = whole_begin; at < whole_end;) {
-+                const u64 piece = (std::min)(whole_end - at, PIECE * 16);
-+                for (u64 i = 0; i < piece; ++i) {
-+                    write_buffer[i] = fill->pattern[(at - dst + i) % fill->element_size];
-+                }
-+                memory_manager.WriteBlockUnsafe(at, write_buffer.data(), piece);
-+                at += piece;
++            // Whole pages: guest memory, then the buffer, query and shader caches invalidate
++            // them, so the buffer cache uploads them (the fill covers each page, so nothing of the
++            // GPU's is lost) and drops a download of them still on its way. One buffer of whole
++            // elements is built once and written over and over.
++            const u64 chunk = (PIECE * 16) / fill->element_size * fill->element_size;
++            write_buffer.resize_destructive(chunk);
++            FillBytes(*fill, whole_begin - dst, write_buffer.data(), chunk);
++            for (GPUVAddr at = whole_begin; at < whole_end; at += chunk) {
++                memory_manager.WriteBlockUnsafe(at, write_buffer.data(),
++                                                (std::min)(chunk, whole_end - at));
 +            }
-+            memory_manager.InvalidateRegion(whole_begin, whole_end - whole_begin);
++            memory_manager.InvalidateRegion(whole_begin, whole_end - whole_begin,
++                                            VideoCommon::CacheType::NoTextureCache);
 +        }
-+        fill_inline(whole_end, end);
++        fill_pieces(whole_end, end);
 +    }
 +    return true;
 +}
@@ -267,7 +319,27 @@
  
 --- a/src/video_core/engines/maxwell_dma.h
 +++ b/src/video_core/engines/maxwell_dma.h
-@@ -255,6 +255,10 @@ private:
+@@ -8,6 +8,7 @@
+ 
+ #include <array>
+ #include <cstddef>
++#include <span>
+ #include <vector>
+ 
+ #include "common/bit_field.h"
+@@ -85,6 +86,11 @@ public:
+ 
+     virtual bool BufferClear(GPUVAddr src_address, u64 amount, u32 value) = 0;
+ 
++    /// Bytes the copy engine wrote to guest memory at a device address, within a page: the buffer
++    /// cache writes them into its copy in order with the GPU's work where the GPU wrote that page,
++    /// and marks the page for an upload where it did not. The texture cache is not told.
++    virtual void BufferWritten(DAddr address, std::span<const u8> data) = 0;
++
+     virtual bool ImageToBuffer(const DMA::ImageCopy& copy_info, const DMA::ImageOperand& src,
+                                const DMA::BufferOperand& dst) = 0;
+ 
+@@ -255,6 +261,10 @@ private:
      /// registers.
      void Launch();
  
@@ -302,3 +374,67 @@
  }
  
  void ReportDroppedDraw(const char* macro, u32 count, u32 instance_count) {
+--- a/src/video_core/renderer_null/null_rasterizer.h
++++ b/src/video_core/renderer_null/null_rasterizer.h
+@@ -21,6 +21,7 @@ public:
+     explicit AccelerateDMA();
+     bool BufferCopy(GPUVAddr start_address, GPUVAddr end_address, u64 amount) override;
+     bool BufferClear(GPUVAddr src_address, u64 amount, u32 value) override;
++    void BufferWritten(DAddr, std::span<const u8>) override {}
+     bool ImageToBuffer(const Tegra::DMA::ImageCopy& copy_info, const Tegra::DMA::ImageOperand& src,
+                        const Tegra::DMA::BufferOperand& dst) override {
+         return false;
+--- a/src/video_core/renderer_opengl/gl_rasterizer.cpp
++++ b/src/video_core/renderer_opengl/gl_rasterizer.cpp
+@@ -1410,6 +1410,13 @@ bool AccelerateDMA::BufferClear(GPUVAddr src_address, u64 amount, u32 value) {
+     return buffer_cache.DMAClear(src_address, amount, value);
+ }
+ 
++void AccelerateDMA::BufferWritten(DAddr address, std::span<const u8> data) {
++    std::scoped_lock lock{buffer_cache.mutex};
++    if (!buffer_cache.InlineMemory(address, data.size(), data)) {
++        buffer_cache.WriteMemory(address, data.size());
++    }
++}
++
+ template <bool IS_IMAGE_UPLOAD>
+ bool AccelerateDMA::DmaBufferImageCopy(const Tegra::DMA::ImageCopy& copy_info,
+                                        const Tegra::DMA::BufferOperand& buffer_operand,
+--- a/src/video_core/renderer_opengl/gl_rasterizer.h
++++ b/src/video_core/renderer_opengl/gl_rasterizer.h
+@@ -56,6 +56,8 @@ public:
+ 
+     bool BufferClear(GPUVAddr src_address, u64 amount, u32 value) override;
+ 
++    void BufferWritten(DAddr address, std::span<const u8> data) override;
++
+     bool ImageToBuffer(const Tegra::DMA::ImageCopy& copy_info, const Tegra::DMA::ImageOperand& src,
+                        const Tegra::DMA::BufferOperand& dst) override;
+ 
+--- a/src/video_core/renderer_vulkan/vk_rasterizer.cpp
++++ b/src/video_core/renderer_vulkan/vk_rasterizer.cpp
+@@ -1010,6 +1010,13 @@ bool AccelerateDMA::BufferClear(GPUVAddr src_address, u64 amount, u32 value) {
+     return buffer_cache.DMAClear(src_address, amount, value);
+ }
+ 
++void AccelerateDMA::BufferWritten(DAddr address, std::span<const u8> data) {
++    std::scoped_lock lock{buffer_cache.mutex};
++    if (!buffer_cache.InlineMemory(address, data.size(), data)) {
++        buffer_cache.WriteMemory(address, data.size());
++    }
++}
++
+ bool AccelerateDMA::BufferCopy(GPUVAddr src_address, GPUVAddr dest_address, u64 amount) {
+     std::scoped_lock lock{buffer_cache.mutex};
+     return buffer_cache.DMACopy(src_address, dest_address, amount);
+--- a/src/video_core/renderer_vulkan/vk_rasterizer.h
++++ b/src/video_core/renderer_vulkan/vk_rasterizer.h
+@@ -60,6 +60,8 @@ public:
+ 
+     bool BufferClear(GPUVAddr src_address, u64 amount, u32 value) override;
+ 
++    void BufferWritten(DAddr address, std::span<const u8> data) override;
++
+     bool ImageToBuffer(const Tegra::DMA::ImageCopy& copy_info, const Tegra::DMA::ImageOperand& src,
+                        const Tegra::DMA::BufferOperand& dst) override;
+ 

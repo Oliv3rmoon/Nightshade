@@ -10,10 +10,16 @@ them, and the culling shader that then added to it gave the draw an instance cou
 0x3F800001 (an old float 1.0 plus one): Final Fantasy Resonance stopped the GPU on draws asking
 for 27 million to 2.7 billion instances (Oliv3rmoon/Nightshade#1).
 
-This applies every Eden patch, in order, to the pinned archive's files; builds the fill's element
-helper on its own and checks what it writes (the case above among them); and compiles the patched
-files that this build compiles with their own compile commands (tools/build-headless-host.sh
-passes the build folder).
+The fill reaches guest memory and the buffer cache's copy (the inline write of each partly covered
+page, then whole pages invalidated at once), but not the texture cache: an image a fill covers only
+in part would take guest memory's older copy of the rest at its next upload. Its bytes are built a
+word at a time, or by copying one element over and over, not byte by byte (16 MiB took 11 ms that
+way on a Mac).
+
+This applies every Eden patch, in order, to the pinned archive's files; builds the fill's helpers on
+their own and checks what they write (the case above among them) and how fast; and compiles the
+patched files that this build compiles with their own compile commands
+(tools/build-headless-host.sh passes the build folder).
 
     check-dma-fill.py [build folder]
 """
@@ -54,20 +60,44 @@ with tempfile.TemporaryDirectory(prefix='eden-dma-fill-') as folder:
 
     dma = (tree / 'src/video_core/engines/maxwell_dma.cpp').read_text()
     helper = dma.split('// constant fill: begin', 1)[1].split('\n', 1)[1].split('// constant fill: end', 1)[0]
-    # The fill runs before the multi-line copy, and reaches every cache through the inline path.
+    # The fill runs before the multi-line copy.
     launch = dma.split('void MaxwellDMA::Launch() {', 1)[1].split('\n}\n', 1)[0]
     assert launch.index('LaunchConstantFill()') < launch.index('if (launch.multi_line_enable) {')
     body = dma.split('bool MaxwellDMA::LaunchConstantFill() {', 1)[1].split('\n}\n', 1)[0]
     assert 'accelerate.BufferClear(dst, line_bytes / 4, *word)' in body
     assert 'u64{regs.line_length_in} * fill->element_size' in body
-    # Otherwise: partial pages (and fills that keep bytes) through the inline-to-memory path,
-    # whole pages written and then invalidated in every cache.
-    assert body.count('rasterizer->AccelerateInlineToMemory(') == 1
+    # Otherwise: partly covered pages (and fills that keep bytes) a piece at a time, into the
+    # buffer cache's copy in order (BufferWritten), with the query and shader caches; whole pages
+    # written and then invalidated at once. Never the texture cache, never byte by byte.
+    assert 'AccelerateInlineToMemory' not in body
+    assert 'CacheType::TextureCache' not in body and 'CacheType::All' not in body
+    assert body.count('memory_manager.InvalidateRegion(') == 2 and body.count('VideoCommon::CacheType::') == 3
+    assert 'accelerate.BufferWritten(*device,' in body
+    assert ('memory_manager.InvalidateRegion(at, piece, VideoCommon::CacheType::QueryCache |\n'
+            '                                                               VideoCommon::CacheType::ShaderCache);') in body
     assert 'const auto [whole_begin, whole_end] = WholePages(dst, end, PIECE);' in body
-    assert body.index('fill_inline(dst, whole_begin);') < body.index(
-        'memory_manager.InvalidateRegion(whole_begin, whole_end - whole_begin);') < body.index(
-        'fill_inline(whole_end, end);')
+    assert body.index('fill_pieces(dst, whole_begin);') < body.index(
+        'FillBytes(*fill, whole_begin - dst, write_buffer.data(), chunk);') < body.index(
+        'memory_manager.InvalidateRegion(whole_begin, whole_end - whole_begin,\n'
+        '                                            VideoCommon::CacheType::NoTextureCache);') < body.index(
+        'fill_pieces(whole_end, end);')
+    assert 'const u64 chunk = (PIECE * 16) / fill->element_size * fill->element_size;' in body
+    assert '% fill->element_size];' not in body, 'a byte at a time again'
     assert 'EDEN_DMA_FILL elements=%u' in dma
+    # The copy engine's buffer-only write, in each renderer: the buffer cache's copy in order
+    # where the GPU wrote the page, else an upload of it; nothing of the texture cache's.
+    interface = (tree / 'src/video_core/engines/maxwell_dma.h').read_text()
+    assert 'virtual void BufferWritten(DAddr address, std::span<const u8> data) = 0;' in interface
+    for renderer in ('vulkan/vk_rasterizer', 'opengl/gl_rasterizer'):
+        source = (tree / f'src/video_core/renderer_{renderer}.cpp').read_text()
+        written = source.split('void AccelerateDMA::BufferWritten(DAddr address, std::span<const u8> data) {', 1)[1].split('\n}\n', 1)[0]
+        assert written.strip() == ('std::scoped_lock lock{buffer_cache.mutex};\n'
+                                   '    if (!buffer_cache.InlineMemory(address, data.size(), data)) {\n'
+                                   '        buffer_cache.WriteMemory(address, data.size());\n    }'), renderer
+        assert 'void BufferWritten(DAddr address, std::span<const u8> data) override;' in (
+            tree / f'src/video_core/renderer_{renderer}.h').read_text(), renderer
+    assert 'void BufferWritten(DAddr, std::span<const u8>) override {}' in (
+        tree / 'src/video_core/renderer_null/null_rasterizer.h').read_text()
     # DMAClear decides as upstream does (a clear it refuses is the fill's to finish, without one
     # buffer made of the whole range); it only says when its quarter-sized check refused one.
     cache = (tree / 'src/video_core/buffer_cache/buffer_cache.h').read_text()
@@ -84,6 +114,7 @@ with tempfile.TemporaryDirectory(prefix='eden-dma-fill-') as folder:
     test.write_text(r'''
 #include <array>
 #include <cassert>
+#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -162,22 +193,66 @@ int main() {
     assert((WholePages(0x1004, 0x4010, 0x1000) == Pages{0x2000, 0x4000}));
     assert((WholePages(0x1ff0, 0x2010, 0x1000) == Pages{0x2000, 0x2000}));
     assert((WholePages(0x2000, 0x2010, 0x1000) == Pages{0x2000, 0x2000}));
-    std::puts("fill elements PASS");
+    // FillBytes writes what a byte at a time would, for every element shape, offset and size.
+    std::vector<ConstantFill> shapes;
+    for (u32 size = 1; size <= 4; ++size)
+        for (u32 count = 1; count <= 4; ++count) {
+            shapes.push_back(*MakeConstantFill(size, count, {A, A, A, A}, 0, 0));
+            shapes.push_back(*MakeConstantFill(size, count, {A, A, A, A}, 0x5a5a5a5a, 0));
+            shapes.push_back(*MakeConstantFill(size, count, {A, B, A, B}, 0x01020304, 0xa0b0c0d0));
+            shapes.push_back(*MakeConstantFill(size, count, {B, A, A, B}, 0x11223344, 0x55667788));
+        }
+    for (const ConstantFill& shape : shapes)
+        for (u64 offset = 0; offset < 40; ++offset)
+            for (u64 size : {0ull, 1ull, 3ull, 7ull, 8ull, 9ull, 31ull, 48ull, 4096ull, 65535ull}) {
+                std::vector<u8> fast(size + 1, 0xcc), slow(size + 1, 0xcc);
+                FillBytes(shape, offset, fast.data(), size);
+                for (u64 i = 0; i < size; ++i) slow[i] = shape.pattern[(offset + i) % shape.element_size];
+                assert(fast == slow);
+            }
+    // And it is fast: 16 MiB against the byte-at-a-time loop it replaced, best of five.
+    const auto time = [](auto&& fill_once) {
+        double best = 1e9;
+        for (int run = 0; run < 5; ++run) {
+            const auto start = std::chrono::steady_clock::now();
+            fill_once();
+            best = std::min(best, std::chrono::duration<double, std::milli>(
+                                      std::chrono::steady_clock::now() - start).count());
+        }
+        return best;
+    };
+    std::vector<u8> big(16u << 20);
+    unsigned sink = 0;
+    for (const auto& [name, shape] : {std::pair{"counter (1-byte components x4)", *bytes},
+                                      std::pair{"12-byte element", *MakeConstantFill(4, 3, {A, B, A, 0}, 1, 2)}}) {
+        const double fast = time([&] { FillBytes(shape, 4, big.data(), big.size()); sink += big[12345]; });
+        const double slow = time([&] {
+            for (u64 i = 0; i < big.size(); ++i) big[i] = shape.pattern[(4 + i) % shape.element_size];
+            sink += big[12345];
+        });
+        std::printf("16 MiB %s: %.2f ms, a byte at a time %.2f ms\n", name, fast, slow);
+        assert(fast * 2 < slow);
+    }
+    std::printf("fill elements PASS%s\n", sink == 0xffffffffu ? " " : "");
 }
 ''')
     binary = Path(folder) / 'fill'
-    subprocess.run(['c++', '-std=c++20', '-Wall', '-Wextra', '-Werror', '-Wno-unused-function',
+    subprocess.run(['c++', '-std=c++20', '-O2', '-Wall', '-Wextra', '-Werror', '-Wno-unused-function',
                     str(test), '-o', str(binary)], check=True)
-    out = subprocess.run([str(binary)], check=True, capture_output=True, text=True, timeout=30)
-    assert out.stdout.strip() == 'fill elements PASS', out.stdout
+    out = subprocess.run([str(binary)], check=True, capture_output=True, text=True, timeout=120)
+    lines = out.stdout.strip().splitlines()
+    assert lines[-1].strip() == 'fill elements PASS', out.stdout
+    print('\n'.join(lines[:-1]))
 
     compiled = []
     if build is not None:
         commands = json.loads((build / 'compile_commands.json').read_text())
-        # The patched files themselves, and the buffer cache's instantiations (buffer_cache.h).
+        # The patched files themselves, the buffer cache's instantiations (buffer_cache.h) and the
+        # null renderer (its header's BufferWritten).
         wanted = {name for name in touched if name.endswith('.cpp')} | {
             'src/video_core/renderer_vulkan/vk_buffer_cache.cpp',
-            'src/video_core/renderer_opengl/gl_buffer_cache_base.cpp'}
+            'src/video_core/renderer_opengl/gl_buffer_cache_base.cpp',
+            'src/video_core/renderer_null/null_rasterizer.cpp'}
         overlay = tree / 'src'
         for entry in commands:
             file = Path(entry['file'])
