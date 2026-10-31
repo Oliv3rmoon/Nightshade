@@ -66,6 +66,7 @@ with tempfile.TemporaryDirectory(prefix='eden-dma-fill-') as folder:
     clear = cache.split('bool BufferCache<P>::DMAClear(', 1)[1].split('\n}\n', 1)[0]
     assert 'IsRegionRegistered(*cpu_dst_address, size)' in clear
     assert clear.index('const size_t size = amount * sizeof(u32);') < clear.index('IsRegionRegistered(')
+    assert 'EDEN_DMA_CLEAR_RANGE bytes=%zu' in clear and 'EDEN_DMA_FILL elements=%u' in dma
     # The CPU's indirect draws: the limit is 2^28 vertices (patch 11's check, patch 12's limit).
     macro = (tree / 'src/video_core/macro.cpp').read_text()
     assert 'return u64(count) * u64(instance_count) > (u64(1) << 28);' in macro

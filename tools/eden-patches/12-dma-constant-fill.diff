@@ -1,6 +1,15 @@
 --- a/src/video_core/buffer_cache/buffer_cache.h
 +++ b/src/video_core/buffer_cache/buffer_cache.h
-@@ -267,12 +267,14 @@ bool BufferCache<P>::DMAClear(GPUVAddr dst_address, u64 amount, u32 value) {
+@@ -7,6 +7,8 @@
+ #pragma once
+ 
+ #include <algorithm>
++#include <atomic>
++#include <cstdio>
+ #include <memory>
+ #include <numeric>
+ 
+@@ -267,12 +269,22 @@ bool BufferCache<P>::DMAClear(GPUVAddr dst_address, u64 amount, u32 value) {
      if (!cpu_dst_address) {
          return false;
      }
@@ -12,6 +21,14 @@
      if (!dest_dirty) {
          return false;
      }
++    if (!IsRegionRegistered(*cpu_dst_address, amount)) {
++        // Before, this clear reached guest memory only: the buffers that hold it lie past its
++        // first quarter. The first 16, for stderr.log.
++        static std::atomic<u32> reports{0};
++        if (reports.fetch_add(1, std::memory_order_relaxed) < 16) {
++            std::fprintf(stderr, "EDEN_DMA_CLEAR_RANGE bytes=%zu value=0x%08x\n", size, value);
++        }
++    }
  
 -    const size_t size = amount * sizeof(u32);
      ClearDownload(*cpu_dst_address, size);
