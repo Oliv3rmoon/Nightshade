@@ -70,6 +70,9 @@ assert shutdown_core.index('gpu_core->NotifyShutdown()') < shutdown_core.index('
 code = r'''
 #include <cassert>
 #include <cerrno>
+#include <cstdio>
+#include <cstdlib>
+#include <string>
 #include <memory>
 #include <pthread.h>
 #include <semaphore>
@@ -138,14 +141,28 @@ private:
 #define pthread_create create
 #define pthread_join join
 #include "native_gpu_thread.inc"
-int main(int argc, char**) {
+static bool stalled;
+int main(int argc, char** argv) {
     VideoCore::RendererBase renderer;
     Core::Frontend::GraphicsContext context;
     Tegra::Control::Scheduler scheduler;
     using VideoCommon::GPUThread::ThreadManager;
     if (argc > 1) {
+        // throw: another failure, no handler. handled: the same with main.cpp's handler set, which it
+        // must not call. lost: VK_ERROR_DEVICE_LOST. stalled: another failure after the stall dump.
+        const std::string mode = argv[1];
+        if (mode != "throw") {
+            Eden::gpu_lost = [](const char* reason) noexcept {
+                std::fprintf(stderr, "closed: %s\n", reason);
+                std::fflush(stderr);
+                std::_Exit(42);
+            };
+            Eden::gpu_stalled = []() noexcept { return stalled; };
+            stalled = mode == "stalled";
+        }
+        const char* what = mode == "lost" ? "VK_ERROR_DEVICE_LOST" : "injected worker failure";
         ThreadManager manager;
-        manager.command = [&] { manager.ready.release(); throw std::runtime_error("injected worker failure"); };
+        manager.command = [&] { manager.ready.release(); throw std::runtime_error(what); };
         manager.queue.EmplaceWait(42);
         manager.StartThread(renderer, context, scheduler);
         manager.ready.acquire();
@@ -218,4 +235,15 @@ with tempfile.TemporaryDirectory(prefix='eden-gpu-thread-') as folder:
     subprocess.run([str(temp / 'check')], check=True, timeout=15)
     failed = subprocess.run([str(temp / 'check'), 'throw'], capture_output=True, text=True, timeout=15)
     assert failed.returncode != 0 and '[ProsperoEden] GPU worker: injected worker failure' in failed.stderr
-print('Native GPU stack, stop/wake/join, creation failures and blocked-command teardown ordering/rejection PASS')
+    # With main.cpp's handler set: another failure still stops the session (exit 1 from the check).
+    handled = subprocess.run([str(temp / 'check'), 'handled'], capture_output=True, text=True, timeout=15)
+    assert handled.returncode == 1 and 'closed:' not in handled.stderr, handled
+    # A device loss, or any failure once the driver's stall dump ran, closes the app with the report
+    # (Oliv3rmoon/Nightshade#1): the handler gets VK_ERROR_DEVICE_LOST after the worker's line.
+    for mode, line in (('lost', 'VK_ERROR_DEVICE_LOST'), ('stalled', 'injected worker failure')):
+        closed = subprocess.run([str(temp / 'check'), mode], capture_output=True, text=True, timeout=15)
+        assert closed.returncode == 42, (mode, closed)
+        assert closed.stderr.index(f'[ProsperoEden] GPU worker: {line}') < closed.stderr.index(
+            'closed: VK_ERROR_DEVICE_LOST'), (mode, closed.stderr)
+print('Native GPU stack, stop/wake/join, creation failures, blocked-command teardown ordering/rejection and '
+      'a stopped GPU closing the app PASS')

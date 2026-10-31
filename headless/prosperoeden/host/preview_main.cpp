@@ -1044,12 +1044,44 @@ void pictures(Stage &s)
     s.shoot("64-home-two-profiles");
     s.services.people.resize(1);
 
-    // About.
+    // About: the community (its QR code, the server's name and address) beside the setup.
     s.restart();
     s.wait(1.0f);
     s.press({Key::l1}); // the last section
     s.wait(1.0f);
     s.shoot("23-about");
+
+    // The card naming the community: once, at a start of the app, over the home screen when the
+    // menu has arrived. Any button closes it for good: closed, it is saved, and the next start
+    // opens without it.
+    {
+        pe::ui::Preferences fresh = s.services.preferences();
+        fresh.community_seen = false;
+        s.services.set_preferences(fresh);
+        s.restart(true);
+        s.wait(3.6f);
+        s.shoot("23b-community-card");
+        if (!s.launcher->community_open())
+        {
+            std::fprintf(stderr, "error: the community's card did not open at the first start\n");
+            s.ok = false;
+        }
+        s.press({Key::circle});
+        s.wait(0.6f);
+        s.shoot("23c-community-card-closed");
+        if (s.launcher->community_open() || !s.services.preferences().community_seen)
+        {
+            std::fprintf(stderr, "error: closing the community's card did not save it as seen\n");
+            s.ok = false;
+        }
+        s.restart(true);
+        s.wait(3.6f);
+        if (s.launcher->community_open())
+        {
+            std::fprintf(stderr, "error: the community's card showed again after it was closed\n");
+            s.ok = false;
+        }
+    }
 
     // What the home screen says when something is wrong, and before any game was played.
     s.services.setup_ready = false;
@@ -1432,6 +1464,9 @@ void tour(Stage &s)
     s.press({Key::cross}, 0.8f);
     s.press({Key::down, Key::right}, 0.4f);
     s.press({Key::circle}, 0.6f);
+    // About, the last section: the community beside the setup; then Settings again.
+    s.press({Key::r1}, 1.8f);
+    s.press({Key::l1}, 0.8f);
     // Back home by the rail, and into the game.
     s.press({Key::left, Key::left}, 0.5f);
     s.press({Key::up, Key::up, Key::up}, 0.3f);
@@ -1620,6 +1655,9 @@ int main(int argc, char **argv)
         const char *theme = std::getenv("PE_THEME");
         pe::ui::Preferences preferences = services.preferences();
         preferences.theme = theme != nullptr && theme[0] != 0 ? theme : "canopy";
+        // The card naming the community shows once, at a first start: only where the screens ask
+        // for it (23b), not over every start of the walk.
+        preferences.community_seen = true;
         services.set_preferences(preferences);
     }
     pe::ui::Textures textures(batch, services);

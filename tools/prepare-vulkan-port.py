@@ -1349,6 +1349,7 @@ texture_partial = [
      '    : runtime{runtime_}, device_memory{device_memory_} {\n'
      '    ' + VULKAN_CACHE + '\n'
      '        Eden::TexturePartial::images.clear();\n'
+     '        ::Eden::Performance::astc_background_bytes = 0;\n'
      '    }\n'),
     ('    ForEachImageInRegion(cpu_addr, size, [this](ImageId image_id, Image& image) {\n'
      '        if (True(image.flags & ImageFlagBits::CpuModified)) {\n'
@@ -1461,12 +1462,46 @@ adapt('src/video_core/texture_cache/texture_cache.h',
      '        std::memcpy(staging.mapped_span.data(), async_decode->decoded_data.data(),\n'
      '                    async_decode->decoded_data.size());\n'
      '        image.UploadMemory(staging, FixSmallVectorADL(async_decode->copies));\n'
+     '        }\n'
+     '        ' + VULKAN_CACHE + '\n'
+     '            auto& in_flight = ::Eden::Performance::astc_background_bytes;\n'
+     '            in_flight -= (std::min)(in_flight, static_cast<unsigned long long>(MapSizeBytes(image)));\n'
      '        }\n'),
-    # An ASTC texture kept as BC3 is converted in the background in a busy frame only, and in
-    # place on a light screen (headless/astc_policy.h). The frame is counted where the texture
-    # cache ends its own.
+    # An ASTC texture kept as BC3 is converted in the background in a busy frame, and on a light
+    # one when it is larger than a screen picture; otherwise in place (headless/astc_policy.h). A
+    # light frame's background conversions and the conversions in place that held the frame for
+    # 16 ms or more are logged (EDEN_ASTC_BACKGROUND, EDEN_ASTC_IN_PLACE; Oliv3rmoon/Nightshade#3).
+    # The frame is counted where the texture cache ends its own.
     ('    if (True(image.flags & ImageFlagBits::AsynchronousDecode)) {\n        QueueAsyncDecode(image, image_id);\n        return;\n    }',
-     '    if (True(image.flags & ImageFlagBits::AsynchronousDecode) && ::Eden::AstcPolicy::InBackground()) {\n        QueueAsyncDecode(image, image_id);\n        return;\n    }'),
+     '    if (True(image.flags & ImageFlagBits::AsynchronousDecode) && ::Eden::AstcPolicy::InBackground(MapSizeBytes(image)) &&\n'
+     # A light frame's conversions in flight are bounded (headless/memory_budget.h).
+     '        (::Eden::AstcPolicy::Busy() || ::Eden::Performance::LightBackgroundRoom(MapSizeBytes(image)))) {\n'
+     '        ::Eden::Performance::astc_background_bytes += MapSizeBytes(image);\n'
+     '        if (!::Eden::AstcPolicy::Busy() && ::Eden::AstcPolicy::ReportLightBackground()) {\n'
+     '            std::printf("EDEN_ASTC_BACKGROUND texels=%u size=%ux%u layers=%u levels=%u draws=%u count=%u\\n",\n'
+     '                        MapSizeBytes(image), image.info.size.width, image.info.size.height,\n'
+     '                        static_cast<unsigned>(image.info.resources.layers),\n'
+     '                        static_cast<unsigned>(image.info.resources.levels),\n'
+     '                        ::Eden::AstcPolicy::Draws(), ::Eden::AstcPolicy::light_background);\n'
+     '        }\n'
+     '        QueueAsyncDecode(image, image_id);\n'
+     '        return;\n'
+     '    }\n'
+     '    const long long eden_astc_start =\n'
+     '        True(image.flags & ImageFlagBits::AsynchronousDecode) ? ::Eden::Performance::NowNs() : 0;\n'
+     '    SCOPE_EXIT {\n'
+     '        if (eden_astc_start == 0) return;\n'
+     '        const long long held = ::Eden::Performance::NowNs() - eden_astc_start;\n'
+     '        if (::Eden::AstcPolicy::ReportSlowInPlace(held)) {\n'
+     '            std::printf("EDEN_ASTC_IN_PLACE ms=%.1f texels=%u size=%ux%u layers=%u levels=%u draws=%u "\n'
+     '                        "slow=%u slow_ms=%.0f\\n", static_cast<double>(held) / 1e6, MapSizeBytes(image),\n'
+     '                        image.info.size.width, image.info.size.height,\n'
+     '                        static_cast<unsigned>(image.info.resources.layers),\n'
+     '                        static_cast<unsigned>(image.info.resources.levels), ::Eden::AstcPolicy::Draws(),\n'
+     '                        ::Eden::AstcPolicy::slow_in_place,\n'
+     '                        static_cast<double>(::Eden::AstcPolicy::slow_in_place_ns) / 1e6);\n'
+     '        }\n'
+     '    };'),
     ('    TickAsyncDecode();\n    TickAsyncUnswizzle();', '    ::Eden::AstcPolicy::Frame();\n    TickAsyncDecode();\n    TickAsyncUnswizzle();'),
     # Every 10 s at most, what the collector freed because memory was short (texture_evictions.h).
     ('    sentenced_images.Tick();\n',
@@ -1709,7 +1744,7 @@ for name in ('vk_graphics_pipeline', 'vk_compute_pipeline'):
                 '::Eden::PipelineIdentity::Compute(*pipeline, shader_hash);')
     anchors = [
         ('#include <algorithm>', '#include <algorithm>\n#include "performance.h"\n#include "pipeline_identity.h"\n'
-                                 '#include "shader_start.h"'),
+                                 '#include "shader_start.h"\n#include "crash_report.h"'),
         ('            std::unique_lock lock{build_mutex};',
          '            auto timer = Eden::Performance::VulkanTimer(16);\n            std::unique_lock lock{build_mutex};'),
         ('            pipeline_statistics->Collect(device, *pipeline);\n        }\n',
@@ -1735,6 +1770,17 @@ for name in ('vk_graphics_pipeline', 'vk_compute_pipeline'):
         ]
     if name == 'vk_graphics_pipeline':
         anchors += configure_phases
+    # While the driver compiles the pipeline, a crash report names it after the thread
+    # (headless/crash_report.h, Doing): a fault inside the driver leaves no other trace of the shader
+    # (Oliv3rmoon/Nightshade#4), and EDEN_PIPELINE is printed only once the pipeline exists.
+    if name == 'vk_graphics_pipeline':
+        anchors.append(('    pipeline = device.GetLogical().CreateGraphicsPipeline({\n',
+                        '    const ::Eden::Crash::Doing eden_doing{"the driver compiling graphics pipeline key", key.Hash()};\n'
+                        '    pipeline = device.GetLogical().CreateGraphicsPipeline({\n'))
+    else:
+        anchors.append(('            pipeline = device.GetLogical().CreateComputePipeline(compute_ci, *pipeline_cache);\n',
+                        '            const ::Eden::Crash::Doing eden_doing{"the driver compiling compute pipeline cs", shader_hash};\n'
+                        '            pipeline = device.GetLogical().CreateComputePipeline(compute_ci, *pipeline_cache);\n'))
     adapt(f'src/video_core/renderer_vulkan/{name}.cpp', name + '_cost.cpp', anchors)
 shader_costs = [
     ('#include <algorithm>', '#include <algorithm>\n#include <cstdio>\n#include <set>\n#include <unordered_set>\n'

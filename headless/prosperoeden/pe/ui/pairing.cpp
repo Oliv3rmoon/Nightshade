@@ -356,35 +356,8 @@ void Launcher::draw_pairing(Canvas &c, float open)
     const bool live = pairing_.stage == PairingStage::waiting || pairing_.stage == PairingStage::asking ||
                       pairing_.stage == PairingStage::idle;
     list.push_opacity(live ? 1.0f : 0.12f);
-    list.rounded_rect(kQrBox, 18.0f, Color{1.0f, 1.0f, 1.0f, 1.0f});
-    if (pairing_qr_.size > 0)
-    {
-        const int quiet = 4;
-        const float module = std::floor((kQrBox.w - 24.0f) / static_cast<float>(pairing_qr_.size + 2 * quiet));
-        const float side = module * static_cast<float>(pairing_qr_.size);
-        // On whole pixels: no seams between the modules.
-        const float x0 = std::floor(kQrBox.x + (kQrBox.w - side) * 0.5f);
-        const float y0 = std::floor(kQrBox.y + (kQrBox.h - side) * 0.5f);
-        const Color ink = Color{0.067f, 0.067f, 0.067f, 1.0f};
-        for (int y = 0; y < pairing_qr_.size; ++y)
-            for (int x = 0; x < pairing_qr_.size;)
-            {
-                if (!pairing_qr_.at(x, y))
-                {
-                    ++x;
-                    continue;
-                }
-                // A run of dark modules as one rectangle.
-                int end = x;
-                while (end < pairing_qr_.size && pairing_qr_.at(end, y))
-                    ++end;
-                list.rounded_rect({x0 + module * static_cast<float>(x), y0 + module * static_cast<float>(y),
-                                   module * static_cast<float>(end - x), module + 0.5f},
-                                  0.0f, ink);
-                x = end;
-            }
-    }
-    else
+    qr_code(c, pairing_qr_, kQrBox);
+    if (pairing_qr_.size <= 0)
     {
         // Asking the server for a code: a turning arc where the code will be.
         arc(list, kQrBox.x + kQrBox.w * 0.5f, kQrBox.y + kQrBox.h * 0.5f, 60.0f, 8.0f, pairing_time_ * 4.2f,

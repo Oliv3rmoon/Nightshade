@@ -1276,13 +1276,18 @@ if(NOT EDEN_DEV_PROFILE)
     list(APPEND core_sources "${PORT_BUILD_DIR}/hle_service.cpp")
 endif()
 # A game that stops itself prints the last service calls first (headless/ipc_ring.h).
+# A stop sets System::is_powered_on false before it suspends the cores, and from then Eden's
+# services write no reply (service.cpp) while the waiting caller is still woken: it reads its own
+# request back and stops with 2010-0212 (InvalidCmifOutHeader), its last call missing from the
+# ring. Every 2010-0212 in Oliv3rmoon/Nightshade#3 and #4's logs came 1 to 7 ms after the menu
+# shortcut or a renderer failure had begun the stop, so such a break says it was the stop's.
 file(READ "${PROJECT_SOURCE_DIR}/src/core/hle/kernel/svc/svc_exception.cpp" break_source)
 set(break_site "    bool notification_only = True(reason & BreakReason::NotificationOnlyFlag);\n")
 string(FIND "${break_source}" "${break_site}" break_at)
 if(break_at LESS 0)
     message(FATAL_ERROR "Pinned svcBreak changed; review where the last service calls are printed.")
 endif()
-string(REPLACE "${break_site}" "${break_site}    if (!notification_only) {\n        ::Eden::IpcRing::Dump(GetCurrentThread(system.Kernel()).GetThreadId(),\n                              [](const char* line) { LOG_CRITICAL(Debug_Emulated, \"{}\", line); });\n    }\n" break_source "${break_source}")
+string(REPLACE "${break_site}" "${break_site}    if (!notification_only && system.IsShuttingDown()) {\n        LOG_CRITICAL(Debug_Emulated, \"EDEN_BREAK_DURING_STOP the session was already stopping: services write no reply \"\n                                     \"then, so a call that waited for one reads its own request (2010-0212)\");\n    }\n    if (!notification_only) {\n        ::Eden::IpcRing::Dump(GetCurrentThread(system.Kernel()).GetThreadId(),\n                              [](const char* line) { LOG_CRITICAL(Debug_Emulated, \"{}\", line); });\n    }\n" break_source "${break_source}")
 write_derived("${PORT_BUILD_DIR}/svc_exception.cpp" "#include \"${EDEN_PORT_DIR}/ipc_ring.h\"\n${break_source}")
 list(REMOVE_ITEM core_sources "hle/kernel/svc/svc_exception.cpp")
 list(APPEND core_sources "${PORT_BUILD_DIR}/svc_exception.cpp")
@@ -3702,6 +3707,7 @@ endif()
                 "${launcher_dir}/pe/ui/apps.cpp"
                 "${launcher_dir}/pe/ui/backup.cpp"
                 "${launcher_dir}/pe/ui/browse.cpp"
+                "${launcher_dir}/pe/ui/community.cpp"
                 "${launcher_dir}/pe/ui/game_options.cpp"
                 "${launcher_dir}/pe/ui/profiles.cpp"
                 "${launcher_dir}/pe/ui/remote.cpp"

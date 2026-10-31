@@ -102,6 +102,18 @@ inline std::size_t CachesFloor(unsigned long long largest_image) {
 inline bool CachesShort(std::size_t caches_free) {
     return caches_free < kShortMemory;
 }
+// ASTC textures converted in the background (headless/astc_policy.h) hold their data in the heap
+// until they are uploaded: the unswizzled input from when they are queued (one decoder thread
+// takes them in turn; TOTK's logs show up to 94 waiting), then the converted copy. A light frame
+// (a loading screen, a menu) sends one there only while less than kLightBackgroundBytes are in
+// flight, and converts the rest in place as before: loading TOTK's textures that way put up to
+// 870 MiB in flight in the simulation (tools/check-memory-soak.py), and the pool's largest free
+// block under its 161 MiB texture array. A busy frame sends every one, as before. GPU thread only.
+inline constexpr unsigned long long kLightBackgroundBytes = 128ull << 20;
+inline unsigned long long astc_background_bytes = 0;
+inline bool LightBackgroundRoom(unsigned long long bytes) {
+    return astc_background_bytes + bytes <= kLightBackgroundBytes;
+}
 // The largest image that had memory of its own this session (bytes), kept by the graphics
 // allocator (tools/prepare-vulkan-port.py): what the caches' floor is twice of.
 inline std::atomic<unsigned long long> graphics_largest_image{0};

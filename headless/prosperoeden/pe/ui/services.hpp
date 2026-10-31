@@ -494,6 +494,9 @@ struct Preferences
     // Settings > Diagnostics: the dialog (or notification) at the start when homebrew.page lists a
     // newer release. Off, the check still runs and About names the newer version.
     bool update_notices = true;
+    // The card naming the community's Discord server was closed (community.cpp): it shows once,
+    // at a start of the app. About names the server whatever this says.
+    bool community_seen = false;
 };
 
 // What one game does differently from Settings (Library > Game settings). Each value is -1 while

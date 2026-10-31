@@ -68,6 +68,9 @@ python3 -B "$root/headless/check_slab_lifetime.py" \
 cmake --build "$scratch/build" --target eden-headless eden-romfs-check eden-streamed-game-check eden-devices-check eden-scalar-check eden-memory-check eden-ryujinx-check eden-mods-check eden-shader-cache-check eden-settings-check eden-patch-library-check eden-update-check eden-update-files-check eden-profiles-check eden-save-sync-check eden-formats-check -j 6
 python3 -B "$root/tools/check-timing-stop.py" "$scratch/build"
 python3 -B "$root/tools/check-post-processing-paths.py" "$scratch/build"
+# The copy engine's constant fill (Eden patch 13): every patch applies in order, the fill writes
+# whole elements, and the patched files compile with this build's commands.
+python3 -B "$root/tools/check-dma-fill.py" "$scratch/build"
 python3 -B "$root/tools/check-guest-hooks.py"
 # ZBIC NSO segments (Switch 22.0.0 and later) as Eden decodes them, on frames made here.
 python3 -B "$root/tools/check-zbic.py" "$scratch/source"
@@ -88,7 +91,10 @@ python3 -B "$root/tools/check-stop-limit.py"
 python3 -B "$root/tools/check-image-pages.py"
 python3 -B "$root/tools/check-guest-headroom.py"
 python3 -B "$root/tools/check-guest-span.py" "$scratch/source/src/core/memory.cpp"
-python3 -B "$root/tools/check-astc-policy.py"
+# With the source: the Vulkan texture cache's ASTC code as the port writes it (issue 3).
+python3 -B "$root/tools/check-astc-policy.py" "$scratch/source"
+# An indexed storage image array within what the pipelines bind (Eden patch 12, issue 4).
+python3 -B "$root/tools/check-indexed-storage-images.py"
 python3 -B "$root/tools/check-guest-clock.py"
 python3 -B "$root/tools/check-guest-idle.py" "$scratch/source/src/core/hle/kernel/physical_core.cpp"
 python3 -B "$root/tools/check-ncz.py"
@@ -107,6 +113,8 @@ python3 -B "$root/tools/check-update-helper.py"
 python3 -B "$root/tools/check-apps.py"
 python3 -B "$root/tools/check-wallpapers.py"
 python3 -B "$root/tools/check-video-profiles.py"
+# The community's invite in About and on the first start's card: its QR code read as a phone would.
+python3 -B "$root/tools/check-community.py"
 python3 -B "$root/tools/check-backup.py"
 "$scratch/build/bin/eden-profiles-check"
 "$scratch/build/bin/eden-save-sync-check"

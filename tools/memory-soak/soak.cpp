@@ -610,6 +610,14 @@ std::size_t menu_array = 0; // the item menu's texture array of 121 layers
 std::uint64_t reloads = 0, expensive_evictions = 0, evictions = 0, created = 0;
 unsigned gc_steps = 0, gc_hardest = 0, gc_dirty = 0; // collector runs, at its hardest, evicting dirty textures
 unsigned image_refused = 0;
+// ASTC textures kept as BC3 that are converted in the background (headless/astc_policy.h): their
+// data is in the heap until the upload (held here for the whole 5 s step, up to the backlog the
+// logs show). In play every one; on a light frame (the session's load, the menu) v1.010.006 converted
+// every one in place, and this tree those of 3 to 32 Mi texels (a byte a texel as BC3) in the
+// background while less than 128 MiB are in flight (memory_budget.h LightBackgroundRoom).
+bool light_frame = false;
+std::vector<void*> decoded_copies;
+std::uint64_t decoded_peak = 0, decoded_now = 0;
 std::uint64_t largest_image = 0;
 std::uint64_t largest_request = 0;
 bool PoolShort(Eden::Performance::PoolView* out) {
@@ -679,6 +687,20 @@ bool CreateTexture(Texture& texture) {
     texture.memory = memory;
     texture.resident = true;
     ++created;
+    const bool background = !light_frame || (fixed_mode && texture.size > 3 * MiB && texture.size <= 32 * MiB &&
+                                             (Eden::Performance::astc_background_bytes = decoded_now, Eden::Performance::LightBackgroundRoom(texture.size)));
+    // At most the backlog the logs show (up to 94 conversions waiting, about 256 MiB of this
+    // catalogue's textures) is in flight; beyond it they are taken as converted and uploaded.
+    if (texture.costly && background && decoded_now + texture.size <= 256 * MiB) {
+        void* copy = __wrap_malloc(texture.size);
+        if (copy == nullptr) {
+            Fail("the heap refused the decoded copy of a texture of " + std::to_string(texture.size >> 20) + " MiB");
+            return false;
+        }
+        decoded_copies.push_back(copy);
+        decoded_now += texture.size;
+        decoded_peak = std::max(decoded_peak, decoded_now);
+    }
     if (now_s - texture.evicted_at < 60) ++reloads;
     // Its upload: whole in v1.010.006, in pieces of at most 64 MiB here.
     bool staged = true;
@@ -847,9 +869,9 @@ int main(int argc, char** argv) {
         std::fprintf(stderr, "no rows in %s\n", argv[2]);
         return 2;
     }
-    // Three hours by default; SOAK_HOURS for longer (with six, this tree failed with one seed of
-    // three, at 3 h 20 min: the pool fragments under the game's bursts and the textures' churn),
-    // SOAK_SEED for another session.
+    // Three hours by default; SOAK_HOURS for longer, SOAK_SEED for another session. With five seeds
+    // this tree fails with one (2 h 40 min in), v1.010.006's rules with three: the pool fragments
+    // under the game's bursts, the textures' churn and their background conversions.
     const char* hours = std::getenv("SOAK_HOURS");
     const double synthetic_hours = hours ? std::clamp(std::atof(hours), 0.1, 24.0) : 3.0;
     const double end_s = trace.empty() ? synthetic_hours * 3600.0 : trace.back().t;
@@ -903,6 +925,11 @@ int main(int argc, char** argv) {
             guest_target = std::uint64_t(std::min(guest, 4096.0) * double(MiB));
             heap_target = std::uint64_t((640 + 450 * std::min(1.0, minutes / 120)) * double(MiB));
         }
+        // Last step's background conversions are uploaded: their copies go.
+        for (void* copy : decoded_copies) __wrap_free(copy);
+        decoded_copies.clear();
+        decoded_now = 0;
+        light_frame = now_s < 6 || std::fmod(now_s, 600.0) < 30;
         GuestTo(guest_target);
         GameHeapTo(heap_target);
         GameHeapChurn(0.01);
@@ -966,14 +993,15 @@ int main(int argc, char** argv) {
                 "graphics_peak=%lluMiB worst_largest_free=%lluMiB(at %.0f s) worst_free=%lluMiB largest_request=%lluMiB "
                 "largest_image=%lluMiB staging_refused=%u images_refused=%u guest_waits=%u evictions_per_min=%.0f "
                 "expensive_evictions_per_min=%.0f reloads_per_min=%.0f collector_hardest=%.0f%% "
-                "collector_dirty=%.0f%%%s%s\n",
+                "collector_dirty=%.0f%% decoded_copies_peak=%lluMiB%s%s\n",
                 fixed_mode ? "fixed" : "control", now_s - 5, failures, start_held >> 20,
                 (unsigned long long)(peak_heap >> 20), returned >> 20, (unsigned long long)(peak_graphics >> 20),
                 (unsigned long long)(worst_largest >> 20), worst_at, (unsigned long long)(worst_free >> 20),
                 (unsigned long long)(largest_request >> 20), (unsigned long long)(largest_image >> 20), staging_refused,
                 image_refused, guest_waits, double(evictions) / minutes, double(expensive_evictions) / minutes,
                 double(reloads) / minutes, 100.0 * gc_hardest / std::max(1u, gc_steps),
-                100.0 * gc_dirty / std::max(1u, gc_steps), failures ? " first_failure=" : "",
+                100.0 * gc_dirty / std::max(1u, gc_steps), (unsigned long long)(decoded_peak >> 20),
+                failures ? " first_failure=" : "",
                 failures ? first_failure.c_str() : "");
     return failures == 0 ? 0 : 1;
 }

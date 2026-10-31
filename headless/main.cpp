@@ -379,6 +379,10 @@ int main(int argc, char** argv) {
         // A crash report says which build it came from: this one is not an official release.
         static const std::string crash_version = std::string{Eden::kAppVersion} + " (Nightshade)";
         Eden::Crash::Install(Eden::LogsDir(), crash_version.c_str(), last_crash.restarted);
+        // A GPU worker that fails on a GPU that stopped writes the report and closes the app
+        // (gpu_failure.h), as a device loss on any other thread does.
+        Eden::gpu_stalled = &Eden::Crash::GpuStalled;
+        Eden::gpu_lost = [](const char* reason) noexcept { Eden::Crash::Fail(reason); };
         Eden::BootTrace::Ready(Eden::LogsDir(), Eden::FilesystemAccess());
         Eden::BootTrace::Line("logs and crash handler ready (%s)", Eden::LogsDir().c_str());
         for (const char* folder : {"/app0", Eden::kMountedAppDir, Eden::kInstallDir, "/mnt/sandbox/PPSA99008_000/app0"})
@@ -1206,8 +1210,10 @@ int main(int argc, char** argv) {
             // 121 layers. New scenery brought several such frames in a row (41 in a session of
             // five minutes), the drops to 10 or 15 frames a second. On another thread (Eden's own
             // asynchronous mode) the texture shows a moment later and no frame waits for it: 6
-            // such frames in the same play. A light screen (loading, a menu) still converts in
-            // place, so nothing is drawn there before it is ready (headless/astc_policy.h, which the
+            // such frames in the same play. A light screen (loading, a menu) still converts a
+            // texture up to a screen picture's size in place, so that picture is not drawn before it
+            // is ready, and a larger one in the background, as a light game in play needs
+            // (Oliv3rmoon/Nightshade#3; headless/astc_policy.h, which the
             // Vulkan texture cache asks; the OpenGL one has no such rule and keeps converting in
             // place). At full quality nothing is compressed, and the GPU decodes the texture.
             Settings::values.accelerate_astc.SetValue(!astc_full && backend == Eden::GraphicsBackend::Vulkan

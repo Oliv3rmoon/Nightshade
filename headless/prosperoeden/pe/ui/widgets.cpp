@@ -462,6 +462,40 @@ void cover(Canvas &c, const std::string &path, const Rect &r, float radius, floa
     c.list.bordered_rect(r, radius, kClear, 1.0f, kWhite.with_alpha(0.10f));
 }
 
+void qr_code(Canvas &c, const QrCode &code, const Rect &box, int quiet)
+{
+    // White whatever the theme: a phone reads dark modules on light.
+    c.list.rounded_rect(box, 18.0f, kWhite);
+    if (code.size <= 0)
+        return;
+    const float module =
+        std::floor((std::min(box.w, box.h) - 24.0f) / static_cast<float>(code.size + 2 * quiet));
+    if (module < 1.0f)
+        return;
+    const float side = module * static_cast<float>(code.size);
+    // On whole pixels: no seams between the modules.
+    const float x0 = std::floor(box.x + (box.w - side) * 0.5f);
+    const float y0 = std::floor(box.y + (box.h - side) * 0.5f);
+    const Color ink = Color{0.067f, 0.067f, 0.067f, 1.0f};
+    for (int y = 0; y < code.size; ++y)
+        for (int x = 0; x < code.size;)
+        {
+            if (!code.at(x, y))
+            {
+                ++x;
+                continue;
+            }
+            // A run of dark modules as one rectangle.
+            int end = x;
+            while (end < code.size && code.at(end, y))
+                ++end;
+            c.list.rounded_rect({x0 + module * static_cast<float>(x), y0 + module * static_cast<float>(y),
+                                 module * static_cast<float>(end - x), module + 0.5f},
+                                0.0f, ink);
+            x = end;
+        }
+}
+
 void controller_icon(Canvas &c, const Rect &r, float lit)
 {
     const std::uint32_t picture = c.textures.controller();

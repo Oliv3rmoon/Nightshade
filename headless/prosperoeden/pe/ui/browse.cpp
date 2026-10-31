@@ -2,6 +2,7 @@
 // Copyright (C) 2026 BlackBearReloaded
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "pe/ui/community.hpp"
 #include "pe/ui/launcher.hpp"
 
 #include <algorithm>
@@ -23,6 +24,15 @@ constexpr float kFitX = layout::kLeft - 108.0f * kFit;
 constexpr float kFitY = 152.0f - 188.0f * kFit;
 constexpr Rect kListPanel{108.0f, 188.0f, 820.0f, 720.0f};
 constexpr Rect kDetailPanel{980.0f, 188.0f, 820.0f, 720.0f};
+// About's are taller, by the room the community takes under the setup (still above the hints).
+constexpr float kAboutTaller = 80.0f;
+constexpr Rect kAboutList{kListPanel.x, kListPanel.y, kListPanel.w, kListPanel.h + kAboutTaller};
+constexpr Rect kAboutDetail{kDetailPanel.x, kDetailPanel.y, kDetailPanel.w, kDetailPanel.h + kAboutTaller};
+// Where a place on those pages is drawn on the screen.
+constexpr Rect on_screen(const Rect &r)
+{
+    return {kFitX + r.x * kFit, kFitY + r.y * kFit, r.w * kFit, r.h * kFit};
+}
 constexpr Rect kWindow{138.0f, 292.0f, 760.0f, 518.0f};
 constexpr float kRowHeight = 78.0f;
 
@@ -472,14 +482,26 @@ void Launcher::draw_about(Canvas &c)
         list.rounded_rect({x, 592.0f, w, 1.0f}, 0.0f, t.rule);
         text(c, tr("GETTING STARTED"), x, baseline(608.0f, 28.0f, t.size_small), t.size_small,
              t.accent_pale, Align::left, 3.0f);
+        // The community at the right of the setup (community.hpp): its QR code, then the server's
+        // name and address under it, all to the panel's right edge.
+        constexpr float kQr = 184.0f;
+        const float right = x + w;
+        const float beside = w - kQr - 24.0f; // what the setup's lines have at its left
+        text_shrink(c, tr("JOIN THE COMMUNITY"), right, baseline(608.0f, 28.0f, t.size_small), t.size_small,
+                    t.accent_pale, w * 0.5f - 24.0f, Align::right, 3.0f);
+        qr_code(c, community_qr(), {right - kQr, 644.0f, kQr, kQr}, 1);
+        text_shrink(c, kCommunityName, right, baseline(836.0f, 30.0f, t.size_text), t.size_text, t.title, kQr,
+                    Align::right);
+        const float link = text_shrink(c, kCommunityLink, right, baseline(864.0f, 28.0f, t.size_small),
+                                       t.size_small, t.accent_pale, w * 0.5f, Align::right);
         text_shrink(c, tr("Supply your own files"), x, baseline(644.0f, 40.0f, t.size_heading),
-                    t.size_heading, t.title, w);
+                    t.size_heading, t.title, beside);
         const std::string folder = services_.files_folder();
         const auto info_line = [&](float top, const char *label, const std::string &value)
         {
             text(c, label, x, baseline(top, 28.0f, t.size_small), t.size_small, t.meta);
             text_shrink(c, value, x + 160.0f, baseline(top, 28.0f, t.size_small), t.size_small,
-                        t.value, w - 160.0f);
+                        t.value, beside - 160.0f);
         };
         info_line(696.0f, tr("KEYS"), folder + "/keys/prod.keys");
         info_line(730.0f, tr("FIRMWARE"), folder + "/firmware/*.nca");
@@ -488,7 +510,7 @@ void Launcher::draw_about(Canvas &c)
         info_line(798.0f, tr("UPDATES, DLC"), games + "/updates");
         info_line(832.0f, tr("MODS"), folder + "/mods");
         text_shrink(c, tr("Menu sound effects made with ElevenLabs."), x,
-                    baseline(880.0f, 26.0f, t.size_small), t.size_small, t.meta, w);
+                    baseline(880.0f, 26.0f, t.size_small), t.size_small, t.meta, w - link - 32.0f);
         text(c, version_, kPanelLeft + kPanelWidth - 32.0f, baseline(920.0f, 26.0f, t.size_small),
              t.size_small, t.accent_pale, Align::right);
         // A newer release the check found (with Update notices off, the one place that says so).
@@ -502,7 +524,7 @@ void Launcher::draw_about(Canvas &c)
 
     c.list.push_transform(kFit, 0.0f, 0.0f, kFitX, kFitY);
 
-    glass(c, kListPanel, th().radius_panel, th().panel.with_alpha(0.80f), th().panel_edge.with_alpha(0.55f));
+    glass(c, kAboutList, th().radius_panel, th().panel.with_alpha(0.80f), th().panel_edge.with_alpha(0.55f));
     text(c, tr("PROJECT CREDITS"), 144.0f, baseline(210.0f, 28.0f, th().size_small), th().size_small,
          th().accent_pale, Align::left, 3.0f);
     text_shrink(c, tr("Powered by Eden"), 144.0f, baseline(250.0f, 54.0f, th().size_lead),
@@ -526,18 +548,20 @@ void Launcher::draw_about(Canvas &c)
     text_block(c, tr("ProsperoEden is an unofficial PS5 port brought to you by BlackBearReloaded."),
                144.0f, baseline(684.0f, 36.0f, th().size_text), th().size_text, 36.0f, th().body,
                748.0f, 2, kShrink);
+    // The last lines at the panel's foot.
+    constexpr float foot = kAboutTaller;
     text_shrink(c, tr("Menu sound effects made with ElevenLabs."), 144.0f,
-                baseline(788.0f, 30.0f, th().size_small), th().size_small, th().meta, 748.0f);
-    text_shrink(c, kBuildCredit, 144.0f, baseline(826.0f, 28.0f, th().size_small), th().size_small,
+                baseline(788.0f + foot, 30.0f, th().size_small), th().size_small, th().meta, 748.0f);
+    text_shrink(c, kBuildCredit, 144.0f, baseline(826.0f + foot, 28.0f, th().size_small), th().size_small,
                 th().accent_pale, 748.0f);
-    text(c, version_, 892.0f, baseline(866.0f, 28.0f, th().size_small), th().size_small,
+    text(c, version_, 892.0f, baseline(866.0f + foot, 28.0f, th().size_small), th().size_small,
          th().accent_pale, Align::right);
     // A newer release the check found (with Update notices off, the one place that says so).
     if (!update_version_.empty())
         text_shrink(c, update_text(fill(tr("Version {0} is on homebrew.page"), {update_version_})), 144.0f,
-                    baseline(866.0f, 28.0f, th().size_small), th().size_small, th().meta, 540.0f);
+                    baseline(866.0f + foot, 28.0f, th().size_small), th().size_small, th().meta, 540.0f);
 
-    glass(c, kDetailPanel, th().radius_panel, th().panel.with_alpha(0.80f),
+    glass(c, kAboutDetail, th().radius_panel, th().panel.with_alpha(0.80f),
           th().panel_edge.with_alpha(0.55f));
     text(c, tr("GETTING STARTED"), 1016.0f, baseline(210.0f, 28.0f, th().size_small), th().size_small,
          th().accent_pale, Align::left, 3.0f);
@@ -555,20 +579,37 @@ void Launcher::draw_about(Canvas &c)
     };
     // Five lines above the rule. A game's own mods folder is named after its ID: its settings in
     // the Library show it (and create it).
-    line(384.0f, tr("KEYS"), short_path(folder + "/keys/prod.keys", 36));
-    line(450.0f, tr("FIRMWARE"), short_path(folder + "/firmware/*.nca", 36));
+    line(352.0f, tr("KEYS"), short_path(folder + "/keys/prod.keys", 36));
+    line(404.0f, tr("FIRMWARE"), short_path(folder + "/firmware/*.nca", 36));
     const std::string games = services_.games_folder();
-    line(516.0f, tr("GAMES"), fill(tr("{0}/ (NSP or XCI)"), {short_path(games + "/roms", 36)}));
-    line(582.0f, tr("UPDATES, DLC"), fill(tr("{0}/ (NSP or XCI)"), {short_path(games + "/updates", 36)}));
-    line(648.0f, tr("MODS"), fill(tr("{0}/ (one folder per game ID)"), {short_path(folder + "/mods", 36)}));
-    list.rounded_rect({1016.0f, 712.0f, 748.0f, 1.0f}, 0.0f, th().rule);
+    line(456.0f, tr("GAMES"), fill(tr("{0}/ (NSP or XCI)"), {short_path(games + "/roms", 36)}));
+    line(508.0f, tr("UPDATES, DLC"), fill(tr("{0}/ (NSP or XCI)"), {short_path(games + "/updates", 36)}));
+    line(560.0f, tr("MODS"), fill(tr("{0}/ (one folder per game ID)"), {short_path(folder + "/mods", 36)}));
+    list.rounded_rect({1016.0f, 616.0f, 748.0f, 1.0f}, 0.0f, th().rule);
     text_block(c,
                tr("Use extracted firmware NCA files. Choose the folder in Settings, Game files; "
                "restart the app after changing it."),
-               1016.0f, baseline(740.0f, 36.0f, th().size_text), th().size_text, 36.0f,
+               1016.0f, baseline(636.0f, 36.0f, th().size_text), th().size_text, 36.0f,
                th().meta, 748.0f, 3, kShrink);
+    // Under the setup, the community (community.hpp): the server's name and address at the left,
+    // its QR code at the right (drawn after the pages, on the screen's own pixels).
+    constexpr Rect kQrBox{1764.0f - 190.0f, 776.0f, 190.0f, 190.0f};
+    const float words = kQrBox.x - 28.0f - 1016.0f;
+    list.rounded_rect({1016.0f, 760.0f, 748.0f, 1.0f}, 0.0f, th().rule);
+    text_shrink(c, tr("JOIN THE COMMUNITY"), 1016.0f, baseline(776.0f, 28.0f, th().size_small), th().size_small,
+                th().accent_pale, words, Align::left, 3.0f);
+    {
+        const Heavy heavy(c);
+        text_shrink(c, kCommunityName, 1016.0f, baseline(810.0f, 48.0f, th().size_lead), th().size_lead,
+                    th().title, words);
+    }
+    text_block(c, tr("Scan the code with your phone, or open the address below."), 1016.0f,
+               baseline(862.0f, 30.0f, th().size_small), th().size_small, 30.0f, th().copy, words, 2, kShrink);
+    text_shrink(c, kCommunityLink, 1016.0f, baseline(926.0f, 34.0f, th().size_text), th().size_text,
+                th().accent_pale, words);
 
     c.list.pop_transform();
+    qr_code(c, community_qr(), on_screen(kQrBox), 1);
     static constexpr Hint kHints[] = {{Pad::circle, TR("Back")}, {Pad::l1, TR("Sections"), Pad::r1}};
     draw_footer(c, kHints, 2);
 }

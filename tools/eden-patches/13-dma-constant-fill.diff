@@ -1,0 +1,304 @@
+--- a/src/video_core/buffer_cache/buffer_cache.h
++++ b/src/video_core/buffer_cache/buffer_cache.h
+@@ -7,6 +7,8 @@
+ #pragma once
+ 
+ #include <algorithm>
++#include <atomic>
++#include <cstdio>
+ #include <memory>
+ #include <numeric>
+ 
+@@ -269,6 +271,17 @@ bool BufferCache<P>::DMAClear(GPUVAddr dst_address, u64 amount, u32 value) {
+     }
+     const bool dest_dirty = IsRegionRegistered(*cpu_dst_address, amount);
+     if (!dest_dirty) {
++        // amount is in words: this asks about the clear's first quarter. A clear whose cached
++        // buffers lie past it is left to the copy engine's own fill (maxwell_dma.cpp), which
++        // reaches them without making one buffer of the whole range here. The first 16, for
++        // stderr.log: before, such a clear reached guest memory only.
++        if (IsRegionRegistered(*cpu_dst_address, amount * sizeof(u32))) {
++            static std::atomic<u32> reports{0};
++            if (reports.fetch_add(1, std::memory_order_relaxed) < 16) {
++                std::fprintf(stderr, "EDEN_DMA_CLEAR_RANGE bytes=%llu value=0x%08x\n",
++                             static_cast<unsigned long long>(amount * sizeof(u32)), value);
++            }
++        }
+         return false;
+     }
+ 
+--- a/src/video_core/engines/maxwell_dma.cpp
++++ b/src/video_core/engines/maxwell_dma.cpp
+@@ -4,6 +4,13 @@
+ // SPDX-FileCopyrightText: Copyright 2018 yuzu Emulator Project
+ // SPDX-License-Identifier: GPL-2.0-or-later
+ 
++#include <algorithm>
++#include <array>
++#include <atomic>
++#include <cstdio>
++#include <numeric>
++#include <optional>
++#include <utility>
+ #include "common/algorithm.h"
+ #include "common/assert.h"
+ #include "common/logging.h"
+@@ -21,6 +28,107 @@ namespace Tegra::Engines {
+ 
+ using namespace Texture;
+ 
++namespace {
++
++// constant fill: begin (tools/check-dma-fill.py builds this part on its own)
++// A remapped copy whose components are all constants (CONST_A, CONST_B) or not written (NO_WRITE)
++// is a fill: the copy engine reads no source. Each element is num_dst_components components of
++// component_size bytes; a constant component is the low component_size bytes of its constant, and
++// a NO_WRITE one leaves what the destination holds.
++struct ConstantFill {
++    std::array<u8, 16> pattern{};
++    std::array<bool, 16> written{};
++    u32 element_size = 0; // 0: no component is written
++    bool keeps_bytes = false;
++
++    // The 32-bit word the fill is made of, when every byte is written and the element, repeated,
++    // is that word repeated.
++    std::optional<u32> Word() const {
++        if (keeps_bytes || element_size == 0) {
++            return std::nullopt;
++        }
++        u32 word = 0;
++        for (u32 byte = 0; byte < 4; ++byte) {
++            word |= static_cast<u32>(pattern[byte % element_size]) << (8 * byte);
++        }
++        const u32 period = std::lcm(element_size, 4u);
++        for (u32 byte = 0; byte < period; ++byte) {
++            if (pattern[byte % element_size] != static_cast<u8>(word >> (8 * (byte % 4)))) {
++                return std::nullopt;
++            }
++        }
++        return word;
++    }
++};
++
++// Swizzles as RemapConst::Swizzle: 0 to 3 a source component, 4 CONST_A, 5 CONST_B, 6 NO_WRITE.
++// Nothing when a written component comes from the source (a remapped copy).
++std::optional<ConstantFill> MakeConstantFill(u32 component_size, u32 num_components,
++                                             const std::array<u32, 4>& swizzles, u32 const_a,
++                                             u32 const_b) {
++    if (component_size == 0 || component_size > 4 || num_components == 0 || num_components > 4) {
++        return std::nullopt;
++    }
++    ConstantFill fill;
++    bool any_written = false;
++    for (u32 component = 0; component < num_components; ++component) {
++        u32 value = 0;
++        switch (swizzles[component]) {
++        case 4:
++            value = const_a;
++            break;
++        case 5:
++            value = const_b;
++            break;
++        case 6:
++            fill.keeps_bytes = true;
++            continue;
++        default:
++            return std::nullopt;
++        }
++        any_written = true;
++        for (u32 byte = 0; byte < component_size; ++byte) {
++            fill.pattern[component * component_size + byte] = static_cast<u8>(value >> (8 * byte));
++            fill.written[component * component_size + byte] = true;
++        }
++    }
++    fill.element_size = any_written ? component_size * num_components : 0;
++    return fill;
++}
++
++// The whole pages of [begin, end): the first and the end of them (equal when there are none).
++std::pair<u64, u64> WholePages(u64 begin, u64 end, u64 page) {
++    const u64 first = (std::min)(end, (begin + page - 1) / page * page);
++    return {first, (std::max)(first, end / page * page)};
++}
++// constant fill: end
++
++// The first fills whose shape the copy engine's earlier emulation got wrong, for stderr.log: it
++// wrote line_length_in * component_size bytes (an element of one component), to guest memory
++// only unless the component was 4 bytes, and it copied from offset_in for a multi-line fill or
++// one whose first component was not CONST_A.
++void ReportConstantFill(const ConstantFill& fill, u32 component_size, u32 num_components,
++                        u32 line_length, u32 lines, bool multi_line, bool first_is_const_a,
++                        u32 const_a) {
++    const bool was_right = !multi_line && first_is_const_a && num_components == 1 &&
++                           component_size == 4 && !fill.keeps_bytes;
++    static std::atomic<u32> reports{0};
++    if (was_right || reports.fetch_add(1, std::memory_order_relaxed) >= 16) {
++        return;
++    }
++    const unsigned long long before =
++        (!multi_line && first_is_const_a) ? u64{line_length} * component_size : 0;
++    std::fprintf(stderr,
++                 "EDEN_DMA_FILL elements=%u components=%ux%u lines=%u multi_line=%u const_a=0x%08x "
++                 "bytes=%llu before=%llu gpu_copy_before=%s\n",
++                 line_length, num_components, component_size, lines, multi_line ? 1U : 0U, const_a,
++                 static_cast<unsigned long long>(u64{line_length} * fill.element_size) * lines,
++                 before,
++                 (!multi_line && first_is_const_a && component_size == 4) ? "filled" : "missed");
++}
++
++} // Anonymous namespace
++
+ MaxwellDMA::MaxwellDMA(MemoryManager& memory_manager_)
+     : memory_manager{memory_manager_}
+ {
+@@ -64,6 +172,11 @@ void MaxwellDMA::Launch() {
+     const LaunchDMA& launch = regs.launch_dma;
+     ASSERT(launch.interrupt_type == LaunchDMA::InterruptType::NONE);
+ 
++    if (launch.remap_enable != 0 && LaunchConstantFill()) {
++        ReleaseSemaphore();
++        return;
++    }
++
+     if (launch.multi_line_enable) {
+         const bool is_src_pitch = launch.src_memory_layout == LaunchDMA::MemoryLayout::PITCH;
+         const bool is_dst_pitch = launch.dst_memory_layout == LaunchDMA::MemoryLayout::PITCH;
+@@ -153,6 +266,101 @@ void MaxwellDMA::Launch() {
+     ReleaseSemaphore();
+ }
+ 
++bool MaxwellDMA::LaunchConstantFill() {
++    const auto& remap = regs.remap_const;
++    const std::array<u32, 4> swizzles{
++        static_cast<u32>(remap.dst_x.Value()), static_cast<u32>(remap.dst_y.Value()),
++        static_cast<u32>(remap.dst_z.Value()), static_cast<u32>(remap.dst_w.Value())};
++    const u32 component_size = remap.component_size_minus_one + 1;
++    const u32 num_components = remap.num_dst_components_minus_one + 1;
++    const std::optional<ConstantFill> fill =
++        MakeConstantFill(component_size, num_components, swizzles, remap.remap_consta_value,
++                         remap.remap_constb_value);
++    if (!fill) {
++        return false;
++    }
++    const bool multi_line = regs.launch_dma.multi_line_enable != 0;
++    if (multi_line && regs.launch_dma.dst_memory_layout != LaunchDMA::MemoryLayout::PITCH) {
++        return false; // a block-linear destination: as before
++    }
++    const u32 lines = multi_line ? regs.line_count : 1;
++    const u64 line_bytes = u64{regs.line_length_in} * fill->element_size;
++    ReportConstantFill(*fill, component_size, num_components, regs.line_length_in, lines,
++                       multi_line, swizzles[0] == 4, remap.remap_consta_value);
++    if (line_bytes == 0 || lines == 0) {
++        return true;
++    }
++    memory_manager.FlushCaching();
++    auto& accelerate = rasterizer->AccessAccelerateDMA();
++    const std::optional<u32> word = fill->Word();
++    static constexpr u64 PIECE = 4096;
++    for (u32 line = 0; line < lines; ++line) {
++        const GPUVAddr dst =
++            regs.offset_out + (multi_line ? static_cast<s64>(line) * regs.pitch_out : 0);
++        if (word && dst % 4 == 0 && line_bytes % 4 == 0 &&
++            accelerate.BufferClear(dst, line_bytes / 4, *word)) {
++            // The buffer cache filled its copy on the GPU, in order with the work before it.
++            // Guest memory gets the same bytes.
++            write_buffer.resize_destructive(PIECE);
++            std::ranges::fill(std::span<u32>(reinterpret_cast<u32*>(write_buffer.data()), PIECE / 4),
++                              *word);
++            for (u64 done = 0; done < line_bytes; done += PIECE) {
++                memory_manager.WriteBlockUnsafe(dst + done, write_buffer.data(),
++                                                (std::min)(PIECE, line_bytes - done));
++            }
++            continue;
++        }
++        // Otherwise every cache gets the fill, as for an inline-to-memory write. Writing guest
++        // memory alone left the buffer cache's copy as it was, which the GPU went on using: a
++        // counter a game cleared this way and a shader then added to kept its old value.
++        const GPUVAddr end = dst + line_bytes;
++        // A page the fill only partly covers, or a fill that keeps some bytes, goes through the
++        // inline-to-memory path, a piece at a time within a page: the buffer cache writes the
++        // bytes into its copy in order with the GPU's work, so GPU data beside them stays.
++        const auto fill_inline = [&](GPUVAddr begin, GPUVAddr stop) {
++            for (GPUVAddr at = begin; at < stop;) {
++                const u64 piece = (std::min)(stop - at, PIECE - (at & (PIECE - 1)));
++                write_buffer.resize_destructive(piece);
++                if (fill->keeps_bytes) {
++                    memory_manager.ReadBlock(at, write_buffer.data(), piece);
++                }
++                for (u64 i = 0; i < piece; ++i) {
++                    const u64 in_element = (at - dst + i) % fill->element_size;
++                    if (fill->written[in_element]) {
++                        write_buffer[i] = fill->pattern[in_element];
++                    }
++                }
++                rasterizer->AccelerateInlineToMemory(
++                    at, piece, std::span<const u8>(write_buffer.data(), piece));
++                at += piece;
++            }
++        };
++        if (fill->keeps_bytes) {
++            fill_inline(dst, end);
++            continue;
++        }
++        const auto [whole_begin, whole_end] = WholePages(dst, end, PIECE);
++        fill_inline(dst, whole_begin);
++        if (whole_end > whole_begin) {
++            // Whole pages: guest memory, then every cache invalidates them, so the buffer
++            // cache uploads them (the fill covers each page, so nothing of the GPU's is lost)
++            // and drops a download of them still on its way.
++            write_buffer.resize_destructive(PIECE * 16);
++            for (GPUVAddr at = whole_begin; at < whole_end;) {
++                const u64 piece = (std::min)(whole_end - at, PIECE * 16);
++                for (u64 i = 0; i < piece; ++i) {
++                    write_buffer[i] = fill->pattern[(at - dst + i) % fill->element_size];
++                }
++                memory_manager.WriteBlockUnsafe(at, write_buffer.data(), piece);
++                at += piece;
++            }
++            memory_manager.InvalidateRegion(whole_begin, whole_end - whole_begin);
++        }
++        fill_inline(whole_end, end);
++    }
++    return true;
++}
++
+ void MaxwellDMA::CopyBlockLinearToPitch() {
+    
+ 
+--- a/src/video_core/engines/maxwell_dma.h
++++ b/src/video_core/engines/maxwell_dma.h
+@@ -255,6 +255,10 @@ private:
+     /// registers.
+     void Launch();
+ 
++    /// A remapped copy that only writes constants: fills the destination as the copy engine does,
++    /// in every cache. False when the copy reads its source (or writes a block-linear surface).
++    bool LaunchConstantFill();
++
+     void CopyBlockLinearToPitch();
+ 
+     void CopyPitchToBlockLinear();
+--- a/src/video_core/macro.cpp
++++ b/src/video_core/macro.cpp
+@@ -64,13 +64,15 @@ bool IsTopologySafe(Maxwell3D::Regs::PrimitiveTopology topology) {
+     }
+ }
+ 
+-// An indirect draw the CPU makes from its parameters, asking for more than 2^32 vertices
+-// (count x instances), is not a real draw: no Switch game draws that many in one call, and the
+-// host GPU would run it until it is reset. Such parameters are memory read before the GPU's write
+-// to it arrived. They are read once more through the caches, and the draw is dropped if they
+-// still say so.
++// An indirect draw the CPU makes from its parameters, asking for more than 2^28 vertices
++// (count x instances, 268 million), is not a real draw: no Switch game draws that many in one
++// call, and the host GPU would run it for seconds, until it is reset. A draw of 36 vertices with
++// 50,987,009 instances (1.8 billion) stopped the GPU under the earlier limit of 2^32
++// (Oliv3rmoon/Nightshade#1). Such parameters are memory the GPU's newest write had not reached,
++// or a counter whose reset was lost. They are read once more through the caches, and the draw is
++// dropped if they still say so.
+ bool IsDrawImplausible(u32 count, u32 instance_count) {
+-    return u64(count) * u64(instance_count) > (u64(1) << 32);
++    return u64(count) * u64(instance_count) > (u64(1) << 28);
+ }
+ 
+ void ReportDroppedDraw(const char* macro, u32 count, u32 instance_count) {

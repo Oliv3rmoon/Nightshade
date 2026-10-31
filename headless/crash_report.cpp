@@ -284,6 +284,13 @@ const char* ThreadName(std::uintptr_t thread) noexcept {
     return "not named";
 }
 
+// The thread's entry, for what it said it was doing (Doing, crash_report.h).
+const NamedThread* ThreadEntry(std::uintptr_t thread) noexcept {
+    for (const NamedThread& entry : named_threads)
+        if (entry.thread.load(std::memory_order_acquire) == thread) return &entry;
+    return nullptr;
+}
+
 void PutRegister(const char* before, const char* name, std::uint64_t value) noexcept {
     report.Put(before);
     report.Put(name);
@@ -348,7 +355,16 @@ void Compose(const Kind* kind, int code, std::uint64_t address, const Registers&
     t.Put(ThreadName(self));
     t.Put(" (0x");
     t.Hex(self);
-    t.Put(")\nrunning: ");
+    t.Put(")\n");
+    const NamedThread* entry = ThreadEntry(self);
+    if (const char* what = entry ? entry->doing.load(std::memory_order_acquire) : nullptr) {
+        t.Put("doing: ");
+        t.Put(what);
+        t.Put(' ');
+        t.Hex(entry->doing_value.load(std::memory_order_relaxed), 16);
+        t.Put('\n');
+    }
+    t.Put("running: ");
     t.Put(sessions[session_now.load(std::memory_order_acquire) & 1]);
     t.Put('\n');
 #ifdef PS5_NATIVE
@@ -681,6 +697,10 @@ Last TakeLast(const std::string& logs_folder, const std::string& eden_log) {
 
 void NoteGpuStalled() noexcept {
     gpu_stalled.store(true, std::memory_order_release);
+}
+
+bool GpuStalled() noexcept {
+    return gpu_stalled.load(std::memory_order_acquire);
 }
 
 } // namespace Eden::Crash
