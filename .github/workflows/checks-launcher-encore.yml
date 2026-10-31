@@ -23,7 +23,7 @@
    "env": {
     "XDG_CACHE_HOME": "/tmp/prosperoeden-dev-host-cache",
     "PROSPEROEDEN_DEPS_CACHE": "/tmp/prosperoeden-dev-downloads",
-    "DEV_HEAD": "5f59a76990ac5ba9a1f2786313cb8c751394507c",
+    "DEV_HEAD": "7990aeaa666c3e860e87143bebefa0f607664927",
     "GITHUB_TOKEN": "${{ github.token }}"
    },
    "steps": [
@@ -31,7 +31,7 @@
      "name": "Check out the fix/shader-start commit",
      "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
      "with": {
-      "ref": "5f59a76990ac5ba9a1f2786313cb8c751394507c",
+      "ref": "7990aeaa666c3e860e87143bebefa0f607664927",
       "persist-credentials": false
      }
     },
