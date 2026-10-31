@@ -68,6 +68,9 @@ python3 -B "$root/headless/check_slab_lifetime.py" \
 cmake --build "$scratch/build" --target eden-headless eden-romfs-check eden-streamed-game-check eden-devices-check eden-scalar-check eden-memory-check eden-ryujinx-check eden-mods-check eden-shader-cache-check eden-settings-check eden-patch-library-check eden-update-check eden-update-files-check eden-profiles-check eden-save-sync-check eden-formats-check -j 6
 python3 -B "$root/tools/check-timing-stop.py" "$scratch/build"
 python3 -B "$root/tools/check-post-processing-paths.py" "$scratch/build"
+# The copy engine's constant fill (Eden patch 12): every patch applies in order, the fill writes
+# whole elements, and the patched files compile with this build's commands.
+python3 -B "$root/tools/check-dma-fill.py" "$scratch/build"
 python3 -B "$root/tools/check-guest-hooks.py"
 # ZBIC NSO segments (Switch 22.0.0 and later) as Eden decodes them, on frames made here.
 python3 -B "$root/tools/check-zbic.py" "$scratch/source"
