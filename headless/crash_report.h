@@ -29,6 +29,9 @@ namespace Eden::Crash {
 struct NamedThread {
     std::atomic<std::uintptr_t> thread{0};
     char name[24]{};
+    // What the thread is doing that a crash in it should name (Doing, below): a string literal.
+    std::atomic<const char*> doing{nullptr};
+    std::atomic<std::uint64_t> doing_value{0};
 };
 inline constexpr unsigned kNamedThreads = 192;
 inline NamedThread named_threads[kNamedThreads];
@@ -44,11 +47,46 @@ inline void NameThread(const char* name) noexcept {
     // A full table starts over with its oldest entries.
     if (!entry) entry = &named_threads[named_thread_count.fetch_add(1, std::memory_order_relaxed) % kNamedThreads];
     entry->thread.store(0, std::memory_order_relaxed);
+    entry->doing.store(nullptr, std::memory_order_relaxed);
     std::size_t length = 0;
     for (; name && name[length] && length + 1 < sizeof(entry->name); ++length) entry->name[length] = name[length];
     entry->name[length] = '\0';
     entry->thread.store(self, std::memory_order_release);
 }
+
+// While one lives, a crash on this thread says what it was doing, on the report's "doing" line
+// after its "thread" line: `what` and `value` in hex. For work whose crash the calls alone do
+// not tell apart: the driver compiling a pipeline (a VkPipelineBuilder thread, the pipeline's
+// hash as tools/prepare-vulkan-port.py gives it), where a fault leaves no other trace of which
+// shader it was (Oliv3rmoon/Nightshade#4). `what` is a string literal. A thread that never named
+// itself has no entry and is not described.
+class Doing {
+public:
+    Doing(const char* what, std::uint64_t value) noexcept {
+        const auto self = (std::uintptr_t)pthread_self();
+        const unsigned count = named_thread_count.load(std::memory_order_relaxed);
+        for (unsigned i = 0; i < kNamedThreads && i < count && !entry; ++i)
+            if (named_threads[i].thread.load(std::memory_order_relaxed) == self) entry = &named_threads[i];
+        if (!entry) return;
+        previous = entry->doing.load(std::memory_order_relaxed);
+        previous_value = entry->doing_value.load(std::memory_order_relaxed);
+        entry->doing_value.store(value, std::memory_order_relaxed);
+        entry->doing.store(what, std::memory_order_release);
+    }
+    ~Doing() {
+        if (!entry) return;
+        entry->doing.store(nullptr, std::memory_order_release);
+        entry->doing_value.store(previous_value, std::memory_order_relaxed);
+        entry->doing.store(previous, std::memory_order_release);
+    }
+    Doing(const Doing&) = delete;
+    Doing& operator=(const Doing&) = delete;
+
+private:
+    NamedThread* entry = nullptr;
+    const char* previous = nullptr;
+    std::uint64_t previous_value = 0;
+};
 
 // How the launcher is told of a report: its launch error is this, followed by the report's path
 // (prosperoeden/eden_services.cpp).
