@@ -477,6 +477,9 @@ extern "C" unsigned eden_heap_arenas_created(void) __attribute__((weak));
 extern "C" std::size_t eden_heap_committed(void) __attribute__((weak));
 extern "C" std::size_t eden_heap_large_held(unsigned* blocks) __attribute__((weak));
 extern "C" std::size_t eden_heap_trim(void) __attribute__((weak));
+extern "C" std::size_t eden_heap_trim_level(int holes) __attribute__((weak));
+extern "C" std::size_t eden_heap_arena_usage(unsigned* count) __attribute__((weak));
+extern "C" std::size_t eden_heap_hole_usage(unsigned* count) __attribute__((weak));
 extern "C" void eden_heap_usage(std::size_t* held, std::size_t* in_use, std::size_t* returned) __attribute__((weak));
 extern "C" unsigned eden_guest_memory_wanted(void) __attribute__((weak));
 extern "C" void eden_guest_memory_waits(unsigned long long* won, unsigned long long* lost,
@@ -505,6 +508,9 @@ extern "C" std::int32_t sceKernelDirectMemoryQuery(std::int64_t, int, DirectMemo
 // writes take blocks from the headroom when the pool has none (and wait for the caches when even
 // that is gone).
 static std::atomic<unsigned long long> largest_free_block{0};
+// What the caches see as free (memory_budget.h CachesFree): the pool's and the graphics allocator's
+// unused block space.
+static std::atomic<unsigned long long> caches_free_bytes{0};
 static void RefreshFreeMemory() {
     static std::atomic<long long> checked_ns{0};
     const long long now = NowNs();
@@ -520,11 +526,18 @@ static void RefreshFreeMemory() {
     const PoolView view = ViewOfPool(known, largest, held, target);
     largest_free_block.store(known ? (view.free != 0 ? view.free : 1) : 0, std::memory_order_relaxed);
     graphics_memory_short.store(view.short_memory, std::memory_order_relaxed);
-    // The heap's empty pieces go back to the pool while it is short (every 2 s at most).
-    static std::atomic<long long> trimmed_ns{0};
-    if (view.short_memory && now - trimmed_ns.load(std::memory_order_relaxed) >= 2'000'000'000) {
-        trimmed_ns.store(now, std::memory_order_relaxed);
-        TrimHeap("the pool is short");
+    const auto held_hook = graphics_memory_held.load(std::memory_order_acquire);
+    const auto used_hook = graphics_memory_used.load(std::memory_order_acquire);
+    const unsigned long long blocks = held_hook ? held_hook() : 0, used = used_hook ? used_hook() : 0;
+    const std::size_t caches = CachesFree(view.free, blocks, used);
+    caches_free_bytes.store(known ? (caches != 0 ? caches : 1) : 0, std::memory_order_relaxed);
+    graphics_caches_short.store(!known || CachesShort(caches), std::memory_order_relaxed);
+    // While the pool is short, what nothing uses goes back to it (every 2 s at most): the idle
+    // staging buffers and the heap's free memory, before the caches give textures back.
+    static std::atomic<long long> relieved_ns{0};
+    if (view.short_memory && now - relieved_ns.load(std::memory_order_relaxed) >= 2'000'000'000) {
+        relieved_ns.store(now, std::memory_order_relaxed);
+        RelieveMemory("the pool is short");
     }
 }
 // A write to the guest's memory waiting for a block (src/guest_memory_service.inc, WaitForBlock):
@@ -534,15 +547,25 @@ static bool GuestMemoryWanted() {
     return eden_guest_memory_wanted && eden_guest_memory_wanted() != 0;
 }
 static bool GraphicsMemoryShort() {
-    if (GuestMemoryWanted()) return true;
+    if (GuestMemoryWanted()) {
+        graphics_caches_short.store(true, std::memory_order_relaxed);
+        return true;
+    }
     RefreshFreeMemory();
     return graphics_memory_short.load(std::memory_order_relaxed);
 }
-// What the caches' "memory in use" is measured against (performance.h, graphics_memory_free).
+// The pool's largest free block, less the guest's headroom not held yet (performance.h,
+// graphics_memory_free): what the next block of graphics memory can be given.
 static unsigned long long GraphicsMemoryFree() {
     if (GuestMemoryWanted()) return 1; // not 0: the caches read 0 as "not known"
     RefreshFreeMemory();
     return largest_free_block.load(std::memory_order_relaxed);
+}
+// What the caches' "memory in use" is measured against (performance.h, graphics_caches_free).
+static unsigned long long GraphicsCachesFree() {
+    if (GuestMemoryWanted()) return 1;
+    RefreshFreeMemory();
+    return caches_free_bytes.load(std::memory_order_relaxed);
 }
 // Pipeline builders (performance.h PipelineWorkers): the console's eight cores run the guest's
 // cores and the GPU thread too, but at start, while the cache is built, they are free.
@@ -550,7 +573,8 @@ static unsigned long long GraphicsMemoryFree() {
     (pipeline_workers_min.store(6, std::memory_order_relaxed), true);
 [[maybe_unused]] static const bool graphics_memory_probe_installed =
     (graphics_memory_probe.store(&GraphicsMemoryShort, std::memory_order_relaxed),
-     graphics_memory_free.store(&GraphicsMemoryFree, std::memory_order_relaxed), true);
+     graphics_memory_free.store(&GraphicsMemoryFree, std::memory_order_relaxed),
+     graphics_caches_free.store(&GraphicsCachesFree, std::memory_order_relaxed), true);
 #endif
 
 namespace {
@@ -755,28 +779,113 @@ void HeapUsage(unsigned long long* held, unsigned long long* in_use) {
     if (in_use) *in_use = u;
 }
 
-// The heap's line in stderr.log: what it holds of the pool (pieces and large blocks), what of that
-// its blocks use, and what it has given back. `why` says when.
+// The heap's line in stderr.log: what it holds of the pool (pieces, arena slots and large blocks),
+// what of that its blocks use, its holes, and what it has given back. `why` says when.
 void ReportHeap(const char* why) {
     if (!eden_heap_usage) return;
     std::size_t held = 0, in_use = 0, returned = 0;
     eden_heap_usage(&held, &in_use, &returned);
-    unsigned large_blocks = 0;
+    unsigned large_blocks = 0, arenas = 0, holes = 0;
     const std::size_t large = eden_heap_large_held ? eden_heap_large_held(&large_blocks) : 0;
-    std::fprintf(stderr, "[ProsperoEden] heap: holds %zu MiB (%zu MiB of pieces, %zu MiB in %u large blocks), "
-                         "%zu MiB of it in use; %zu MiB given back so far (%s)\n",
-                 held >> 20, (held - large) >> 20, large >> 20, large_blocks, in_use >> 20, returned >> 20, why);
+    const std::size_t arena_bytes = eden_heap_arena_usage ? eden_heap_arena_usage(&arenas) : 0;
+    const std::size_t hole_bytes = eden_heap_hole_usage ? eden_heap_hole_usage(&holes) : 0;
+    const std::size_t pieces = held > large + arena_bytes ? held - large - arena_bytes : 0;
+    std::fprintf(stderr, "[ProsperoEden] heap: holds %zu MiB (%zu MiB of pieces, %zu MiB in %u arenas, %zu MiB in %u "
+                         "large blocks), %zu MiB of it in use; %zu MiB of free runs given back as holes; %zu MiB "
+                         "given back so far (%s)\n",
+                 held >> 20, pieces >> 20, arena_bytes >> 20, arenas, large >> 20, large_blocks, in_use >> 20,
+                 hole_bytes >> 20, returned >> 20, why);
 }
 
-std::size_t TrimHeap(const char* why) {
-    if (!eden_heap_trim) return 0;
-    const std::size_t returned = eden_heap_trim();
+std::size_t TrimHeap(const char* why, bool holes) {
+    std::size_t returned = 0;
+    if (eden_heap_trim_level) {
+        returned = eden_heap_trim_level(holes ? 1 : 0);
+    } else if (eden_heap_trim) {
+        returned = eden_heap_trim();
+    }
     if (returned != 0) {
         char text[160];
         std::snprintf(text, sizeof(text), "gave back %zu MiB: %s", returned >> 20, why);
         ReportHeap(text);
     }
     return returned;
+}
+
+#ifdef PS5_NATIVE
+// The pool's free memory, how many runs it is in, and its three largest runs (bytes), for the
+// pressure line. Walks the allocated regions (sceKernelDirectMemoryQuery); false when it cannot.
+static bool PoolRuns(unsigned long long* free_bytes, unsigned* runs, unsigned long long largest[3]) {
+    const std::int64_t total = sceKernelGetDirectMemorySize();
+    if (total <= 0) return false;
+    std::int64_t offset = 0, taken = 0;
+    unsigned regions = 0;
+    *runs = 0;
+    largest[0] = largest[1] = largest[2] = 0;
+    const auto run = [&](std::int64_t bytes) {
+        if (bytes <= 0) return;
+        ++*runs;
+        const auto size = static_cast<unsigned long long>(bytes);
+        if (size > largest[0]) {
+            largest[2] = largest[1];
+            largest[1] = largest[0];
+            largest[0] = size;
+        } else if (size > largest[1]) {
+            largest[2] = largest[1];
+            largest[1] = size;
+        } else if (size > largest[2]) {
+            largest[2] = size;
+        }
+    };
+    DirectMemoryRegion region{};
+    while (offset < total && regions < 8192 &&
+           sceKernelDirectMemoryQuery(offset, 1, &region, sizeof(region)) == 0 && region.end > offset &&
+           region.start >= 0 && region.end <= total && region.start < region.end) {
+        run(region.start - offset);
+        taken += region.end - region.start;
+        offset = region.end;
+        ++regions;
+    }
+    if (regions == 0) return false;
+    run(total - offset);
+    *free_bytes = static_cast<unsigned long long>(total - taken);
+    return true;
+}
+#endif
+
+unsigned long long RelieveMemory(const char* why, bool always) {
+    unsigned long long staging = 0;
+    if (const auto release = graphics_staging_release.load(std::memory_order_acquire)) staging = release();
+    const std::size_t heap = TrimHeap(why);
+    // Said when it is asked to, when it gave something back (once a second at most), and every 30 s
+    // while memory stays short.
+    static std::atomic<long long> said_ns{0};
+    const long long now = NowNs(), since = now - said_ns.load(std::memory_order_relaxed);
+    if (always || (staging + heap != 0 && since >= 1'000'000'000) || since >= 30'000'000'000) {
+        said_ns.store(now, std::memory_order_relaxed);
+        const auto held_hook = graphics_memory_held.load(std::memory_order_acquire);
+        const auto used_hook = graphics_memory_used.load(std::memory_order_acquire);
+        const auto free_hook = graphics_memory_free.load(std::memory_order_relaxed);
+        unsigned long long free_bytes = 0, largest[3] = {0, 0, 0};
+        unsigned runs = 0;
+        bool walked = false;
+#ifdef PS5_NATIVE
+        walked = PoolRuns(&free_bytes, &runs, largest);
+#endif
+        char pool[160] = "";
+        if (walked)
+            std::snprintf(pool, sizeof(pool), "the pool has %llu MiB free in %u runs, the largest %llu, %llu and %llu MiB",
+                          free_bytes >> 20, runs, largest[0] >> 20, largest[1] >> 20, largest[2] >> 20);
+        else
+            std::snprintf(pool, sizeof(pool), "the pool's largest free block is %llu MiB",
+                          free_hook ? free_hook() >> 20 : 0ULL);
+        std::fprintf(stderr, "[ProsperoEden] memory pressure (%s): gave back %llu MiB of idle staging buffers and "
+                             "%zu MiB of the heap; %s; the graphics allocator holds %llu MiB in blocks, %llu MiB of "
+                             "it in use\n",
+                     why, staging >> 20, heap >> 20, pool, held_hook ? held_hook() >> 20 : 0ULL,
+                     used_hook ? used_hook() >> 20 : 0ULL);
+    }
+    return staging + heap;
 }
 
 void ReportSessionMemory(const char* phase, unsigned session) {
@@ -837,15 +946,27 @@ void ReportMemory() {
     if (eden_guest_memory_reserve) eden_guest_memory_reserve(&reserve, &reserve_target);
     std::size_t heap_used = 0, heap_returned = 0;
     if (eden_heap_usage) eden_heap_usage(nullptr, &heap_used, &heap_returned);
+    unsigned arenas = 0, holes = 0;
+    const std::size_t arena_bytes = eden_heap_arena_usage ? eden_heap_arena_usage(&arenas) : 0;
+    const std::size_t hole_bytes = eden_heap_hole_usage ? eden_heap_hole_usage(&holes) : 0;
+    const auto used = graphics_memory_used.load(std::memory_order_acquire);
+    const auto caches = graphics_caches_free.load(std::memory_order_relaxed);
     std::printf("EDEN_MEMORY guest=%zuMiB heap=%zuMiB large=%zuMiB/%u tables=%zuMiB graphics=%lluMiB "
                 "free=%lluMiB largest_free=%zuMiB short=%d waits_won=%llu waits_lost=%llu refused=%llu "
-                "reserve=%zuMiB/%zuMiB heap_used=%zuMiB heap_returned=%zuMiB\n",
+                "reserve=%zuMiB/%zuMiB heap_used=%zuMiB heap_returned=%zuMiB heap_arenas=%zuMiB/%u "
+                "heap_holes=%zuMiB graphics_used=%lluMiB caches_free=%lluMiB caches_short=%d\n",
                 guest >> 20, (eden_heap_committed ? eden_heap_committed() : std::size_t{0}) >> 20, large >> 20,
                 large_blocks, tables >> 20, held ? held() >> 20 : 0ULL, free_bytes >> 20, largest >> 20,
                 int(graphics_memory_short.load(std::memory_order_relaxed)), won, lost, refused, reserve >> 20,
-                reserve_target >> 20, heap_used >> 20, heap_returned >> 20);
+                reserve_target >> 20, heap_used >> 20, heap_returned >> 20, arena_bytes >> 20, arenas,
+                hole_bytes >> 20, used ? used() >> 20 : 0ULL, caches ? caches() >> 20 : 0ULL,
+                int(graphics_caches_short.load(std::memory_order_relaxed)));
     static unsigned reports = 0;
-    if (++reports % 6 == 0) ReportHeap("every 30 s");
+    if (++reports % 6 == 0) {
+        // Every 30 s the heap gives back what it does not use (its free runs beyond its slack).
+        TrimHeap("every 30 s");
+        ReportHeap("every 30 s");
+    }
 }
 
 void ReportGpuThread(unsigned frame) {

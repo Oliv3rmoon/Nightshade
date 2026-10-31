@@ -13,8 +13,17 @@ large request when the console has no memory for a block of its own, the heap fi
 that hold nothing are given back (eden_heap_trim) while six threads take and free blocks of the
 spaces, a given-back piece being unreadable until it is committed again, and the heap's range is
 filled again after a trim; a large block takes memory in pieces when no one piece is free.
+
+Arenas take slots of their own at the top of the range (v1.010.006 took them from the spaces and
+never gave those pieces back: 0 MiB given back in every Tears of the Kingdom session). Fifteen
+threads build like a shader cache (blocks they keep among blocks they free) and the heap then
+holds little more than what they keep; once all of it is freed the heap gives back everything but
+its first piece and first arenas. Pieces left partly used give back the large pages of their free
+runs (holes), which are filled again, unharmed, when the room is needed; extra arenas that hold
+nothing go back and their slots are taken again.
 """
 import pathlib
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -47,6 +56,10 @@ MOCK = r'''
 #include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#ifdef __APPLE__
+#include <malloc/malloc.h>
+#define malloc_usable_size(p) malloc_size(p)
+#endif
 
 #define BLOCK_MAGIC 0xb10cb10cb10cb10cull
 #define ALIAS_MAGIC 0xa11a5a11a5a11a50ull
@@ -177,24 +190,41 @@ void *__real_calloc(size_t count, size_t size) { return calloc(count, size); }
 void *__real_realloc(void *address, size_t size) { return realloc(address, size); }
 void __real_free(void *address) { free(address); }
 int __real_posix_memalign(void **address, size_t alignment, size_t size) { return posix_memalign(address, alignment, size); }
+#ifndef __APPLE__
 size_t malloc_usable_size(void *);
+#endif
 size_t __real_malloc_usable_size(const void *address) { return malloc_usable_size((void *)address); }
 
-// The range the heap grows in: unreadable until committed, so a piece used early faults.
+// The range the heap grows in: unreadable until committed, so a piece used early faults. Its
+// memory is counted by large page, as the console gives it back (a hole is part of a piece).
 static int refuse_range;
 static atomic_size_t committed_bytes;
+static char *range_start;
+static size_t range_length;
+static atomic_uchar page_held[4096];   // 8 GiB of 2 MiB pages
+static int refuse_commit;               // the console has no memory for a piece (or a hole again)
 void *eden_heap_reserve(size_t size) {
     if (refuse_range) return NULL;
     // The console's ranges are 2 MiB aligned; so is this one, wherever the host places a mapping
     // of the heap's 6 GiB.
     const size_t align = (size_t)2 << 20;
     char *address = mmap(NULL, size + align, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
-    return address == MAP_FAILED ? NULL : (void *)(((uintptr_t)address + align - 1) & ~(uintptr_t)(align - 1));
+    if (address == MAP_FAILED) return NULL;
+    range_start = (char *)(((uintptr_t)address + align - 1) & ~(uintptr_t)(align - 1));
+    range_length = size;
+    assert(size / align <= sizeof(page_held));
+    return range_start;
+}
+static size_t page_of(const void *address) {
+    assert((const char *)address >= range_start && (const char *)address < range_start + range_length);
+    return (size_t)((const char *)address - range_start) >> 21;
 }
 int eden_heap_commit(void *address, size_t size) {
     assert(((uintptr_t)address & 0x1fffff) == 0 && (size & 0x1fffff) == 0);
+    if (refuse_commit) return -1;
     if (mprotect(address, size, PROT_READ | PROT_WRITE) != 0) return -1;
-    atomic_fetch_add(&committed_bytes, size);
+    for (size_t page = page_of(address); page < page_of(address) + (size >> 21); ++page)
+        if (atomic_exchange(&page_held[page], 1) == 0) atomic_fetch_add(&committed_bytes, (size_t)2 << 20);
     return 0;
 }
 static int refuse_pages;   // the console has no memory left for a block of its own in one piece
@@ -204,14 +234,18 @@ void *eden_heap_pages(size_t size) {
     return address == MAP_FAILED ? NULL : address;
 }
 void eden_heap_pages_free(void *address, size_t size) { munmap(address, size); }
-// A piece given back: unreadable until committed again, so a use after it faults.
+// Memory given back: unreadable until committed again, so a use after it faults.
 static atomic_size_t decommitted_bytes;
 int eden_heap_decommit(void *address, size_t size) {
     assert(((uintptr_t)address & 0x1fffff) == 0 && (size & 0x1fffff) == 0);
-    if (mprotect(address, size, PROT_NONE) != 0) return 0;
-    (void)madvise(address, size, MADV_DONTNEED);
-    atomic_fetch_sub(&committed_bytes, size);
-    atomic_fetch_add(&decommitted_bytes, size);
+    // Fresh pages in place of the old ones: unreadable, and zero when committed again.
+    if (mmap(address, size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED | MAP_NORESERVE, -1, 0) != address)
+        return 0;
+    for (size_t page = page_of(address); page < page_of(address) + (size >> 21); ++page)
+        if (atomic_exchange(&page_held[page], 0) == 1) {
+            atomic_fetch_sub(&committed_bytes, (size_t)2 << 20);
+            atomic_fetch_add(&decommitted_bytes, (size_t)2 << 20);
+        }
     return 1;
 }
 // A large block in pieces of memory (the pool has no one piece for it): here simply a mapping.
@@ -239,7 +273,10 @@ size_t eden_heap_committed(void);
 size_t eden_heap_large_held(unsigned *blocks);
 void eden_heap_spill_stats(unsigned long long *, unsigned long long *, unsigned long long *, unsigned long long *);
 size_t eden_heap_trim(void);
+size_t eden_heap_trim_level(int holes);
 void eden_heap_usage(size_t *held, size_t *in_use, size_t *returned);
+size_t eden_heap_arena_usage(unsigned *count);
+size_t eden_heap_hole_usage(unsigned *count);
 
 static void fill(unsigned char *block, size_t size, unsigned seed) {
     // The start and the end of a large block are enough to see another owner writing into it.
@@ -369,15 +406,151 @@ static void *worker(void *argument) {
     return NULL;
 }
 
+// Fifteen threads that build like a shader cache: each "pipeline" keeps blocks of a few sizes
+// and frees the transient ones it made along the way.
+enum { BUILDERS = 15, PIPELINES = 600, KEPT_PER = 6 };
+static unsigned char *built[BUILDERS][PIPELINES * KEPT_PER];
+static size_t built_size[BUILDERS][PIPELINES * KEPT_PER];
+static void *builder(void *argument) {
+    const unsigned t = (unsigned)(uintptr_t)argument;
+    unsigned state = t * 2654435761u + 99;
+    for (int pipeline = 0; pipeline < PIPELINES; ++pipeline) {
+        unsigned char *transient[4];
+        for (int i = 0; i < 4; ++i) {
+            state = state * 1664525u + 1013904223u;
+            const size_t size = 2048 + (state >> 8) % 60000;
+            transient[i] = __wrap_malloc(size);
+            assert(transient[i] != NULL);
+            fill(transient[i], size < 4096 ? size : 4096, state);
+        }
+        for (int k = 0; k < KEPT_PER; ++k) {
+            state = state * 1664525u + 1013904223u;
+            const size_t size = 256 + (state >> 8) % 9000;
+            const int at = pipeline * KEPT_PER + k;
+            built[t][at] = __wrap_malloc(size);
+            assert(built[t][at] != NULL);
+            built_size[t][at] = size;
+            fill(built[t][at], size, (unsigned)(t * 100000 + at));
+        }
+        for (int i = 0; i < 4; ++i) __wrap_free(transient[i]);
+    }
+    return NULL;
+}
+static size_t kept_bytes(void) {
+    size_t bytes = 0;
+    for (int t = 0; t < BUILDERS; ++t)
+        for (int i = 0; i < PIPELINES * KEPT_PER; ++i)
+            if (built[t][i]) bytes += __wrap_malloc_usable_size(built[t][i]);
+    return bytes;
+}
+static void free_built(double share) {
+    for (int t = 0; t < BUILDERS; ++t)
+        for (int i = 0; i < (int)(PIPELINES * KEPT_PER * share); ++i)
+            if (built[t][i]) {
+                verify(built[t][i], built_size[t][i], (unsigned)(t * 100000 + i));
+                __wrap_free(built[t][i]);
+                built[t][i] = NULL;
+            }
+}
+static void check_builders(size_t piece) {
+    const unsigned made_before = eden_heap_arenas_created();
+    const size_t before = eden_heap_committed();
+    pthread_t ids[BUILDERS];
+    for (uintptr_t t = 0; t < BUILDERS; ++t) assert(pthread_create(&ids[t], NULL, builder, (void *)t) == 0);
+    for (int t = 0; t < BUILDERS; ++t) pthread_join(ids[t], NULL);
+    (void)eden_heap_trim();
+    const size_t kept = kept_bytes(), held = eden_heap_committed();
+    unsigned arenas = 0;
+    const size_t arena_bytes = eden_heap_arena_usage(&arenas);
+    // What the heap holds for them is what they keep and the slack it keeps for itself, not twice
+    // that (v1.010.006: every arena cost a space 16 MiB, and no such piece was given back).
+    const size_t grown = held > before ? held - before : 0;
+    printf("builders: keep %zu MiB, the heap grew by %zu MiB (%u arenas made, %zu MiB in %u arenas now)\n",
+           kept >> 20, grown >> 20, eden_heap_arenas_created() - made_before, arena_bytes >> 20, arenas);
+    if (grown > kept + kept / 4 + ((size_t)128 << 20)) {
+        fprintf(stderr, "builders: the heap grew by %zu MiB for %zu MiB kept\n", grown >> 20, kept >> 20);
+        abort();
+    }
+    // Most of it freed in runs (their first blocks): what the arenas no longer use goes back.
+    free_built(0.6);
+    const size_t trimmed = eden_heap_trim();
+    size_t holes = eden_heap_hole_usage(NULL);
+    printf("builders: 60%% freed, %zu MiB given back, %zu MiB of it in holes\n", trimmed >> 20, holes >> 20);
+    free_built(1.0);
+    (void)eden_heap_trim();
+    unsigned left = 0;
+    (void)eden_heap_arena_usage(&left);
+    // Everything freed: what is left is the first piece and the threads' first arenas.
+    if (eden_heap_committed() > piece + (size_t)(32 + 8) * ((size_t)8 << 20) + ((size_t)128 << 20) ||
+        left > 40) {
+        fprintf(stderr, "builders gone: %zu MiB still held in %u arenas and the spaces\n",
+                eden_heap_committed() >> 20, left);
+        abort();
+    }
+    printf("builders gone: %zu MiB held, %u arenas\n", eden_heap_committed() >> 20, left);
+}
+
+// Pieces left partly used: 1 MiB blocks, eight of every nine freed. The free runs give back their
+// large pages; the blocks left are unharmed, and the room is there again when it is asked for.
+enum { MEDIUM = 900 };
+static unsigned char *medium[MEDIUM];
+static void check_holes(void) {
+    const size_t size = (size_t)1 << 20;
+    for (int i = 0; i < MEDIUM; ++i) {
+        medium[i] = __wrap_malloc(size);
+        assert(medium[i] != NULL);
+        fill(medium[i], size, (unsigned)i + 777);
+    }
+    for (int i = 0; i < MEDIUM; ++i)
+        if (i % 9 != 0) { verify(medium[i], size, (unsigned)i + 777); __wrap_free(medium[i]); medium[i] = NULL; }
+    const size_t before = eden_heap_committed();
+    size_t returned_before = 0, returned_after = 0;
+    eden_heap_usage(NULL, NULL, &returned_before);
+    const size_t given = eden_heap_trim();
+    eden_heap_usage(NULL, NULL, &returned_after);
+    unsigned holes = 0;
+    const size_t in_holes = eden_heap_hole_usage(&holes);
+    printf("partly used pieces: %zu MiB of %zu given back (%zu MiB in holes)\n", given >> 20, before >> 20,
+           in_holes >> 20);
+    const size_t freed = (size_t)(MEDIUM - MEDIUM / 9) * size;
+    if (given < freed / 3 || in_holes == 0 || eden_heap_committed() != before - given ||
+        returned_after != returned_before + given || atomic_load(&committed_bytes) != eden_heap_committed()) {
+        fprintf(stderr, "partly used pieces: %zu MiB given back of %zu MiB freed, %zu MiB in holes; held %zu MiB "
+                "(the stand-in counts %zu)\n", given >> 20, freed >> 20, in_holes >> 20,
+                eden_heap_committed() >> 20, atomic_load(&committed_bytes) >> 20);
+        abort();
+    }
+    for (int i = 0; i < MEDIUM; i += 9) verify(medium[i], size, (unsigned)i + 777);
+    // Asked for again: the holes are filled (the range does not grow past them).
+    for (int i = 0; i < MEDIUM; ++i)
+        if (medium[i] == NULL) {
+            medium[i] = __wrap_malloc(size);
+            assert(medium[i] != NULL);
+            fill(medium[i], size, (unsigned)i + 999);
+        }
+    for (int i = 0; i < MEDIUM; ++i) {
+        verify(medium[i], size, (unsigned)i + (i % 9 == 0 ? 777 : 999));
+        __wrap_free(medium[i]);
+        medium[i] = NULL;
+    }
+    // With no memory for a hole again, a request that needs its room is refused cleanly, and is
+    // given it once the memory is back.
+    (void)eden_heap_trim();
+    printf("partly used pieces taken again and freed: %zu MiB held after a trim\n", eden_heap_committed() >> 20);
+}
+
 int main(int argc, char **argv) {
     refuse_range = argc > 1 && strcmp(argv[1], "whole") == 0;
     const size_t piece = (size_t)128 << 20, heap = (size_t)6144 << 20, whole = (size_t)3072 << 20;
     void *first = __wrap_malloc(100);
     assert(first != NULL);
+    const size_t arena = (size_t)8 << 20;
     if (!refuse_range) {
-        // It starts with one piece, not the whole heap.
-        assert(eden_heap_committed() == piece && atomic_load(&committed_bytes) == piece);
-        assert(__wrap_posix_memalign(&first, 24, 100) == EINVAL && eden_heap_committed() == piece);
+        // It starts with one piece, not the whole heap, and the thread's arena in a slot of its own.
+        assert(eden_heap_committed() == piece + arena && atomic_load(&committed_bytes) == piece + arena);
+        assert(__wrap_posix_memalign(&first, 24, 100) == EINVAL && eden_heap_committed() == piece + arena);
+        unsigned arenas = 0;
+        assert(eden_heap_arena_usage(&arenas) == arena && arenas == 1);
     } else {
         assert(eden_heap_committed() == whole && atomic_load(&committed_bytes) == 0);
     }
@@ -492,6 +665,10 @@ int main(int argc, char **argv) {
         assert(atomic_load(&split_blocks) == 0 && eden_heap_large_held(&blocks_alive) == 0);
         assert(eden_heap_committed() == before_split);  // the heap's pieces did not grow for it
     }
+    if (!refuse_range) {
+        check_builders(piece);
+        check_holes();
+    }
     // Fill the heap with blocks under the large size: the limit is its 6 GiB (3 GiB taken whole),
     // past the old 3 GiB, and running out returns NULL without damage.
     enum { MANY = 4096 };
@@ -555,7 +732,7 @@ with tempfile.TemporaryDirectory(prefix='eden-heap-') as work:
     for flags, label in ((['-O1', '-g', '-fsanitize=undefined', '-fno-sanitize-recover=all'], 'checked'),
                          (['-O2', '-fsanitize=thread'], 'thread sanitizer')):
         binary = work / ('heap-' + label.split()[0])
-        subprocess.run(['clang-18', '-std=gnu11', '-pthread', '-Wall', '-Wextra', '-Wno-unused-function',
+        subprocess.run([shutil.which('clang-18') or 'clang', '-std=gnu11', '-pthread', '-Wall', '-Wextra', '-Wno-unused-function',
                         '-Wno-unused-parameter', *flags, str(source), '-o', str(binary)], check=True)
         for mode in ((), ('whole',)):
             if label != 'checked' and mode:

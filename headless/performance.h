@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
+#include "memory_budget.h"
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -481,31 +482,9 @@ inline std::atomic<bool> gc_keep_dirty{true};
 // restores Eden's visit counting.
 inline std::atomic<bool> gc_count_visits{false};
 inline std::atomic<bool> graphics_memory_short{false};
-// 1 GiB: the pool is the CPU's too, and the largest thing a game asked of it at once was a
-// block of 486 MiB (a texture array of 121 layers, decoded before it is uploaded). With 384 MiB
-// here the collector let the pool run down to 620 MiB in one block at 2x, and that request
-// ended the session.
-inline constexpr std::size_t kShortMemory = std::size_t{1} << 30;
-// The guest's headroom in the pool: 1 GiB that a game's own memory may take at once while the
-// graphics caches give memory back (a large open-world game wrote 0.5 to 1.8 GB within seconds).
-// The memory service holds it as blocks of its own (src/guest_memory_service.inc, the reserve).
-inline constexpr std::size_t kGuestReserve = std::size_t{1} << 30;
-// What the caches see of the pool (performance.cpp, the PS5's RefreshFreeMemory): its largest free
-// block less the part of the guest's headroom the service does not hold yet (all of it when no
-// service holds any: a 32-bit game, or Compact memory's service switched off), and memory short
-// when that is under kShortMemory or a burst of the game's writes has taken half the headroom, so
-// the caches start giving memory back before a write has to wait for them. `known`: the pool
-// could be read; `held`, `target`: the service's reserve now and in full (bytes, both 0 without).
-struct PoolView {
-    std::size_t free;
-    bool short_memory;
-};
-inline PoolView ViewOfPool(bool known, std::size_t largest, std::size_t held, std::size_t target) {
-    if (!known) return {0, true};
-    const std::size_t headroom = target == 0 ? kGuestReserve : held < target ? target - held : 0;
-    const std::size_t free = largest > headroom ? largest - headroom : 0;
-    return {free, free < kShortMemory || (target != 0 && held < target / 2)};
-}
+// The caches' own view of it (memory_budget.h CachesShort): the pool and what the graphics
+// allocator's blocks hold unused. Dirty textures are evicted only while this is short.
+inline std::atomic<bool> graphics_caches_short{false};
 // Development: the texture cache reports its memory use and marks every 300 frames.
 inline std::atomic<bool> texture_budget_log{false};
 // "Is memory short?", installed by the PS5 build (performance.cpp, GraphicsMemoryShort). This
@@ -523,16 +502,26 @@ inline std::atomic<bool (*)()> graphics_memory_probe{nullptr};
 // caches evict at half the use they were set to. dev-settings graphics_usage=driver restores
 // the driver's count.
 inline std::atomic<unsigned long long (*)()> graphics_memory_free{nullptr};
+// Graphics memory still free for the texture and buffer caches (memory_budget.h CachesFree): the
+// pool's, and what the graphics allocator's blocks hold unused. Installed by the PS5 build; the
+// caches' "memory in use" is the budget less this (tools/prepare-vulkan-port.py).
+inline std::atomic<unsigned long long (*)()> graphics_caches_free{nullptr};
 // The memory the graphics allocator holds in its blocks now, installed by the Vulkan renderer
 // while it has an allocator (tools/prepare-vulkan-port.py): the part of the pool that grows as
 // scenery loads, and the one the FPS overlay shows beside the pool.
 inline std::atomic<unsigned long long (*)()> graphics_memory_held{nullptr};
+// What of those blocks its images and buffers use, installed with it.
+inline std::atomic<unsigned long long (*)()> graphics_memory_used{nullptr};
+// Lets go of the staging buffers the GPU is done with and returns their bytes, installed by the
+// Vulkan staging pool; it does nothing on a thread other than the one the pool runs on.
+inline std::atomic<unsigned long long (*)()> graphics_staging_release{nullptr};
 inline std::atomic<bool> graphics_usage_from_pool{true};
-// GPU thread only (the collector).
+// GPU thread only (the collector). Textures the GPU wrote are kept until memory is short for the
+// caches too (memory_budget.h CachesShort), not the pool alone.
 inline bool KeepDirtyTextures() {
     if (!gc_keep_dirty.load(std::memory_order_relaxed)) return false;
     const auto probe = graphics_memory_probe.load(std::memory_order_relaxed);
-    return !probe || !probe();
+    return !probe || !probe() || !graphics_caches_short.load(std::memory_order_relaxed);
 }
 // Threads that build pipelines (the Vulkan pipeline cache, GetTotalPipelineWorkers, through
 // tools/prepare-vulkan-port.py). Eden takes the processor count less one. On the console a large
@@ -708,10 +697,16 @@ void ReportSessionMemory(const char* phase, unsigned session);
 void ReportMemory();
 // The heap's line in stderr.log: what it holds, what of that is in use, what it gave back.
 void ReportHeap(const char* why);
-// Gives the heap's empty pieces back to the pool (headless/heap_arenas.inc eden_heap_trim) and says
-// so in stderr.log when it gave any; returns the bytes given back. At the end of a shader cache
-// build and of a session, while the pool is short, and before an allocation is refused.
-std::size_t TrimHeap(const char* why);
+// Gives the heap's empty pieces and arenas back to the pool, and with `holes` the large pages of
+// the free runs in the rest (headless/heap_arenas.inc eden_heap_trim_level), and says so in
+// stderr.log when it gave any; returns the bytes given back. At the end of a shader cache build
+// and of a session, every 30 s, while the pool is short, and before an allocation is refused.
+std::size_t TrimHeap(const char* why, bool holes = true);
+// The pool is short or an allocation was refused: the idle staging buffers (on the thread the
+// staging pool runs on) and the heap's free memory go back to the pool, in that order. Returns the
+// bytes given back, and says what it did in stderr.log: when `always`, when it gave something back
+// (once a second at most), and every 30 s while memory stays short.
+unsigned long long RelieveMemory(const char* why, bool always = false);
 // GPU thread only (Vulkan frame report): cumulative GPU-thread idle/dispatch/wait
 // totals with the owner's CPU clock, then a guest-core CPU snapshot.
 void ReportGpuThread(unsigned frame);
