@@ -23,7 +23,7 @@
    "env": {
     "XDG_CACHE_HOME": "/tmp/prosperoeden-dev-host-cache",
     "PROSPEROEDEN_DEPS_CACHE": "/tmp/prosperoeden-dev-downloads",
-    "DEV_HEAD": "7a537495582096a387286cb687191e0482313365",
+    "DEV_HEAD": "67d47815357025965d3468b8f0fa237a88c7a4b8",
     "GITHUB_TOKEN": "${{ github.token }}"
    },
    "steps": [
@@ -31,7 +31,7 @@
      "name": "Check out the fix commit",
      "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
      "with": {
-      "ref": "7a537495582096a387286cb687191e0482313365",
+      "ref": "67d47815357025965d3468b8f0fa237a88c7a4b8",
       "persist-credentials": false
      }
     },
