@@ -1483,7 +1483,7 @@ for name in ('vk_graphics_pipeline', 'vk_compute_pipeline'):
                 '::Eden::PipelineIdentity::Compute(*pipeline, shader_hash);')
     anchors = [
         ('#include <algorithm>', '#include <algorithm>\n#include "performance.h"\n#include "pipeline_identity.h"\n'
-                                 '#include "shader_start.h"'),
+                                 '#include "shader_start.h"\n#include "crash_report.h"'),
         ('            std::unique_lock lock{build_mutex};',
          '            auto timer = Eden::Performance::VulkanTimer(16);\n            std::unique_lock lock{build_mutex};'),
         ('            pipeline_statistics->Collect(device, *pipeline);\n        }\n',
@@ -1509,6 +1509,17 @@ for name in ('vk_graphics_pipeline', 'vk_compute_pipeline'):
         ]
     if name == 'vk_graphics_pipeline':
         anchors += configure_phases
+    # While the driver compiles the pipeline, a crash report names it after the thread
+    # (headless/crash_report.h, Doing): a fault inside the driver leaves no other trace of the shader
+    # (Oliv3rmoon/Nightshade#4), and EDEN_PIPELINE is printed only once the pipeline exists.
+    if name == 'vk_graphics_pipeline':
+        anchors.append(('    pipeline = device.GetLogical().CreateGraphicsPipeline({\n',
+                        '    const ::Eden::Crash::Doing eden_doing{"the driver compiling graphics pipeline key", key.Hash()};\n'
+                        '    pipeline = device.GetLogical().CreateGraphicsPipeline({\n'))
+    else:
+        anchors.append(('            pipeline = device.GetLogical().CreateComputePipeline(compute_ci, *pipeline_cache);\n',
+                        '            const ::Eden::Crash::Doing eden_doing{"the driver compiling compute pipeline cs", shader_hash};\n'
+                        '            pipeline = device.GetLogical().CreateComputePipeline(compute_ci, *pipeline_cache);\n'))
     adapt(f'src/video_core/renderer_vulkan/{name}.cpp', name + '_cost.cpp', anchors)
 shader_costs = [
     ('#include <algorithm>', '#include <algorithm>\n#include <cstdio>\n#include <set>\n#include <unordered_set>\n'
