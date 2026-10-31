@@ -2,6 +2,21 @@
 
 What changed in each release of ProsperoEden, newest first. A release's notes on GitHub are its section here.
 
+## v1.010.008
+
+**A test build for Tears of the Kingdom's freeze.** On v1.010.007 a tester's TOTK froze about 70 minutes in, on a loading screen: the picture and the sound kept going and memory was fine, but the load never finished. This build doesn't fix that yet. It makes a frozen game say what it is waiting on. Not confirmed on a console yet: play TOTK until it freezes (or as long as you can), then send `/data/prosperoeden/logs` and `/data/prosperoeden/user/log`.
+
+### New
+
+- **A frozen game says why.** While a game plays, Nightshade watches each of its cores and every request it makes of the console's system. When one stays put for 10 seconds, a minute and five minutes, `stderr.log` gets an `EDEN_STUCK` line naming it (the core, the request and its system service, and once the game's last 64 requests), and every 30 seconds an `EDEN_PROGRESS` line sums up what is running.
+- **GPU waits in the log.** When the GPU stops answering for a while, `stderr.log` says when the wait began and ended (`EDEN_GPU_STALL`).
+
+Everything else is v1.010.007.
+
+### Install
+
+This is a test release, so **Update now** doesn't offer it. Download `Nightshade-v1.010.008.zip` below and copy its `PPSA99008` folder over yours. The next full release installs over it as usual.
+
 ## v1.010.007
 
 **Memory in long sessions, video profiles, Safe Launch and Quick settings, and homebrew in the Library.** Tears of the Kingdom ended after about an hour on v1.010.006 and slowed down after its item menu: Nightshade kept 2 GB more of the console's memory than it used and never gave any back, and the game's largest texture needed one 176 MiB block that a long session no longer had. Nightshade now gives its memory back, uploads large textures in pieces, and its graphics caches no longer evict at their hardest for the rest of a session. Choose Minimum, Recommended, High or Ultra for every game or for one, start a game once in safe mode when it won't start, and change a game's video from a quick panel. Homebrew NROs are listed beside your games with their own names and icons, and newer games' ZBIC-compressed code must decode whole. Not confirmed on a console yet: play TOTK as long as you can, open its item menu often, and send `/data/prosperoeden/logs`.
