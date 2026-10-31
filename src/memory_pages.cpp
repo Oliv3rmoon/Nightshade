@@ -755,6 +755,12 @@ bool CommitMemoryRange(void* address, std::size_t size) noexcept {
     return CommitMemoryRangeFrom(address, size, true);
 }
 
+#ifdef PS5_NATIVE
+namespace {
+int ReserveOver(void* at, std::size_t length) noexcept;
+} // namespace
+#endif
+
 // `high`: from the top of the pool (memory that stays: the heap's pieces), else from where the
 // system places it (memory a session gives back: a large block).
 bool CommitMemoryRangeFrom(void* address, std::size_t size, bool high) noexcept {
@@ -793,12 +799,8 @@ bool CommitMemoryRangeFrom(void* address, std::size_t size, bool high) noexcept 
             break;
         }
         if (!RecordCommitted(begin + done, block, physical)) {
-            // No entry left to give it back with: unmap it now, keeping the address space.
-            if (munmap(at, block) == 0) {
-                void* again = at;
-                (void)sceKernelReserveVirtualRange(&again, block, MAP_FIXED, LargePage);
-                (void)sceKernelReleaseDirectMemory(physical, block);
-            }
+            // No entry left to give it back with: given back now, keeping the address space.
+            if (ReserveOver(at, block) != 0) (void)sceKernelReleaseDirectMemory(physical, block);
             break;
         }
         done += block;
@@ -836,6 +838,20 @@ bool CommitMemoryRangeFrom(void* address, std::size_t size, bool high) noexcept 
 // given back this way again (the heap then keeps its free runs, as before).
 namespace {
 std::atomic<bool> partial_release_refused{false};
+// Turns a mapping into reserved address space. Asked to reserve over the mapping with MAP_FIXED,
+// the system replaces it in one call, so no other thread's mapping can land in between (unmapped
+// first and reserved after, a mapping made in the gap would be overwritten by the reservation).
+// Where it will not, the mapping is unmapped and the range reserved again, as before.
+// 1: reserved; 0: nothing changed (still mapped); -1: unmapped but not reserved again.
+#ifdef PS5_NATIVE
+int ReserveOver(void* at, std::size_t length) noexcept {
+    void* over = at;
+    if (sceKernelReserveVirtualRange(&over, length, MAP_FIXED, LargePage) == 0 && over == at) return 1;
+    if (munmap(at, length) != 0) return 0;
+    void* again = at;
+    return sceKernelReserveVirtualRange(&again, length, MAP_FIXED, LargePage) == 0 && again == at ? 1 : -1;
+}
+#endif
 } // namespace
 
 int DecommitMemoryRange(void* address, std::size_t size) noexcept {
@@ -855,15 +871,13 @@ int DecommitMemoryRange(void* address, std::size_t size) noexcept {
         const std::uintptr_t from = std::max(block.address, begin), to = std::min(block_end, end);
         void* at = reinterpret_cast<void*>(from);
         if (from == block.address && to == block_end) {
-            // As the guest's memory gives a block back (src/host_memory.cpp): unmapped, the address
-            // space reserved again at once, then the memory released.
-            if (munmap(at, block.size) != 0) {
+            // Its address space reserved over the mapping, then the memory released.
+            const int reserved = ReserveOver(at, block.size);
+            if (reserved == 0) {
                 failed = true;
                 continue;
             }
-            void* again = at;
-            if (sceKernelReserveVirtualRange(&again, block.size, MAP_FIXED, LargePage) != 0 || again != at)
-                failed = true;
+            if (reserved < 0) failed = true;
             if (sceKernelReleaseDirectMemory(block.physical, block.size) != 0) failed = true;
             done = true;
             block = CommittedBlock{};
@@ -886,13 +900,12 @@ int DecommitMemoryRange(void* address, std::size_t size) noexcept {
         }
         const std::size_t length = to - from;
         const std::int64_t physical = block.physical + static_cast<std::int64_t>(from - block.address);
-        if (munmap(at, length) != 0) {
+        const int over = ReserveOver(at, length);
+        if (over == 0) {
             skipped = true;
             continue;
         }
-        void* again = at;
-        const bool reserved =
-            sceKernelReserveVirtualRange(&again, length, MAP_FIXED, LargePage) == 0 && again == at;
+        const bool reserved = over > 0;
         if (sceKernelReleaseDirectMemory(physical, length) != 0) {
             // The system keeps part of a block: map it back where it was.
             void* back = at;

@@ -115,7 +115,8 @@ inline bool LightBackgroundRoom(unsigned long long bytes) {
     return astc_background_bytes + bytes <= kLightBackgroundBytes;
 }
 // The largest image that had memory of its own this session (bytes), kept by the graphics
-// allocator (tools/prepare-vulkan-port.py): what the caches' floor is twice of.
+// allocator (tools/prepare-vulkan-port.py): what the caches' floor is twice of. Set to 0 when a
+// session starts and when its graphics allocator is made.
 inline std::atomic<unsigned long long> graphics_largest_image{0};
 // Lets go of the staging buffers the GPU is done with and returns their bytes, installed by the
 // Vulkan staging pool (tools/prepare-vulkan-port.py); it does nothing on a thread other than the
