@@ -699,6 +699,10 @@ void NoteGpuStalled() noexcept {
     gpu_stalled.store(true, std::memory_order_release);
 }
 
+bool GpuStalled() noexcept {
+    return gpu_stalled.load(std::memory_order_acquire);
+}
+
 } // namespace Eden::Crash
 
 // The driver's stall dump (Belladonna, radv_ps5_winsys.c) calls this first, before anything

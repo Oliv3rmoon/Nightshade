@@ -379,6 +379,10 @@ int main(int argc, char** argv) {
         // A crash report says which build it came from: this one is not an official release.
         static const std::string crash_version = std::string{Eden::kAppVersion} + " (Nightshade)";
         Eden::Crash::Install(Eden::LogsDir(), crash_version.c_str(), last_crash.restarted);
+        // A GPU worker that fails on a GPU that stopped writes the report and closes the app
+        // (gpu_failure.h), as a device loss on any other thread does.
+        Eden::gpu_stalled = &Eden::Crash::GpuStalled;
+        Eden::gpu_lost = [](const char* reason) noexcept { Eden::Crash::Fail(reason); };
         Eden::BootTrace::Ready(Eden::LogsDir(), Eden::FilesystemAccess());
         Eden::BootTrace::Line("logs and crash handler ready (%s)", Eden::LogsDir().c_str());
         for (const char* folder : {"/app0", Eden::kMountedAppDir, Eden::kInstallDir, "/mnt/sandbox/PPSA99008_000/app0"})
