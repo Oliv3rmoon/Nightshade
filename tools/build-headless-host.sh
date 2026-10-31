@@ -78,6 +78,9 @@ python3 -B "$root/tools/check-multiplayer-headers.py" "$scratch/build"
 python3 -B "$root/tools/check-heap-growth.py"
 # Transfers of more than 64 MiB staged in pieces, and the caches' staged paths on the pinned source.
 python3 -B "$root/tools/check-staging-chunks.py" "$scratch/source"
+# Three hours of TOTK and four TOTK sessions that ended, against the heap, the chunker and the
+# pressure rules; v1.010.006 as the control.
+python3 -B "$root/tools/check-memory-soak.py"
 # The shader cache built while a game plays: its shared state, and the Vulkan port that uses it.
 python3 -B "$root/tools/check-shader-start.py" "$scratch/source"
 python3 -B "$root/tools/check-crash-report.py"

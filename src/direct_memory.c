@@ -53,6 +53,14 @@ int eden_direct_high(size_t size, size_t alignment, int type, int64_t *start) {
       return 0;
     }
   }
+  /* Room the top has again (the heap gives back empty pieces, arena slots and the pages of its
+   * free runs, headless/heap_arenas.inc): the lowest that fits above the floor, so the top is
+   * used again before it grows down into the middle of the pool. */
+  if (eden_direct_floor != 0 &&
+      __real_sceKernelAllocateDirectMemory(eden_direct_floor, total, size, alignment, type, start) == 0) {
+    eden_direct_release();
+    return 0;
+  }
   /* Below what is at the top already; past what something else has put there, for a while. */
   int64_t next = eden_direct_floor != 0 ? eden_direct_floor : total;
   for (unsigned tries = 0; tries < 512 && next >= bytes; ++tries) {
@@ -66,6 +74,20 @@ int eden_direct_high(size_t size, size_t alignment, int type, int64_t *start) {
   }
   eden_direct_release();
   return __real_sceKernelAllocateDirectMemory(0, total, size, alignment, type, start);
+}
+
+/* Room the top has again, above the lowest block taken there (the heap's pieces, arena slots
+ * and holes it gave back): the lowest that fits. Nothing when the top has no such room; the
+ * caller asks for less, then below the floor (eden_direct_high). */
+int eden_direct_top_room(size_t size, size_t alignment, int type, int64_t *start) {
+  const int64_t total = sceKernelGetDirectMemorySize();
+  if (total <= 0) return -1;
+  eden_direct_acquire();
+  const int result = eden_direct_floor != 0
+                         ? __real_sceKernelAllocateDirectMemory(eden_direct_floor, total, size, alignment, type, start)
+                         : -1;
+  eden_direct_release();
+  return result;
 }
 
 /* As the system places it: for what a session takes and gives back. */

@@ -298,6 +298,8 @@ SparseRange* SparseRangeOf(std::uintptr_t address) {
 // From as high in the pool as there is room (src/direct_memory.c): what is committed this way,
 // the heap's pieces, stays for good, while a game's memory and its graphics come and go below.
 extern "C" int eden_direct_high(std::size_t size, std::size_t alignment, int type, std::int64_t* start);
+// The room the top has again (what the heap gave back there), lowest first; -1: none that large.
+extern "C" int eden_direct_top_room(std::size_t size, std::size_t alignment, int type, std::int64_t* start);
 // Where the system puts it: a 2 MiB block of this file's, which a session gives back.
 extern "C" int eden_direct_low(std::size_t size, std::size_t alignment, int type, std::int64_t* start);
 #endif
@@ -763,12 +765,23 @@ bool CommitMemoryRangeFrom(void* address, std::size_t size, bool high) noexcept 
     const auto begin = reinterpret_cast<std::uintptr_t>(address);
     std::size_t done = 0, block = size;
     unsigned blocks = 0;
+    // Memory that stays first fills the room the top has again, in blocks as large as it has
+    // (the heap gives back pieces and the pages of its free runs there): taken below it instead, the
+    // top would stay full of holes and the heap grow down into the middle of the pool, where the
+    // graphics' large blocks need one run. Then, as before, as high as there is room.
+    bool top_room = high;
     while (done < size) {
         block = std::min(block, size - done);
         std::int64_t physical = -1;
-        const int taken = high ? eden_direct_high(block, LargePage, 12, &physical)
-                               : eden_direct_low(block, LargePage, 12, &physical);
+        const int taken = top_room ? eden_direct_top_room(block, LargePage, 12, &physical)
+                          : high   ? eden_direct_high(block, LargePage, 12, &physical)
+                                   : eden_direct_low(block, LargePage, 12, &physical);
         if (taken != 0) {
+            if (top_room && block == LargePage) {
+                top_room = false;  // none left up there: anywhere at the top, the whole rest at once
+                block = size - done;
+                continue;
+            }
             if (block == LargePage) break;  // not even one large page left
             block = std::max(LargePage, block / 2 / LargePage * LargePage);
             continue;

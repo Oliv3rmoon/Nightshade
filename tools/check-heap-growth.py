@@ -745,5 +745,7 @@ with tempfile.TemporaryDirectory(prefix='eden-heap-') as work:
 print('Heap by pieces: growth on demand, owners by address, requests larger than a piece, the 6 GiB limit, '
       'the 3 GiB whole-heap fallback, threads keeping more than an arena in arenas of their own (used again by '
       'the next threads), empty spaces given back while six threads take and free blocks and taken again in the '
-      'same range, a large block in pieces of memory when the pool has no one piece for it, and eight threads '
+      'same range, a large block in pieces of memory when the pool has no one piece for it, arenas in slots of '
+      'their own (fifteen builders: the heap holds what they keep; all freed, it gives back all but its first piece '
+      'and arenas), the free runs of partly used pieces given back as holes and filled again, and eight threads '
       'under the thread sanitizer PASS')

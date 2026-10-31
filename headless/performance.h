@@ -699,11 +699,12 @@ void ReportHeap(const char* why);
 // stderr.log when it gave any; returns the bytes given back. At the end of a shader cache build
 // and of a session, every 30 s, while the pool is short, and before an allocation is refused.
 std::size_t TrimHeap(const char* why, bool holes = true);
-// The pool is short or an allocation was refused: the idle staging buffers (on the thread the
-// staging pool runs on) and the heap's free memory go back to the pool, in that order. Returns the
-// bytes given back, and says what it did in stderr.log: when `always`, when it gave something back
-// (once a second at most), and every 30 s while memory stays short.
-unsigned long long RelieveMemory(const char* why, bool always = false);
+// The pool is short, or memory is wanted at once (`urgent`: an allocation was refused, a write of
+// the game's waits): the idle staging buffers (on the thread the staging pool runs on) and the
+// heap's empty pieces and arenas go back to the pool, and when urgent the pages of the heap's free
+// runs too. Returns the bytes given back, and says what it did in stderr.log: when urgent, when
+// it gave something back (once a second at most), and every 30 s while memory stays short.
+unsigned long long RelieveMemory(const char* why, bool urgent = false);
 // GPU thread only (Vulkan frame report): cumulative GPU-thread idle/dispatch/wait
 // totals with the owner's CPU clock, then a guest-core CPU snapshot.
 void ReportGpuThread(unsigned frame);

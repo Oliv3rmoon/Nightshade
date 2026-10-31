@@ -549,6 +549,14 @@ static bool GuestMemoryWanted() {
 static bool GraphicsMemoryShort() {
     if (GuestMemoryWanted()) {
         graphics_caches_short.store(true, std::memory_order_relaxed);
+        // A write of the game's waits for a block: what nothing uses goes back at once (every 2 s at
+        // most), the pages of the heap's free runs with it.
+        static std::atomic<long long> wanted_ns{0};
+        const long long now = NowNs();
+        if (now - wanted_ns.load(std::memory_order_relaxed) >= 2'000'000'000) {
+            wanted_ns.store(now, std::memory_order_relaxed);
+            RelieveMemory("a write of the game's waits for memory", true);
+        }
         return true;
     }
     RefreshFreeMemory();
@@ -853,10 +861,11 @@ static bool PoolRuns(unsigned long long* free_bytes, unsigned* runs, unsigned lo
 }
 #endif
 
-unsigned long long RelieveMemory(const char* why, bool always) {
+unsigned long long RelieveMemory(const char* why, bool urgent) {
     unsigned long long staging = 0;
     if (const auto release = graphics_staging_release.load(std::memory_order_acquire)) staging = release();
-    const std::size_t heap = TrimHeap(why);
+    const std::size_t heap = TrimHeap(why, urgent);
+    const bool always = urgent;
     // Said when it is asked to, when it gave something back (once a second at most), and every 30 s
     // while memory stays short.
     static std::atomic<long long> said_ns{0};
@@ -963,8 +972,11 @@ void ReportMemory() {
                 int(graphics_caches_short.load(std::memory_order_relaxed)));
     static unsigned reports = 0;
     if (++reports % 6 == 0) {
-        // Every 30 s the heap gives back what it does not use (its free runs beyond its slack).
-        TrimHeap("every 30 s");
+        // Every 30 s the heap gives back its empty pieces and arenas: memory in runs of 8 MiB or
+        // more. The pages of its free runs go back only while the pool is short (RelieveMemory):
+        // given back at other times they are holes at the top of the pool that only the heap
+        // itself takes again (tools/check-memory-soak.py).
+        TrimHeap("every 30 s", false);
         ReportHeap("every 30 s");
     }
 }

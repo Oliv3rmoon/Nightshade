@@ -45,12 +45,17 @@
  * A space or an arena that is partly used gives back the large pages inside its free runs: a run
  * of 4 MiB or more is taken as one block (a "hole"), and the 2 MiB pages wholly inside it are
  * released while the block stays taken, so the allocator, which only writes at a block's ends,
- * never touches them. When the space or arena needs that room again, the hole's pages are
- * committed and the block freed. Holes leave the heap a slack of its own (EDEN_HEAP_SLACK, or an
- * eighth of what it holds in use, whichever is more), so a game that allocates again right away
- * does not wait for the system. The app trims at the end of a shader cache build, at the end of a
- * session, every 30 s, when the pool the CPU shares with the GPU is short, and before an
- * allocation is refused (headless/performance.cpp TrimHeap).
+ * never touches them. Before the heap grows, every hole of its spaces is committed again and its
+ * block freed (an arena fills its own when it is full): a hole keeps its run from joining the
+ * blocks freed beside it, so holes are memory lent to the pool, not a way to keep free runs.
+ * Holes leave the heap a slack of its own (EDEN_HEAP_SLACK, or an eighth of what it holds in use,
+ * whichever is more), so a game that allocates again right away does not wait for the system.
+ * Empty spaces and arenas go back at the end of a shader cache build, at the end of a session,
+ * every 30 s and while the pool the CPU shares with the GPU is short; holes are made only when
+ * memory is wanted at once: a graphics allocation or a write of the game's was refused, or an
+ * allocation of the heap's own was about to be (headless/performance.cpp TrimHeap,
+ * RelieveMemory). Made at every shortage they kept the heap growing past its own free runs
+ * (tools/check-memory-soak.py).
  *
  * Large blocks the pool has no room for in one piece. A block of its own is one piece of direct
  * memory, and a growth of the heap was too: in a fragmented pool both failed for a 486 MiB request
@@ -715,6 +720,21 @@ static int eden_heap_holes_fill(int owner, size_t need) {
   return best < EDEN_HEAP_HOLES ? eden_heap_hole_fill(best) : 0;
 }
 
+/* Every hole of the spaces filled again, before the heap grows: a hole keeps its run from joining
+ * the blocks freed beside it, and a heap that grew past its holes would keep both. Returns the
+ * holes filled (it stops when the system has no memory for one). The growth lock is held. */
+static unsigned eden_heap_holes_fill_spaces(void) {
+  unsigned filled = 0;
+  for (unsigned index = eden_heap_hole_count; index-- > 0;) {
+    if (eden_heap_holes[index].lost || eden_heap_holes[index].owner < 0)
+      continue;
+    if (!eden_heap_hole_fill(index))
+      break;
+    ++filled;
+  }
+  return filled;
+}
+
 /* How much free memory the heap keeps before it makes holes: EDEN_HEAP_SLACK, or an eighth of what
  * its blocks use, whichever is more. */
 static size_t eden_heap_slack(void) {
@@ -784,7 +804,7 @@ static size_t eden_heap_holes_make(int owner, void *space, const size_t *sizes, 
 
 /* ---- growth ---- */
 
-/* Adds a space with room for `bytes`: first the holes of the spaces (their room is given back),
+/* Adds a space with room for `bytes`: first the holes of the spaces (all of them filled again),
  * else memory for pieces of the range (pieces given back earlier first, else the next ones, below
  * the arenas' slots) and an mspace over them, in a slot given back earlier or a new one. `seen` is
  * the growth the caller tried after: when another thread grew the heap meanwhile, that space is
@@ -825,8 +845,8 @@ static int eden_heap_grow(size_t bytes, unsigned seen) {
     }
   if (atomic_load_explicit(&eden_heap_space_generation, memory_order_relaxed) != seen) {
     grown = 1;
-  } else if (eden_heap_hole_count != 0 && need > bytes && eden_heap_holes_fill(EDEN_HEAP_ANY_SPACE, need) != 0) {
-    /* A space has its room back: the request tries the spaces again. */
+  } else if (eden_heap_hole_count != 0 && need > bytes && eden_heap_holes_fill_spaces() != 0) {
+    /* The spaces have their room back: the request tries them again. */
     atomic_fetch_add_explicit(&eden_heap_space_generation, 1, memory_order_release);
     grown = 1;
   } else if (eden_heap_grows && need > bytes && slot < EDEN_HEAP_PIECES &&
@@ -986,7 +1006,7 @@ size_t eden_heap_trim_level(int holes) {
     /* The large pages of the free runs in what is left, while the heap keeps its slack: the
      * spaces' runs from 64 MiB down, an arena's of 4 MiB (two pages fit in 8 MiB at most). */
     static const size_t space_sizes[] = {(size_t)64 << 20, (size_t)32 << 20, (size_t)16 << 20,
-                                         (size_t)8 << 20, (size_t)4 << 20};
+                                         (size_t)8 << 20, (size_t)4 << 20, (size_t)3 << 20};
     static const size_t arena_sizes[] = {(size_t)4 << 20};
     int stop = 0;
     size_t made = 0;
@@ -994,7 +1014,7 @@ size_t eden_heap_trim_level(int holes) {
       void *space = atomic_load_explicit(&eden_heap_spaces[slot], memory_order_acquire);
       if (space != NULL && eden_heap_space_span[slot] != 0 &&
           !atomic_load_explicit(&eden_heap_space_retired[slot], memory_order_relaxed))
-        made += eden_heap_holes_make((int)slot, space, space_sizes, 5u, &stop);
+        made += eden_heap_holes_make((int)slot, space, space_sizes, 6u, &stop);
     }
     for (unsigned slot = eden_heap_arena_floor; slot <= eden_heap_arena_top && slot < EDEN_HEAP_SLOTS && !stop;
          ++slot) {
