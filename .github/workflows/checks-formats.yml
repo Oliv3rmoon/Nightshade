@@ -1,9 +1,9 @@
 {
- "name": "Nightshade formats checks",
+ "name": "Nightshade heap regression formats checks",
  "on": {
   "push": {
    "branches": [
-    "test/1.010.007"
+    "test/heap-regression"
    ]
   },
   "workflow_dispatch": {}
@@ -23,15 +23,15 @@
    "env": {
     "XDG_CACHE_HOME": "/tmp/prosperoeden-dev-host-cache",
     "PROSPEROEDEN_DEPS_CACHE": "/tmp/prosperoeden-dev-downloads",
-    "DEV_HEAD": "5f59a76990ac5ba9a1f2786313cb8c751394507c",
+    "DEV_HEAD": "d0c5a63812d7261390bc2b5cf432e3a4618f3fab",
     "GITHUB_TOKEN": "${{ github.token }}"
    },
    "steps": [
     {
-     "name": "Check out the feature/formats commit",
+     "name": "Check out the fix/heap-regression commit",
      "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
      "with": {
-      "ref": "5f59a76990ac5ba9a1f2786313cb8c751394507c",
+      "ref": "d0c5a63812d7261390bc2b5cf432e3a4618f3fab",
       "persist-credentials": false
      }
     },

@@ -1,9 +1,9 @@
 {
- "name": "Nightshade launcher encore screens",
+ "name": "Nightshade heap regression launcher encore screens",
  "on": {
   "push": {
    "branches": [
-    "test/1.010.007"
+    "test/heap-regression"
    ]
   },
   "workflow_dispatch": {}
@@ -42,10 +42,10 @@
    "name": "screens (${{ matrix.what }})",
    "steps": [
     {
-     "name": "Check out the release commit",
+     "name": "Check out the fix/heap-regression commit",
      "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
      "with": {
-      "ref": "5f59a76990ac5ba9a1f2786313cb8c751394507c",
+      "ref": "d0c5a63812d7261390bc2b5cf432e3a4618f3fab",
       "persist-credentials": false
      }
     },
