@@ -9,34 +9,27 @@
  #include <memory>
  #include <numeric>
  
-@@ -267,12 +269,22 @@ bool BufferCache<P>::DMAClear(GPUVAddr dst_address, u64 amount, u32 value) {
-     if (!cpu_dst_address) {
-         return false;
+@@ -269,6 +271,17 @@ bool BufferCache<P>::DMAClear(GPUVAddr dst_address, u64 amount, u32 value) {
      }
--    const bool dest_dirty = IsRegionRegistered(*cpu_dst_address, amount);
-+    // amount is in words: the whole cleared range, not its first quarter, decides whether a cached
-+    // buffer holds it.
-+    const size_t size = amount * sizeof(u32);
-+    const bool dest_dirty = IsRegionRegistered(*cpu_dst_address, size);
+     const bool dest_dirty = IsRegionRegistered(*cpu_dst_address, amount);
      if (!dest_dirty) {
++        // amount is in words: this asks about the clear's first quarter. A clear whose cached
++        // buffers lie past it is left to the copy engine's own fill (maxwell_dma.cpp), which
++        // reaches them without making one buffer of the whole range here. The first 16, for
++        // stderr.log: before, such a clear reached guest memory only.
++        if (IsRegionRegistered(*cpu_dst_address, amount * sizeof(u32))) {
++            static std::atomic<u32> reports{0};
++            if (reports.fetch_add(1, std::memory_order_relaxed) < 16) {
++                std::fprintf(stderr, "EDEN_DMA_CLEAR_RANGE bytes=%llu value=0x%08x\n",
++                             static_cast<unsigned long long>(amount * sizeof(u32)), value);
++            }
++        }
          return false;
      }
-+    if (!IsRegionRegistered(*cpu_dst_address, amount)) {
-+        // Before, this clear reached guest memory only: the buffers that hold it lie past its
-+        // first quarter. The first 16, for stderr.log.
-+        static std::atomic<u32> reports{0};
-+        if (reports.fetch_add(1, std::memory_order_relaxed) < 16) {
-+            std::fprintf(stderr, "EDEN_DMA_CLEAR_RANGE bytes=%zu value=0x%08x\n", size, value);
-+        }
-+    }
- 
--    const size_t size = amount * sizeof(u32);
-     ClearDownload(*cpu_dst_address, size);
-     gpu_modified_ranges.Subtract(*cpu_dst_address, size);
  
 --- a/src/video_core/engines/maxwell_dma.cpp
 +++ b/src/video_core/engines/maxwell_dma.cpp
-@@ -4,6 +4,12 @@
+@@ -4,6 +4,13 @@
  // SPDX-FileCopyrightText: Copyright 2018 yuzu Emulator Project
  // SPDX-License-Identifier: GPL-2.0-or-later
  
@@ -46,10 +39,11 @@
 +#include <cstdio>
 +#include <numeric>
 +#include <optional>
++#include <utility>
  #include "common/algorithm.h"
  #include "common/assert.h"
  #include "common/logging.h"
-@@ -21,6 +27,101 @@ namespace Tegra::Engines {
+@@ -21,6 +28,107 @@ namespace Tegra::Engines {
  
  using namespace Texture;
  
@@ -120,6 +114,12 @@
 +    fill.element_size = any_written ? component_size * num_components : 0;
 +    return fill;
 +}
++
++// The whole pages of [begin, end): the first and the end of them (equal when there are none).
++std::pair<u64, u64> WholePages(u64 begin, u64 end, u64 page) {
++    const u64 first = (std::min)(end, (begin + page - 1) / page * page);
++    return {first, (std::max)(first, end / page * page)};
++}
 +// constant fill: end
 +
 +// The first fills whose shape the copy engine's earlier emulation got wrong, for stderr.log: it
@@ -151,7 +151,7 @@
  MaxwellDMA::MaxwellDMA(MemoryManager& memory_manager_)
      : memory_manager{memory_manager_}
  {
-@@ -64,6 +165,11 @@ void MaxwellDMA::Launch() {
+@@ -64,6 +172,11 @@ void MaxwellDMA::Launch() {
      const LaunchDMA& launch = regs.launch_dma;
      ASSERT(launch.interrupt_type == LaunchDMA::InterruptType::NONE);
  
@@ -163,7 +163,7 @@
      if (launch.multi_line_enable) {
          const bool is_src_pitch = launch.src_memory_layout == LaunchDMA::MemoryLayout::PITCH;
          const bool is_dst_pitch = launch.dst_memory_layout == LaunchDMA::MemoryLayout::PITCH;
-@@ -153,6 +259,76 @@ void MaxwellDMA::Launch() {
+@@ -153,6 +266,101 @@ void MaxwellDMA::Launch() {
      ReleaseSemaphore();
  }
  
@@ -211,28 +211,53 @@
 +            }
 +            continue;
 +        }
-+        // In pieces within a 4 KiB page, through the inline-to-memory path: guest memory, the
-+        // buffer cache's copy (written in order with the GPU's work when the GPU wrote that
-+        // memory) and the texture, shader and query caches all get the fill. Writing guest memory
-+        // alone left the buffer cache's copy as it was, which the GPU went on using: a counter
-+        // a game cleared this way and a shader then added to kept its old value.
-+        for (u64 done = 0; done < line_bytes;) {
-+            const GPUVAddr at = dst + done;
-+            const u64 piece = (std::min)(line_bytes - done, PIECE - (at & (PIECE - 1)));
-+            write_buffer.resize_destructive(piece);
-+            if (fill->keeps_bytes) {
-+                memory_manager.ReadBlock(at, write_buffer.data(), piece);
-+            }
-+            for (u64 i = 0; i < piece; ++i) {
-+                const u64 in_element = (done + i) % fill->element_size;
-+                if (fill->written[in_element]) {
-+                    write_buffer[i] = fill->pattern[in_element];
++        // Otherwise every cache gets the fill, as for an inline-to-memory write. Writing guest
++        // memory alone left the buffer cache's copy as it was, which the GPU went on using: a
++        // counter a game cleared this way and a shader then added to kept its old value.
++        const GPUVAddr end = dst + line_bytes;
++        // A page the fill only partly covers, or a fill that keeps some bytes, goes through the
++        // inline-to-memory path, a piece at a time within a page: the buffer cache writes the
++        // bytes into its copy in order with the GPU's work, so GPU data beside them stays.
++        const auto fill_inline = [&](GPUVAddr begin, GPUVAddr stop) {
++            for (GPUVAddr at = begin; at < stop;) {
++                const u64 piece = (std::min)(stop - at, PIECE - (at & (PIECE - 1)));
++                write_buffer.resize_destructive(piece);
++                if (fill->keeps_bytes) {
++                    memory_manager.ReadBlock(at, write_buffer.data(), piece);
 +                }
++                for (u64 i = 0; i < piece; ++i) {
++                    const u64 in_element = (at - dst + i) % fill->element_size;
++                    if (fill->written[in_element]) {
++                        write_buffer[i] = fill->pattern[in_element];
++                    }
++                }
++                rasterizer->AccelerateInlineToMemory(
++                    at, piece, std::span<const u8>(write_buffer.data(), piece));
++                at += piece;
 +            }
-+            rasterizer->AccelerateInlineToMemory(at, piece,
-+                                                 std::span<const u8>(write_buffer.data(), piece));
-+            done += piece;
++        };
++        if (fill->keeps_bytes) {
++            fill_inline(dst, end);
++            continue;
 +        }
++        const auto [whole_begin, whole_end] = WholePages(dst, end, PIECE);
++        fill_inline(dst, whole_begin);
++        if (whole_end > whole_begin) {
++            // Whole pages: guest memory, then every cache invalidates them, so the buffer
++            // cache uploads them (the fill covers each page, so nothing of the GPU's is lost)
++            // and drops a download of them still on its way.
++            write_buffer.resize_destructive(PIECE * 16);
++            for (GPUVAddr at = whole_begin; at < whole_end;) {
++                const u64 piece = (std::min)(whole_end - at, PIECE * 16);
++                for (u64 i = 0; i < piece; ++i) {
++                    write_buffer[i] = fill->pattern[(at - dst + i) % fill->element_size];
++                }
++                memory_manager.WriteBlockUnsafe(at, write_buffer.data(), piece);
++                at += piece;
++            }
++            memory_manager.InvalidateRegion(whole_begin, whole_end - whole_begin);
++        }
++        fill_inline(whole_end, end);
 +    }
 +    return true;
 +}
