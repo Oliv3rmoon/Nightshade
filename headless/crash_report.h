@@ -79,6 +79,8 @@ void SetSession(const std::string& text, bool game) noexcept;
 // The GPU stopped: the driver's stall dump says so before it reads anything (eden_gpu_stalled, in
 // crash_report.cpp), and a crash after it closes the app like VK_ERROR_DEVICE_LOST.
 void NoteGpuStalled() noexcept;
+// Whether it has (gpu_failure.h: a GPU worker that fails after it closes the app with a report).
+bool GpuStalled() noexcept;
 
 // For the checks (tools/check-crash-report.py).
 bool Readable(const void* address, std::size_t bytes) noexcept;

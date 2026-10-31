@@ -38,10 +38,12 @@ void ThreadManager::StartThread(VideoCore::RendererBase& renderer,
             start->owner->RunWorker(start->renderer, start->context, start->scheduler);
         } catch (const std::exception& error) {
             Eden::Report("GPU worker", error.what());
+            if (Eden::gpu_lost && Eden::IsGpuLost(error.what())) Eden::gpu_lost("VK_ERROR_DEVICE_LOST");
             Eden::RecordGpuFailure(std::current_exception());
             start->owner->stop_source.request_stop();
         } catch (...) {
             Eden::Report("GPU worker", "Unknown exception");
+            if (Eden::gpu_lost && Eden::IsGpuLost(nullptr)) Eden::gpu_lost("VK_ERROR_DEVICE_LOST");
             Eden::RecordGpuFailure(std::current_exception());
             start->owner->stop_source.request_stop();
         }
