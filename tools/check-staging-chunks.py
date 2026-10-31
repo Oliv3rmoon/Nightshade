@@ -161,6 +161,20 @@ int main() {
     std::printf("TOTK texture array decoded: %u staging buffers, the largest %llu MiB\n", batches,
                 (unsigned long long)(largest >> 20));
     assert(largest <= kLimit && batches >= 10);
+    // Decoded copies as Eden's ConvertImage left them before this tree set their sizes: each at its
+    // compressed size (16 bytes a 4x4 block), laid out decoded. Sized() gives each the bytes up to
+    // the next one's data, so every layer is staged whole.
+    {
+        auto stale = rgba;
+        for (std::size_t k = 0; k < stale.size(); ++k) stale[k].buffer_size = bc3[k].buffer_size;
+        std::uint64_t rgba_total = 0;
+        for (const auto& copy : rgba) rgba_total += copy.buffer_size;
+        const auto sized = Sized<BufferImageCopy>(stale.data(), stale.size(), rgba_total);
+        for (std::size_t k = 0; k < sized.size(); ++k) assert(sized[k].buffer_size == rgba[k].buffer_size);
+        largest = Image(sized, ~std::uint64_t{0}, &batches);
+        assert(largest <= kLimit && batches >= 10);
+        std::printf("  with the sizes ConvertImage left: repaired, %u staging buffers\n", batches);
+    }
     // A 3D image (one layer, 256 slices of 512x512 RGBA): staged by slices.
     const auto volume = Levels(512, 1, 1, 4, 1, 256);
     largest = Image(volume, ~std::uint64_t{0}, &batches);
@@ -209,13 +223,16 @@ if len(sys.argv) > 1:
                 node.targets[0].id in ('VULKAN_CACHE',):
             env[node.targets[0].id] = eval(compile(ast.Expression(node.value), 'prepare-vulkan-port.py', 'eval'), env)
     wanted = {
-        'src/video_core/texture_cache/texture_cache.h': ['::Eden::StagingChunks::UploadStaged(image, staging, copies);',
-                                                         '::Eden::StagingChunks::Host<Runtime> host',
-                                                         'staged_in_pieces = true;'],
-        'src/video_core/buffer_cache/buffer_cache.h': ['runtime.UploadStagingBuffer(bytes)',
-                                                       'runtime.DownloadStagingBuffer(bytes)'],
+        'src/video_core/texture_cache/texture_cache.h': ('StagingChunks', [
+            '::Eden::StagingChunks::UploadStaged(image, staging, copies);', '::Eden::StagingChunks::Host<Runtime> host',
+            'staged_in_pieces = true;']),
+        'src/video_core/buffer_cache/buffer_cache.h': ('StagingChunks', [
+            'runtime.UploadStagingBuffer(bytes)', 'runtime.DownloadStagingBuffer(bytes)']),
+        # Every converted copy's size set (the decoded ASTC and BCn branches left it compressed).
+        'src/video_core/texture_cache/util.cpp': ('copy.buffer_size = output_offset - copy.buffer_offset;', [
+            'copy.buffer_size = output_offset - copy.buffer_offset;']),
     }
-    for relative, needles in wanted.items():
+    for relative, (marker, needles) in wanted.items():
         calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call) and getattr(node.func, 'id', None) == 'adapt'
                  and isinstance(node.args[0], ast.Constant) and node.args[0].value == relative]
         assert len(calls) == 1, f'one adapt() call for {relative}'
@@ -232,13 +249,15 @@ if len(sys.argv) > 1:
         text = (src / relative).read_text()
         applied = 0
         for old, new in pairs:
-            if not isinstance(old, str) or not isinstance(new, str) or 'StagingChunks' not in new:
+            if not isinstance(old, str) or not isinstance(new, str) or marker not in new:
                 continue
             assert text.count(old) == 1, f'{relative}: a staged path anchor must match once: {old[:70]!r}'
             text = text.replace(old, new)
             applied += 1
         for needle in needles:
             assert needle in text, f'{relative}: {needle} is not in the patched file'
+        if relative.endswith('util.cpp'):
+            assert text.count('copy.buffer_size = output_offset - copy.buffer_offset;') == 2, 'both converted branches'
         print(f'{relative}: {applied} staged-path replacements match the pinned source')
 print('Staging chunks: PASS transfers of more than 64 MiB staged in pieces, data and layers in place, refusals halved '
       'down to 4 MiB')

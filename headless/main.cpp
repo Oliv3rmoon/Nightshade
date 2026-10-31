@@ -387,9 +387,11 @@ int main(int argc, char** argv) {
                                   Eden::FileExists(std::string{folder} + "/ui/fonts/montserrat-medium.pefont") ? "yes" : "no");
         Eden::BootTrace::Line("app folder: %s", Eden::AppDir().c_str());
         std::set_new_handler([] {
-            // Before an allocation is refused, the heap gives its empty pieces back to the pool and
-            // operator new tries again; only when there was nothing to give back is it refused.
-            if (Eden::Performance::TrimHeap("an allocation found no memory") != 0) return;
+            // Before an allocation is refused, the heap gives its empty pieces and arenas back to
+            // the pool and operator new tries again; only when there was nothing to give back is it
+            // refused. Not the pages of its free runs: the retry would take them back to grow, and
+            // the handler would give them again for good.
+            if (Eden::Performance::TrimHeap("an allocation found no memory", false) != 0) return;
             ps5_opengl_heap_snapshot("allocation_failure", 0);
             std::fflush(stdout);
             Eden::Performance::ReportHeap("an allocation found no memory");

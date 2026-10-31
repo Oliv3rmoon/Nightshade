@@ -539,6 +539,9 @@ struct StagingRef { std::span<std::uint8_t> mapped_span; };
 // ---- the game's memory and its reserve ----
 std::vector<std::int64_t> guest_pages, reserve_pages;
 std::mt19937_64 rng(20261030);
+// The same numbers on every host: std::mt19937_64 is specified, its distributions are not.
+double Unit(std::mt19937_64& random) { return double(random() >> 11) * (1.0 / 9007199254740992.0); }
+std::size_t Pick(std::mt19937_64& random, std::size_t n) { return n == 0 ? 0 : std::size_t(random() % n); }
 unsigned guest_waits = 0;
 void Gc(bool hardest);
 bool GuestPage() {
@@ -573,8 +576,7 @@ void GuestTo(std::uint64_t bytes) {
             return;
         }
     while (guest_pages.size() > want) {
-        std::uniform_int_distribution<std::size_t> pick(0, guest_pages.size() - 1);
-        const std::size_t k = pick(rng);
+        const std::size_t k = Pick(rng, guest_pages.size());
         std::lock_guard lock{pool_mutex};
         pool.Give(guest_pages[k], PAGE);
         guest_pages[k] = guest_pages.back();
@@ -715,18 +717,27 @@ bool CreateTexture(Texture& texture) {
                       std::to_string(texture.size >> 20) + " MiB was refused");
     return staged;
 }
+Texture MakeTexture(std::uint64_t size, bool dirty, bool costly) {
+    Texture texture{};
+    texture.size = size;
+    texture.dirty = dirty;
+    texture.costly = costly;
+    return texture;
+}
 void BuildCatalog() {
-    std::uniform_real_distribution<double> unit(0, 1);
     const auto size = [&] {
-        const double r = unit(rng);
-        const double mib = r < 0.70 ? 0.25 + unit(rng) * 1.75 : r < 0.95 ? 2 + unit(rng) * 6 : r < 0.99 ? 8 + unit(rng) * 8 : 32;
+        const double r = Unit(rng);
+        const double mib = r < 0.70 ? 0.25 + Unit(rng) * 1.75 : r < 0.95 ? 2 + Unit(rng) * 6 : r < 0.99 ? 8 + Unit(rng) * 8 : 32;
         return std::uint64_t(mib * double(MiB)) / 4096 * 4096;
     };
-    for (unsigned i = 0; i < kRegions * kPerRegion + kCommon; ++i)
-        textures.push_back(Texture{size(), unit(rng) < 0.3, unit(rng) < 0.5});
+    for (unsigned i = 0; i < kRegions * kPerRegion + kCommon; ++i) {
+        const std::uint64_t bytes = size();
+        const bool dirty = Unit(rng) < 0.3, costly = Unit(rng) < 0.5;
+        textures.push_back(MakeTexture(bytes, dirty, costly));
+    }
     menu_array = textures.size();
     // 1024x1024, 121 layers, 11 levels, BC3: 161 MiB (ASTC kept as BC3, as TOTK's profiles do).
-    textures.push_back(Texture{std::uint64_t(161.3 * double(MiB)) / 4096 * 4096, false, true});
+    textures.push_back(MakeTexture(std::uint64_t(161.3 * double(MiB)) / 4096 * 4096, false, true));
 }
 void Use(std::size_t index) {
     Texture& texture = textures[index];
@@ -743,12 +754,11 @@ void Build(unsigned pipelines) {
     for (unsigned t = 0; t < 15; ++t)
         threads.emplace_back([t, pipelines] {
             std::mt19937_64 random(t * 7919 + 1);
-            std::uniform_int_distribution<std::size_t> transient(4096, 120000), keep(1000, 30000);
             for (unsigned p = t; p < pipelines; p += 15) {
                 void* scratch[4];
-                for (void*& block : scratch) block = __wrap_malloc(transient(random));
+                for (void*& block : scratch) block = __wrap_malloc(4096 + Pick(random, 120000 - 4096 + 1));
                 for (int k = 0; k < 6; ++k) {
-                    void* block = __wrap_malloc(keep(random));
+                    void* block = __wrap_malloc(1000 + Pick(random, 30000 - 1000 + 1));
                     if (block == nullptr) return;
                     built[t].push_back(block);
                 }
@@ -761,13 +771,12 @@ void Build(unsigned pipelines) {
 std::vector<std::pair<void*, std::size_t>> game_blocks;
 std::size_t game_bytes = 0;
 void GameHeapTo(std::uint64_t target) {
-    std::uniform_real_distribution<double> unit(0, 1);
     unsigned guard = 0;
     while (game_bytes < target && guard++ < 200000) {
-        const double r = unit(rng);
-        const std::size_t size = r < 0.70 ? 64 + std::size_t(unit(rng) * 32768)
-                                : r < 0.995 ? 262144 + std::size_t(unit(rng) * 4 * double(MiB))
-                                            : std::size_t(32 * MiB + unit(rng) * 64 * double(MiB));
+        const double r = Unit(rng);
+        const std::size_t size = r < 0.70 ? 64 + std::size_t(Unit(rng) * 32768)
+                                : r < 0.995 ? 262144 + std::size_t(Unit(rng) * 4 * double(MiB))
+                                            : std::size_t(32 * MiB + Unit(rng) * 64 * double(MiB));
         void* block = __wrap_malloc(size);
         if (block == nullptr) {
             Fail("the heap refused " + std::to_string(size) + " bytes");
@@ -777,8 +786,7 @@ void GameHeapTo(std::uint64_t target) {
         game_bytes += size;
     }
     while (game_bytes > target + 8 * MiB && !game_blocks.empty()) {
-        std::uniform_int_distribution<std::size_t> pick(0, game_blocks.size() - 1);
-        const std::size_t k = pick(rng);
+        const std::size_t k = Pick(rng, game_blocks.size());
         __wrap_free(game_blocks[k].first);
         game_bytes -= game_blocks[k].second;
         game_blocks[k] = game_blocks.back();
@@ -790,8 +798,7 @@ void GameHeapChurn(double share) {
     const std::size_t n = std::size_t(double(game_blocks.size()) * share);
     const std::uint64_t target = game_bytes;
     for (std::size_t i = 0; i < n && !game_blocks.empty(); ++i) {
-        std::uniform_int_distribution<std::size_t> pick(0, game_blocks.size() - 1);
-        const std::size_t k = pick(rng);
+        const std::size_t k = Pick(rng, game_blocks.size());
         __wrap_free(game_blocks[k].first);
         game_bytes -= game_blocks[k].second;
         game_blocks[k] = game_blocks.back();
@@ -809,9 +816,11 @@ std::vector<Row> ReadTrace(const char* path) {
     std::getline(in, line); // header
     while (std::getline(in, line) && rows.size() < 100000) {
         if (line.size() > 4096) continue;
+        while (!line.empty() && (line.back() == '\r' || line.back() == '\n')) line.pop_back();
         std::vector<std::string> cells;
         std::stringstream cut(line);
         for (std::string cell; std::getline(cut, cell, ',');) cells.push_back(cell);
+        if (!line.empty() && line.back() == ',') cells.emplace_back(); // the empty last field
         if (cells.size() < 10) continue;
         const auto number = [&](std::size_t k) {
             char* end = nullptr;
@@ -833,7 +842,14 @@ int main(int argc, char** argv) {
         std::fprintf(stderr, "no rows in %s\n", argv[2]);
         return 2;
     }
-    const double end_s = trace.empty() ? 3 * 3600.0 : trace.back().t;
+    // Three hours by default (v1.010.006's rules fail at 2 h 20 min); SOAK_HOURS for longer. Given
+    // six hours this tree's rules fail too, at 4 h 32 min: the pool fragments under the game's
+    // bursts and the textures' churn until its largest free block (148 MiB) is under the menu's
+    // array. What would hold it longer is placement (the game's pages where they split no large
+    // run), which only a console can measure.
+    const char* hours = std::getenv("SOAK_HOURS");
+    const double synthetic_hours = hours ? std::clamp(std::atof(hours), 0.1, 24.0) : 3.0;
+    const double end_s = trace.empty() ? synthetic_hours * 3600.0 : trace.back().t;
     std::printf("%s, %s\n", fixed_mode ? "this tree" : "control (v1.010.006's graphics rules)",
                 trace.empty() ? "synthetic 3 hours of TOTK" : argv[2]);
     // What stays: the driver's blocks and the threads' stacks (the stream buffer of 256 MiB among
@@ -864,7 +880,6 @@ int main(int argc, char** argv) {
     std::uint64_t peak_heap = 0, peak_graphics = 0;
     unsigned region = 0;
     std::size_t row = 0;
-    std::uniform_real_distribution<double> unit(0, 1);
     for (now_s = 5; now_s <= end_s + 0.1 && failures == 0; now_s += 5) {
         // The game's memory and the heap's use: the trace's, or bursts of the game's writes and slow growth.
         std::uint64_t guest_target, heap_target;
@@ -889,7 +904,7 @@ int main(int argc, char** argv) {
         GameHeapTo(heap_target);
         GameHeapChurn(0.01);
         // Streaming: a region of the world every 20 s, six around the player; the menu's array.
-        if (std::fmod(now_s, 20.0) < 1) region = (region + 1 + unsigned(unit(rng) * 2)) % kRegions;
+        if (std::fmod(now_s, 20.0) < 1) region = (region + 1 + unsigned(Unit(rng) * 2)) % kRegions;
         const unsigned near = trace.empty() ? 4 : unsigned(std::clamp(graphics_mib * 0.6 / 280.0, 2.0, 10.0));
         for (unsigned r = 0; r < near && failures == 0; ++r)
             for (unsigned k = 0; k < kPerRegion && failures == 0; ++k) Use(((region + r) % kRegions) * kPerRegion + k);

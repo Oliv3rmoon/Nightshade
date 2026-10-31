@@ -1522,6 +1522,23 @@ recompress_new = '''            // A layer at a time (headless/CMakeLists.txt): 
 adapt('src/video_core/texture_cache/util.cpp', 'texture_util.cpp', [
     ('#include <vector>', '#include <cstring>\n#include <vector>\n#include "texture_partial.h"'),
     (recompress_old, recompress_new),
+    # Every converted copy says how many bytes it is: Eden set buffer_size only for ASTC kept as
+    # BC1/BC3, and left the decoded ASTC and BCn copies at their compressed size. Vulkan does not
+    # read it, but a transfer staged in pieces does (headless/staging_chunks.h).
+    ('            output_offset += copy.image_extent.width * copy.image_extent.height *\n'
+     '                             copy.image_subresource.num_layers *\n'
+     '                             BytesPerBlock(PixelFormat::A8B8G8R8_UNORM);\n',
+     '            output_offset += copy.image_extent.width * copy.image_extent.height *\n'
+     '                             copy.image_subresource.num_layers *\n'
+     '                             BytesPerBlock(PixelFormat::A8B8G8R8_UNORM);\n'
+     '            copy.buffer_size = output_offset - copy.buffer_offset;\n'),
+    ('            output_offset += copy.image_extent.width * copy.image_extent.height *\n'
+     '                             copy.image_subresource.num_layers *\n'
+     '                             ConvertedBytesPerBlock(info.format);\n',
+     '            output_offset += copy.image_extent.width * copy.image_extent.height *\n'
+     '                             copy.image_subresource.num_layers *\n'
+     '                             ConvertedBytesPerBlock(info.format);\n'
+     '            copy.buffer_size = output_offset - copy.buffer_offset;\n'),
     ('} // namespace VideoCommon', (port / 'texture_rows.inc').read_text() + '\n} // namespace VideoCommon'),
 ])
 

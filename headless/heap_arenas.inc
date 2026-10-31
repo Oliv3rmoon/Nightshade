@@ -51,11 +51,11 @@
  * Holes leave the heap a slack of its own (EDEN_HEAP_SLACK, or an eighth of what it holds in use,
  * whichever is more), so a game that allocates again right away does not wait for the system.
  * Empty spaces and arenas go back at the end of a shader cache build, at the end of a session,
- * every 30 s and while the pool the CPU shares with the GPU is short; holes are made only when
- * memory is wanted at once: a graphics allocation or a write of the game's was refused, or an
- * allocation of the heap's own was about to be (headless/performance.cpp TrimHeap,
- * RelieveMemory). Made at every shortage they kept the heap growing past its own free runs
- * (tools/check-memory-soak.py).
+ * every 30 s, while the pool the CPU shares with the GPU is short, and before an allocation is
+ * refused. Holes are made at the end of a shader cache build and of a session (once each) and
+ * when memory is wanted at once: a graphics allocation was refused or a write of the game's waits
+ * (headless/performance.cpp TrimHeap, RelieveMemory). Made at every shortage they kept the heap
+ * growing past its own free runs (tools/check-memory-soak.py).
  *
  * Large blocks the pool has no room for in one piece. A block of its own is one piece of direct
  * memory, and a growth of the heap was too: in a fragmented pool both failed for a 486 MiB request
@@ -180,6 +180,7 @@ static struct {
 static unsigned eden_heap_hole_count;
 static atomic_size_t eden_heap_hole_bytes;
 static atomic_uint eden_heap_hole_total; /* holes made since the process began */
+static atomic_uint eden_heap_holes_now;  /* holes now */
 
 /* Requests of this size or more get memory of their own (eden_heap_pages), freed with them. */
 #define EDEN_HEAP_LARGE_REQUEST ((size_t)32 << 20)
@@ -352,7 +353,7 @@ size_t eden_heap_arena_usage(unsigned *count) {
 /* The memory of the holes in partly used spaces and arenas now, and how many there are. */
 size_t eden_heap_hole_usage(unsigned *count) {
   if (count)
-    *count = atomic_load_explicit(&eden_heap_hole_total, memory_order_relaxed);
+    *count = atomic_load_explicit(&eden_heap_holes_now, memory_order_relaxed);
   return atomic_load_explicit(&eden_heap_hole_bytes, memory_order_relaxed);
 }
 
@@ -670,6 +671,7 @@ static int eden_heap_hole_fill(unsigned index) {
       atomic_fetch_sub_explicit(&arena->blocks, 1, memory_order_release);
   }
   eden_heap_holes[index] = eden_heap_holes[--eden_heap_hole_count];
+  atomic_fetch_sub_explicit(&eden_heap_holes_now, 1, memory_order_relaxed);
   return 1;
 }
 
@@ -684,6 +686,7 @@ static void eden_heap_holes_drop(int owner) {
       atomic_fetch_sub_explicit(&eden_heap_hole_bytes, eden_heap_holes[index].end - eden_heap_holes[index].begin,
                                 memory_order_relaxed);
     eden_heap_holes[index] = eden_heap_holes[--eden_heap_hole_count];
+    atomic_fetch_sub_explicit(&eden_heap_holes_now, 1, memory_order_relaxed);
   }
   if (owner >= 0)
     atomic_store_explicit(&eden_heap_space_holes[owner], 0, memory_order_relaxed);
@@ -721,16 +724,15 @@ static int eden_heap_holes_fill(int owner, size_t need) {
 }
 
 /* Every hole of the spaces filled again, before the heap grows: a hole keeps its run from joining
- * the blocks freed beside it, and a heap that grew past its holes would keep both. Returns the
- * holes filled (it stops when the system has no memory for one). The growth lock is held. */
+ * the blocks freed beside it, and a heap that grew past its holes would keep both. A hole the
+ * system has no memory for stays (a smaller one may still be filled). Returns the holes filled.
+ * The growth lock is held. */
 static unsigned eden_heap_holes_fill_spaces(void) {
   unsigned filled = 0;
   for (unsigned index = eden_heap_hole_count; index-- > 0;) {
-    if (eden_heap_holes[index].lost || eden_heap_holes[index].owner < 0)
+    if (index >= eden_heap_hole_count || eden_heap_holes[index].lost || eden_heap_holes[index].owner < 0)
       continue;
-    if (!eden_heap_hole_fill(index))
-      break;
-    ++filled;
+    filled += (unsigned)eden_heap_hole_fill(index);
   }
   return filled;
 }
@@ -792,8 +794,11 @@ static size_t eden_heap_holes_make(int owner, void *space, const size_t *sizes, 
           atomic_fetch_add_explicit(&arena->blocks, 1, memory_order_relaxed);
         atomic_fetch_add_explicit(&arena->holes, 1, memory_order_relaxed);
       }
-      atomic_fetch_sub_explicit(&eden_heap_committed_bytes, end - begin, memory_order_relaxed);
+      /* A hole given back in part stays counted as held: the space or arena it is in counts its
+       * range off when it goes back whole (eden_heap_holes_in leaves lost holes out). */
+      atomic_fetch_add_explicit(&eden_heap_holes_now, 1, memory_order_relaxed);
       if (done > 0) {
+        atomic_fetch_sub_explicit(&eden_heap_committed_bytes, end - begin, memory_order_relaxed);
         atomic_fetch_add_explicit(&eden_heap_hole_bytes, end - begin, memory_order_relaxed);
         given += end - begin;
       }

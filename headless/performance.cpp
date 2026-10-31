@@ -973,9 +973,9 @@ void ReportMemory() {
     static unsigned reports = 0;
     if (++reports % 6 == 0) {
         // Every 30 s the heap gives back its empty pieces and arenas: memory in runs of 8 MiB or
-        // more. The pages of its free runs go back only while the pool is short (RelieveMemory):
-        // given back at other times they are holes at the top of the pool that only the heap
-        // itself takes again (tools/check-memory-soak.py).
+        // more. The pages of its free runs go back only when memory is wanted at once
+        // (RelieveMemory, urgent): made at every shortage, those holes kept the heap growing past
+        // its own free runs (tools/check-memory-soak.py).
         TrimHeap("every 30 s", false);
         ReportHeap("every 30 s");
     }

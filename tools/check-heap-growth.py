@@ -322,8 +322,9 @@ static atomic_int trimming;
 static atomic_size_t trimmed_total;
 static void *trimmer(void *argument) {
     (void)argument;
-    while (atomic_load(&trimming)) {
-        atomic_fetch_add(&trimmed_total, eden_heap_trim());
+    for (unsigned rounds = 0; atomic_load(&trimming); ++rounds) {
+        // Holes every other time: the pages of the free runs too, while blocks are taken and freed.
+        atomic_fetch_add(&trimmed_total, eden_heap_trim_level((int)(rounds & 1)));
         usleep(100);
     }
     return NULL;
@@ -488,6 +489,71 @@ static void check_builders(size_t piece) {
         abort();
     }
     printf("builders gone: %zu MiB held, %u arenas\n", eden_heap_committed() >> 20, left);
+}
+
+// Extra arenas given back while threads use them: sixteen threads each fill more than an arena with
+// small blocks, free them (half themselves, half by the next thread) and fill them again, while a
+// trimmer gives back every arena that holds nothing and makes holes in the rest. A thread whose
+// arena went back takes another; a block handed out of a given-back arena faults or damages a
+// pattern.
+enum { RECYCLERS = 16, RECYCLED = 5200, RECYCLED_SIZE = 2100, ROUNDS = 6 };
+static unsigned char *recycled[RECYCLERS][RECYCLED];
+// A barrier of mutex and condition (macOS has no pthread_barrier).
+static struct { pthread_mutex_t lock; pthread_cond_t turn; unsigned waiting, round; } recycle_barrier = {
+    PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER, 0, 0};
+static void recycle_wait(void) {
+    pthread_mutex_lock(&recycle_barrier.lock);
+    const unsigned round = recycle_barrier.round;
+    if (++recycle_barrier.waiting == RECYCLERS) {
+        recycle_barrier.waiting = 0;
+        ++recycle_barrier.round;
+        pthread_cond_broadcast(&recycle_barrier.turn);
+    } else {
+        while (recycle_barrier.round == round) pthread_cond_wait(&recycle_barrier.turn, &recycle_barrier.lock);
+    }
+    pthread_mutex_unlock(&recycle_barrier.lock);
+}
+static void *recycler(void *argument) {
+    const unsigned t = (unsigned)(uintptr_t)argument;
+    for (int round = 0; round < ROUNDS; ++round) {
+        for (int i = 0; i < RECYCLED; ++i) {
+            recycled[t][i] = __wrap_malloc(RECYCLED_SIZE);
+            assert(recycled[t][i] != NULL);
+            fill(recycled[t][i], RECYCLED_SIZE, t * 7919u + (unsigned)i + (unsigned)round);
+        }
+        recycle_wait();
+        // Its own first half, and the next thread's second half.
+        const unsigned next = (t + 1) % RECYCLERS;
+        for (int i = 0; i < RECYCLED / 2; ++i) {
+            verify(recycled[t][i], RECYCLED_SIZE, t * 7919u + (unsigned)i + (unsigned)round);
+            __wrap_free(recycled[t][i]);
+        }
+        for (int i = RECYCLED / 2; i < RECYCLED; ++i) {
+            verify(recycled[next][i], RECYCLED_SIZE, next * 7919u + (unsigned)i + (unsigned)round);
+            __wrap_free(recycled[next][i]);
+        }
+        recycle_wait();
+    }
+    return NULL;
+}
+static void check_recycled_arenas(void) {
+    const unsigned made_before = eden_heap_arenas_created();
+    pthread_t trim_thread, ids[RECYCLERS];
+    atomic_store(&trimming, 1);
+    assert(pthread_create(&trim_thread, NULL, trimmer, NULL) == 0);
+    for (uintptr_t t = 0; t < RECYCLERS; ++t) assert(pthread_create(&ids[t], NULL, recycler, (void *)t) == 0);
+    for (int t = 0; t < RECYCLERS; ++t) pthread_join(ids[t], NULL);
+    atomic_store(&trimming, 0);
+    pthread_join(trim_thread, NULL);
+    (void)eden_heap_trim();
+    unsigned left = 0;
+    (void)eden_heap_arena_usage(&left);
+    printf("arenas given back while in use: %u made over %d rounds of %d threads, %u alive after\n",
+           eden_heap_arenas_created() - made_before, ROUNDS, RECYCLERS, left);
+    if (left > 40) {
+        fprintf(stderr, "arenas given back while in use: %u still alive\n", left);
+        abort();
+    }
 }
 
 // Pieces left partly used: 1 MiB blocks, eight of every nine freed. The free runs give back their
@@ -667,6 +733,7 @@ int main(int argc, char **argv) {
     }
     if (!refuse_range) {
         check_builders(piece);
+        check_recycled_arenas();
         check_holes();
     }
     // Fill the heap with blocks under the large size: the limit is its 6 GiB (3 GiB taken whole),

@@ -17,7 +17,10 @@ rules (headless/staging_chunks.h, headless/memory_budget.h). Then it runs:
   out-of-memory crash 83 minutes in, v1.010.006's staging refusal and both of issue #2's logs).
 
 In each, no allocation may fail and the pool's largest free block must stay above the largest
-request (the menu's array, 161 MiB, which has memory of its own). The heap must start near
+request (the menu's array, 161 MiB, which has memory of its own). The model is harsher than the
+logs (bursts of 1.2 GB every 20 minutes), and its margin is thin: the worst block in the three
+hours is 164 MiB. Run longer (SOAK_HOURS=6), this tree fails at 4 h 32 min, v1.010.006 at
+2 h 20 min. The heap must start near
 v1.010.004's 2.56 GB. As a control, the synthetic session runs again with v1.010.006's graphics
 rules (whole transfers, the pool's free block alone for the caches, nothing given back on a
 refusal) and v1.010.006's heap (tools/memory-soak/heap-v1.010.006.inc); it must fail, or the

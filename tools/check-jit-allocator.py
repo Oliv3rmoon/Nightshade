@@ -56,6 +56,8 @@ extern "C" int eden_direct_high(size_t size, size_t alignment, int type, std::in
 extern "C" int eden_direct_low(size_t size, size_t alignment, int type, std::int64_t* out) {
     return sceKernelAllocateDirectMemory(0, std::int64_t{1}<<40, size, alignment, type, out);
 }
+// The top's room again (what the heap gave back there): none in this check.
+extern "C" int eden_direct_top_room(size_t, size_t, int, std::int64_t*) { return -1; }
 extern "C" int sceKernelReleaseDirectMemory(std::int64_t physical, size_t) {
     return close(physical>>32);
 }

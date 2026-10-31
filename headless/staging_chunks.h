@@ -23,6 +23,8 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <exception>
+#include <new>
 #include <span>
 #include <type_traits>
 #include <utility>
@@ -102,7 +104,9 @@ std::size_t StageBuffer(std::size_t count, Range&& range, Request&& request, Run
         auto staging = [&] {
             try {
                 return std::make_pair(request(bytes), true);
-            } catch (...) {
+            } catch (const std::bad_alloc&) {
+                throw;
+            } catch (const std::exception&) {
                 if (limit <= kLeast) throw;
                 return std::make_pair(decltype(request(bytes)){}, false);
             }
@@ -212,7 +216,9 @@ std::size_t StageImage(std::span<const std::uint8_t> data, const Copy* copies, s
         try {
             staging = request(bytes);
             staged = true;
-        } catch (...) {
+        } catch (const std::bad_alloc&) {
+            throw;
+        } catch (const std::exception&) {
             if (limit <= kLeast) throw;
         }
         if (!staged) {
@@ -259,11 +265,35 @@ template <class Image, class Staging, class Copies>
 void UploadStaged(Image& image, Staging& staging, const Copies& copies) {
     image.UploadMemory(staging, copies);
 }
+// The copies' sizes, from where their data lies. The texture cache lays copies out one after
+// another with nothing between them (UnswizzleImage, ConvertImage, the partial rows): a copy's
+// bytes run to the next one's data. Its layers are cut by its size, and a size left at what the
+// data was before a conversion (Eden's ConvertImage did so for decoded ASTC and BCn) would stage a
+// quarter of a decoded texture. The last copy's runs to the end of the data when it says more,
+// or less by a whole number of its layers (and slices); otherwise it stays.
+template <class Copy>
+std::vector<Copy> Sized(const Copy* copies, std::size_t count, std::uint64_t data_bytes) {
+    std::vector<Copy> sized(copies, copies + count);
+    bool in_order = true;
+    for (std::size_t k = 0; k + 1 < count; ++k)
+        in_order = in_order && copies[k + 1].buffer_offset > copies[k].buffer_offset;
+    if (count == 0 || !in_order || std::uint64_t(copies[count - 1].buffer_offset) >= data_bytes) return sized;
+    for (std::size_t k = 0; k + 1 < count; ++k)
+        sized[k].buffer_size = static_cast<decltype(sized[k].buffer_size)>(copies[k + 1].buffer_offset - copies[k].buffer_offset);
+    Copy& last = sized[count - 1];
+    const std::uint64_t room = data_bytes - std::uint64_t(last.buffer_offset);
+    const std::uint64_t units = std::uint64_t(last.image_subresource.num_layers > 0 ? last.image_subresource.num_layers : 1) *
+                                std::uint64_t(last.image_extent.depth > 0 ? last.image_extent.depth : 1);
+    if (std::uint64_t(last.buffer_size) > room || (std::uint64_t(last.buffer_size) < room && room % units == 0))
+        last.buffer_size = static_cast<decltype(last.buffer_size)>(room);
+    return sized;
+}
 template <class Image, class Runtime, class Copies>
 void UploadStaged(Image& image, Host<Runtime>& host, const Copies& copies) {
     using Copy = std::remove_cv_t<std::remove_reference_t<decltype(*copies.data())>>;
-    StageImage<Copy>(std::span<const std::uint8_t>(host.mapped_span.data(), host.mapped_span.size()), copies.data(),
-                     copies.size(), [&](std::uint64_t bytes) { return host.runtime->UploadStagingBuffer(bytes); },
+    const auto sized = Sized<Copy>(copies.data(), copies.size(), host.mapped_span.size());
+    StageImage<Copy>(std::span<const std::uint8_t>(host.mapped_span.data(), host.mapped_span.size()), sized.data(),
+                     sized.size(), [&](std::uint64_t bytes) { return host.runtime->UploadStagingBuffer(bytes); },
                      [&](auto& staging, std::span<const Copy> batch) { image.UploadMemory(staging, batch); });
 }
 } // namespace Eden::StagingChunks
