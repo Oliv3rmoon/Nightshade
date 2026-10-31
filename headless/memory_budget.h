@@ -28,6 +28,7 @@
 // under kShortMemory, and the heap's free memory, the idle staging buffers and the textures go back
 // in that order (performance.cpp RelieveMemory, the texture collector).
 #pragma once
+#include <atomic>
 #include <cstddef>
 
 namespace Eden::Performance {
@@ -88,4 +89,8 @@ inline std::size_t CachesFree(std::size_t pool_free, unsigned long long held, un
 inline bool CachesShort(std::size_t caches_free) {
     return caches_free < kShortMemory;
 }
+// Lets go of the staging buffers the GPU is done with and returns their bytes, installed by the
+// Vulkan staging pool (tools/prepare-vulkan-port.py); it does nothing on a thread other than the
+// one the pool runs on.
+inline std::atomic<unsigned long long (*)()> graphics_staging_release{nullptr};
 } // namespace Eden::Performance

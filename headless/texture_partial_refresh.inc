@@ -39,7 +39,13 @@
                         std::printf("\n");
                     }
                 }
-                if (bytes != 0) {
+                if (bytes != 0 && Eden::StagingChunks::Chunked(bytes)) {
+                    // headless/staging_chunks.h: the rows are in the heap already.
+                    Eden::StagingChunks::Host<Runtime> host{std::span<u8>(unswizzle_data_buffer.data(), bytes), &runtime};
+                    Eden::StagingChunks::UploadStaged(image, host, *copies);
+                    Eden::StagingChunks::Said(bytes);
+                    runtime.InsertUploadMemoryBarrier();
+                } else if (bytes != 0) {
                     auto staging = runtime.UploadStagingBuffer(bytes);
                     std::memcpy(staging.mapped_span.data(), unswizzle_data_buffer.data(), bytes);
                     image.UploadMemory(staging, *copies);

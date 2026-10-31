@@ -630,8 +630,12 @@ adapt('src/video_core/vulkan_common/vulkan_device.cpp', 'vulkan_device.cpp', [
      'u64 graphics_capacity = 0;\n'
      '}\n\n'
      'u64 Device::GetDeviceMemoryUsage() const {\n'
-     '    if (const auto free_memory = ::Eden::Performance::graphics_memory_free.load(std::memory_order_relaxed);\n'
-     '        free_memory && ::Eden::Performance::graphics_usage_from_pool.load(std::memory_order_relaxed)) {\n'
+     '    // The pool\'s free block and three quarters of what the graphics allocator\'s blocks hold\n'
+     '    // unused (headless/memory_budget.h CachesFree): freeing a texture puts its memory back in\n'
+     '    // its block, not in the pool.\n'
+     '    auto free_memory = ::Eden::Performance::graphics_caches_free.load(std::memory_order_relaxed);\n'
+     '    if (!free_memory) free_memory = ::Eden::Performance::graphics_memory_free.load(std::memory_order_relaxed);\n'
+     '    if (free_memory && ::Eden::Performance::graphics_usage_from_pool.load(std::memory_order_relaxed)) {\n'
      '        // The caches evict what is unused 1.6 GiB under the budget and evict hard 0.8 GiB under\n'
      '        // it. Where the pool could never give graphics 6.4 GiB, those marks become a quarter\n'
      '        // and an eighth of what it could give.\n'
@@ -962,6 +966,12 @@ for call in ('vmaCreateImage(allocator, &ci, &alloc_ci, &handle, &allocation, &a
         '            std::fprintf(stderr, "[ProsperoEden] graphics memory: refused outside the budget too (result %d): the pool\'s "\n'
         '                         "largest free block is %llu MiB; the allocator holds %llu MiB in blocks, %llu MiB of it in use\\n",\n'
         '                         int(created), free_block ? free_block() >> 20 : 0ull, blocks >> 20, used >> 20);\n'
+        # What nothing uses goes back to the pool (the idle staging buffers, the heap's free memory),
+        # and the request is asked for once more before the refusal goes on.
+        '            const unsigned long long relieved = ::Eden::Performance::RelieveMemory("graphics memory was refused", true);\n'
+        '            created = AGAIN;\n'
+        '            std::fprintf(stderr, "[ProsperoEden] graphics memory: %s when asked again, once %llu MiB went back to the pool\\n",\n'
+        '                         created == VK_SUCCESS ? "given" : "refused", relieved >> 20);\n'
         '        }\n'
         '    }\n'
         '    vk::Check(created);\n'
@@ -990,13 +1000,25 @@ allocator = allocator.replace(held_ctor[0], (
     '    for (const VmaBudget& heap : held) blocks += heap.statistics.blockBytes;\n'
     '    return blocks;\n'
     '}\n'
+    # What of its blocks images and buffers use (the caches count the rest as free, memory_budget.h).
+    'unsigned long long GraphicsMemoryUsed() {\n'
+    '    const VmaAllocator allocator = overlay_allocator.load(std::memory_order_acquire);\n'
+    '    if (allocator == nullptr) return 0;\n'
+    '    VmaBudget held[VK_MAX_MEMORY_HEAPS]{};\n'
+    '    vmaGetHeapBudgets(allocator, held);\n'
+    '    unsigned long long used = 0;\n'
+    '    for (const VmaBudget& heap : held) used += heap.statistics.allocationBytes;\n'
+    '    return used;\n'
+    '}\n'
     '} // namespace\n\n') + held_ctor[0])
 allocator = allocator.replace(held_ctor[2], held_ctor[2] + (
     '    overlay_allocator.store(allocator, std::memory_order_release);\n'
-    '    ::Eden::Performance::graphics_memory_held.store(&GraphicsMemoryHeld, std::memory_order_release);\n'))
+    '    ::Eden::Performance::graphics_memory_held.store(&GraphicsMemoryHeld, std::memory_order_release);\n'
+    '    ::Eden::Performance::graphics_memory_used.store(&GraphicsMemoryUsed, std::memory_order_release);\n'))
 allocator = allocator.replace(held_ctor[1], (
     'MemoryAllocator::~MemoryAllocator() {\n'
     '    ::Eden::Performance::graphics_memory_held.store(nullptr, std::memory_order_release);\n'
+    '    ::Eden::Performance::graphics_memory_used.store(nullptr, std::memory_order_release);\n'
     '    overlay_allocator.store(nullptr, std::memory_order_release);\n'
     '}\n'))
 include = '#include "video_core/vulkan_common/vulkan_memory_allocator.h"\n'
@@ -1014,8 +1036,55 @@ if not path.exists() or path.read_text() != allocator:
 # tools/check-staging-buffers.py applies these replacements to the pinned source and runs the result.
 adapt('src/video_core/renderer_vulkan/vk_staging_buffer_pool.cpp', 'vulkan_staging_buffer_pool.cpp', [
     ('#include "video_core/vulkan_common/vulkan_wrapper.h"\n',
-     '#include "video_core/vulkan_common/vulkan_wrapper.h"\n#include <atomic>\n#include <cstdio>\n'
-     '#include "staging_buffers.h"\n'),
+     '#include "video_core/vulkan_common/vulkan_wrapper.h"\n#include <atomic>\n#include <cstdio>\n#include <thread>\n'
+     '#include "memory_budget.h"\n#include "staging_buffers.h"\n'),
+    # The idle kept buffers go when the pool is short or a request was refused (performance.cpp
+    # RelieveMemory, through memory_budget.h graphics_staging_release), on the pool's own thread:
+    # the frame's tick, which runs there, does it when asked.
+    ('StagingBufferPool::~StagingBufferPool() = default;\n',
+     'namespace {\n'
+     'std::atomic<StagingBufferPool*> staging_pool_alive{nullptr};\n'
+     'std::atomic<std::thread::id> staging_pool_thread{};\n'
+     'std::atomic<bool> staging_release_asked{false};\n'
+     'std::atomic<unsigned long long> staging_released_bytes{0};\n'
+     'unsigned long long ReleaseIdleStaging() {\n'
+     '    StagingBufferPool* const pool = staging_pool_alive.load(std::memory_order_acquire);\n'
+     '    if (pool == nullptr || staging_pool_thread.load(std::memory_order_relaxed) != std::this_thread::get_id()) {\n'
+     '        return 0;\n'
+     '    }\n'
+     '    const unsigned long long before = staging_released_bytes.load(std::memory_order_relaxed);\n'
+     '    staging_release_asked.store(true, std::memory_order_relaxed);\n'
+     '    pool->TickFrame();\n'
+     '    return staging_released_bytes.load(std::memory_order_relaxed) - before;\n'
+     '}\n'
+     '} // namespace\n\n'
+     'StagingBufferPool::~StagingBufferPool() {\n'
+     '    StagingBufferPool* self = this;\n'
+     '    if (staging_pool_alive.compare_exchange_strong(self, nullptr, std::memory_order_acq_rel)) {\n'
+     '        ::Eden::Performance::graphics_staging_release.store(nullptr, std::memory_order_release);\n'
+     '    }\n'
+     '}\n'),
+    ('void StagingBufferPool::TickFrame() {\n'
+     '    current_delete_level = (current_delete_level + 1) % NUM_LEVELS;\n',
+     'void StagingBufferPool::TickFrame() {\n'
+     '    staging_pool_thread.store(std::this_thread::get_id(), std::memory_order_relaxed);\n'
+     '    if (staging_pool_alive.exchange(this, std::memory_order_acq_rel) != this) {\n'
+     '        ::Eden::Performance::graphics_staging_release.store(&ReleaseIdleStaging, std::memory_order_release);\n'
+     '    }\n'
+     '    if (staging_release_asked.exchange(false, std::memory_order_relaxed)) {\n'
+     '        const auto idle = [this](const StagingBuffer& entry) {\n'
+     '            return !entry.deferred && scheduler.IsFree(entry.tick);\n'
+     '        };\n'
+     '        ::Eden::StagingBuffers::Released released;\n'
+     '        for (StagingBuffersCache* const cache : {&device_local_cache, &upload_cache, &download_cache}) {\n'
+     '            for (StagingBuffers& level : *cache) {\n'
+     '                released += ::Eden::StagingBuffers::ReleaseFrom(level, idle);\n'
+     '            }\n'
+     '        }\n'
+     '        staging_released_bytes.fetch_add(released.bytes, std::memory_order_relaxed);\n'
+     '        return;\n'
+     '    }\n'
+     '    current_delete_level = (current_delete_level + 1) % NUM_LEVELS;\n'),
     ('    const auto is_free = [this](const StagingBuffer& entry) {\n'
      '        return !entry.deferred && scheduler.IsFree(entry.tick);\n'
      '    };',
@@ -1303,7 +1372,72 @@ texture_partial = [
 ]
 adapt('src/video_core/texture_cache/texture_cache.h',
       'vulkan-cache/video_core/texture_cache/texture_cache.h', [
-    ('namespace VideoCommon {', '#include "performance.h"\n#include "texture_partial.h"\n#include "image_pages.h"\n#include "astc_policy.h"\n#include "texture_evictions.h"\n#include "common/scope_exit.h"\nnamespace Vulkan { class TextureCacheRuntime; }\n\nnamespace VideoCommon {'),
+    ('namespace VideoCommon {', '#include "performance.h"\n#include "texture_partial.h"\n#include "image_pages.h"\n#include "astc_policy.h"\n#include "texture_evictions.h"\n#include "staging_chunks.h"\n#include "common/scope_exit.h"\nnamespace Vulkan { class TextureCacheRuntime; }\n\nnamespace VideoCommon {'),
+    # A large image is laid out in the heap and staged in pieces of at most 64 MiB (headless/
+    # staging_chunks.h): Tears of the Kingdom's texture array of 121 layers asked for a staging
+    # buffer of 176 MiB each time it came back, and its v1.010.006 session ended on one.
+    ('    auto staging = runtime.UploadStagingBuffer(MapSizeBytes(image));\n'
+     '    UploadImageContents(image, staging);\n'
+     '    runtime.InsertUploadMemoryBarrier();\n',
+     '    ' + VULKAN_CACHE + '\n'
+     '        if (::Eden::StagingChunks::Chunked(MapSizeBytes(image)) &&\n'
+     '            False(image.flags & ImageFlagBits::AcceleratedUpload)) {\n'
+     '            Common::ScratchBuffer<u8> laid_out(MapSizeBytes(image));\n'
+     '            ::Eden::StagingChunks::Host<Runtime> host{std::span<u8>(laid_out.data(), MapSizeBytes(image)), &runtime};\n'
+     '            UploadImageContents(image, host);\n'
+     '            ::Eden::StagingChunks::Said(MapSizeBytes(image));\n'
+     '            runtime.InsertUploadMemoryBarrier();\n'
+     '            return;\n'
+     '        }\n'
+     '    }\n'
+     '    auto staging = runtime.UploadStagingBuffer(MapSizeBytes(image));\n'
+     '    UploadImageContents(image, staging);\n'
+     '    runtime.InsertUploadMemoryBarrier();\n'),
+    ('    if (True(image.flags & ImageFlagBits::AcceleratedUpload)) {\n'
+     '        gpu_memory->ReadBlock(gpu_addr, mapped_span.data(), mapped_span.size_bytes(),\n'
+     '                              VideoCommon::CacheType::NoTextureCache);\n'
+     '        const auto uploads = FullUploadSwizzles(image.info);\n'
+     '        runtime.AccelerateImageUpload(image, staging, FixSmallVectorADL(uploads), 0, 0);\n'
+     '        return;\n'
+     '    }\n',
+     '    if constexpr (!::Eden::StagingChunks::kIsHost<StagingBuffer>) {\n'
+     '    if (True(image.flags & ImageFlagBits::AcceleratedUpload)) {\n'
+     '        gpu_memory->ReadBlock(gpu_addr, mapped_span.data(), mapped_span.size_bytes(),\n'
+     '                              VideoCommon::CacheType::NoTextureCache);\n'
+     '        const auto uploads = FullUploadSwizzles(image.info);\n'
+     '        runtime.AccelerateImageUpload(image, staging, FixSmallVectorADL(uploads), 0, 0);\n'
+     '        return;\n'
+     '    }\n'
+     '    }\n'),
+    ('        ConvertImage(unswizzle_data_buffer, image.info, mapped_span, copies);\n'
+     '        image.UploadMemory(staging, copies);\n',
+     '        ConvertImage(unswizzle_data_buffer, image.info, mapped_span, copies);\n'
+     '        ::Eden::StagingChunks::UploadStaged(image, staging, copies);\n'),
+    ('        const auto copies = FixSmallVectorADL(UnswizzleImage(*gpu_memory, gpu_addr, image.info, swizzle_data, mapped_span));\n'
+     '        image.UploadMemory(staging, copies);\n',
+     '        const auto copies = FixSmallVectorADL(UnswizzleImage(*gpu_memory, gpu_addr, image.info, swizzle_data, mapped_span));\n'
+     '        ::Eden::StagingChunks::UploadStaged(image, staging, copies);\n'),
+    # An ASTC texture converted in the background is in the heap already: staged in pieces too.
+    ('        auto staging = runtime.UploadStagingBuffer(MapSizeBytes(image));\n'
+     '        std::memcpy(staging.mapped_span.data(), async_decode->decoded_data.data(),\n'
+     '                    async_decode->decoded_data.size());\n'
+     '        image.UploadMemory(staging, FixSmallVectorADL(async_decode->copies));\n',
+     '        bool staged_in_pieces = false;\n'
+     '        ' + VULKAN_CACHE + '\n'
+     '            if (::Eden::StagingChunks::Chunked(MapSizeBytes(image))) {\n'
+     '                ::Eden::StagingChunks::Host<Runtime> host{\n'
+     '                    std::span<u8>(async_decode->decoded_data.data(), async_decode->decoded_data.size()), &runtime};\n'
+     '                ::Eden::StagingChunks::UploadStaged(image, host, async_decode->copies);\n'
+     '                ::Eden::StagingChunks::Said(MapSizeBytes(image));\n'
+     '                staged_in_pieces = true;\n'
+     '            }\n'
+     '        }\n'
+     '        if (!staged_in_pieces) {\n'
+     '        auto staging = runtime.UploadStagingBuffer(MapSizeBytes(image));\n'
+     '        std::memcpy(staging.mapped_span.data(), async_decode->decoded_data.data(),\n'
+     '                    async_decode->decoded_data.size());\n'
+     '        image.UploadMemory(staging, FixSmallVectorADL(async_decode->copies));\n'
+     '        }\n'),
     # An ASTC texture kept as BC3 is converted in the background in a busy frame only, and in
     # place on a light screen (headless/astc_policy.h). The frame is counted where the texture
     # cache ends its own.
@@ -1382,7 +1516,58 @@ adapt('src/video_core/texture_cache/util.cpp', 'texture_util.cpp', [
 adapt('src/video_core/buffer_cache/buffer_cache.h',
       'vulkan-cache/video_core/buffer_cache/buffer_cache.h', [
     ('#include "video_core/buffer_cache/buffer_cache_base.h"',
-     '#include "video_core/buffer_cache/buffer_cache_base.h"\n#include "performance.h"'),
+     '#include "video_core/buffer_cache/buffer_cache_base.h"\n#include "performance.h"\n#include "staging_chunks.h"'),
+    # A buffer's upload or download of more than 64 MiB is staged in pieces (headless/staging_chunks.h).
+    ('    if constexpr (USE_MEMORY_MAPS) {\n'
+     '        auto upload_staging = runtime.UploadStagingBuffer(total_size_bytes);\n',
+     '    if constexpr (USE_MEMORY_MAPS) {\n'
+     '        if (::Eden::StagingChunks::Chunked(total_size_bytes)) {\n'
+     '            std::vector<BufferCopy> batch;\n'
+     '            ::Eden::StagingChunks::StageBuffer(\n'
+     '                copies.size(), [&](std::size_t i) { return std::pair<u64, u64>{copies[i].dst_offset, copies[i].size}; },\n'
+     '                [&](u64 bytes) { return runtime.UploadStagingBuffer(bytes); },\n'
+     '                [&](auto& staging, const std::vector<::Eden::StagingChunks::Piece>& pieces) {\n'
+     '                    batch.clear();\n'
+     '                    for (const auto& piece : pieces) {\n'
+     '                        device_memory.ReadBlockUnsafe(buffer.CpuAddr() + piece.at,\n'
+     '                                                      staging.mapped_span.data() + piece.staged, piece.size);\n'
+     '                        batch.push_back(BufferCopy{.src_offset = staging.offset + piece.staged,\n'
+     '                                                   .dst_offset = piece.at, .size = piece.size});\n'
+     '                    }\n'
+     '                    const std::span<BufferCopy> batch_span(batch.data(), batch.size());\n'
+     '                    runtime.CopyBuffer(buffer, staging.buffer, batch_span, true,\n'
+     '                                       runtime.CanReorderUpload(buffer, batch_span));\n'
+     '                });\n'
+     '            ::Eden::StagingChunks::Said(total_size_bytes);\n'
+     '            return;\n'
+     '        }\n'
+     '        auto upload_staging = runtime.UploadStagingBuffer(total_size_bytes);\n'),
+    ('    if constexpr (USE_MEMORY_MAPS) {\n'
+     '        auto download_staging = runtime.DownloadStagingBuffer(total_size_bytes);\n',
+     '    if constexpr (USE_MEMORY_MAPS) {\n'
+     '        if (::Eden::StagingChunks::Chunked(total_size_bytes)) {\n'
+     '            std::vector<BufferCopy> batch;\n'
+     '            ::Eden::StagingChunks::StageBuffer(\n'
+     '                copies.size(), [&](std::size_t i) { return std::pair<u64, u64>{copies[i].src_offset, copies[i].size}; },\n'
+     '                [&](u64 bytes) { return runtime.DownloadStagingBuffer(bytes); },\n'
+     '                [&](auto& staging, const std::vector<::Eden::StagingChunks::Piece>& pieces) {\n'
+     '                    batch.clear();\n'
+     '                    for (const auto& piece : pieces) {\n'
+     '                        batch.push_back(BufferCopy{.src_offset = piece.at,\n'
+     '                                                   .dst_offset = staging.offset + piece.staged, .size = piece.size});\n'
+     '                        buffer.MarkUsage(piece.at, piece.size);\n'
+     '                    }\n'
+     '                    runtime.CopyBuffer(staging.buffer, buffer, std::span<BufferCopy>(batch.data(), batch.size()), true);\n'
+     '                    runtime.Finish();\n'
+     '                    for (const auto& piece : pieces) {\n'
+     '                        device_memory.WriteBlockUnsafe(buffer.CpuAddr() + piece.at,\n'
+     '                                                       staging.mapped_span.data() + piece.staged, piece.size);\n'
+     '                    }\n'
+     '                });\n'
+     '            ::Eden::StagingChunks::Said(total_size_bytes);\n'
+     '            return;\n'
+     '        }\n'
+     '        auto download_staging = runtime.DownloadStagingBuffer(total_size_bytes);\n'),
     ('void BufferCache<P>::BindHostGeometryBuffers(bool is_indexed) {',
      'void BufferCache<P>::BindHostGeometryBuffers(bool is_indexed) {\n'
      '    long long since_geo = ::Eden::Performance::MarkStart();'),

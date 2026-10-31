@@ -512,9 +512,6 @@ inline std::atomic<unsigned long long (*)()> graphics_caches_free{nullptr};
 inline std::atomic<unsigned long long (*)()> graphics_memory_held{nullptr};
 // What of those blocks its images and buffers use, installed with it.
 inline std::atomic<unsigned long long (*)()> graphics_memory_used{nullptr};
-// Lets go of the staging buffers the GPU is done with and returns their bytes, installed by the
-// Vulkan staging pool; it does nothing on a thread other than the one the pool runs on.
-inline std::atomic<unsigned long long (*)()> graphics_staging_release{nullptr};
 inline std::atomic<bool> graphics_usage_from_pool{true};
 // GPU thread only (the collector). Textures the GPU wrote are kept until memory is short for the
 // caches too (memory_budget.h CachesShort), not the pool alone.
