@@ -45,7 +45,7 @@
      "name": "Check out the fix/heap-regression commit",
      "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
      "with": {
-      "ref": "d0c5a63812d7261390bc2b5cf432e3a4618f3fab",
+      "ref": "ca9937d194b0fb2dcf3a0c9af378cc605518d9da",
       "persist-credentials": false
      }
     },
