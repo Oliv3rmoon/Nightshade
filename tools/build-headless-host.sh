@@ -84,6 +84,8 @@ python3 -B "$root/tools/check-image-pages.py"
 python3 -B "$root/tools/check-guest-headroom.py"
 python3 -B "$root/tools/check-guest-span.py" "$scratch/source/src/core/memory.cpp"
 python3 -B "$root/tools/check-astc-policy.py"
+# An indexed storage image array within what the pipelines bind (Eden patch 12, issue 4).
+python3 -B "$root/tools/check-indexed-storage-images.py"
 python3 -B "$root/tools/check-guest-clock.py"
 python3 -B "$root/tools/check-guest-idle.py" "$scratch/source/src/core/hle/kernel/physical_core.cpp"
 python3 -B "$root/tools/check-ncz.py"
