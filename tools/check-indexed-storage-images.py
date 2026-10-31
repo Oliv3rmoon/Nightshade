@@ -13,10 +13,13 @@ own array, as an empty texture descriptor ("texture format=0").
 This applies tools/eden-patches in order to the files they touch (from the pinned archive, its
 hash checked against UPSTREAM.json), checks that the storage image cap reaches both descriptor
 kinds and that OpenGL's limit is its graphics pipelines' 8 images, then compiles the patched
-functions themselves: the pinned count for an array at the start of a constant buffer is 1024,
-the patch binds 8, shared between arrays and never more than the host allows. Where Boost's
-headers are found it also shows the pinned count overflowing OpenGL's static_vector with the
-message the console logged.
+functions themselves: the pinned count for an array at the start of a constant buffer is 1024;
+the patch gives each indexed array 8 elements (yuzu's count), so on Vulkan two arrays still reach
+element 7 each, and shares the room between arrays only where the host's limit, beside the
+shader's other storage images, cannot hold 8 for each (OpenGL's 8), never under one element: with
+OpenGL no shader of up to 7 other storage images and 8 arrays binds more than 8 images. Where
+Boost's headers are found it also shows the pinned count overflowing OpenGL's static_vector with
+the message the console logged.
 """
 from pathlib import Path
 import hashlib, json, os, re, shutil, subprocess, sys, tarfile, tempfile
@@ -61,10 +64,17 @@ with tempfile.TemporaryDirectory() as tmp:
     texture_pass = (tree / 'src/shader_recompiler/ir_opt/texture_pass.cpp').read_text()
     gl_cache = (tree / 'src/video_core/renderer_opengl/gl_shader_cache.cpp').read_text()
 
+    def function_text(signature, closing='\n}\n'):
+        start = texture_pass.index(signature)
+        return texture_pass[start:texture_pass.index(closing, start) + len(closing)]
+
     # The cap is computed once per shader and applied where both storage descriptor kinds are
     # added, before the index clamp uses the count.
-    assert ('    const u32 storage_dynamic_cap = DynamicStorageImageCap(host_info, '
-            'DynamicStorageImageArrayCount(to_replace));') in texture_pass
+    assert '    const u32 storage_dynamic_cap = DynamicStorageImageCap(host_info, to_replace);' in texture_pass
+    # Within the device's own limits: its storage images per set and its resources per stage.
+    assert ('(std::min)(host_info.max_descriptor_set_storage_images, host_info.max_per_stage_resources);'
+            in function_text('u32 DynamicStorageImageCap(const HostTranslateInfo& host_info, '
+                             'const TextureInstVector& to_replace) {'))
     storage_case = texture_pass.split('        case IR::Opcode::ImageWrite: {', 1)[1].split('        default:', 1)[0]
     capped = storage_case.index('                count = storage_dynamic_cap;')
     assert capped < storage_case.index('index = descriptors.Add(ImageBufferDescriptor{'), 'image buffers'
@@ -79,21 +89,43 @@ with tempfile.TemporaryDirectory() as tmp:
         assert value in (tree / name).read_text(), (name, value)
 
     # The patched functions, compiled as they are.
-    def function(signature):
-        start = texture_pass.index(signature)
-        end = texture_pass.index('\n}\n', start) + 3
-        return texture_pass[start:end]
+    function = function_text
     constants = re.findall(r'^constexpr u32 (?:DESCRIPTOR_SIZE|DESCRIPTOR_MAX_COUNT|MAX_DYNAMIC_STORAGE_IMAGES) = [^;]+;',
                            texture_pass, re.M)
     assert len(constants) == 3, constants
     code = '\n'.join([
-        '#include <algorithm>', '#include <bit>', '#include <cassert>', '#include <cstdint>',
+        '#include <algorithm>', '#include <bit>', '#include <cassert>', '#include <cstddef>', '#include <cstdint>',
+        '#include <utility>', '#include <vector>',
         'using u32 = std::uint32_t;',
-        'struct HostTranslateInfo { u32 max_descriptor_set_storage_images; };',
+        # Stand-ins for what the functions take from Eden: the host's limits, the instructions found.
+        'namespace boost::container { template <typename T, std::size_t N> using small_vector = std::vector<T>; }',
+        'struct HostTranslateInfo { u32 max_descriptor_set_storage_images; u32 max_per_stage_resources; };',
+        'struct ConstBufferAddr { u32 index; u32 offset; u32 count; };',
+        'struct Inst { bool storage; };',
+        'const Inst& IndexedInstruction(const Inst& inst) { return inst; }',
+        'bool IsStorageImageOpcode(const Inst& inst) { return inst.storage; }',
+        'struct TextureInst { ConstBufferAddr cbuf; Inst* inst; };',
+        'using TextureInstVector = std::vector<TextureInst>;',
         *constants,
         function('u32 DynamicDescriptorCount(u32 base_offset, u32 size_shift, u32 max_descriptors) {'),
-        function('u32 DynamicStorageImageCap(const HostTranslateInfo& host_info, u32 dynamic_arrays) {'),
+        function_text('struct StorageImageUse {', '\n};\n'),
+        function('StorageImageUse StorageImageUses(const TextureInstVector& to_replace) {'),
+        function('u32 StorageImageArrayCap(u32 host_limit, StorageImageUse use) {'),
+        function('u32 DynamicStorageImageCap(const HostTranslateInfo& host_info, const TextureInstVector& to_replace) {'),
         r'''
+Inst storage{true}, sampled{false};
+// `statics` storage images by one handle each, `arrays` indexed arrays (each read and written), and
+// a sampled array beside them that does not count.
+TextureInstVector Shader(u32 statics, u32 arrays) {
+    TextureInstVector found;
+    for (u32 i = 0; i < statics; ++i) found.push_back({{1, 0x10 + 8 * i, 1}, &storage});
+    for (u32 i = 0; i < arrays; ++i) {
+        found.push_back({{2, 0x100 * i, 1024}, &storage});
+        found.push_back({{2, 0x100 * i, 1024}, &storage});
+    }
+    found.push_back({{3, 0, 1024}, &sampled});
+    return found;
+}
 int main() {
     // An array whose first handle is at the start of the constant buffer, 8 bytes a handle, on a
     // host that reports Eden's default limit (OpenGL, and RADV's are larger still): 1024 elements.
@@ -101,18 +133,35 @@ int main() {
     assert(pinned == 1024);
     // More than OpenGL's compute pipeline binds (64 textures + 16 images), which the console hit.
     assert(pinned > 64 + 16);
-    const HostTranslateInfo vulkan{8388606}, opengl{8}, small{4};
-    // Patched: 8 elements on either renderer, within OpenGL's 8 graphics and 16 compute images.
-    assert(DynamicStorageImageCap(vulkan, 1) == 8);
-    assert(DynamicStorageImageCap(opengl, 1) == 8);
-    assert(std::min(pinned, DynamicStorageImageCap(opengl, 1)) <= 8);
-    // Shared between arrays, never below one element, never above the host's own limit.
-    assert(DynamicStorageImageCap(vulkan, 2) == 4);
-    assert(DynamicStorageImageCap(vulkan, 3) == 2);
-    assert(DynamicStorageImageCap(vulkan, 16) == 1);
-    assert(DynamicStorageImageCap(small, 1) == 4);
-    assert(DynamicStorageImageCap(HostTranslateInfo{0}, 1) == 1);
-    assert(DynamicStorageImageCap(vulkan, 0) == 8);
+    // The same array read and written is one; sampled arrays are not storage images.
+    assert(StorageImageUses(Shader(3, 2)).static_images == 3 && StorageImageUses(Shader(3, 2)).dynamic_arrays == 2);
+    const HostTranslateInfo vulkan{8388606, 8388606}, opengl{8, 1024};
+    // Vulkan: every indexed array gets 8, however many there are: two arrays still reach element 5.
+    for (u32 arrays = 1; arrays <= 16; ++arrays) {
+        assert(DynamicStorageImageCap(vulkan, Shader(0, arrays)) == 8);
+        assert(DynamicStorageImageCap(vulkan, Shader(4, arrays)) == 8);
+    }
+    assert(5 < DynamicStorageImageCap(vulkan, Shader(0, 2)));
+    // The patched count for Fighting Force Collection's array: 8, not 1024, on either renderer.
+    assert(std::min(pinned, DynamicStorageImageCap(vulkan, Shader(0, 1))) == 8);
+    assert(std::min(pinned, DynamicStorageImageCap(opengl, Shader(0, 1))) == 8);
+    // OpenGL: the room its 8 images leave beside the shader's others is shared.
+    assert(DynamicStorageImageCap(opengl, Shader(2, 1)) == 6);
+    assert(DynamicStorageImageCap(opengl, Shader(0, 2)) == 4);
+    assert(DynamicStorageImageCap(opengl, Shader(0, 3)) == 2);
+    assert(DynamicStorageImageCap(opengl, Shader(0, 9)) == 1);
+    assert(DynamicStorageImageCap(opengl, Shader(8, 1)) == 1);
+    // And it holds: with up to 7 other storage images and 8 arrays a shader binds at most 8 images,
+    // within a graphics pipeline's 8 and a compute pipeline's 16 (beside its 64 textures, the 80
+    // views the console overflowed).
+    for (u32 statics = 0; statics <= 7; ++statics)
+        for (u32 arrays = 1; statics + arrays <= 8; ++arrays)
+            assert(statics + arrays * DynamicStorageImageCap(opengl, Shader(statics, arrays)) <= 8);
+    // A host that allows fewer, by its storage images or its resources per stage; never under one.
+    assert(StorageImageArrayCap(4, {0, 1}) == 4);
+    assert(DynamicStorageImageCap(HostTranslateInfo{8388606, 6}, Shader(0, 1)) == 6);
+    assert(StorageImageArrayCap(0, {0, 1}) == 1);
+    assert(StorageImageArrayCap(8, {0, 0}) == 8);
     return 0;
 }
 '''])
@@ -154,5 +203,6 @@ int main() {
         print(f'Indexed storage images: the pinned 1024 elements overflow OpenGL\'s views ({shown})')
     else:
         print(f'Indexed storage images: no usable Boost headers here ({boost}); the static_vector overflow was not shown')
-print('Indexed storage images: PASS patch 12 applies with the set, binds at most 8 elements on either renderer '
-      '(shared between arrays, within the host limit), and OpenGL\'s limit is its 8 graphics images')
+print('Indexed storage images: PASS patch 12 applies with the set; each indexed array gets 8 elements on Vulkan '
+      'however many there are; OpenGL\'s 8 images are shared between arrays beside the shader\'s others, never '
+      'more than 8 in all; never under one element or over the host\'s limits')

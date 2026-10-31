@@ -11,7 +11,7 @@
  #include "common/settings.h"
  #include "shader_recompiler/environment.h"
  #include "shader_recompiler/frontend/ir/basic_block.h"
-@@ -197,8 +199,40 @@
+@@ -197,8 +199,58 @@
          }
      }
      return count;
@@ -24,43 +24,61 @@
 +// handles (empty texture descriptors), and OpenGL keeps a pipeline's views in fixed arrays (64
 +// textures and 16 images in compute, 8 in graphics), so a longer array ended the session with
 +// boost::container::bad_alloc or wrote past them. The shader keeps its index within the array
-+// (UMin below), so a shorter array clamps the access instead. At most MAX_DYNAMIC_STORAGE_IMAGES
-+// elements in all, shared between such arrays: what yuzu bound for every indexed descriptor, and
-+// OpenGL's graphics limit; fewer when the host allows fewer.
++// (UMin below), so a shorter array clamps the access instead.
++// Each such array gets MAX_DYNAMIC_STORAGE_IMAGES elements, what yuzu bound for every indexed
++// descriptor. Only where the host's storage image limit cannot hold that many for every array
++// beside the shader's other storage images (OpenGL reports 8) is the room left shared between the
++// arrays, never under one element each.
 +constexpr u32 MAX_DYNAMIC_STORAGE_IMAGES = 8;
 +
-+u32 DynamicStorageImageArrayCount(const TextureInstVector& to_replace) {
-+    boost::container::small_vector<std::pair<u32, u32>, 4> arrays;
++struct StorageImageUse {
++    u32 static_images{};  // storage images the shader names by one handle each
++    u32 dynamic_arrays{}; // storage image arrays it indexes
++};
++
++StorageImageUse StorageImageUses(const TextureInstVector& to_replace) {
++    boost::container::small_vector<std::pair<u32, u32>, 8> statics, arrays;
 +    for (const TextureInst& inst : to_replace) {
-+        if (inst.cbuf.count <= 1 || !IsStorageImageOpcode(IndexedInstruction(*inst.inst))) {
++        if (!IsStorageImageOpcode(IndexedInstruction(*inst.inst))) {
 +            continue;
 +        }
-+        const std::pair<u32, u32> array{inst.cbuf.index, inst.cbuf.offset};
-+        if (std::ranges::find(arrays, array) == arrays.end()) {
-+            arrays.push_back(array);
++        auto& seen = inst.cbuf.count > 1 ? arrays : statics;
++        const std::pair<u32, u32> handle{inst.cbuf.index, inst.cbuf.offset};
++        if (std::ranges::find(seen, handle) == seen.end()) {
++            seen.push_back(handle);
 +        }
 +    }
-+    return static_cast<u32>(arrays.size());
++    return {static_cast<u32>(statics.size()), static_cast<u32>(arrays.size())};
++}
++
++// host_limit: the storage images a stage can bind.
++u32 StorageImageArrayCap(u32 host_limit, StorageImageUse use) {
++    if (use.dynamic_arrays == 0) {
++        return MAX_DYNAMIC_STORAGE_IMAGES;
++    }
++    const u32 room = host_limit > use.static_images ? host_limit - use.static_images : 0;
++    return (std::max)(1U, (std::min)(MAX_DYNAMIC_STORAGE_IMAGES, room / use.dynamic_arrays));
  }
  
-+u32 DynamicStorageImageCap(const HostTranslateInfo& host_info, u32 dynamic_arrays) {
-+    auto const limit = (std::max)(1U, (std::min)(MAX_DYNAMIC_STORAGE_IMAGES,
-+                                                 host_info.max_descriptor_set_storage_images));
-+    return (std::max)(1U, limit / (std::max)(1U, dynamic_arrays));
++u32 DynamicStorageImageCap(const HostTranslateInfo& host_info, const TextureInstVector& to_replace) {
++    // A Vulkan device's own limits (large on RADV), or OpenGL's 8 (gl_shader_cache.cpp).
++    const u32 host_limit =
++        (std::min)(host_info.max_descriptor_set_storage_images, host_info.max_per_stage_resources);
++    return StorageImageArrayCap(host_limit, StorageImageUses(to_replace));
 +}
 +
  bool IsBindless(const IR::Inst& inst) {
      switch (inst.GetOpcode()) {
      case IR::Opcode::BindlessImageSampleImplicitLod:
-@@ -690,6 +724,7 @@
+@@ -690,6 +742,7 @@
          program.info.image_descriptors,
      };
      const u32 sampled_dynamic_cap = DynamicSampledTextureCap(program.info, host_info, DynamicSampledTextureArrayCount(to_replace));
-+    const u32 storage_dynamic_cap = DynamicStorageImageCap(host_info, DynamicStorageImageArrayCount(to_replace));
++    const u32 storage_dynamic_cap = DynamicStorageImageCap(host_info, to_replace);
      bool has_last_is_integer{false};
      u32 last_cbuf_index{};
      u32 last_cbuf_offset{};
-@@ -770,6 +805,11 @@
+@@ -770,6 +823,11 @@
              const bool is_written{inst->GetOpcode() != IR::Opcode::ImageRead};
              const bool is_read{inst->GetOpcode() != IR::Opcode::ImageWrite};
              const bool is_integer{is_texture_pixel_format_integer(cbuf)};
