@@ -823,8 +823,11 @@ std::size_t TrimHeap(const char* why, bool holes) {
 
 #ifdef PS5_NATIVE
 // The pool's free memory, how many runs it is in, and its three largest runs (bytes), for the
-// pressure line. Walks the allocated regions (sceKernelDirectMemoryQuery); false when it cannot.
-static bool PoolRuns(unsigned long long* free_bytes, unsigned* runs, unsigned long long largest[3]) {
+// pressure line. Walks the allocated regions (sceKernelDirectMemoryQuery, a system call each), at
+// most kPoolRunsWalk of them: *read_all says whether it got to the end of the pool (if not, the
+// free memory and runs are those below where it stopped). False when it cannot read the pool.
+static constexpr unsigned kPoolRunsWalk = 1024;
+static bool PoolRuns(unsigned long long* free_bytes, unsigned* runs, unsigned long long largest[3], bool* read_all) {
     const std::int64_t total = sceKernelGetDirectMemorySize();
     if (total <= 0) return false;
     std::int64_t offset = 0, taken = 0;
@@ -847,17 +850,26 @@ static bool PoolRuns(unsigned long long* free_bytes, unsigned* runs, unsigned lo
         }
     };
     DirectMemoryRegion region{};
-    while (offset < total && regions < 8192 &&
-           sceKernelDirectMemoryQuery(offset, 1, &region, sizeof(region)) == 0 && region.end > offset &&
-           region.start >= 0 && region.end <= total && region.start < region.end) {
+    bool ended = false;
+    while (offset < total && regions < kPoolRunsWalk) {
+        if (sceKernelDirectMemoryQuery(offset, 1, &region, sizeof(region)) != 0 || region.end <= offset ||
+            region.start < 0 || region.end > total || region.start >= region.end) {
+            ended = true;  // nothing allocated past here
+            break;
+        }
         run(region.start - offset);
         taken += region.end - region.start;
         offset = region.end;
         ++regions;
     }
     if (regions == 0) return false;
-    run(total - offset);
-    *free_bytes = static_cast<unsigned long long>(total - taken);
+    *read_all = ended || offset >= total;
+    if (*read_all) {
+        run(total - offset);
+        *free_bytes = static_cast<unsigned long long>(total - taken);
+    } else {
+        *free_bytes = static_cast<unsigned long long>(offset - taken);
+    }
     return true;
 }
 #endif
@@ -866,26 +878,28 @@ unsigned long long RelieveMemory(const char* why, bool urgent) {
     unsigned long long staging = 0;
     if (const auto release = graphics_staging_release.load(std::memory_order_acquire)) staging = release();
     const std::size_t heap = TrimHeap(why, urgent);
-    const bool always = urgent;
-    // Said when it is asked to, when it gave something back (once a second at most), and every 30 s
-    // while memory stays short.
-    static std::atomic<long long> said_ns{0};
+    // Said when a shortage starts (no relief in the 10 s before), once a minute while it lasts, and
+    // when memory is wanted at once (every 10 s at most): each line reads the pool's regions, a
+    // system call each, on the GPU thread, and a shortage asks for relief every 2 s.
+    static std::atomic<long long> said_ns{0}, relieved_ns{0};
     const long long now = NowNs(), since = now - said_ns.load(std::memory_order_relaxed);
-    if (always || (staging + heap != 0 && since >= 1'000'000'000) || since >= 30'000'000'000) {
+    const long long quiet = now - relieved_ns.exchange(now, std::memory_order_relaxed);
+    if ((urgent && since >= 10'000'000'000) || quiet >= 10'000'000'000 || since >= 60'000'000'000) {
         said_ns.store(now, std::memory_order_relaxed);
         const auto held_hook = graphics_memory_held.load(std::memory_order_acquire);
         const auto used_hook = graphics_memory_used.load(std::memory_order_acquire);
         const auto free_hook = graphics_memory_free.load(std::memory_order_relaxed);
         unsigned long long free_bytes = 0, largest[3] = {0, 0, 0};
         unsigned runs = 0;
-        bool walked = false;
+        bool walked = false, read_all = true;
 #ifdef PS5_NATIVE
-        walked = PoolRuns(&free_bytes, &runs, largest);
+        walked = PoolRuns(&free_bytes, &runs, largest, &read_all);
 #endif
-        char pool[160] = "";
+        char pool[192] = "";
         if (walked)
-            std::snprintf(pool, sizeof(pool), "the pool has %llu MiB free in %u runs, the largest %llu, %llu and %llu MiB",
-                          free_bytes >> 20, runs, largest[0] >> 20, largest[1] >> 20, largest[2] >> 20);
+            std::snprintf(pool, sizeof(pool), "the pool has %llu MiB free in %u runs%s, the largest %llu, %llu and %llu MiB",
+                          free_bytes >> 20, runs, read_all ? "" : " below its first 1024 regions",
+                          largest[0] >> 20, largest[1] >> 20, largest[2] >> 20);
         else
             std::snprintf(pool, sizeof(pool), "the pool's largest free block is %llu MiB",
                           free_hook ? free_hook() >> 20 : 0ULL);
@@ -899,6 +913,9 @@ unsigned long long RelieveMemory(const char* why, bool urgent) {
 }
 
 void ReportSessionMemory(const char* phase, unsigned session) {
+    // The caches' floor is a session's (memory_budget.h CachesFloor): a game's largest image is not
+    // the next game's.
+    if (std::strcmp(phase, "start") == 0) graphics_largest_image.store(0, std::memory_order_relaxed);
     unsigned large_blocks = 0;
     const std::size_t large = eden_heap_large_held ? eden_heap_large_held(&large_blocks) : 0;
     std::size_t table_span = 0, table_held = 0;

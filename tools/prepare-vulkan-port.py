@@ -1014,7 +1014,9 @@ allocator = allocator.replace(held_ctor[0], (
 allocator = allocator.replace(held_ctor[2], held_ctor[2] + (
     '    overlay_allocator.store(allocator, std::memory_order_release);\n'
     '    ::Eden::Performance::graphics_memory_held.store(&GraphicsMemoryHeld, std::memory_order_release);\n'
-    '    ::Eden::Performance::graphics_memory_used.store(&GraphicsMemoryUsed, std::memory_order_release);\n'))
+    '    ::Eden::Performance::graphics_memory_used.store(&GraphicsMemoryUsed, std::memory_order_release);\n'
+    # A session's own: the caches' floor is twice the largest image of this session's graphics.
+    '    ::Eden::Performance::graphics_largest_image.store(0, std::memory_order_relaxed);\n'))
 allocator = allocator.replace(held_ctor[1], (
     'MemoryAllocator::~MemoryAllocator() {\n'
     '    ::Eden::Performance::graphics_memory_held.store(nullptr, std::memory_order_release);\n'

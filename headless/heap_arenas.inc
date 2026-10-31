@@ -725,14 +725,22 @@ static int eden_heap_holes_fill(int owner, size_t need) {
 
 /* Every hole of the spaces filled again, before the heap grows: a hole keeps its run from joining
  * the blocks freed beside it, and a heap that grew past its holes would keep both. A hole the
- * system has no memory for stays (a smaller one may still be filled). Returns the holes filled.
- * The growth lock is held. */
+ * system has no memory for stays, and so does every hole as large: only a smaller one is tried
+ * again in this growth (each refused commit searched the pool, src/direct_memory.c). Returns the
+ * holes filled. The growth lock is held. */
 static unsigned eden_heap_holes_fill_spaces(void) {
   unsigned filled = 0;
+  uintptr_t refused = (uintptr_t)-1; /* the smallest hole the system had no memory for */
   for (unsigned index = eden_heap_hole_count; index-- > 0;) {
     if (index >= eden_heap_hole_count || eden_heap_holes[index].lost || eden_heap_holes[index].owner < 0)
       continue;
-    filled += (unsigned)eden_heap_hole_fill(index);
+    const uintptr_t size = eden_heap_holes[index].end - eden_heap_holes[index].begin;
+    if (size >= refused)
+      continue;
+    if (eden_heap_hole_fill(index))
+      ++filled;
+    else
+      refused = size;
   }
   return filled;
 }
