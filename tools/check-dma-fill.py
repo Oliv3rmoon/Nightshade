@@ -58,15 +58,24 @@ with tempfile.TemporaryDirectory(prefix='eden-dma-fill-') as folder:
     launch = dma.split('void MaxwellDMA::Launch() {', 1)[1].split('\n}\n', 1)[0]
     assert launch.index('LaunchConstantFill()') < launch.index('if (launch.multi_line_enable) {')
     body = dma.split('bool MaxwellDMA::LaunchConstantFill() {', 1)[1].split('\n}\n', 1)[0]
-    assert 'rasterizer->AccelerateInlineToMemory(at, piece,' in body
     assert 'accelerate.BufferClear(dst, line_bytes / 4, *word)' in body
     assert 'u64{regs.line_length_in} * fill->element_size' in body
-    # DMAClear asks whether a cached buffer holds the whole cleared range, in bytes.
+    # Otherwise: partial pages (and fills that keep bytes) through the inline-to-memory path,
+    # whole pages written and then invalidated in every cache.
+    assert body.count('rasterizer->AccelerateInlineToMemory(') == 1
+    assert 'const auto [whole_begin, whole_end] = WholePages(dst, end, PIECE);' in body
+    assert body.index('fill_inline(dst, whole_begin);') < body.index(
+        'memory_manager.InvalidateRegion(whole_begin, whole_end - whole_begin);') < body.index(
+        'fill_inline(whole_end, end);')
+    assert 'EDEN_DMA_FILL elements=%u' in dma
+    # DMAClear decides as upstream does (a clear it refuses is the fill's to finish, without one
+    # buffer made of the whole range); it only says when its quarter-sized check refused one.
     cache = (tree / 'src/video_core/buffer_cache/buffer_cache.h').read_text()
     clear = cache.split('bool BufferCache<P>::DMAClear(', 1)[1].split('\n}\n', 1)[0]
-    assert 'IsRegionRegistered(*cpu_dst_address, size)' in clear
-    assert clear.index('const size_t size = amount * sizeof(u32);') < clear.index('IsRegionRegistered(')
-    assert 'EDEN_DMA_CLEAR_RANGE bytes=%zu' in clear and 'EDEN_DMA_FILL elements=%u' in dma
+    assert 'const bool dest_dirty = IsRegionRegistered(*cpu_dst_address, amount);' in clear
+    assert clear.index('IsRegionRegistered(*cpu_dst_address, amount * sizeof(u32))') < clear.index(
+        'return false;\n    }\n\n    const size_t size = amount * sizeof(u32);')
+    assert 'EDEN_DMA_CLEAR_RANGE bytes=%llu' in clear
     # The CPU's indirect draws: the limit is 2^28 vertices (patch 11's check, patch 12's limit).
     macro = (tree / 'src/video_core/macro.cpp').read_text()
     assert 'return u64(count) * u64(instance_count) > (u64(1) << 28);' in macro
@@ -80,7 +89,9 @@ with tempfile.TemporaryDirectory(prefix='eden-dma-fill-') as folder:
 #include <cstring>
 #include <numeric>
 #include <optional>
+#include <utility>
 #include <vector>
+#include <algorithm>
 using u8 = std::uint8_t; using u32 = std::uint32_t; using u64 = std::uint64_t;
 namespace {
 ''' + helper + r'''
@@ -144,6 +155,13 @@ int main() {
     // A component from the source is a remapped copy: not a fill.
     assert(!MakeConstantFill(4, 2, {A, 0, 0, 0}, 0, 0));
     assert(!MakeConstantFill(4, 1, {2, 0, 0, 0}, 0, 0));
+    // The whole pages of a range: none inside one page, the ends aligned inward otherwise.
+    using Pages = std::pair<u64, u64>;
+    assert((WholePages(0x1004, 0x1008, 0x1000) == Pages{0x1008, 0x1008}));
+    assert((WholePages(0x1000, 0x2000, 0x1000) == Pages{0x1000, 0x2000}));
+    assert((WholePages(0x1004, 0x4010, 0x1000) == Pages{0x2000, 0x4000}));
+    assert((WholePages(0x1ff0, 0x2010, 0x1000) == Pages{0x2000, 0x2000}));
+    assert((WholePages(0x2000, 0x2010, 0x1000) == Pages{0x2000, 0x2000}));
     std::puts("fill elements PASS");
 }
 ''')
