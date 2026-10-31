@@ -57,6 +57,7 @@ cache_code = r"""
 #include <cassert>
 #include <cstdio>
 #include "astc_policy.h"
+#include "memory_budget.h"
 #include "common/scope_exit.h"
 namespace Eden::Performance {
 long long now = 1;
@@ -101,6 +102,13 @@ int main() {
     RefreshContents(picture, 1, 0);
     RefreshContents(array, 3, 0);
     assert(in_place == 4 && queued == 3);
+    // A light frame again, with 120 MiB of conversions in flight: the next goes in place
+    // (memory_budget.h LightBackgroundRoom), unlogged at 0 ms.
+    Frame();
+    Frame();
+    Eden::Performance::astc_background_bytes = 120ull << 20;
+    RefreshContents(atlas, 2, 0);
+    assert(in_place == 5 && queued == 3);
     return 0;
 }
 """
@@ -121,7 +129,7 @@ with tempfile.TemporaryDirectory() as tmp:
         refresh = cache.split('void TextureCache<P>::RefreshContents(Image& image, ImageId image_id) {', 1)[1]
         refresh = refresh.split('\ntemplate <class P>', 1)[0]
         begin = refresh.index('    if (True(image.flags & ImageFlagBits::AsynchronousDecode) && '
-                              '::Eden::AstcPolicy::InBackground(MapSizeBytes(image))) {')
+                              '::Eden::AstcPolicy::InBackground(MapSizeBytes(image))')
         end = refresh.index('    };\n', begin) + len('    };\n')
         snippet = refresh[begin:end]
         # The conversion in place it times is the upload that follows it.
