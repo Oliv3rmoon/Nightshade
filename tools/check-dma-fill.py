@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""The copy engine's constant fill (Eden patch 12, tools/eden-patches/12-dma-constant-fill.diff).
+"""The copy engine's constant fill (Eden patch 13, tools/eden-patches/13-dma-constant-fill.diff).
 
 A game clears memory with the copy engine: a remapped copy whose components are constants. Eden
 wrote line_length_in * component_size bytes of it, an element of one component, to guest memory
@@ -30,7 +30,7 @@ root = Path(__file__).resolve().parents[1]
 # EDEN_ARCHIVE: another copy of the same pinned archive (a checkout without make deps).
 archive = Path(os.environ.get('EDEN_ARCHIVE', root / '.deps/eden-67bada77.tar.gz'))
 patches = sorted((root / 'tools/eden-patches').glob('*.diff'))
-fill_patch = root / 'tools/eden-patches/12-dma-constant-fill.diff'
+fill_patch = root / 'tools/eden-patches/13-dma-constant-fill.diff'
 assert fill_patch in patches, fill_patch
 build = Path(sys.argv[1]) if len(sys.argv) > 1 else None
 
@@ -76,7 +76,7 @@ with tempfile.TemporaryDirectory(prefix='eden-dma-fill-') as folder:
     assert clear.index('IsRegionRegistered(*cpu_dst_address, amount * sizeof(u32))') < clear.index(
         'return false;\n    }\n\n    const size_t size = amount * sizeof(u32);')
     assert 'EDEN_DMA_CLEAR_RANGE bytes=%llu' in clear
-    # The CPU's indirect draws: the limit is 2^28 vertices (patch 11's check, patch 12's limit).
+    # The CPU's indirect draws: the limit is 2^28 vertices (patch 11's check, patch 13's limit).
     macro = (tree / 'src/video_core/macro.cpp').read_text()
     assert 'return u64(count) * u64(instance_count) > (u64(1) << 28);' in macro
 

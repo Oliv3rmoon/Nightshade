@@ -31,7 +31,7 @@ with archive.open('rb') as data:
 assert digest.hexdigest() == pinned, f'{archive} is not the pinned Eden archive'
 
 patches = sorted((root / 'tools/eden-patches').glob('*.diff'))
-assert patches[-1].name == '12-indexed-storage-images.diff', [p.name for p in patches]
+assert root / 'tools/eden-patches/12-indexed-storage-images.diff' in patches, [p.name for p in patches]
 touched = sorted({line[6:] for p in patches for line in p.read_text().splitlines()
                   if line.startswith('+++ b/')})
 # The image limits of OpenGL's pipelines, as pinned (no patch changes them).
