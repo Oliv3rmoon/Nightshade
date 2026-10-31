@@ -1025,6 +1025,23 @@ include = '#include "video_core/vulkan_common/vulkan_memory_allocator.h"\n'
 if allocator.count(include) != 1:
     raise RuntimeError('Pinned Vulkan allocator changed: its own include')
 allocator = allocator.replace(include, include + '#include <atomic>\n#include <cstdio>\n#include "performance.h"\n')
+# An image of 128 MiB or more has memory of its own, one run of the pool: the 1st, 2nd, 4th ... in
+# stderr.log, with its size, so a log names the image a session's memory went to (Tears of the
+# Kingdom's texture array of 121 layers: 161 MiB as BC3, 645 MiB decoded).
+image_log = '    // Log GPU memory allocation for images\n'
+if allocator.count(image_log) != 1:
+    raise RuntimeError('Pinned Vulkan allocator changed: the image log')
+allocator = allocator.replace(image_log, (
+    '    if (alloc_info.size >= (VkDeviceSize{128} << 20)) {\n'
+    '        static std::atomic<unsigned long long> large_images{0};\n'
+    '        const auto times = large_images.fetch_add(1, std::memory_order_relaxed) + 1;\n'
+    '        if ((times & (times - 1)) == 0) {\n'
+    '            std::fprintf(stderr, "[ProsperoEden] graphics memory: an image of %llu MiB (%ux%ux%u, %u layers, %u levels, "\n'
+    '                         "format %d) has memory of its own (%llu so far)\\n",\n'
+    '                         static_cast<unsigned long long>(alloc_info.size >> 20), ci.extent.width, ci.extent.height,\n'
+    '                         ci.extent.depth, ci.arrayLayers, ci.mipLevels, int(ci.format), times);\n'
+    '        }\n'
+    '    }\n') + image_log)
 path = output / 'vulkan_memory_allocator.cpp'
 if not path.exists() or path.read_text() != allocator:
     path.write_text(allocator)
