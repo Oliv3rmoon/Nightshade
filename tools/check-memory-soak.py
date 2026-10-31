@@ -17,14 +17,14 @@ rules (headless/staging_chunks.h, headless/memory_budget.h). Then it runs:
   out-of-memory crash 83 minutes in, v1.010.006's staging refusal and both of issue #2's logs).
 
 In each, no allocation may fail and the pool's largest free block must stay above the largest
-request (the menu's array, 161 MiB, which has memory of its own). The model is harsher than the
-logs (bursts of 1.2 GB every 20 minutes), and its margin is thin: the worst block in the three
-hours is 164 MiB. Run longer (SOAK_HOURS=6), this tree fails at 4 h 32 min, v1.010.006 at
-2 h 20 min. The heap must start near
+request (the menu's array, 161 MiB, which has memory of its own). The synthetic session runs with
+five seeds and must pass with every one. The model is harsher than the logs (bursts of 1.2 GB
+every 20 minutes); run longer (SOAK_HOURS=6), this tree failed with one of three seeds (3 h 20 min)
+and v1.010.006 with all three (2 h 40 min to 4 h 30 min). The heap must start near
 v1.010.004's 2.56 GB. As a control, the synthetic session runs again with v1.010.006's graphics
 rules (whole transfers, the pool's free block alone for the caches, nothing given back on a
-refusal) and v1.010.006's heap (tools/memory-soak/heap-v1.010.006.inc); it must fail, or the
-simulation does not tell the two apart. With --heap this tree's heap source is another file
+refusal) and v1.010.006's heap (tools/memory-soak/heap-v1.010.006.inc); it must fail with one seed
+at least (it fails with three of five), or the simulation does not tell the two apart. With --heap this tree's heap source is another file
 (v1.010.006's, to see the heap's own bound fail).
 
 The simulator reads only the CSV traces in the tree; its reader bounds every line and value. It
@@ -90,8 +90,10 @@ def watched(command, timeout):
     return process.returncode, output
 
 
-cases = [('fixed', None)] + [('fixed', path) for path in sorted((root / 'tools/memory-soak/traces').glob('*.csv'))] + \
-        [('control', None)]
+SEEDS = (20261030, 1, 2, 3, 4)
+cases = [('fixed', None, seed) for seed in SEEDS] + \
+        [('fixed', path, SEEDS[0]) for path in sorted((root / 'tools/memory-soak/traces').glob('*.csv'))] + \
+        [('control', None, seed) for seed in SEEDS]
 with tempfile.TemporaryDirectory(prefix='eden-soak-') as tmp:
     tmp = Path(tmp)
     cc = shutil.which('clang-18') or shutil.which('clang') or 'cc'
@@ -109,9 +111,11 @@ with tempfile.TemporaryDirectory(prefix='eden-soak-') as tmp:
                        check=True)
     results = {}
     failed = []
-    for mode, trace in cases:
-        name = f'{mode} {trace.name if trace else "synthetic"}'
+    control_failed = 0
+    for mode, trace, seed in cases:
+        name = f'{mode} {trace.name if trace else "synthetic"} seed {seed}'
         binary = tmp / ('soak' if mode == 'fixed' else 'soak-v1.010.006')
+        os.environ['SOAK_SEED'] = str(seed)
         code, output = watched([str(binary), mode] + ([str(trace)] if trace else []), timeout=1200)
         lines = output.splitlines()
         summary = next((line for line in reversed(lines) if line.startswith('SUMMARY')), '')
@@ -120,11 +124,15 @@ with tempfile.TemporaryDirectory(prefix='eden-soak-') as tmp:
             sys.stdout.write('\n'.join(lines) + '\n')
         sys.stdout.write(summary + '\n\n')
         results[name] = (code, summary)
-        expected = 0 if mode == 'fixed' else 1
-        if code != expected:
-            failed.append(f'{name}: exit {code}, expected {expected}')
-            if mode == 'fixed':
-                sys.stdout.write('\n'.join(lines[-40:]) + '\n')
+        if mode == 'control':
+            # v1.010.006's rules must fail in at least one of the seeds' three hours (3 of 5 here).
+            control_failed += code == 1
+            if code not in (0, 1):
+                failed.append(f'{name}: exit {code}')
+            continue
+        if code != 0:
+            failed.append(f'{name}: exit {code}, expected 0')
+            sys.stdout.write('\n'.join(lines[-40:]) + '\n')
             if not args.keep_going:
                 break
         # The heap at the start of a TOTK session, near v1.010.004's 2560 MiB (v1.010.006: 4480).
@@ -135,8 +143,11 @@ with tempfile.TemporaryDirectory(prefix='eden-soak-') as tmp:
                 failed.append(f'{name}: the heap held {start} MiB at the start (more than 3072 MiB)')
                 if not args.keep_going:
                     break
+    print(f'control (v1.010.006): failed in {control_failed} of {len(SEEDS)} seeds')
+    if control_failed == 0 and not failed:
+        failed.append('v1.010.006 passed every seed: the simulation does not tell it from this tree')
 if failed:
     sys.exit('memory soak failed:\n  ' + '\n  '.join(failed))
-print('Memory soak: PASS three hours of TOTK and four TOTK sessions that ended, with no allocation refused and the '
-      'largest free block above the largest request; the heap starts near v1.010.004; v1.010.006\'s graphics rules '
-      'fail the same session')
+print(f'Memory soak: PASS three hours of TOTK with {len(SEEDS)} seeds and four TOTK sessions that ended, with no '
+      'allocation refused and the largest free block above the largest request; the heap starts near v1.010.004; '
+      f'v1.010.006 fails in {control_failed} of {len(SEEDS)} seeds')

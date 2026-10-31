@@ -133,9 +133,11 @@ std::int64_t top_floor = -1; // the lowest page memory that stays has taken (src
 
 extern "C" {
 void* eden_heap_reserve(std::size_t size) {
-    char* at = static_cast<char*>(mmap(nullptr, size + PAGE, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0));
+    // 8 MiB aligned, wherever the host maps it: the same arena slots on every host.
+    constexpr std::uintptr_t align = 8 * MiB;
+    char* at = static_cast<char*>(mmap(nullptr, size + align, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0));
     if (at == MAP_FAILED) return nullptr;
-    range_base = reinterpret_cast<char*>((reinterpret_cast<std::uintptr_t>(at) + PAGE - 1) & ~(PAGE - 1));
+    range_base = reinterpret_cast<char*>((reinterpret_cast<std::uintptr_t>(at) + align - 1) & ~(align - 1));
     range_bytes = size;
     range_page.assign(size / PAGE, -1);
     return range_base;
@@ -423,8 +425,10 @@ bool Allocate(std::uint64_t size, bool host, Allocation* out) {
     std::vector<int> order;
     for (int i = 0; i < int(blocks.size()); ++i)
         if (blocks[std::size_t(i)].first >= 0 && blocks[std::size_t(i)].host == host) order.push_back(i);
-    std::sort(order.begin(), order.end(), [](int a, int b) {
-        return blocks[std::size_t(a)].size - blocks[std::size_t(a)].used < blocks[std::size_t(b)].size - blocks[std::size_t(b)].used;
+    std::stable_sort(order.begin(), order.end(), [](int a, int b) {
+        const std::uint64_t free_a = blocks[std::size_t(a)].size - blocks[std::size_t(a)].used;
+        const std::uint64_t free_b = blocks[std::size_t(b)].size - blocks[std::size_t(b)].used;
+        return free_a != free_b ? free_a < free_b : a < b;
     });
     for (int i : order)
         if (FitIn(blocks[std::size_t(i)], size, out, i)) {
@@ -538,7 +542,7 @@ struct StagingRef { std::span<std::uint8_t> mapped_span; };
 
 // ---- the game's memory and its reserve ----
 std::vector<std::int64_t> guest_pages, reserve_pages;
-std::mt19937_64 rng(20261030);
+std::mt19937_64 rng(std::getenv("SOAK_SEED") ? std::strtoull(std::getenv("SOAK_SEED"), nullptr, 10) : 20261030);
 // The same numbers on every host: std::mt19937_64 is specified, its distributions are not.
 double Unit(std::mt19937_64& random) { return double(random() >> 11) * (1.0 / 9007199254740992.0); }
 std::size_t Pick(std::mt19937_64& random, std::size_t n) { return n == 0 ? 0 : std::size_t(random() % n); }
@@ -632,7 +636,7 @@ void Gc(bool hardest) {
     std::uint64_t free_view = view.free;
     if (fixed_mode) {
         std::lock_guard lock{pool_mutex};
-        free_view = Eden::Performance::CachesFree(view.free, Held(), used_bytes);
+        free_view = Eden::Performance::CachesFree(view.free, Held(), used_bytes, Eden::Performance::CachesFloor(largest_image));
     }
     const std::uint64_t budget = 6 * GiB;
     const std::uint64_t usage = budget - std::min(budget, free_view);
@@ -747,12 +751,12 @@ void Use(std::size_t index) {
 
 // ---- the heap's users ----
 // The shader cache's builders: 15 threads, each pipeline keeping ~95 KiB in six blocks and
-// freeing what it used along the way.
+// freeing what it used along the way. They run one after another (each a thread of its own, so
+// each has its arenas), so every run lays the heap out the same.
 std::vector<std::vector<void*>> built(15);
 void Build(unsigned pipelines) {
-    std::vector<std::thread> threads;
-    for (unsigned t = 0; t < 15; ++t)
-        threads.emplace_back([t, pipelines] {
+    for (unsigned t = 0; t < 15; ++t) {
+        std::thread thread([t, pipelines] {
             std::mt19937_64 random(t * 7919 + 1);
             for (unsigned p = t; p < pipelines; p += 15) {
                 void* scratch[4];
@@ -765,7 +769,8 @@ void Build(unsigned pipelines) {
                 for (void* block : scratch) __wrap_free(block);
             }
         });
-    for (auto& thread : threads) thread.join();
+        thread.join();
+    }
 }
 // The game's own use of the heap: blocks of every size, freed in any order.
 std::vector<std::pair<void*, std::size_t>> game_blocks;
@@ -842,11 +847,9 @@ int main(int argc, char** argv) {
         std::fprintf(stderr, "no rows in %s\n", argv[2]);
         return 2;
     }
-    // Three hours by default (v1.010.006's rules fail at 2 h 20 min); SOAK_HOURS for longer. Given
-    // six hours this tree's rules fail too, at 4 h 32 min: the pool fragments under the game's
-    // bursts and the textures' churn until its largest free block (148 MiB) is under the menu's
-    // array. What would hold it longer is placement (the game's pages where they split no large
-    // run), which only a console can measure.
+    // Three hours by default; SOAK_HOURS for longer (with six, this tree failed with one seed of
+    // three, at 3 h 20 min: the pool fragments under the game's bursts and the textures' churn),
+    // SOAK_SEED for another session.
     const char* hours = std::getenv("SOAK_HOURS");
     const double synthetic_hours = hours ? std::clamp(std::atof(hours), 0.1, 24.0) : 3.0;
     const double end_s = trace.empty() ? synthetic_hours * 3600.0 : trace.back().t;

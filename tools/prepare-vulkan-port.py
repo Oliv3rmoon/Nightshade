@@ -1032,6 +1032,13 @@ image_log = '    // Log GPU memory allocation for images\n'
 if allocator.count(image_log) != 1:
     raise RuntimeError('Pinned Vulkan allocator changed: the image log')
 allocator = allocator.replace(image_log, (
+    # The largest image with memory of its own: the caches' floor is twice it (memory_budget.h).
+    '    if (alloc_info.size >= (VkDeviceSize{32} << 20)) {\n'
+    '        auto& largest = ::Eden::Performance::graphics_largest_image;\n'
+    '        for (unsigned long long seen = largest.load(std::memory_order_relaxed);\n'
+    '             alloc_info.size > seen && !largest.compare_exchange_weak(seen, alloc_info.size, std::memory_order_relaxed);) {\n'
+    '        }\n'
+    '    }\n'
     '    if (alloc_info.size >= (VkDeviceSize{128} << 20)) {\n'
     '        static std::atomic<unsigned long long> large_images{0};\n'
     '        const auto times = large_images.fetch_add(1, std::memory_order_relaxed) + 1;\n'

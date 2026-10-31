@@ -529,7 +529,8 @@ static void RefreshFreeMemory() {
     const auto held_hook = graphics_memory_held.load(std::memory_order_acquire);
     const auto used_hook = graphics_memory_used.load(std::memory_order_acquire);
     const unsigned long long blocks = held_hook ? held_hook() : 0, used = used_hook ? used_hook() : 0;
-    const std::size_t caches = CachesFree(view.free, blocks, used);
+    const std::size_t caches =
+        CachesFree(view.free, blocks, used, CachesFloor(graphics_largest_image.load(std::memory_order_relaxed)));
     caches_free_bytes.store(known ? (caches != 0 ? caches : 1) : 0, std::memory_order_relaxed);
     graphics_caches_short.store(!known || CachesShort(caches), std::memory_order_relaxed);
     // While the pool is short, what nothing uses goes back to it (every 2 s at most): the idle

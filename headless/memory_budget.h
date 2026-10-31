@@ -79,9 +79,22 @@ inline PoolView ViewOfPool(bool known, std::size_t largest, std::size_t held, st
 // (3,000 textures freed every 10 s, those the GPU wrote copied back first), the game drew them
 // again, and it ran at a few frames a second after its item menu; and freeing an image puts its
 // memory back in the allocator's block, not in the pool, so the pool never looked better.
-inline std::size_t CachesFree(std::size_t pool_free, unsigned long long held, unsigned long long used) {
+// Under `floor`, the pool's own block is what the caches see again: then the next large image may
+// find no room, and evicting at their hardest is what empties the allocator's blocks and the
+// images with memory of their own (tools/check-memory-soak.py: without it the pool's largest block
+// fell under TOTK's 161 MiB texture array within two hours of the simulation).
+inline std::size_t CachesFree(std::size_t pool_free, unsigned long long held, unsigned long long used,
+                              std::size_t floor = 0) {
+    if (pool_free < floor) return pool_free;
     const unsigned long long unused = held > used ? held - used : 0;
     return pool_free + static_cast<std::size_t>(unused / 4 * 3);
+}
+// The floor: twice the largest image that had memory of its own (one run of the pool), and at
+// least 384 MiB.
+inline constexpr std::size_t kCachesFloor = std::size_t{384} << 20;
+inline std::size_t CachesFloor(unsigned long long largest_image) {
+    const unsigned long long twice = largest_image * 2;
+    return twice > kCachesFloor ? static_cast<std::size_t>(twice) : kCachesFloor;
 }
 // The caches evict textures the GPU wrote (copied back to the game's memory first, at a wait for
 // the GPU each) only while this is short too: evicting them while the allocator's blocks hold
@@ -89,6 +102,9 @@ inline std::size_t CachesFree(std::size_t pool_free, unsigned long long held, un
 inline bool CachesShort(std::size_t caches_free) {
     return caches_free < kShortMemory;
 }
+// The largest image that had memory of its own this session (bytes), kept by the graphics
+// allocator (tools/prepare-vulkan-port.py): what the caches' floor is twice of.
+inline std::atomic<unsigned long long> graphics_largest_image{0};
 // Lets go of the staging buffers the GPU is done with and returns their bytes, installed by the
 // Vulkan staging pool (tools/prepare-vulkan-port.py); it does nothing on a thread other than the
 // one the pool runs on.
