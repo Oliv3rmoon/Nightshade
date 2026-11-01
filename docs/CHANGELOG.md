@@ -2,6 +2,25 @@
 
 What changed in each release of ProsperoEden, newest first. A release's notes on GitHub are its section here.
 
+## v1.012.002
+
+**Experimental test release: v1.012.001 with more logging for Final Fantasy Resonance ([#1](https://github.com/Oliv3rmoon/Nightshade/issues/1)).** Nothing a game does changes. This release only writes more to `eden_log.txt` and `stderr.log` around the moment that game went wrong on v1.012.001: a copy of graphics memory back into the game's memory (reactive flushing), then reads through a null pointer, then a jump to an unmapped address. If v1.011.002 or v1.012.001 plays your games well, keep it for playing.
+
+### What the logs now say
+
+- **Each copy back from the graphics memory (reactive flushing):** a session's first 64, then each power of two, with the address the game read, the area copied, the bytes at that address before and after the copy, and each image in the area (its GPU address, size, format and how recently the GPU wrote it). A session's first 16 also go to `stderr.log` as `EDEN_REACTIVE_FLUSH` lines.
+- **Reads through a null pointer:** where in the game's code, for each session's first 32. Before, only the app's first 32 were named, so a second game named none. The first 4 also go to `stderr.log` with the thread's name.
+- **A jump to an unmapped address:** an `EDEN_GUEST_FAULT` line in `stderr.log` with the thread's pc, lr, sp and return addresses.
+- **After a crash, `eden_log.txt` is written out too**, so it no longer ends minutes before the crash.
+
+### What to send
+
+For Final Fantasy Resonance: play to where it stopped before (the movie after the tutorial boss), then send `/data/nightshade/logs` (`stderr.log` and any crash report) and `/data/nightshade/user/log/eden_log.txt` before opening the app twice. A second run with **Reactive flushing** off (Settings > Performance, or the game's own Performance settings) says whether that copy is the cause.
+
+### Install
+
+From 1.005.102 or later, **Update now** applies it (from a Nightshade before v1.011.000, open the old tile once afterwards). If it doesn't, send `/data/nightshade/logs/updater.log` (`/data/prosperoeden/logs/updater.log` from a Nightshade before v1.011.000). By hand, copy this ZIP's `PPSA64448` folder to `/data/homebrew/PPSA64448`.
+
 ## v1.012.001
 
 **Experimental test release: v1.012.000 with v1.010.006's faster starts and memory given back.** Everything in v1.012.000 (Switch 2 games, eden-nx2 `50fa86bbbc` under every game) and everything in v1.011.002, which is v1.010.006 below: a game starts as soon as its graphics are ready and its saved pipelines are built while it plays, the emulator's own memory goes back to the console, a large allocation takes memory in pieces when it must, and ASTC textures are converted to BC3 a layer at a time with Vulkan. None of it has run on a console with eden-nx2 yet. This release is for testing: if v1.011.002 plays your games well, keep it for playing.
