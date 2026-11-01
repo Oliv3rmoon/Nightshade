@@ -16,7 +16,17 @@ the load stops: in a file read that never ends, in a core held in a system call'
 quietly (a thread that made many requests makes no more). Each must be named: EDEN_STUCK for the
 request, the core or the fault handler, at its three ages and no more; EDEN_PROGRESS with the
 frames' requests still finishing, no file reads, and the quiet thread. A core that keeps changing
-state, an idle core and requests that finish are never reported. It does not run a game.
+state, an idle core and requests that finish are never reported.
+
+And the freeze of v1.010.009 (TOTK, 110 minutes into a boss fight: EDEN_STUCK core=0 state=guest
+thread=78) two ways: a thread that spins in the guest's code and answers the watchdog's looks, which
+must give EDEN_STUCK_GUEST with pc and lr as main+0x..., its code, registers and memory at each of
+the three ages, four EDEN_STUCK_PC looks after the first, and every thread with the first two
+reports, while the looks' own stops never count as the core moving (still three EDEN_STUCK lines);
+and a core that never stops when asked (its host thread held under the guest's code), which must
+give EDEN_STUCK_NO_ANSWER after each ask. With the source, the core's halt for a look is taken
+under m_guard in EnterContext, and the look is answered after ExitContext, before CoreHost. It does
+not run a game.
 """
 from pathlib import Path
 import re, shutil, subprocess, sys, tempfile
@@ -75,6 +85,35 @@ def check_sites(source):
                  'CoreSvc(m_core_index, interface->GetSvcNumber())', 'CoreIdle(m_core_index)'):
         if mark not in core:
             failures.append(f'physical_core.cpp: no {mark}')
+    # A look (EDEN_STUCK_GUEST): EnterContext leaves the watchdog a way to halt the JIT, under the
+    # core's lock and only while a thread runs, before the core is marked in the guest's code; the
+    # look is answered after ExitContext (the JIT stopped, its context let go) and before CoreHost.
+    run = core[core.index('void PhysicalCore::RunThread('):core.index('void PhysicalCore::LoadContext(')]
+    enter = run[run.index('const auto EnterContext = [&]() {'):run.index('const auto ExitContext = [&]() {')]
+    if not ('Pokeable(m_core_index,' in enter and enter.index('Pokeable(m_core_index,') <
+            enter.index('CoreGuest(m_core_index, thread->GetThreadId())') < enter.index('interface->LockThread(thread)')):
+        failures.append('physical_core.cpp: the core is not made pokeable in EnterContext before CoreGuest')
+    poke = enter[enter.index('Pokeable(m_core_index,'):enter.index('CoreGuest(m_core_index')]
+    for needed in ('std::scoped_lock poke_lock{core->m_guard};', 'if (core->m_arm_interface)',
+                   'SignalInterrupt(core->m_current_thread)'):
+        if needed not in poke:
+            failures.append(f'physical_core.cpp: the look\'s halt lacks {needed}')
+    loop = run[run.index('hr = interface->RunThread(thread);'):run.index('// Determine why we stopped.')]
+    if not ('LookWanted(m_core_index)' in loop and loop.index('ExitContext();') <
+            loop.index('if (hr == Core::HaltReason::BreakLoop) {') < loop.index('LookWanted(m_core_index)') <
+            loop.index('::Eden::Sample::Answer(kernel, *process, *interface, *thread, m_core_index, eden_look);') <
+            loop.index('if (kernel.CurrentPhysicalCoreIndex() != m_core_index) return;') <
+            loop.index('CoreHost(m_core_index)')):
+        failures.append('physical_core.cpp: the look is not answered after ExitContext, for the look\'s halt only, '
+                        'and before CoreHost on the core it ends on')
+    # Only a stop for an interrupt is answered, and that stop returns from the run loop anyway.
+    after = run[run.index('// Handle external interrupt sources.'):]
+    if 'if (interrupt || m_is_single_core) {\n            return;' not in after:
+        failures.append('physical_core.cpp: an interrupt no longer ends the run loop; review the look\'s early return')
+    derived = cmake[cmake.index('write_derived("${PORT_BUILD_DIR}/physical_core.cpp"'):]
+    derived = derived[:derived.index(')\n')]
+    if 'guest_sample.h' not in derived:
+        failures.append('CMakeLists.txt: physical_core.cpp does not include guest_sample.h')
     # The system call is marked before it is made, and the idle wait at both ends.
     body = core[core.index('void PhysicalCore::Idle() {'):]
     body = body[:body.index('\n}') + 2]
@@ -119,8 +158,11 @@ def check_sites(source):
     service_inc = (root / 'src/guest_memory_service.inc').read_text()
     fault = service_inc[service_inc.index('bool HandleGuestWriteFault(void* fault) noexcept {'):]
     fault = fault[:fault.index('\n}\n')]
-    if fault.index('const FaultInside inside;') > fault.index('LockSlot('):
+    if fault.index('const FaultInside inside{address};') > fault.index('LockSlot('):
         failures.append('guest_memory_service.inc: the fault handler is counted after its slot lock')
+    if not (fault.index('LockSlot(') < fault.index('inside.Stage(2, state);') and
+            fault.index('inside.Stage(3, state);') < fault.index('WaitForBlock(promote)')):
+        failures.append('guest_memory_service.inc: the fault handler\'s stages are not marked where they begin')
     main = (root / 'headless/main.cpp').read_text()
     stop = 'Eden::Progress::Stop();\n                if (streamed) streamed->stop();\n                system.ShutdownMainProcess();'
     if not (main.count('Eden::Progress::Start();') == 1 and
@@ -139,9 +181,79 @@ extern "C" unsigned eden_guest_fault_busy(long long* since_ns) {
     if (since_ns) *since_ns = fault_from.load();
     return fault_threads.load();
 }
+// The busy handler's write: waiting for its slot's lock (a slot never let go).
+extern "C" std::uintptr_t eden_guest_fault_detail(unsigned* stage, unsigned* slot_state) {
+    if (stage) *stage = 1;
+    if (slot_state) *slot_state = 0x81;
+    return 0x8012345000ull;
+}
 
 using namespace Eden::Progress;
 static void Sleep(int ms) { std::this_thread::sleep_for(std::chrono::milliseconds(ms)); }
+
+// The core's JIT, halted for a look: PhysicalCore's poke sets the JIT's halt flag.
+static void Poke(void* self) { static_cast<std::atomic<bool>*>(self)->store(true); }
+
+// What headless/guest_sample.h finds and prints for a look at a thread spinning in the game's code.
+static void AnswerLook(std::size_t core, std::uint64_t thread, unsigned look, unsigned& answered) {
+    GuestModules modules;
+    modules.entry[0] = {0x80000000ull, 0x84000000ull, "main"};
+    modules.entry[1] = {0x84000000ull, 0x85000000ull, "sdk"};
+    modules.count = 2;
+    GuestLook out;
+    out.core = core;
+    out.thread = thread;
+    out.name = "GameMain";
+    out.priority = 44;
+    for (unsigned r = 0; r < 31; ++r) out.x[r] = 0x1000ull * r;
+    out.x[19] = 0x2a0000040ull;
+    out.x[30] = 0x84000123ull + 4 * (answered % 2);
+    out.sp = 0x2b0000000ull;
+    out.pc = 0x80001234ull + 4 * (answered % 3); // a loop of three instructions
+    out.pstate = 0x60000000;
+    if (look == kLookPc) {
+        PrintLook(out, modules, kLookPc);
+        ++answered;
+        return;
+    }
+    out.code_from = out.pc - 64;
+    for (unsigned i = 0; i < 32; ++i) out.code[i] = 0xd503201fu; // nop
+    out.code_words = 32;
+    out.frames[0] = 0x80002000ull;
+    out.frames[1] = 0x84000400ull;
+    out.frame_count = 2;
+    PrintLook(out, modules, kLookFull);
+    out.data[0].reg = 19;
+    out.data[0].at = out.x[19];
+    out.data[0].words[0] = 1;
+    out.data_count = 1;
+    PrintLookData(out);
+    if (look == kLookThreads) {
+        PrintThreadsHeader(core, 2);
+        GuestThreadRow spinning;
+        spinning.id = thread;
+        spinning.name = "GameMain";
+        spinning.state = "runnable";
+        spinning.priority = spinning.base_priority = 44;
+        spinning.core = int(core);
+        spinning.running = int(core);
+        spinning.pc = out.pc;
+        PrintThreadRow(spinning, modules);
+        GuestThreadRow waiting;
+        waiting.id = 80;
+        waiting.name = "Worker";
+        waiting.state = "waiting:arbitration";
+        waiting.priority = waiting.base_priority = 45;
+        waiting.core = int(core);
+        waiting.owner = thread;
+        waiting.key = 0x2a0000040ull;
+        waiting.pc = 0x84000800ull;
+        waiting.frames[0] = 0x80003000ull;
+        waiting.frame_count = 1;
+        PrintThreadRow(waiting, modules);
+    }
+    ++answered;
+}
 
 int main(int argc, char** argv) {
     Timing& timing = Times();
@@ -152,18 +264,39 @@ int main(int argc, char** argv) {
     timing.stuck_ms[2] = 600;
     timing.quiet_ms = 250;
     timing.quiet_calls = 20;
+    timing.answer_ms = 100;
     const std::string mode = argc > 1 ? argv[1] : "";
+    const bool looks = mode == "spin" || mode == "deaf";
+    if (looks) {
+        // Room for the four pc looks (one a look), under a sanitizer on a busy machine too.
+        timing.stuck_ms[1] = 600;
+        timing.stuck_ms[2] = 1200;
+    }
     std::atomic<bool> stop{false};
+    static std::atomic<bool> jit_halted{false}, display_halted{false};
     // The game's frames keep coming: a display thread on core 0 hands in a frame, the GPU's
     // requests with it, and its core changes state all the time.
+    // In spin mode its thread runs the game's code between frames, where the watchdog's look at
+    // every thread also asks for its pc.
     std::thread display([&] {
+        unsigned display_answers = 0;
         while (!stop.load()) {
+            if (mode == "spin") Pokeable(0, &Poke, &display_halted);
             CoreGuest(0, 77);
             { RequestScope request{"IHOSBinderDriver", 2, 77}; request.Locked(); }
+            if (mode == "spin") {
+                Sleep(5);
+                if (display_halted.exchange(false)) {
+                    if (const unsigned look = LookWanted(0)) {
+                        AnswerLook(0, 77, look, display_answers);
+                        LookAnswered(0, 77);
+                    }
+                }
+            }
             CoreSvc(0, 0x21);
             { RequestScope request{"nvdrv", 1, 77}; request.Locked(); }
             CoreHost(0);
-            Sleep(5);
+            if (mode != "spin") Sleep(5);
         }
     });
     // Core 1 has nothing to run.
@@ -200,6 +333,34 @@ int main(int argc, char** argv) {
             CoreSvc(2, 0x2c);
             while (!stop.load()) Sleep(5);
         });
+    } else if (mode == "spin" || mode == "deaf") {
+        // v1.010.009: thread 78 runs the game's own code on core 2 with no system call, so its core
+        // never changes state. Its JIT stops only when the watchdog pokes it; then it answers the
+        // look (or, deaf, its host thread is held under the guest's code and never sees the poke)
+        // and the same thread goes on, as PhysicalCore::RunThread does.
+        loader = std::thread([&] {
+            for (int i = 0; i < 30; ++i) {
+                Pokeable(2, &Poke, &jit_halted);
+                CoreGuest(2, 78);
+                { RequestScope request{"IStorage", 0, 78}; request.Locked(); }
+                CoreHost(2);
+            }
+            unsigned answered = 0;
+            Pokeable(2, &Poke, &jit_halted);
+            CoreGuest(2, 78);
+            while (!stop.load()) {
+                if (mode == "spin" && jit_halted.exchange(false)) {
+                    if (const unsigned look = LookWanted(2)) {
+                        AnswerLook(2, 78, look, answered);
+                        LookAnswered(2, 78);
+                    }
+                    CoreHost(2);
+                    Pokeable(2, &Poke, &jit_halted);
+                    CoreGuest(2, 78);
+                }
+                Sleep(1);
+            }
+        });
     } else if (mode == "quiet") {
         // The load's thread reads files, then waits on something of the game's own: no request, its
         // core idle. And the memory service's write handler is busy on core 3 (a slot never let go).
@@ -215,7 +376,7 @@ int main(int argc, char** argv) {
             while (!stop.load()) Sleep(5);
         });
     }
-    Sleep(1300);
+    Sleep(looks ? 2000 : 1300);
     stop.store(true);
     loader.join();
     display.join();
@@ -251,7 +412,7 @@ def run_simulation():
         if sanitized.returncode != 0:
             subprocess.run(base, check=True)
             print('guest progress: ThreadSanitizer is not available here; built without it')
-        for mode in ('file', 'core', 'quiet'):
+        for mode in ('file', 'core', 'quiet', 'spin', 'deaf'):
             result = subprocess.run([str(binary), mode], capture_output=True, text=True, timeout=60)
             text = result.stderr
             lines = text.splitlines()
@@ -260,7 +421,8 @@ def run_simulation():
                 continue
             if 'WARNING: ThreadSanitizer' in text:
                 failures.append(f'{mode}: ThreadSanitizer found a race\n' + text[:3000])
-            stuck = [line for line in lines if line.startswith('EDEN_STUCK')]
+            stuck = [line for line in lines if line.startswith('EDEN_STUCK ')]
+            looks = [line for line in lines if line.startswith('EDEN_STUCK_')]
             progress = [line for line in lines if line.startswith('EDEN_PROGRESS')]
             # What is never stuck: the display's core, the idle core, finished requests.
             for line in stuck:
@@ -303,6 +465,56 @@ def run_simulation():
                 # Core 3 in the guest's code under the busy handler: reported as the guest's code.
                 if len(ages(r'core=3 state=guest thread=55|core=3 state=guest svc=0x0 thread=55')) != 3:
                     failures.append(f'quiet: core 3 under the handler was not reported: {stuck}')
+                # What the handler waits for: its write's address and stage.
+                if not all(re.search(r'address=0x[0-9a-f]+ stage=slot_lock slot=0x81 ', line) for line in handler):
+                    failures.append(f'quiet: the busy fault handler does not say what it waits for: {handler}')
+                # A core that cannot be asked (no poke) is reported, never looked at.
+                if looks:
+                    failures.append(f'quiet: a core that cannot be asked was looked at: {looks[:3]}')
+            elif mode in ('spin', 'deaf'):
+                held = ages(r'^EDEN_STUCK core=2 state=guest svc=0x0 thread=78 ')
+                if len(held) != 3:
+                    failures.append(f'{mode}: the spinning core was not reported at its three ages (a look '
+                                    f'counted as a change?): {stuck}')
+                guest = [line for line in looks if line.startswith('EDEN_STUCK_GUEST ')]
+                pcs = [line for line in looks if line.startswith('EDEN_STUCK_PC core=2 ')]
+                others = [line for line in looks if line.startswith('EDEN_STUCK_PC ') and line not in pcs]
+                lists = [line for line in looks if line.startswith('EDEN_STUCK_THREADS ')]
+                rows = [line for line in looks if line.startswith('EDEN_STUCK_THREAD ')]
+                silent = [line for line in looks if line.startswith('EDEN_STUCK_NO_ANSWER ')]
+                if mode == 'spin':
+                    if len(guest) != 3 or not all(
+                            re.search(r'core=2 thread=78 name=GameMain prio=44 pc=main\+0x123[48c] lr=sdk\+0x12[37]', line)
+                            for line in guest):
+                        failures.append(f'spin: a look at each report did not say where thread 78 runs: {guest}')
+                    if len(pcs) != 4 or not all(re.search(r'core=2 thread=78 pc=main\+0x123[48c] ', line) for line in pcs):
+                        failures.append(f'spin: four pc looks did not follow the first report: {pcs}')
+                    for kind, count in (('EDEN_STUCK_REGS ', 3), ('EDEN_STUCK_FRAMES ', 3), ('EDEN_STUCK_CODE ', 3),
+                                        ('EDEN_STUCK_DATA ', 3)):
+                        if len([line for line in looks if line.startswith(kind)]) != count:
+                            failures.append(f'spin: not {count} {kind.strip()} lines: {looks}')
+                    if not any('EDEN_STUCK_FRAMES core=2 main+0x2000 sdk+0x400' in line for line in looks):
+                        failures.append(f'spin: the return chain is not named by module: {looks}')
+                    if not any(re.search(r'EDEN_STUCK_CODE core=2 from=main\+0x1[0-9a-f]+ pc_word=16: d503201f', line)
+                               for line in looks):
+                        failures.append(f'spin: the code around pc is not shown: {looks}')
+                    if len(lists) != 2 or len(rows) != 4:
+                        failures.append(f'spin: every thread was not listed with the first two reports: {lists} {rows}')
+                    if not any(re.search(r'id=80 name=Worker state=waiting:arbitration prio=45/45 core=2 lock_owner=78 '
+                                         r'key=0x2a0000040 pc=sdk\+0x800 .*frames=main\+0x3000', line) for line in rows):
+                        failures.append(f'spin: the waiting thread does not name its lock owner and address: {rows}')
+                    if silent:
+                        failures.append(f'spin: a core that answered was said not to: {silent}')
+                    # The display's core, in the game's code but never stuck: its pc with each list.
+                    if not 1 <= len(others) <= 2 or not all(line.startswith('EDEN_STUCK_PC core=0 thread=77 pc=main+0x')
+                                                            for line in others):
+                        failures.append(f'spin: the other core in the guest\'s code was not looked at with the '
+                                        f'thread lists: {others}')
+                else:
+                    if len(silent) != 3 or not all('core=2 thread=78 ' in line for line in silent):
+                        failures.append(f'deaf: a core that never stopped was not named after each ask: {silent}')
+                    if guest or pcs or lists:
+                        failures.append(f'deaf: a look was printed for a core that never answered: {looks}')
             # The last service calls, once, after an incident reached its second age.
             ring = [line for line in lines if line.startswith('EDEN_IPC_RING')]
             if len(ring) != 1 or 'service=IStorage' not in ring[0]:
@@ -319,5 +531,7 @@ run_simulation()
 if failures:
     sys.exit('guest progress check failed:\n  ' + '\n  '.join(failures))
 print('Guest progress: PASS a frozen load named three ways (a file read in progress, a core held in a '
-      'system call, a thread gone quiet with the fault handler busy) while the frames keep coming'
+      'system call, a thread gone quiet with the fault handler busy) while the frames keep coming; a thread '
+      'spinning in the guest\'s code looked at (pc, code, registers, every thread) at each report without '
+      'its looks counting as moves, and a core that never stops when asked named'
       + (', and every mark at its site in the pinned source' if len(sys.argv) > 1 else ''))

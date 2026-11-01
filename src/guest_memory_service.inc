@@ -499,14 +499,24 @@ namespace {
 // is never let go, a wait that never ends) instead of a core that only looks busy in the game.
 std::atomic<unsigned> fault_inside{0};
 std::atomic<long long> fault_since{0};
+// The latest write to enter the handler, and what it does now (EDEN_STUCK fault_handler): 1 waits
+// for its slot's lock, 2 makes the slot writable, 3 waits for a block (WaitForBlock).
+std::atomic<std::uintptr_t> fault_address{0};
+std::atomic<unsigned> fault_stage{0}, fault_slot_state{0};
 struct FaultInside {
-    FaultInside() noexcept {
+    explicit FaultInside(std::uintptr_t address) noexcept {
+        fault_address.store(address, std::memory_order_relaxed);
+        fault_stage.store(1, std::memory_order_relaxed);
         if (fault_inside.fetch_add(1, std::memory_order_acq_rel) == 0)
             fault_since.store(std::chrono::duration_cast<std::chrono::nanoseconds>(
                                   std::chrono::steady_clock::now().time_since_epoch()).count(),
                               std::memory_order_release);
     }
     ~FaultInside() { fault_inside.fetch_sub(1, std::memory_order_acq_rel); }
+    void Stage(unsigned stage, unsigned slot_state) const noexcept {
+        fault_slot_state.store(slot_state, std::memory_order_relaxed);
+        fault_stage.store(stage, std::memory_order_relaxed);
+    }
 };
 } // namespace
 
@@ -514,6 +524,14 @@ extern "C" unsigned eden_guest_fault_busy(long long* since_ns) noexcept {
     const unsigned inside = fault_inside.load(std::memory_order_acquire);
     if (since_ns) *since_ns = inside ? fault_since.load(std::memory_order_acquire) : 0;
     return inside;
+}
+
+// The latest write in the handler: its address, its stage and its slot's state (headless/
+// guest_progress.h prints them when the handler stays busy).
+extern "C" std::uintptr_t eden_guest_fault_detail(unsigned* stage, unsigned* slot_state) noexcept {
+    if (stage) *stage = fault_stage.load(std::memory_order_relaxed);
+    if (slot_state) *slot_state = fault_slot_state.load(std::memory_order_relaxed);
+    return fault_address.load(std::memory_order_relaxed);
 }
 
 // A write fault at `address`: true when it was a write to a slot of the guest's memory that is
@@ -526,7 +544,7 @@ bool HandleGuestWriteFault(void* fault) noexcept {
     }
     SparseRange* const range = WriteRangeOf(address);
     if (range == nullptr) return false;
-    const FaultInside inside;
+    const FaultInside inside{address};
     const std::size_t slot = (address - range->begin.load(std::memory_order_relaxed)) / SparseSlot;
     // The same address faulting again and again with nothing to change is not a slot to promote
     // but a real fault. A promotion starts the count again (below).
@@ -543,6 +561,7 @@ bool HandleGuestWriteFault(void* fault) noexcept {
     counters.faults.fetch_add(1, std::memory_order_relaxed);
     const bool waited = LockSlot(*range, slot, true);
     const std::uint8_t state = SlotState(*range, slot);
+    inside.Stage(2, state);
     if (waited) {
         // Someone changed the slot meanwhile (or is mapping it again): the access may now succeed,
         // and a read must never make a Fine slot whole. It faults again if it was a write.
@@ -562,7 +581,10 @@ bool HandleGuestWriteFault(void* fault) noexcept {
         return done;
     };
     bool ok = promote();
-    if (!ok) ok = WaitForBlock(promote);
+    if (!ok) {
+        inside.Stage(3, state);
+        ok = WaitForBlock(promote);
+    }
     UnlockSlot(*range, slot, ok ? SlotOwn : state);
     if (!ok) {
         counters.failures.fetch_add(1, std::memory_order_relaxed);

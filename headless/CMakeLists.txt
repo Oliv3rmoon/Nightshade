@@ -1065,6 +1065,12 @@ string(REPLACE "${prefetch_old}"
 # stays in one busy state names where a frozen game's thread is held (tools/check-guest-progress.py
 # reads these sites). The idle marks go into the Idle body written above, after its first line and
 # before its end, so tools/check-guest-idle.py still reads that body as it is.
+# A core held in the guest's code is asked for a look (EDEN_STUCK_GUEST): EnterContext leaves the
+# watchdog a way to halt its JIT (the halt a preemption uses, under m_guard as Interrupt does), and
+# after ExitContext, before the core is marked back in the emulator, a JIT stopped only by that halt
+# answers the look it was asked for (headless/guest_sample.h); the run loop then returns as for any
+# interrupt, and the same thread goes on. A system call or another stop is handled as before, the
+# look left for the next halt.
 set(progress_enter_old "        // Mark that we are running.\n        m_arm_interface = interface;\n        m_current_thread = thread;\n")
 set(progress_exit_old "            ExitContext();\n        }\n")
 set(progress_svc_old "            // Perform call.\n            Svc::Call(system, interface->GetSvcNumber());")
@@ -1077,10 +1083,10 @@ foreach(pinned_text IN ITEMS progress_enter_old progress_exit_old progress_svc_o
     endif()
 endforeach()
 string(REPLACE "${progress_enter_old}"
-    "${progress_enter_old}        ::Eden::Progress::CoreGuest(m_core_index, thread->GetThreadId());\n"
+    "${progress_enter_old}        ::Eden::Progress::Pokeable(m_core_index, +[](void* self) {\n            auto* core = static_cast<PhysicalCore*>(self);\n            std::scoped_lock poke_lock{core->m_guard};\n            if (core->m_arm_interface) core->m_arm_interface->SignalInterrupt(core->m_current_thread);\n        }, this);\n        ::Eden::Progress::CoreGuest(m_core_index, thread->GetThreadId());\n"
     physical_core_source "${physical_core_source}")
 string(REPLACE "${progress_exit_old}"
-    "            ExitContext();\n            ::Eden::Progress::CoreHost(m_core_index);\n        }\n"
+    "            ExitContext();\n            if (hr == Core::HaltReason::BreakLoop) {\n                if (const unsigned eden_look = ::Eden::Progress::LookWanted(m_core_index)) {\n                    ::Eden::Sample::Answer(kernel, *process, *interface, *thread, m_core_index, eden_look);\n                    // A look that waited for a kernel lock may go on on another core: that core marks it.\n                    if (kernel.CurrentPhysicalCoreIndex() != m_core_index) return;\n                }\n            }\n            ::Eden::Progress::CoreHost(m_core_index);\n        }\n"
     physical_core_source "${physical_core_source}")
 string(REPLACE "${progress_svc_old}"
     "            // Perform call.\n            ::Eden::Progress::CoreSvc(m_core_index, interface->GetSvcNumber());\n            Svc::Call(system, interface->GetSvcNumber());"
@@ -1092,7 +1098,7 @@ string(REPLACE "${progress_idle_end_old}"
     "    ::Eden::Performance::AdaptIdlePoll(m_core_index, raised > start ? raised - start : 0, slept);\n    ::Eden::Progress::CoreHost(m_core_index);\n}"
     physical_core_source "${physical_core_source}")
 write_derived("${PORT_BUILD_DIR}/physical_core.cpp"
-    "#include \"${EDEN_PORT_DIR}/guest_fault.h\"\n#include \"${EDEN_PORT_DIR}/guest_progress.h\"\n#include \"${EDEN_PORT_DIR}/performance.h\"\n#include \"core/arm/debug.h\"\n${physical_core_source}")
+    "#include \"${EDEN_PORT_DIR}/guest_fault.h\"\n#include \"${EDEN_PORT_DIR}/guest_progress.h\"\n#include \"${EDEN_PORT_DIR}/guest_sample.h\"\n#include \"${EDEN_PORT_DIR}/performance.h\"\n#include \"core/arm/debug.h\"\n${physical_core_source}")
 # The guest's tick counter gives when a frame is a little late (headless/guest_clock.h): its
 # rate is applied where Eden applies its own clock settings, and it follows the frames the
 # game hands in (BufferQueueProducer::QueueBuffer, below).

@@ -36,11 +36,33 @@
 // in progress names its service and command; and with none of those, which threads went quiet
 // and which kinds of requests stopped (a load whose file reads stop, an audio thread that stops
 // updating) is what is left to look at. tools/check-guest-progress.py runs these rules on the host.
+//
+// v1.010.008 and v1.010.009 then caught one: TOTK froze 110 minutes into a boss fight with
+// EDEN_STUCK core=0 state=guest thread=78, no request in progress and the fault handler idle,
+// and the stop suspended the cores in 3 ms. So a guest thread ran the guest's own code for 10 s
+// with no system call, and the line could not say where. Now a core reported in the guest's code
+// is asked to stop for a moment (its JIT halts as it does for a preemption, and the same thread
+// goes on at once: headless/guest_sample.h answers on the core's own thread), and it prints:
+//
+//   EDEN_STUCK_GUEST  the thread (name, priority), pc and lr as main+0x..., sp, fp, then
+//                     EDEN_STUCK_REGS, _FRAMES (the frame pointer chain), _CODE (the words around
+//                     pc: the loop it spins in) and _DATA (the memory its pointer registers show);
+//   EDEN_STUCK_PC     four more looks a second apart: a loop keeps to a few addresses;
+//   EDEN_STUCK_THREAD with the first two reports of a session, every thread of the game: state and
+//                     what it waits on (the lock's owner, the address), priority, core, and the
+//                     saved pc, lr and return chain, to name the thread the spinning one waits for;
+//   EDEN_STUCK_NO_ANSWER  a core that did not stop when asked: its host thread is held inside the
+//                     emulator under the guest's code (a memory callback, a GPU flush, a fault
+//                     handler), not in a guest loop.
+//
+// The looks' own stops are not changes (Core::moved), so a core that keeps spinning is still
+// reported at 10, 60 and 300 s. A stuck write fault names its address and what it waits for.
 #pragma once
 #include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <cstdarg>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -51,6 +73,7 @@
 #include "ipc_ring.h"
 
 extern "C" unsigned eden_guest_fault_busy(long long* since_ns) __attribute__((weak));
+extern "C" std::uintptr_t eden_guest_fault_detail(unsigned* stage, unsigned* slot_state) __attribute__((weak));
 
 namespace Eden::Progress {
 
@@ -65,11 +88,26 @@ inline long long NowNs() noexcept {
 enum CoreState : unsigned { kIdle = 0, kGuest = 1, kHost = 2, kSvc = 3 };
 inline constexpr std::size_t kCores = 4;
 
+// A look the watchdog asks of a core in the guest's code (headless/guest_sample.h answers it).
+enum Look : unsigned { kLookNone = 0, kLookPc = 1, kLookFull = 2, kLookThreads = 3 };
+
 struct alignas(64) Core {
     std::atomic<unsigned> state{kIdle};
     std::atomic<unsigned> svc{0};
     std::atomic<std::uint64_t> thread{0};  // the guest thread it last entered
     std::atomic<std::uint64_t> changes{0}; // written by the core's own host thread only
+    // The changes that were not a look's own stop and the same thread's return (EDEN_STUCK reads
+    // these). Written by the core's own host thread only, as `own` and `own_thread` are: 2, the
+    // next CoreHost is the look's; 1, the next CoreGuest of own_thread is.
+    std::atomic<std::uint64_t> moved{0};
+    std::atomic<unsigned> own{0};
+    std::atomic<std::uint64_t> own_thread{0};
+    // The look wanted (Look; the core takes it), the looks answered, and how to ask: a function
+    // that halts the core's JIT, and its PhysicalCore (both cleared while no watchdog runs).
+    std::atomic<unsigned> want{kLookNone};
+    std::atomic<std::uint64_t> answers{0};
+    std::atomic<void (*)(void*)> poke{nullptr};
+    std::atomic<void*> poke_self{nullptr};
 };
 // Function-local statics: inline variables of one header do not initialize in order on the PS5.
 inline Core* Cores() noexcept {
@@ -77,24 +115,171 @@ inline Core* Cores() noexcept {
     return cores;
 }
 
-inline void SetCore(std::size_t core, unsigned state, unsigned svc = 0) noexcept {
+// `own`: the change is a look's (EDEN_STUCK_GUEST), not the core's: the state stays as it was.
+inline void SetCore(std::size_t core, unsigned state, unsigned svc = 0, bool own = false) noexcept {
     if (core >= kCores) return;
     Core& entry = Cores()[core];
-    entry.state.store(state, std::memory_order_relaxed);
-    entry.svc.store(svc, std::memory_order_relaxed);
+    if (!own) {
+        entry.state.store(state, std::memory_order_relaxed);
+        entry.svc.store(svc, std::memory_order_relaxed);
+        entry.moved.store(entry.moved.load(std::memory_order_relaxed) + 1, std::memory_order_release);
+    }
     entry.changes.store(entry.changes.load(std::memory_order_relaxed) + 1, std::memory_order_release);
 }
 // The core enters the guest's code for `thread` (RunThread's EnterContext).
 inline void CoreGuest(std::size_t core, std::uint64_t thread) noexcept {
-    if (core < kCores) Cores()[core].thread.store(thread, std::memory_order_relaxed);
-    SetCore(core, kGuest);
+    if (core >= kCores) return;
+    Core& entry = Cores()[core];
+    const bool own = entry.own.load(std::memory_order_relaxed) == 1 &&
+                     entry.own_thread.load(std::memory_order_relaxed) == thread;
+    entry.own.store(0, std::memory_order_relaxed);
+    entry.thread.store(thread, std::memory_order_relaxed);
+    SetCore(core, kGuest, 0, own);
 }
 // Back in the emulator (after ExitContext, and after an idle wait).
-inline void CoreHost(std::size_t core) noexcept { SetCore(core, kHost); }
+inline void CoreHost(std::size_t core) noexcept {
+    if (core >= kCores) return;
+    Core& entry = Cores()[core];
+    const bool own = entry.own.load(std::memory_order_relaxed) == 2;
+    entry.own.store(own ? 1 : 0, std::memory_order_relaxed);
+    SetCore(core, kHost, 0, own);
+}
 // Handling a system call of the guest thread it ran.
-inline void CoreSvc(std::size_t core, unsigned svc) noexcept { SetCore(core, kSvc, svc); }
+inline void CoreSvc(std::size_t core, unsigned svc) noexcept {
+    if (core < kCores) Cores()[core].own.store(0, std::memory_order_relaxed);
+    SetCore(core, kSvc, svc);
+}
 // Nothing to run: waiting for an interrupt (PhysicalCore::Idle).
-inline void CoreIdle(std::size_t core) noexcept { SetCore(core, kIdle); }
+inline void CoreIdle(std::size_t core) noexcept {
+    if (core < kCores) Cores()[core].own.store(0, std::memory_order_relaxed);
+    SetCore(core, kIdle);
+}
+
+// ---- Looks into a core held in the guest's code (headless/CMakeLists.txt, PhysicalCore) ----
+
+// How the watchdog stops the core's JIT for a look (EnterContext, before CoreGuest): `poke(self)`
+// halts it as a preemption does. Cheap enough for every entry.
+inline void Pokeable(std::size_t core, void (*poke)(void*), void* self) noexcept {
+    if (core >= kCores) return;
+    Core& entry = Cores()[core];
+    if (entry.poke_self.load(std::memory_order_relaxed) == self && entry.poke.load(std::memory_order_relaxed) == poke)
+        return;
+    entry.poke_self.store(self, std::memory_order_release);
+    entry.poke.store(poke, std::memory_order_release);
+}
+// After the JIT stopped (after ExitContext, before CoreHost): the look wanted of this core, taken.
+inline unsigned LookWanted(std::size_t core) noexcept {
+    if (core >= kCores) return kLookNone;
+    Core& entry = Cores()[core];
+    if (entry.want.load(std::memory_order_relaxed) == kLookNone) return kLookNone;
+    return entry.want.exchange(kLookNone, std::memory_order_acq_rel);
+}
+// The look was printed: this stop (the CoreHost that follows) and `thread`'s return to the guest's
+// code (the CoreGuest after it, with nothing between) are the look's, not the core's. A look that
+// waited for a kernel lock may end with its thread on another core (`same_core` false): then the
+// core it was asked of has run other threads meanwhile, and only the answer is counted.
+inline void LookAnswered(std::size_t core, std::uint64_t thread, bool same_core = true) noexcept {
+    if (core >= kCores) return;
+    Core& entry = Cores()[core];
+    if (same_core) {
+        entry.own_thread.store(thread, std::memory_order_relaxed);
+        entry.own.store(2, std::memory_order_relaxed);
+    }
+    entry.answers.fetch_add(1, std::memory_order_release);
+}
+
+// The game's modules where they are loaded, for addresses as main+0x... (guest_sample.h fills it).
+struct GuestModule {
+    std::uint64_t base = 0, end = 0;
+    char name[32] = {};
+};
+inline constexpr unsigned kGuestModules = 24;
+struct GuestModules {
+    GuestModule entry[kGuestModules];
+    unsigned count = 0;
+};
+// "main+0x1a2b3c" for an address in a module, else "0x..." (always terminated).
+inline void Where(char* out, std::size_t size, const GuestModules& modules, std::uint64_t address) noexcept {
+    for (unsigned i = 0; i < modules.count && i < kGuestModules; ++i) {
+        const GuestModule& module = modules.entry[i];
+        if (address >= module.base && address < module.end) {
+            std::snprintf(out, size, "%s+0x%llx", module.name[0] ? module.name : "?",
+                          static_cast<unsigned long long>(address - module.base));
+            return;
+        }
+    }
+    std::snprintf(out, size, "0x%llx", static_cast<unsigned long long>(address));
+}
+
+// What a look found (guest_sample.h): the thread's registers, and with a full look the words around
+// pc, the frame pointer chain's return addresses and the memory some registers point at.
+struct GuestLook {
+    std::size_t core = 0;
+    std::uint64_t thread = 0;
+    const char* name = "-";
+    int priority = 0;
+    std::uint64_t x[31] = {}; // x0-x28, fp (x29), lr (x30)
+    std::uint64_t sp = 0, pc = 0;
+    std::uint32_t pstate = 0;
+    std::uint64_t code_from = 0;
+    std::uint32_t code[32] = {};
+    unsigned code_words = 0;
+    std::uint64_t frames[12] = {};
+    unsigned frame_count = 0;
+    struct Data {
+        unsigned reg = 0;
+        std::uint64_t at = 0;
+        std::uint64_t words[8] = {};
+    } data[16];
+    unsigned data_count = 0;
+};
+// The registers whose memory a full look shows (arguments, the indirect result, callee-saved).
+inline constexpr unsigned kDataRegs[] = {0, 1, 2, 3, 8, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28};
+
+class Text {
+public:
+    __attribute__((format(printf, 2, 3))) void Add(const char* format, ...) noexcept {
+        if (at_ >= sizeof(line_) - 1) return;
+        va_list args;
+        va_start(args, format);
+        const int wrote = std::vsnprintf(line_ + at_, sizeof(line_) - at_, format, args);
+        va_end(args);
+        if (wrote > 0) at_ = std::min(sizeof(line_) - 1, at_ + static_cast<std::size_t>(wrote));
+    }
+    void Where(const GuestModules& modules, std::uint64_t address) noexcept {
+        char where[64];
+        ::Eden::Progress::Where(where, sizeof(where), modules, address);
+        Add("%s", where);
+    }
+    // Ends the line and writes it to stderr.log.
+    void Print() noexcept;
+
+private:
+    char line_[1536] = {};
+    std::size_t at_ = 0;
+};
+
+// The first lines of a look: the thread and where it is (EDEN_STUCK_GUEST, or EDEN_STUCK_PC for a
+// look at pc and lr only), then its registers, its return chain and the code around pc.
+inline void PrintLook(const GuestLook& look, const GuestModules& modules, unsigned kind) noexcept;
+// The memory the pointer registers show (after the first lines: reading it can be slow).
+inline void PrintLookData(const GuestLook& look) noexcept;
+
+// One guest thread of the game, from the threads' list (guest_sample.h): its saved context, so a
+// thread running on another core shows where it last switched out.
+struct GuestThreadRow {
+    std::uint64_t id = 0;
+    const char* name = "-";
+    const char* state = "?";
+    int priority = 0, base_priority = 0, core = -1, running = -1;
+    std::uint32_t suspend = 0;
+    std::uint64_t owner = 0, key = 0, arbiter = 0;
+    std::uint64_t pc = 0, lr = 0, sp = 0;
+    std::uint64_t frames[6] = {};
+    unsigned frame_count = 0;
+};
+inline void PrintThreadsHeader(std::size_t core, std::size_t count) noexcept;
+inline void PrintThreadRow(const GuestThreadRow& row, const GuestModules& modules) noexcept;
 
 // ---- Service requests (headless/CMakeLists.txt, ServiceFrameworkBase::HandleSyncRequest) ----
 
@@ -236,6 +421,9 @@ struct Timing {
     long long stuck_ms[3] = {10000, 60000, 300000};
     long long quiet_ms = 60000;     // a thread with no request for this long is quiet...
     std::uint64_t quiet_calls = 100; // ...when it had made at least this many
+    long long answer_ms = 2000;     // a look not answered by then: EDEN_STUCK_NO_ANSWER
+    unsigned pc_looks = 4;          // pc-only looks after an incident's first report, one a look
+    unsigned thread_lists = 2;      // reports a session that also list every guest thread
 };
 inline Timing& Times() noexcept {
     static Timing timing;
@@ -257,6 +445,91 @@ inline void Line(const char* text) noexcept {
     std::fflush(stderr);
 }
 
+inline void Text::Print() noexcept {
+    line_[at_ < sizeof(line_) - 1 ? at_ : sizeof(line_) - 2] = '\n';
+    line_[at_ < sizeof(line_) - 1 ? at_ + 1 : sizeof(line_) - 1] = '\0';
+    Line(line_);
+    at_ = 0;
+    line_[0] = '\0';
+}
+
+inline void PrintLook(const GuestLook& look, const GuestModules& modules, unsigned kind) noexcept {
+    const unsigned long long thread = look.thread;
+    Text text;
+    if (kind == kLookPc) {
+        text.Add("EDEN_STUCK_PC core=%zu thread=%llu pc=", look.core, thread);
+        text.Where(modules, look.pc);
+        text.Add(" lr=");
+        text.Where(modules, look.x[30]);
+        text.Print();
+        return;
+    }
+    text.Add("EDEN_STUCK_GUEST core=%zu thread=%llu name=%s prio=%d pc=", look.core, thread,
+             look.name && look.name[0] ? look.name : "-", look.priority);
+    text.Where(modules, look.pc);
+    text.Add(" lr=");
+    text.Where(modules, look.x[30]);
+    text.Add(" sp=0x%llx fp=0x%llx pstate=0x%x (where the guest's code runs: a loop shows the same pc again)",
+             static_cast<unsigned long long>(look.sp), static_cast<unsigned long long>(look.x[29]), look.pstate);
+    text.Print();
+    text.Add("EDEN_STUCK_REGS core=%zu", look.core);
+    for (unsigned r = 0; r < 31; ++r) text.Add(" x%u=%llx", r, static_cast<unsigned long long>(look.x[r]));
+    text.Print();
+    text.Add("EDEN_STUCK_FRAMES core=%zu", look.core);
+    for (unsigned i = 0; i < look.frame_count && i < 12; ++i) {
+        text.Add(" ");
+        text.Where(modules, look.frames[i]);
+    }
+    if (look.frame_count == 0) text.Add(" none");
+    text.Print();
+    text.Add("EDEN_STUCK_CODE core=%zu from=", look.core);
+    text.Where(modules, look.code_from);
+    text.Add(" pc_word=%llu:", static_cast<unsigned long long>((look.pc - look.code_from) / 4));
+    for (unsigned i = 0; i < look.code_words && i < 32; ++i) text.Add(" %08x", look.code[i]);
+    text.Print();
+}
+
+inline void PrintLookData(const GuestLook& look) noexcept {
+    Text text;
+    for (unsigned i = 0; i < look.data_count && i < 16; ++i) {
+        const GuestLook::Data& data = look.data[i];
+        text.Add("EDEN_STUCK_DATA core=%zu x%u=0x%llx:", look.core, data.reg, static_cast<unsigned long long>(data.at));
+        for (const std::uint64_t word : data.words) text.Add(" %016llx", static_cast<unsigned long long>(word));
+        text.Print();
+    }
+}
+
+inline void PrintThreadsHeader(std::size_t core, std::size_t count) noexcept {
+    Text text;
+    text.Add("EDEN_STUCK_THREADS core=%zu count=%zu (each thread's saved context: one running on another core "
+             "shows where it last switched out)",
+             core, count);
+    text.Print();
+}
+
+inline void PrintThreadRow(const GuestThreadRow& row, const GuestModules& modules) noexcept {
+    Text text;
+    text.Add("EDEN_STUCK_THREAD id=%llu name=%s state=%s prio=%d/%d core=%d", static_cast<unsigned long long>(row.id),
+             row.name && row.name[0] ? row.name : "-", row.state ? row.state : "?", row.priority, row.base_priority,
+             row.core);
+    if (row.running >= 0) text.Add(" running=%d", row.running);
+    if (row.suspend) text.Add(" suspend=0x%x", row.suspend);
+    if (row.owner) text.Add(" lock_owner=%llu", static_cast<unsigned long long>(row.owner));
+    if (row.key) text.Add(" key=0x%llx", static_cast<unsigned long long>(row.key));
+    if (row.arbiter) text.Add(" arbiter=0x%llx", static_cast<unsigned long long>(row.arbiter));
+    text.Add(" pc=");
+    text.Where(modules, row.pc);
+    text.Add(" lr=");
+    text.Where(modules, row.lr);
+    text.Add(" sp=0x%llx frames=", static_cast<unsigned long long>(row.sp));
+    for (unsigned i = 0; i < row.frame_count && i < 6; ++i) {
+        if (i) text.Add(",");
+        text.Where(modules, row.frames[i]);
+    }
+    if (row.frame_count == 0) text.Add("none");
+    text.Print();
+}
+
 // Which of the ages an incident of `age` ms has crossed since it was last reported (`reported`:
 // how many of them were), and so whether to print it now.
 inline bool Crossed(long long age, unsigned& reported) noexcept {
@@ -272,6 +545,7 @@ class Watchdog {
 public:
     void Start() {
         Stop();
+        ForgetPokes();
         for (unsigned kind = 0; kind < kKinds; ++kind) Finished()[kind].store(0, std::memory_order_relaxed);
         for (unsigned i = 0; i < kGuestThreads; ++i) {
             GuestThread& entry = GuestThreads()[i];
@@ -293,16 +567,47 @@ public:
         }
         wake_.notify_all();
         if (thread_.joinable()) thread_.join();
+        // The session's cores go away after the stop: nothing may poke them any more.
+        ForgetPokes();
     }
     ~Watchdog() { Stop(); }
 
 private:
     struct CoreSeen {
-        std::uint64_t changes = ~std::uint64_t{0};
+        std::uint64_t moved = ~std::uint64_t{0};
         long long same_since = 0;
         std::uint64_t window_start = 0;
         unsigned reported = 0;
+        // A look asked of the core and not answered yet, and the pc-only looks still to ask.
+        bool asking = false;
+        long long asked_at = 0;
+        std::uint64_t answers = 0;
+        unsigned pc_looks = 0;
     };
+
+    static void ForgetPokes() noexcept {
+        for (std::size_t core = 0; core < kCores; ++core) {
+            Core& entry = Cores()[core];
+            entry.want.store(kLookNone, std::memory_order_relaxed);
+            entry.poke.store(nullptr, std::memory_order_release);
+            entry.poke_self.store(nullptr, std::memory_order_release);
+        }
+    }
+
+    // Asks a core in the guest's code for a look; false when it cannot be asked.
+    static bool Ask(std::size_t core, unsigned look, CoreSeen& seen, long long now) noexcept {
+        Core& entry = Cores()[core];
+        void* const self = entry.poke_self.load(std::memory_order_acquire);
+        void (*const poke)(void*) = entry.poke.load(std::memory_order_acquire);
+        if (poke == nullptr || self == nullptr) return false;
+        seen.answers = entry.answers.load(std::memory_order_acquire);
+        seen.asking = true;
+        seen.asked_at = now;
+        // A pc look the core has not taken yet becomes this look: it is asked again later.
+        if (entry.want.exchange(look, std::memory_order_acq_rel) == kLookPc && look != kLookPc) ++seen.pc_looks;
+        poke(self);
+        return true;
+    }
     struct RequestSeen {
         long long since = 0;
         unsigned reported = 0;
@@ -316,6 +621,7 @@ private:
         long long fault_since_seen = 0;
         unsigned fault_reported = 0;
         bool ring_printed = false;
+        unsigned thread_lists = 0;
         std::uint64_t finished_before[kKinds] = {};
         for (std::size_t core = 0; core < kCores; ++core)
             cores[core].window_start = Cores()[core].changes.load(std::memory_order_acquire);
@@ -327,31 +633,77 @@ private:
             const long long now = NowNs();
             bool stuck_long = false;
             char line[512];
-            // The cores: one busy state with no change since the last look.
+            // The cores: one busy state with no change since the last look (a look's own stop is
+            // not a change: Core::moved).
             for (std::size_t core = 0; core < kCores; ++core) {
-                const Core& entry = Cores()[core];
-                const std::uint64_t changes = entry.changes.load(std::memory_order_acquire);
+                Core& entry = Cores()[core];
+                const std::uint64_t moved = entry.moved.load(std::memory_order_acquire);
                 CoreSeen& seen = cores[core];
-                if (changes != seen.changes) {
-                    seen.changes = changes;
+                if (seen.asking && entry.answers.load(std::memory_order_acquire) != seen.answers) seen.asking = false;
+                if (moved != seen.moved) {
+                    seen.moved = moved;
                     seen.same_since = now;
                     seen.reported = 0;
+                    seen.pc_looks = 0;
+                    // A core that moves answers at its next stop; one asked long ago is asked no more.
+                    if (seen.asking && now - seen.asked_at >= Times().answer_ms * 1000000) {
+                        entry.want.store(kLookNone, std::memory_order_relaxed);
+                        seen.asking = false;
+                    }
                     continue;
                 }
                 const unsigned state = entry.state.load(std::memory_order_relaxed);
                 if (state == kIdle) continue;
+                const unsigned long long thread = entry.thread.load(std::memory_order_relaxed);
+                if (seen.asking && now - seen.asked_at >= Times().answer_ms * 1000000) {
+                    // It did not stop when asked, in the guest's code since before it was asked: not
+                    // a guest loop, but the core's host thread held in the emulator under the guest's
+                    // code. (One asked between two runs of the guest's code is only asked no more.)
+                    entry.want.store(kLookNone, std::memory_order_relaxed);
+                    seen.asking = false;
+                    seen.pc_looks = 0;
+                    if (state == kGuest && seen.same_since <= seen.asked_at) {
+                        std::snprintf(line, sizeof(line),
+                                      "EDEN_STUCK_NO_ANSWER core=%zu thread=%llu seconds=%lld (asked to stop for a "
+                                      "look, it did not: its host thread is held in the emulator under the guest's "
+                                      "code, in a memory callback, a GPU flush or a fault handler)\n",
+                                      core, thread, (now - seen.asked_at) / 1000000000);
+                        Line(line);
+                    }
+                }
                 const long long age = (now - seen.same_since) / 1000000;
-                if (!Crossed(age, seen.reported)) continue;
+                const unsigned reported_before = seen.reported;
+                if (!Crossed(age, seen.reported)) {
+                    // The pc-only looks after an incident's first report, one a look.
+                    if (state == kGuest && !seen.asking && seen.pc_looks > 0) {
+                        --seen.pc_looks;
+                        (void)Ask(core, kLookPc, seen, now);
+                    }
+                    continue;
+                }
                 stuck_long |= seen.reported >= 2;
                 std::snprintf(line, sizeof(line),
                               "EDEN_STUCK core=%zu state=%s svc=0x%x thread=%llu seconds=%lld (%s)\n", core,
-                              CoreStateName(state), entry.svc.load(std::memory_order_relaxed),
-                              static_cast<unsigned long long>(entry.thread.load(std::memory_order_relaxed)),
+                              CoreStateName(state), entry.svc.load(std::memory_order_relaxed), thread,
                               age / 1000,
                               state == kGuest ? "in the guest's code, or a fault handler under it"
                               : state == kSvc ? "in this system call's handler"
                                               : "in the emulator between guest threads");
                 Line(line);
+                // In the guest's code: where (EDEN_STUCK_GUEST), and with the first reports of a
+                // session every guest thread too, with where the other cores' threads run now (their
+                // saved contexts are only where they last switched out).
+                if (state == kGuest) {
+                    const bool threads = thread_lists < Times().thread_lists;
+                    if (Ask(core, threads ? kLookThreads : kLookFull, seen, now) && threads) {
+                        ++thread_lists;
+                        for (std::size_t other = 0; other < kCores; ++other)
+                            if (other != core && !cores[other].asking &&
+                                Cores()[other].state.load(std::memory_order_relaxed) == kGuest)
+                                (void)Ask(other, kLookPc, cores[other], now);
+                    }
+                    if (reported_before == 0) seen.pc_looks += Times().pc_looks;
+                }
             }
             // Requests in progress.
             const unsigned slots = std::min(RequestSlotsTaken().load(std::memory_order_relaxed), kRequestSlots);
@@ -398,9 +750,19 @@ private:
                 const long long age = (now - fault_since) / 1000000;
                 if (Crossed(age, fault_reported)) {
                     stuck_long |= fault_reported >= 2;
+                    // What the latest write to fault waits for (src/guest_memory_service.inc).
+                    unsigned stage = 0, slot_state = 0;
+                    const std::uintptr_t address =
+                        eden_guest_fault_detail ? eden_guest_fault_detail(&stage, &slot_state) : 0;
                     std::snprintf(line, sizeof(line),
-                                  "EDEN_STUCK fault_handler threads=%u seconds=%lld (a write of the guest's memory)\n",
-                                  faulting, age / 1000);
+                                  "EDEN_STUCK fault_handler threads=%u seconds=%lld address=0x%llx stage=%s slot=0x%x "
+                                  "(a write of the guest's memory)\n",
+                                  faulting, age / 1000, static_cast<unsigned long long>(address),
+                                  stage == 1   ? "slot_lock"
+                                  : stage == 2 ? "making_writable"
+                                  : stage == 3 ? "waiting_for_memory"
+                                               : "?",
+                                  slot_state);
                     Line(line);
                 }
             }
