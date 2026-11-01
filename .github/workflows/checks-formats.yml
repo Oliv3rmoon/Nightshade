@@ -1,9 +1,9 @@
 {
- "name": "Nightshade TOTK freeze formats checks",
+ "name": "Nightshade test build updates formats checks",
  "on": {
   "push": {
    "branches": [
-    "test/totk-freeze"
+    "test/test-build-updates"
    ]
   },
   "workflow_dispatch": {}
@@ -23,7 +23,7 @@
    "env": {
     "XDG_CACHE_HOME": "/tmp/prosperoeden-dev-host-cache",
     "PROSPEROEDEN_DEPS_CACHE": "/tmp/prosperoeden-dev-downloads",
-    "DEV_HEAD": "81c24ecdf9e23ccba272189a2cf08c9128fb2660",
+    "DEV_HEAD": "c7cbd4b57a1bdeaa2899c35e116bd0ffc81ee76c",
     "GITHUB_TOKEN": "${{ github.token }}"
    },
    "steps": [
@@ -31,7 +31,7 @@
      "name": "Check out the feature/formats commit",
      "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
      "with": {
-      "ref": "81c24ecdf9e23ccba272189a2cf08c9128fb2660",
+      "ref": "c7cbd4b57a1bdeaa2899c35e116bd0ffc81ee76c",
       "persist-credentials": false
      }
     },
