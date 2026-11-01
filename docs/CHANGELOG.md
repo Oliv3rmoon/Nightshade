@@ -2,6 +2,20 @@
 
 What changed in each release of ProsperoEden, newest first. A release's notes on GitHub are its section here.
 
+## v1.010.009
+
+**Test builds through Update now.** A tester asked for each new test build to come through **Update now** instead of being copied over by hand. **Settings > Diagnostics > Test builds** (off by default) does it. Not confirmed on a console yet.
+
+### New
+
+- **Test builds in Update now.** Switched on, the check at the start offers the newest release of the version line you have, a test build or not: the releases with the same first two numbers and a higher third (1.010.010 for 1.010.009). Another line is never offered, however new: not 1.011 (another title ID and folder), and not 1.012 (the Switch 2 test line). The update dialog says **Test build available** with the release's title, and the download is checked against that release's own `SHA256SUMS` and installed as any update is. It applies the next time Nightshade opens. See [Test builds](https://github.com/Oliv3rmoon/Nightshade/blob/v1.010.009/docs/SETTINGS.md#test-builds).
+
+Everything else is v1.010.008, its freeze diagnostics too.
+
+### Install
+
+This is a test release, and the versions before it don't have the switch, so **Update now** doesn't offer it. Download `Nightshade-v1.010.009.zip` below and copy its `PPSA99008` folder over yours. Then switch on **Test builds**, and the next test builds come through **Update now**.
+
 ## v1.010.008
 
 **A test build for Tears of the Kingdom's freeze.** On v1.010.007 a tester's TOTK froze about 70 minutes in, on a loading screen: the picture and the sound kept going and memory was fine, but the load never finished. This build doesn't fix that yet. It makes a frozen game say what it is waiting on. Not confirmed on a console yet: play TOTK until it freezes (or as long as you can), then send `/data/prosperoeden/logs` and `/data/prosperoeden/user/log`.
