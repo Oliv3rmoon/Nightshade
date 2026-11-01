@@ -960,6 +960,8 @@ bool EdenServices::take_update(pe::ui::UpdateOffer* offer) {
     offer->installable = found.installable;
     offer->notes = found.notes;
     offer->notes_truncated = found.notes_truncated;
+    offer->test_build = found.test_build;
+    offer->title = found.title;
     return true;
 }
 
@@ -1214,6 +1216,7 @@ pe::ui::Preferences EdenServices::preferences() {
     result.wallpaper = saved.wallpaper;
     result.update_notices = saved.update_notices;
     result.community_seen = saved.community_seen;
+    result.test_builds = saved.test_builds;
     // Settings > Performance: the general values (settings_store.h).
     const Eden::PerformanceSettings speed = Eden::LoadPerformance(0);
     result.block_list = speed.block_list;
@@ -1265,6 +1268,7 @@ bool EdenServices::set_preferences(const pe::ui::Preferences& preferences) {
     value.wallpaper = preferences.wallpaper;
     value.update_notices = preferences.update_notices;
     value.community_seen = preferences.community_seen;
+    value.test_builds = preferences.test_builds;
     value.mapping = preferences.mapping;
     value.menu_bind = preferences.menu_bind;
     Eden::PerformanceSettings speed = Eden::LoadPerformance(0);

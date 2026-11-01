@@ -598,6 +598,29 @@ void pictures(Stage &s)
     s.shoot("89-update-notes-truncated-end");
     s.services.update_notes_truncated = false;
 
+    // A test build (Settings > Diagnostics > Test builds): the dialog says so, with its title on
+    // GitHub; one without a title names its version as any update does; the notification says so.
+    s.services.update_test_build = true;
+    s.services.update_title = "Nightshade v1.000.061 (test release)";
+    s.services.update_version = "v1.000.061";
+    s.restart(true);
+    s.wait(2.6f);
+    s.shoot("89b-update-offer-test-build");
+    s.services.update_title.clear();
+    s.services.update_version = "v1.000.061";
+    s.restart(true);
+    s.wait(2.6f);
+    s.shoot("89c-update-offer-test-build-untitled");
+    s.restart();
+    s.wait(1.0f);
+    s.services.update_installable = false;
+    s.services.update_version = "v1.000.061";
+    s.wait(1.2f);
+    s.shoot("89d-update-notice-test-build");
+    s.wait(9.5f);
+    s.services.update_installable = true;
+    s.services.update_test_build = false;
+
     // Update notices off (Settings > Diagnostics): the check runs, but the app opens without the
     // offer; About names the newer version.
     {
@@ -878,7 +901,23 @@ void pictures(Stage &s)
         std::fprintf(stderr, "error: the Update notices switch did not reach the settings\n");
         s.ok = false;
     }
-    // Back up to USB, Diagnostics' fourth row: the drives and the size, a backup copying and done,
+    // Test builds: off until switched on, then on and back off, saved each time.
+    s.press({Key::down});
+    s.wait(0.6f);
+    s.shoot("18k-diagnostics-test-builds");
+    const bool tests_were_off = !s.services.preferences().test_builds;
+    s.press({Key::right});
+    s.wait(0.4f);
+    s.shoot("18l-diagnostics-test-builds-on");
+    const bool tests_on = s.services.preferences().test_builds;
+    s.press({Key::right});
+    s.wait(0.4f);
+    if (!tests_were_off || !tests_on || s.services.preferences().test_builds)
+    {
+        std::fprintf(stderr, "error: the Test builds switch did not reach the settings\n");
+        s.ok = false;
+    }
+    // Back up to USB, Diagnostics' fifth row: the drives and the size, a backup copying and done,
     // one on a drive that fills up, a cancel; then back to Diagnostics on its row.
     s.press({Key::down});
     s.wait(0.6f);

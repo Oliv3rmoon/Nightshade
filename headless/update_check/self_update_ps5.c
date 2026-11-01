@@ -432,3 +432,28 @@ self_update_check_result self_update_check_self_from(const char *repository, con
     return self_update_check_from(self_update_console(), repository, name, title, version, offer,
                                   report);
 }
+
+/* ProsperoEden: test builds (Settings > Diagnostics > Test builds): the same, asking the
+   repository's releases list, pre-releases with them (github_release_test_check). With no
+   repository named it is self_update_check_self() above: the catalog lists no test builds. */
+self_update_check_result self_update_check_self_tests(const char *repository, const char *name,
+                                                      self_update_offer *offer,
+                                                      github_release_report *report)
+{
+    char title[10];
+    char version[12];
+    if (report != NULL)
+        memset(report, 0, sizeof(*report));
+    if (offer == NULL || !update_check_read_param(SELF_UPDATE_PARAM_PATH, title, version))
+    {
+        if (offer != NULL)
+            memset(offer, 0, sizeof(*offer));
+        if (report != NULL)
+            report->reason = GITHUB_RELEASE_BAD_ARGUMENT;
+        return SELF_UPDATE_UNKNOWN;
+    }
+    (void)snprintf(self_update_agent, sizeof(self_update_agent), "homebrew-self-update/1 (%s)",
+                   title);
+    return self_update_check_tests_from(self_update_console(), repository, name, title, version, offer,
+                                        report);
+}

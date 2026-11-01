@@ -2155,6 +2155,16 @@ msgstr "Прибрано зі списку. Збереження лишилис�
 msgid "Tears of the Kingdom: 4 GiB and compressed ASTC in every tier, what it needs to play for hours."
 msgstr "Tears of the Kingdom: 4 GiB і стиснені ASTC на кожному рівні, що потрібно для багатогодинної гри."
 
+#. Update dialog and notification title: the newer release of this app on offer is a test build (made for testing, before a regular release).
+#: pe/ui/launcher.cpp, pe/ui/update.cpp
+msgid "Test build available"
+msgstr "Доступна тестова версія"
+
+#. Settings switch (Diagnostics, under Update notices): whether the app's update offer also includes test builds, releases of this app made for testing before a regular release (not games).
+#: pe/ui/settings.cpp
+msgid "Test builds"
+msgstr "Тестові версії"
+
 #: settings_store.h
 msgid "Thai"
 msgstr "Тайська"
@@ -2441,6 +2451,11 @@ msgstr "Сповіщення про оновлення"
 #: pe/ui/update.cpp
 msgid "Update now"
 msgstr "Оновити"
+
+#. About the Test builds switch. A version line is the releases sharing the version's first two numbers (1.010.007, 1.010.008...); test builds of other lines are never offered.
+#: pe/ui/settings.cpp
+msgid "Update offers include test builds of this version line. They can have new bugs."
+msgstr "До оновлень входять і тестові версії цієї лінійки. У них можуть бути нові помилки."
 
 #: pe/ui/update.cpp
 msgid "Update ready"

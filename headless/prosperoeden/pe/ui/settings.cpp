@@ -150,14 +150,15 @@ constexpr float kAccentRowHeight = 72.0f;
 constexpr int kAccentRowsShown = 6;
 constexpr Rect kAccentWindow{592.0f, kVideoRowsTop, 736.0f,
                              kAccentRowPitch * (kAccentRowsShown - 1) + kAccentRowHeight};
-// The Diagnostics dialog's rows, under the setup's state: three of the four show and the list
+// The Diagnostics dialog's rows, under the setup's state: three of the five show and the list
 // scrolls, as Controls' do.
 enum DiagnosticsRow : int
 {
     diagnostics_logging,
     diagnostics_immediate,
     diagnostics_notices,
-    diagnostics_backup, // opens Back up to USB (backup.cpp)
+    diagnostics_test_builds, // the update offer includes test builds (GitHub pre-releases)
+    diagnostics_backup,      // opens Back up to USB (backup.cpp, kDiagnosticsRow)
     kDiagnosticsRows,
 };
 constexpr float kDiagnosticsRowsTop = 470.0f;
@@ -617,7 +618,7 @@ int Launcher::dialog_rows(Modal modal) const
                         !games_[static_cast<std::size_t>(library_.selected)].remote ? 1 : 0);
     case Modal::controls:     // vibration, its strength, the button mapping, the menu's own buttons
         return kControlRows;
-    case Modal::diagnostics:  // detailed logging, logs written at once, update notices, the backup
+    case Modal::diagnostics:  // detailed logging, logs written at once, update notices, test builds, the backup
         return kDiagnosticsRows;
     default:
         return 1;
@@ -960,6 +961,8 @@ void Launcher::press_dialog(Key key)
             prefs_.detailed_logging = !prefs_.detailed_logging;
         else if (option_ == diagnostics_immediate)
             prefs_.immediate_logs = !prefs_.immediate_logs;
+        else if (option_ == diagnostics_test_builds)
+            prefs_.test_builds = !prefs_.test_builds;
         else
             prefs_.update_notices = !prefs_.update_notices;
         break;
@@ -1008,9 +1011,9 @@ void Launcher::press_dialog(Key key)
         // change arrives.
         say(tr("Saved. Applies when a game starts."));
     }
-    else if (modal_ == Modal::diagnostics && option_ == diagnostics_notices)
+    else if (modal_ == Modal::diagnostics && (option_ == diagnostics_notices || option_ == diagnostics_test_builds))
     {
-        // Update notices: the check and its answer come as the app opens.
+        // Update notices and Test builds: the check and its answer come as the app opens.
         say(tr("Saved. Applies the next time Nightshade opens."));
     }
     apply_look();
@@ -1078,10 +1081,11 @@ void Launcher::draw_dialog(Canvas &c, Modal modal, float open)
     default:
         title = tr("Diagnostics");
         sourced = update_text(tr("Says when homebrew.page has a newer version. Off, only About names it."));
-        copy = option_ == diagnostics_logging   ? tr("Detailed logs apply to the next game launch.") :
-               option_ == diagnostics_immediate ? tr("Keeps the last line before a crash, but games stutter. From the next start.") :
-               option_ == diagnostics_backup    ? tr("Copies settings, profiles and save data to a USB drive.") :
-                                                  sourced.c_str();
+        copy = option_ == diagnostics_logging     ? tr("Detailed logs apply to the next game launch.") :
+               option_ == diagnostics_immediate   ? tr("Keeps the last line before a crash, but games stutter. From the next start.") :
+               option_ == diagnostics_test_builds ? tr("Update offers include test builds of this version line. They can have new bugs.") :
+               option_ == diagnostics_backup      ? tr("Copies settings, profiles and save data to a USB drive.") :
+                                                    sourced.c_str();
         break;
     }
     text_shrink(c, title, 592.0f, baseline(218.0f, 62.0f, th().size_display), th().size_display,
@@ -1449,11 +1453,13 @@ void Launcher::draw_dialog(Canvas &c, Modal modal, float open)
         text_block(c, services_.setup_details(), 592.0f, baseline(350.0f, 38.0f, th().size_text),
                    th().size_text, 38.0f, th().body, 736.0f, 3, kShrink);
         static constexpr const char *kNames[kDiagnosticsRows] = {TR("Detailed logging"), TR("Write logs at once"),
-                                                                 TR("Update notices"), TR("Back up to USB")};
+                                                                 TR("Update notices"), TR("Test builds"),
+                                                                 TR("Back up to USB")};
         static constexpr const char *kAbout[kDiagnosticsRows] = {
             TR("Eden's debug messages in the logs of a game."),
             TR("Keeps the last line before a crash, but games stutter. From the next start."),
             TR("Says when homebrew.page has a newer version. Off, only About names it."),
+            TR("Update offers include test builds of this version line. They can have new bugs."),
             TR("Copies settings, profiles and save data to a USB drive.")};
         for (int row = first; row <= last; ++row)
         {

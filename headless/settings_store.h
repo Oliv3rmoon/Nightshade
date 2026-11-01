@@ -11,7 +11,7 @@
 //     "audio": { "volume": 100, "mute": false, "menu_volume": 70 },
 //     "controls": { "vibration": true, "vibration_strength": 100,
 //                   "mapping": { "a": "cross", "b": "circle" } },
-//     "system": { "language": "en-US", "update_notices": true },
+//     "system": { "language": "en-US", "update_notices": true, "test_builds": false },
 //     "accessibility": { "large_text": false, "high_contrast": false, "reduce_motion": false },
 //     "launcher": { "theme": "nightly", "community_seen": true },
 //     "diagnostics": { "detailed_logging": false, "immediate_logs": false },
@@ -184,6 +184,10 @@ struct Preferences {
     // The card naming the community (its Discord server) was closed: it shows once, at a start of
     // the app, and never again (pe/ui/community.cpp). About names the server whatever this says.
     bool community_seen = false;
+    // Settings > Diagnostics > Test builds: the update check also offers the GitHub repository's
+    // pre-releases of this version's line (update_check/github_release.h, test builds). Off by
+    // default; read as the app opens (update_notice.h).
+    bool test_builds = false;
 };
 
 inline int KeyIndex(const std::string& value, const char* const* keys, int count, int fallback) {
@@ -501,6 +505,7 @@ inline Preferences LoadPreferences(const std::string& file = SettingsFile()) {
                                kLanguageKeys, int(std::size(kLanguageKeys)), result.language);
     result.update_notices = Settings::Bool(document, Json::json_pointer("/system/update_notices"),
                                            result.update_notices);
+    result.test_builds = Settings::Bool(document, Json::json_pointer("/system/test_builds"), result.test_builds);
     result.large_text = Settings::Bool(document, Json::json_pointer("/accessibility/large_text"), false);
     result.high_contrast = Settings::Bool(document, Json::json_pointer("/accessibility/high_contrast"), false);
     result.reduce_motion = Settings::Bool(document, Json::json_pointer("/accessibility/reduce_motion"), false);
@@ -554,6 +559,7 @@ inline bool SavePreferences(const Preferences& value, const std::string& file = 
     else document["controls"]["menu_mapping"] = Settings::MenuMappingJson(value.menu_bind);
     document["system"]["language"] = kLanguageKeys[value.language];
     document["system"]["update_notices"] = value.update_notices;
+    document["system"]["test_builds"] = value.test_builds;
     document["diagnostics"]["detailed_logging"] = value.detailed_logging;
     document["diagnostics"]["immediate_logs"] = value.immediate_logs;
     document["accessibility"]["large_text"] = value.large_text;

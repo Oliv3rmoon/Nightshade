@@ -2155,6 +2155,16 @@ msgstr "Odebráno ze seznamu. Uložená data zůstávají na konzoli."
 msgid "Tears of the Kingdom: 4 GiB and compressed ASTC in every tier, what it needs to play for hours."
 msgstr "Tears of the Kingdom: 4 GiB a komprimované ASTC v každé úrovni, což potřebuje k hraní celé hodiny."
 
+#. Update dialog and notification title: the newer release of this app on offer is a test build (made for testing, before a regular release).
+#: pe/ui/launcher.cpp, pe/ui/update.cpp
+msgid "Test build available"
+msgstr "Je dostupná testovací verze"
+
+#. Settings switch (Diagnostics, under Update notices): whether the app's update offer also includes test builds, releases of this app made for testing before a regular release (not games).
+#: pe/ui/settings.cpp
+msgid "Test builds"
+msgstr "Testovací verze"
+
 #: settings_store.h
 msgid "Thai"
 msgstr "Thajština"
@@ -2441,6 +2451,11 @@ msgstr "Upozornění na aktualizace"
 #: pe/ui/update.cpp
 msgid "Update now"
 msgstr "Aktualizovat"
+
+#. About the Test builds switch. A version line is the releases sharing the version's first two numbers (1.010.007, 1.010.008...); test builds of other lines are never offered.
+#: pe/ui/settings.cpp
+msgid "Update offers include test builds of this version line. They can have new bugs."
+msgstr "Aktualizace nabídnou i testovací verze této řady. Mohou mít nové chyby."
 
 #: pe/ui/update.cpp
 msgid "Update ready"

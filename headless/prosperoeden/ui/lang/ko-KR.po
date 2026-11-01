@@ -2155,6 +2155,16 @@ msgstr "목록에서 뺐습니다. 저장 데이터는 본체에 남습니다."
 msgid "Tears of the Kingdom: 4 GiB and compressed ASTC in every tier, what it needs to play for hours."
 msgstr "Tears of the Kingdom: 모든 단계에서 4 GiB와 압축 ASTC 사용. 오래 플레이하는 데 필요한 설정입니다."
 
+#. Update dialog and notification title: the newer release of this app on offer is a test build (made for testing, before a regular release).
+#: pe/ui/launcher.cpp, pe/ui/update.cpp
+msgid "Test build available"
+msgstr "테스트 버전이 있습니다"
+
+#. Settings switch (Diagnostics, under Update notices): whether the app's update offer also includes test builds, releases of this app made for testing before a regular release (not games).
+#: pe/ui/settings.cpp
+msgid "Test builds"
+msgstr "테스트 버전"
+
 #: settings_store.h
 msgid "Thai"
 msgstr "태국어"
@@ -2441,6 +2451,11 @@ msgstr "업데이트 알림"
 #: pe/ui/update.cpp
 msgid "Update now"
 msgstr "지금 업데이트"
+
+#. About the Test builds switch. A version line is the releases sharing the version's first two numbers (1.010.007, 1.010.008...); test builds of other lines are never offered.
+#: pe/ui/settings.cpp
+msgid "Update offers include test builds of this version line. They can have new bugs."
+msgstr "업데이트로 이 버전 계열의 테스트 버전도 알려 줍니다. 새로운 버그가 있을 수 있습니다."
 
 #: pe/ui/update.cpp
 msgid "Update ready"

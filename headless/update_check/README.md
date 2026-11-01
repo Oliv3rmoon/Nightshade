@@ -37,6 +37,14 @@ tells an answer too long for its buffer (`SELF_UPDATE_FETCH_TOO_LARGE`) from a
 failed transfer. The host test is `headless/update_check_check.cpp`
 (`tools/check-update-check.py`).
 
+Test builds (Settings > Diagnostics > Test builds) are `github_release_test_check` in the same
+file, with `self_update_check_tests_from` and, in `self_update_ps5.c`,
+`self_update_check_self_tests`: the repository's releases list (`releases?per_page=100`)
+instead of `releases/latest`, the release `github_release_pick` chooses from it (the newest of
+the installed version's line, its first two numbers, a pre-release or not; never another line),
+then that release's `SHA256SUMS` and ZIP as before. The offer has two more fields, `prerelease`
+and `release_title`, for the dialog only; the helper is told what any update tells it.
+
 For Nightshade's Apps (`headless/apps.h`), which install and update other apps from their own
 GitHub releases, the kit has three more things. `github_release_asset_check` finds a release's
 file by its name (`PPSA99003.zip`), whatever the tag, with its SHA-256 from the release's

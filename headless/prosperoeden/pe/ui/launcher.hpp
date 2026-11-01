@@ -39,7 +39,7 @@ class Launcher
 
     // An offer a launcher pack took before this launcher replaced it; with Update notices off it
     // is only named in About.
-    void accept_update_offer(const UpdateOffer& offer) { update_=offer; update_version_=offer.version; notes_laid_out_=false; update_waiting_=offer.installable && prefs_.update_notices; }
+    void accept_update_offer(const UpdateOffer& offer) { update_=offer; update_version_=offer.version; update_test_build_=offer.test_build; notes_laid_out_=false; update_waiting_=offer.installable && prefs_.update_notices; }
     bool take_launcher_picker() { return std::exchange(launcher_picker_, false); }
     void press(Key key);
     void update(float dt);
@@ -463,6 +463,7 @@ class Launcher
     float clock_wait_ = 0.0f;
     float presence_wait_ = 0.0f; // time since the shown games' files were last looked at
     std::string update_version_;       // the newer release being announced
+    bool update_test_build_ = false;   // ... is a test build (the notification says so)
     float update_notice_left_ = 0.0f;  // seconds its notification still shows
     tween::Spring update_notice_in_;   // 0 away .. 1 in place
     // The update dialog.

@@ -879,6 +879,384 @@ void CatalogUnchanged() {
     assert(Check(kRepository, "01.005.000", &offer, &report) == SELF_UPDATE_UNKNOWN);
     for (const std::string& url : network.asked) assert(url.find("homebrew.page") == std::string::npos);
 }
+
+// ---- Test builds (Settings > Diagnostics > Test builds) -------------------------------------
+
+constexpr const char* kList = "https://api.github.com/repos/Oliv3rmoon/Nightshade/releases?per_page=100";
+constexpr const char* kOldList = "https://api.github.com/repos/Oliv3rmoon/ProsperoEden/releases?per_page=100";
+constexpr const char* kMovedList = "https://api.github.com/repositories/1421452418/releases?per_page=100";
+
+// A release of the fixture's shape with another tag: its files, addresses and title follow the tag,
+// as the release workflow names them (Nightshade-<tag>.zip and SHA256SUMS).
+std::string ReleaseOf(const std::string& tag, bool prerelease, const std::string& title = "") {
+    std::string json = WithAll(kRelease, "v1.005.100", tag);
+    if (prerelease) json = With(json, "\"prerelease\": false", "\"prerelease\": true");
+    if (!title.empty()) json = With(json, "\"name\": \"Nightshade " + tag + "\"", "\"name\": \"" + title + "\"");
+    return json;
+}
+
+// The releases list as GitHub answers it: an array of releases, in GitHub's order, not the versions'.
+std::string ListOf(const std::vector<std::string>& releases) {
+    std::string json = "[\n";
+    for (std::size_t i = 0; i < releases.size(); ++i) json += (i ? ",\n" : "") + releases[i];
+    return json + "\n]";
+}
+
+std::string SumsUrl(const std::string& tag) {
+    return "https://github.com/Oliv3rmoon/Nightshade/releases/download/" + tag + "/SHA256SUMS";
+}
+std::string ZipUrl(const std::string& tag) {
+    return "https://github.com/Oliv3rmoon/Nightshade/releases/download/" + tag + "/Nightshade-" + tag + ".zip";
+}
+// Each release's SHA256SUMS gives its ZIP a digest of its own, so the one used says whose it is.
+std::string DigestOf(const std::string& tag) {
+    std::string digest(64, '0');
+    for (std::size_t i = 0; i < digest.size(); ++i) digest[i] = "0123456789abcdef"[(tag[i % tag.size()] + i) % 16];
+    return digest;
+}
+
+// The repository as it is now (Oliv3rmoon/Nightshade, 2026-11-01), in the order GitHub lists it:
+// the 1.010 line (PPSA99008) stable and test, the own title ID's line 1.011 and the Switch 2 test
+// line 1.012 (both PPSA64448), the fork's first test builds, whose tags are no versions, and a
+// draft (which only the repository's owner would see).
+std::vector<std::string> Repository() {
+    return {ReleaseOf("v1.010.007", false),
+            ReleaseOf("v1.010.008", true, "Nightshade v1.010.008 (test release)"),
+            ReleaseOf("v1.010.006", false),
+            ReleaseOf("v1.012.001", true, "Nightshade v1.012.001 (Switch 2 test release)"),
+            ReleaseOf("v1.012.000", true, "Nightshade v1.012.000 (Switch 2 test release)"),
+            ReleaseOf("v1.011.002", true, "Nightshade v1.011.002 (test release)"),
+            ReleaseOf("v1.011.000", true, "Nightshade v1.011.000 (test release)"),
+            ReleaseOf("v1.010.003", false),
+            With(WithAll(ReleaseOf("v1.010.008", true), "v1.010.008", "oliv3rmoon-build-3"),
+                 "\"name\": \"Nightshade oliv3rmoon-build-3\"", "\"name\": \"ProsperoEden build 3\""),
+            With(ReleaseOf("v1.010.099", false), "\"draft\": false", "\"draft\": true")};
+}
+
+const char* kListTags[] = {"v1.010.007", "v1.010.008", "v1.010.006", "v1.012.001", "v1.012.000",
+                           "v1.011.002", "v1.011.000", "v1.010.003", "v1.010.099"};
+
+void ServeList(const std::string& list, const char* at = kList) {
+    network = Network{};
+    network.answers[at] = {200, list};
+    for (const char* tag : kListTags) network.files[SumsUrl(tag)] = DigestOf(tag) + "  Nightshade-" + tag + ".zip\n";
+}
+
+self_update_check_result TestCheck(const char* repository, const char* installed, self_update_offer* offer,
+                                   github_release_report* report) {
+    network.asked.clear();
+    return self_update_check_tests_from(&kPlatform, repository, "Nightshade", "PPSA99008", installed, offer, report);
+}
+
+// Which tag github_release_pick chooses for an install of `installed` ("" for none).
+std::string Picked(const std::string& list, const char* installed, github_release_reason* reason = nullptr,
+                   int* listed = nullptr) {
+    const char* chosen = nullptr;
+    std::size_t length = 0;
+    const github_release_reason found = github_release_pick(list.data(), list.size(), installed, &chosen, &length, listed);
+    if (reason) *reason = found;
+    if (found != GITHUB_RELEASE_NEWER) {
+        assert(chosen == nullptr && length == 0);
+        return "";
+    }
+    char tag[40] = {};
+    assert(update_check_json_string(chosen, length, "tag_name", tag, sizeof(tag)) == 1);
+    return tag;
+}
+
+void Lines() {
+    // The line is the first two numbers; the third is the build on it.
+    assert(github_release_same_line("01.010.009", "01.010.008") && github_release_same_line("01.010.008", "01.010.008"));
+    assert(github_release_same_line("01.010.000", "01.010.999") && github_release_same_line("10.000.001", "10.000.000"));
+    // The own title ID's line, the Switch 2 test line, another major version, an older line: never.
+    for (const char* other : {"01.011.000", "01.011.002", "01.012.000", "01.012.001", "02.010.008", "00.010.008",
+                              "01.009.999", "11.010.008", "01.100.008", "01.001.008"})
+        assert(!github_release_same_line(other, "01.010.008") && !github_release_same_line("01.010.008", other));
+    // Anything that isn't a content version is on no line.
+    for (const char* bad : {"v1.010.009", "1.010.009", "01.010", "01.010.", "01.010.0089", "01.010.00a", "", "development"})
+        assert(!github_release_same_line(bad, "01.010.008") && !github_release_same_line("01.010.008", bad));
+    assert(!github_release_same_line(nullptr, "01.010.008") && !github_release_same_line("01.010.008", nullptr));
+
+    // The list's address, and the one a renamed repository's list is sent on to, exactly.
+    char url[256];
+    assert(github_release_list_url(url, sizeof(url), kRepository) != 0 && std::strcmp(url, kList) == 0);
+    assert(github_release_list_url(url, sizeof(url), "Oliv3rmoon") == 0 && url[0] == '\0');
+    assert(github_release_list_url(url, sizeof(url), "x/y?per_page=1") == 0);
+    assert(github_release_list_url(url, 60, kRepository) == 0 && url[0] == '\0');
+    assert(github_release_list_url_allowed(kMovedList) == 1);
+    for (const char* elsewhere : {kList, kMoved, "https://api.github.com/repositories/1421452418/releases",
+                                  "https://api.github.com/repositories/1421452418/releases?per_page=1",
+                                  "https://api.github.com/repositories/1421452418/releases?per_page=100&page=2",
+                                  "https://api.github.com/repositories/1421452418/releases?per_page=100#x",
+                                  "https://api.github.com/repositories/01421452418/releases?per_page=100",
+                                  "https://example.net/repositories/1421452418/releases?per_page=100",
+                                  "http://api.github.com/repositories/1421452418/releases?per_page=100",
+                                  "https://api.github.com/repos/someone/else/releases?per_page=100", ""})
+        assert(github_release_list_url_allowed(elsewhere) == 0);
+    assert(github_release_list_url_allowed(nullptr) == 0);
+    // And releases/latest's redirect still goes to releases/latest alone, never to a list.
+    assert(github_release_api_url_allowed(kMovedList) == 0);
+}
+
+void Picking() {
+    const std::string list = ListOf(Repository());
+    github_release_reason reason{};
+    int listed = 0;
+    // The newest of the 1.010 line newer than the install, a test build or not, wherever it is in the
+    // list: 1.010.008 (a pre-release, listed second) for 1.010.007 and every earlier 1.010 build.
+    for (const char* installed : {"01.010.007", "01.010.006", "01.010.003", "01.010.000"}) {
+        assert(Picked(list, installed, &reason, &listed) == "v1.010.008" && reason == GITHUB_RELEASE_NEWER);
+        assert(listed == 10);
+    }
+    assert(Picked(Compact(list), "01.010.006") == "v1.010.008");
+    // 1.010.008 has nothing newer on its line: the 1.011 and 1.012 releases are newer, and never
+    // offered to it; nor is the draft of 1.010.099.
+    assert(Picked(list, "01.010.008", &reason) == "" && reason == GITHUB_RELEASE_NOT_NEWER);
+    assert(Picked(list, "01.010.099", &reason) == "" && reason == GITHUB_RELEASE_NOT_NEWER);
+    // Each line keeps to itself: a 1.011 install gets 1.011.002, a 1.012 one 1.012.001, an install
+    // of a line the list doesn't have (1.005, 2.010) nothing.
+    assert(Picked(list, "01.011.000") == "v1.011.002" && Picked(list, "01.011.001") == "v1.011.002");
+    assert(Picked(list, "01.012.000") == "v1.012.001");
+    assert(Picked(list, "01.005.105", &reason) == "" && reason == GITHUB_RELEASE_NOT_NEWER);
+    assert(Picked(list, "02.010.000", &reason) == "" && reason == GITHUB_RELEASE_NOT_NEWER);
+    assert(Picked(list, "development", &reason) == "" && reason == GITHUB_RELEASE_BAD_ARGUMENT);
+
+    // Version order is the numbers', not the list's: the highest third number, wherever it is.
+    assert(Picked(ListOf({ReleaseOf("v1.010.009", true), ReleaseOf("v1.010.100", true), ReleaseOf("v1.010.010", false),
+                          ReleaseOf("v1.010.099", false)}),
+                  "01.010.008") == "v1.010.100");
+    assert(Picked(ListOf({ReleaseOf("v1.010.010", false), ReleaseOf("v1.010.009", true)}), "01.010.008") ==
+           "v1.010.010");
+    assert(Picked(ListOf({ReleaseOf("v1.010.009", true), ReleaseOf("v1.010.010", false)}), "01.010.008") ==
+           "v1.010.010");
+    // A stable release newer than the test builds is the one offered; a test build newer than the
+    // stable one is.
+    assert(Picked(ListOf({ReleaseOf("v1.010.009", true), ReleaseOf("v1.010.010", false), ReleaseOf("v1.011.003", false)}),
+                  "01.010.008") == "v1.010.010");
+    assert(Picked(ListOf({ReleaseOf("v1.010.010", false), ReleaseOf("v1.010.011", true), ReleaseOf("v1.012.002", true)}),
+                  "01.010.008") == "v1.010.011");
+    // A newer draft is passed over, and the newest published one taken.
+    assert(Picked(ListOf({With(ReleaseOf("v1.010.012", true), "\"draft\": false", "\"draft\": true"),
+                          ReleaseOf("v1.010.009", true)}),
+                  "01.010.008") == "v1.010.009");
+    // Two releases of a lower version say nothing about the one chosen.
+    assert(Picked(ListOf({ReleaseOf("v1.010.009", false), ReleaseOf("v1.010.009", false), ReleaseOf("v1.010.010", true)}),
+                  "01.010.008") == "v1.010.010");
+
+    // Nothing at all: no releases.
+    assert(Picked("[]", "01.010.008", &reason, &listed) == "" && reason == GITHUB_RELEASE_NONE && listed == 0);
+    assert(Picked(" [ ] ", "01.010.008", &reason) == "" && reason == GITHUB_RELEASE_NONE);
+    // Not GitHub's list: cut short (anywhere), not an array, a release that isn't an object, a
+    // draft or prerelease that isn't true or false, or missing, a tag twice, two releases of the
+    // version that would be chosen. Read as nothing, never as part of an answer.
+    for (const std::size_t cut : {list.size() / 3, list.size() / 2, list.size() - 2, list.size() - 1})
+        assert(Picked(list.substr(0, cut), "01.010.007", &reason) == "" && reason == GITHUB_RELEASE_BAD_RESPONSE);
+    for (const std::string& bad :
+         {std::string("<html>blocked</html>"), Repository()[1], std::string("{\"message\":\"Not Found\"}"),
+          ListOf({ReleaseOf("v1.010.009", true), "7"}), ListOf({ReleaseOf("v1.010.009", true), "null"}),
+          ListOf({ReleaseOf("v1.010.009", true), "[]"}),
+          ListOf({With(ReleaseOf("v1.010.009", true), "\"draft\": false", "\"draft\": \"no\"")}),
+          ListOf({With(ReleaseOf("v1.010.009", true), "\"prerelease\": true", "\"prerelease\": 1")}),
+          ListOf({With(ReleaseOf("v1.010.009", true), "\"draft\": false,", "")}),
+          ListOf({With(ReleaseOf("v1.010.009", true), "\"tag_name\": \"v1.010.009\",",
+                       "\"tag_name\": \"v1.010.009\", \"tag_name\": \"v1.011.009\",")}),
+          ListOf({ReleaseOf("v1.010.009", true), ReleaseOf("v1.010.009", false)}),
+          ListOf({ReleaseOf("v1.010.009", true), ReleaseOf("v1.010.008", false), ReleaseOf("v1.010.009", true)}),
+          ListOf({ReleaseOf("v1.010.009", true)}) + ","})
+        assert(Picked(bad, "01.010.007", &reason) == "" && reason == GITHUB_RELEASE_BAD_RESPONSE);
+    // A tag that isn't a version (or is too long to be one) is no release of a line, not an error.
+    assert(Picked(ListOf({With(ReleaseOf("v1.010.009", true), "\"tag_name\": \"v1.010.009\"",
+                               "\"tag_name\": \"" + std::string(60, 'v') + "\""),
+                          ReleaseOf("v1.010.008", true)}),
+                  "01.010.007") == "v1.010.008");
+    assert(Picked(ListOf({With(ReleaseOf("v1.010.009", true), "\"tag_name\": \"v1.010.009\"", "\"tag_name\": null")}),
+                  "01.010.007", &reason) == "" &&
+           reason == GITHUB_RELEASE_NOT_NEWER);
+}
+
+void Listed() {
+    // The release chosen is read as releases/latest's is, and a pre-release is offered: its title kept.
+    github_release release{};
+    assert(github_release_evaluate_listed(Repository()[1].data(), Repository()[1].size(), "01.010.007", &release) ==
+           GITHUB_RELEASE_NEWER);
+    assert(release.prerelease == 1 && std::strcmp(release.title, "Nightshade v1.010.008 (test release)") == 0);
+    assert(std::strcmp(release.tag, "v1.010.008") == 0 && std::strcmp(release.available, "01.010.008") == 0);
+    assert(release.zip_count == 1 && std::strcmp(release.zips[0], "Nightshade-v1.010.008.zip") == 0);
+    // A stable one is offered as before, not as a pre-release.
+    assert(github_release_evaluate_listed(Repository()[0].data(), Repository()[0].size(), "01.010.006", &release) ==
+           GITHUB_RELEASE_NEWER && release.prerelease == 0);
+    // Without test builds a pre-release is still never offered, whatever asks.
+    assert(Evaluate(Repository()[1], "01.010.007") == GITHUB_RELEASE_NOT_PUBLISHED);
+    // A draft never is.
+    const std::string draft = With(Repository()[1], "\"draft\": false", "\"draft\": true");
+    assert(github_release_evaluate_listed(draft.data(), draft.size(), "01.010.007", &release) ==
+           GITHUB_RELEASE_NOT_PUBLISHED);
+    // The title as the dialog draws it: control characters as spaces; none (null), one longer than
+    // the dialog takes, or one not text is no title; one said twice is no answer.
+    const auto title = [&](const std::string& value, github_release_reason expected = GITHUB_RELEASE_NEWER) {
+        const std::string json = With(Repository()[1], "\"name\": \"Nightshade v1.010.008 (test release)\"", "\"name\": " + value);
+        github_release read{};
+        assert(github_release_evaluate_listed(json.data(), json.size(), "01.010.007", &read) == expected);
+        return std::string(read.title);
+    };
+    assert(title("\"Nightshade\\tv1.010.008\\n(test \\u0007release)\"") == "Nightshade v1.010.008 (test  release)");
+    assert(title("\"Nightshade v1.010.008 \\u2014 test\"") == "Nightshade v1.010.008 \xe2\x80\x94 test");
+    assert(title("null") == "" && title("7") == "" && title("\"" + std::string(200, 'x') + "\"") == "");
+    assert(title("\"" + std::string(127, 'x') + "\"") == std::string(127, 'x'));
+    title("\"a\", \"name\": \"b\"", GITHUB_RELEASE_BAD_RESPONSE);
+}
+
+void TestBuildCheck() {
+    static self_update_offer offer;
+    github_release_report report{};
+    const std::string list = ListOf(Repository());
+
+    // An install of 1.010.007 (the stable release) with test builds: 1.010.008, the test build, its
+    // ZIP's address made from the repository and its tag, its SHA-256 from its own SHA256SUMS; two
+    // requests, the list and that SHA256SUMS. The helper is told what any update tells it.
+    ServeList(list);
+    assert(TestCheck(kRepository, "01.010.007", &offer, &report) == SELF_UPDATE_AVAILABLE);
+    assert((network.asked == std::vector<std::string>{kList, SumsUrl("v1.010.008")}));
+    assert(report.reason == GITHUB_RELEASE_NEWER && report.http_status == 200 && report.listed == 10 &&
+           report.prerelease == 1 && std::strcmp(report.tag, "v1.010.008") == 0 &&
+           std::strcmp(report.zip, "Nightshade-v1.010.008.zip") == 0);
+    assert(std::strcmp(offer.title, "PPSA99008") == 0 && std::strcmp(offer.name, "Nightshade") == 0);
+    assert(std::strcmp(offer.installed, "01.010.007") == 0 && std::strcmp(offer.available, "01.010.008") == 0);
+    assert(std::strcmp(offer.version, "v1.010.008") == 0 && offer.artifact == ZipUrl("v1.010.008"));
+    assert(offer.sha256 == DigestOf("v1.010.008") && offer.size == 42651073 && offer.beside[0] == '\0');
+    assert(std::strcmp(offer.page, "https://github.com/Oliv3rmoon/Nightshade/releases/tag/v1.010.008") == 0);
+    assert(offer.prerelease == 1 && std::strcmp(offer.release_title, "Nightshade v1.010.008 (test release)") == 0);
+    assert(std::string(offer.notes).find("Nightshade v1.010.008.") == 0);
+    assert(self_update_url_allowed(offer.artifact, 0) == 1);
+
+    // Without test builds the same repository offers nothing to 1.010.007: releases/latest is 1.010.007
+    // itself, and the list is not asked.
+    Serve(200, Repository()[0]);
+    network.files = {};
+    assert(Check(kRepository, "01.010.007", &offer, &report) == SELF_UPDATE_UP_TO_DATE &&
+           report.reason == GITHUB_RELEASE_NOT_NEWER && offer.artifact[0] == '\0');
+    assert((network.asked == std::vector<std::string>{kApi}));
+
+    // A stable release found in the list is the update it always was, not a test build.
+    ServeList(ListOf({ReleaseOf("v1.010.008", true, "Nightshade v1.010.008 (test release)"), ReleaseOf("v1.010.009", false)}));
+    network.files[SumsUrl("v1.010.009")] = DigestOf("v1.010.009") + "  Nightshade-v1.010.009.zip\n";
+    assert(TestCheck(kRepository, "01.010.007", &offer, &report) == SELF_UPDATE_AVAILABLE);
+    assert(std::strcmp(offer.version, "v1.010.009") == 0 && offer.sha256 == DigestOf("v1.010.009"));
+    assert(offer.prerelease == 0 && offer.release_title[0] == '\0' && report.prerelease == 0);
+
+    // The install's own line only: 1.010.008 is up to date though 1.011.002 and 1.012.001 are newer;
+    // 1.011.001 is offered 1.011.002; SHA256SUMS is never asked for a release that isn't offered.
+    ServeList(list);
+    assert(TestCheck(kRepository, "01.010.008", &offer, &report) == SELF_UPDATE_UP_TO_DATE);
+    assert(report.reason == GITHUB_RELEASE_NOT_NEWER && report.listed == 10 && offer.artifact[0] == '\0');
+    assert((network.asked == std::vector<std::string>{kList}));
+    assert(TestCheck(kRepository, "01.011.001", &offer, &report) == SELF_UPDATE_AVAILABLE);
+    assert(std::strcmp(offer.available, "01.011.002") == 0 && offer.artifact == ZipUrl("v1.011.002"));
+    assert((network.asked == std::vector<std::string>{kList, SumsUrl("v1.011.002")}));
+    for (const char* installed : {"01.010.000", "01.010.003", "01.010.006", "01.010.007"}) {
+        assert(TestCheck(kRepository, installed, &offer, &report) == SELF_UPDATE_AVAILABLE);
+        assert(github_release_same_line(offer.available, installed) && std::strcmp(offer.available, "01.010.008") == 0);
+    }
+
+    // The test build's SHA256SUMS: missing, without its ZIP's line, or another release's line.
+    ServeList(list);
+    network.files.erase(SumsUrl("v1.010.008"));
+    assert(TestCheck(kRepository, "01.010.007", &offer, &report) == SELF_UPDATE_UNKNOWN &&
+           report.reason == GITHUB_RELEASE_SUMS_UNREADABLE && offer.artifact[0] == '\0' && offer.prerelease == 0);
+    network.files[SumsUrl("v1.010.008")] = DigestOf("v1.010.007") + "  Nightshade-v1.010.007.zip\n";
+    assert(TestCheck(kRepository, "01.010.007", &offer, &report) == SELF_UPDATE_UNKNOWN &&
+           report.reason == GITHUB_RELEASE_SUMS_NO_LINE && offer.sha256[0] == '\0');
+    // Its ZIP not uploaded yet (the release workflow still at it): nothing now, not an older build.
+    {
+        std::vector<std::string> releases = Repository();
+        releases[1] = With(releases[1], "\"state\": \"uploaded\",\n      \"size\": 42651073",
+                           "\"state\": \"starter\",\n      \"size\": 42651073");
+        ServeList(ListOf(releases));
+        assert(TestCheck(kRepository, "01.010.007", &offer, &report) == SELF_UPDATE_UNKNOWN &&
+               report.reason == GITHUB_RELEASE_NO_ZIP && std::strcmp(report.tag, "v1.010.008") == 0);
+        assert((network.asked == std::vector<std::string>{kList}));
+    }
+
+    // Nothing to say, never an error: no repository's list (404), the rate limit, another status,
+    // no network, an answer that isn't the list, one longer than 4 MiB.
+    for (const auto& [status, reason] : std::vector<std::pair<int, github_release_reason>>{
+             {404, GITHUB_RELEASE_NONE}, {403, GITHUB_RELEASE_RATE_LIMITED}, {429, GITHUB_RELEASE_RATE_LIMITED},
+             {500, GITHUB_RELEASE_HTTP_STATUS}}) {
+        ServeList("{\"message\":\"Not Found\"}");
+        network.answers[kList].first = status;
+        assert(TestCheck(kRepository, "01.010.007", &offer, &report) == SELF_UPDATE_UNKNOWN);
+        assert(report.reason == reason && report.http_status == status && offer.artifact[0] == '\0');
+        assert((network.asked == std::vector<std::string>{kList}));
+    }
+    ServeList("[]");
+    assert(TestCheck(kRepository, "01.010.007", &offer, &report) == SELF_UPDATE_UNKNOWN &&
+           report.reason == GITHUB_RELEASE_NONE);
+    ServeList(list.substr(0, list.size() - 1));
+    assert(TestCheck(kRepository, "01.010.007", &offer, &report) == SELF_UPDATE_UNKNOWN &&
+           report.reason == GITHUB_RELEASE_BAD_RESPONSE);
+    ServeList(list);
+    network.failure = -10006;
+    assert(TestCheck(kRepository, "01.010.007", &offer, &report) == SELF_UPDATE_UNKNOWN &&
+           report.reason == GITHUB_RELEASE_NETWORK && report.platform_error == -10006);
+    // A page of 100 releases with long notes is within the answer's 4 MiB (more than
+    // releases/latest's 1 MiB); one past it is too large, said as such.
+    {
+        std::string notes;
+        for (int i = 0; i < 10000; ++i) notes += "\xe6\xbc\xa2"; // U+6F22
+        std::vector<std::string> page;
+        for (int i = 0; i < GITHUB_RELEASE_LIST_PAGE - 1; ++i) {
+            char tag[32];
+            std::snprintf(tag, sizeof(tag), "v1.009.%03d", i);
+            page.push_back(With(ReleaseOf(tag, true), "\"body\": \"", "\"body\": \"" + notes));
+        }
+        page.push_back(Repository()[1]);
+        ServeList(ListOf(page));
+        assert(network.answers[kList].second.size() > 3 * 1024 * 1024 &&
+               network.answers[kList].second.size() <= GITHUB_RELEASE_MAX_LIST_ANSWER);
+        assert(TestCheck(kRepository, "01.010.007", &offer, &report) == SELF_UPDATE_AVAILABLE &&
+               report.listed == GITHUB_RELEASE_LIST_PAGE && std::strcmp(offer.available, "01.010.008") == 0);
+        ServeList(ListOf(page) + std::string(GITHUB_RELEASE_MAX_LIST_ANSWER, ' '));
+        assert(TestCheck(kRepository, "01.010.007", &offer, &report) == SELF_UPDATE_UNKNOWN &&
+               report.reason == GITHUB_RELEASE_TOO_LARGE && report.http_status == 200);
+    }
+
+    // A renamed repository: the list's redirect is followed to the list at its new address, and to
+    // nothing else (releases/latest's address is not the list's).
+    ServeList(list, kMovedList);
+    network.answers[kOldList] = {301, std::string("{\"message\":\"Moved Permanently\",\"url\":\"") + kMovedList + "\"}"};
+    for (const char* tag : kListTags)
+        network.files["https://github.com/Oliv3rmoon/ProsperoEden/releases/download/" + std::string(tag) + "/SHA256SUMS"] =
+            DigestOf(tag) + "  Nightshade-" + tag + ".zip\n";
+    assert(TestCheck(kOldRepository, "01.010.007", &offer, &report) == SELF_UPDATE_AVAILABLE && report.redirects == 1);
+    assert((network.asked == std::vector<std::string>{
+                kOldList, kMovedList,
+                "https://github.com/Oliv3rmoon/ProsperoEden/releases/download/v1.010.008/SHA256SUMS"}));
+    network.answers[kOldList] = {301, std::string("{\"message\":\"Moved Permanently\",\"url\":\"") + kMoved + "\"}"};
+    network.answers[kMoved] = {200, Repository()[1]};
+    assert(TestCheck(kOldRepository, "01.010.007", &offer, &report) == SELF_UPDATE_UNKNOWN &&
+           report.reason == GITHUB_RELEASE_REDIRECT_REFUSED);
+    assert((network.asked == std::vector<std::string>{kOldList}));
+
+    // A repository, title ID or installed version that can't be used asks nothing.
+    ServeList(list);
+    assert(TestCheck("Oliv3rmoon", "01.010.007", &offer, &report) == SELF_UPDATE_UNKNOWN &&
+           report.reason == GITHUB_RELEASE_BAD_ARGUMENT && network.asked.empty());
+    assert(TestCheck(kRepository, "development", &offer, &report) == SELF_UPDATE_UNKNOWN && network.asked.empty());
+    assert(self_update_check_tests_from(&kPlatform, kRepository, "Nightshade", "../PPSA99008", "01.010.007", &offer,
+                                        &report) == SELF_UPDATE_UNKNOWN &&
+           network.asked.empty());
+
+    // A build that names no repository asks the catalog, test builds or not, exactly as without them.
+    for (const char* none : {"", static_cast<const char*>(nullptr)}) {
+        network = Network{};
+        static self_update_offer direct;
+        const self_update_check_result expected = self_update_check(&kPlatform, "PPSA99008", "01.010.007", &direct);
+        const std::vector<std::string> catalog = network.asked;
+        assert(!catalog.empty() && catalog[0] == "https://homebrew.page/api/v1/manifest.json");
+        assert(TestCheck(none, "01.010.007", &offer, &report) == expected && network.asked == catalog);
+        for (const std::string& url : network.asked) assert(url.find("github.com") == std::string::npos);
+    }
+}
 } // namespace
 
 int main(int argc, char** argv) {
@@ -937,9 +1315,16 @@ int main(int argc, char** argv) {
     LoggedTag();
     TwiceSaid();
     CatalogUnchanged();
+    Lines();
+    Picking();
+    Listed();
+    TestBuildCheck();
     std::puts("update check: versions, request address, newer/same/older and silent answers PASS");
     std::puts("update check from GitHub: tag versions, addresses and redirects, SHA256SUMS lines, release notes, "
               "releases/latest answers, the ZIP SHA256SUMS lists, the check, its redirects and silent answers, no "
               "repository is the catalog PASS");
+    std::puts("update check with test builds: version lines, the list's address and redirect, the release chosen "
+              "(this line only, highest version, pre-release or not, drafts passed over), the list read whole, the "
+              "test build's title, its SHA256SUMS and ZIP, without test builds releases/latest alone PASS");
     return 0;
 }

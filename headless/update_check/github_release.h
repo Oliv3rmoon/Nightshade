@@ -29,6 +29,14 @@
  * helper still checks what it unpacks before anything is replaced: the title ID and the
  * content version in the ZIP's param.json must be this app's and the offered one.
  *
+ * Test builds (Settings > Diagnostics > Test builds, github_release_test_check) ask the
+ * repository's list of releases instead, https://api.github.com/repos/<owner/name>/releases?
+ * per_page=100, where its pre-releases are too, and offer the newest release, a pre-release or
+ * not, of the installed version's own line: the same first two numbers ("01.010"), a higher
+ * third. A 01.010.xxx install is never offered 01.011.000 or 01.012.001, whatever the list holds:
+ * those are other apps' lines. That release then goes the same way as above from step 2: its
+ * SHA256SUMS, its ZIP, the same download and helper.
+ *
  * C11; also compiles as C++. The decisions build without a network (UPDATE_CHECK_NO_NETWORK) and
  * are tested on the host (headless/update_check_check.cpp).
  */
@@ -59,6 +67,11 @@ extern "C"
 #define GITHUB_RELEASE_MAX_SUMS 4096u
 /* As the catalog bounds release_notes (self_update_offer.notes). */
 #define GITHUB_RELEASE_NOTES_CHARACTERS 4000u
+/* Test builds: the releases of the list's first page, GitHub's largest (newest first, roughly:
+ * GitHub's order is not the versions', so every one of them is looked at). */
+#define GITHUB_RELEASE_LIST_PAGE 100
+/* That page's answer: some 8 KB a release with its notes and files, 200 KB for 24 of them. */
+#define GITHUB_RELEASE_MAX_LIST_ANSWER (4u * 1024u * 1024u)
 
     typedef enum github_release_reason
     {
@@ -99,6 +112,9 @@ extern "C"
          * end, a space, a backslash, every byte of a non-ASCII character) as \xNN. */
         char tag[160];      /* the newest release's tag, once read (at most 39 bytes, escaped) */
         char zip[128];      /* the ZIP's file name, once known */
+        /* Test builds (github_release_test_check): */
+        int listed;         /* releases the list held */
+        int prerelease;     /* the release chosen is a pre-release */
     } github_release_report;
 
     /* A release as releases/latest describes it, reduced to what the offer needs. */
@@ -115,6 +131,10 @@ extern "C"
         uint64_t sums_size;
         char notes[16384];  /* plain text, as self_update_offer.notes */
         int notes_truncated;
+        /* Test builds (github_release_evaluate_listed): */
+        int prerelease;     /* a pre-release ("prerelease": true) */
+        char title[128];    /* its title as GitHub has it ("name"), control characters as spaces;
+                               empty when it has none or a longer one */
     } github_release;
 
     /* The content version a tag names, the inverse of make-dist.py's 'v' + removeprefix('0'):
@@ -189,6 +209,67 @@ extern "C"
     self_update_check_result self_update_check_self_from(const char *repository, const char *name,
                                                          self_update_offer *offer,
                                                          github_release_report *report);
+
+    /* ---- ProsperoEden: test builds (Settings > Diagnostics > Test builds) ------------------ */
+
+    /* 1 when `version` is on `installed`'s line: both are content versions with the same first
+     * two numbers. "01.010.009" is on the line of "01.010.008"; "01.011.000", "01.012.001",
+     * "02.010.008" and "01.009.999" are not. */
+    int github_release_same_line(const char *version, const char *installed);
+
+    /* https://api.github.com/repos/<repository>/releases?per_page=100. Its length, or 0. */
+    size_t github_release_list_url(char *out, size_t size, const char *repository);
+
+    /* 1 when a redirect of the list's request may be followed to `url`: the address GitHub gives a
+     * renamed repository's list, exactly
+     * https://api.github.com/repositories/<its number>/releases?per_page=100. */
+    int github_release_list_url_allowed(const char *url);
+
+    /* From the list's answer, an array of releases each as releases/latest describes one: the
+     * release to offer, a view of it in *release (it borrows `json`). It is the one with the
+     * highest version of those on `installed`'s line (github_release_same_line) and newer than it,
+     * a pre-release or not; drafts and tags that are not content versions are passed over.
+     * GITHUB_RELEASE_NEWER: found. NOT_NEWER: none on the line is newer. NONE: the list is empty.
+     * BAD_RESPONSE: not such an array (cut short, a release that isn't an object, a draft or
+     * prerelease that isn't true or false, a tag twice), or two releases of the version chosen.
+     * *listed, when given: the releases read. */
+    github_release_reason github_release_pick(const char *json, size_t length, const char *installed,
+                                              const char **release, size_t *release_length,
+                                              int *listed);
+
+    /* github_release_evaluate for the release github_release_pick chose: the same, except that a
+     * pre-release is offered too (release->prerelease says so) and its title is kept
+     * (release->title). A draft is still never offered. */
+    github_release_reason github_release_evaluate_listed(const char *json, size_t length,
+                                                         const char *installed,
+                                                         github_release *release);
+
+    /* github_release_check with test builds: the releases list (a renamed repository's redirect
+     * followed, as for releases/latest), the release github_release_pick chooses, then its
+     * SHA256SUMS and ZIP as github_release_check takes them. The offer is the same, with
+     * offer->prerelease and offer->release_title set for a pre-release. `report` as above, and
+     * report->listed and report->prerelease. Blocking. */
+    self_update_check_result github_release_test_check(const self_update_platform *platform,
+                                                       const char *repository, const char *name,
+                                                       const char *title_id, const char *installed,
+                                                       self_update_offer *offer,
+                                                       github_release_report *report);
+
+    /* self_update_check_from with test builds: the catalog when `repository` is NULL or empty
+     * (it lists no test builds: self_update_check(), as without them), github_release_test_check
+     * otherwise. */
+    self_update_check_result self_update_check_tests_from(const self_update_platform *platform,
+                                                          const char *repository, const char *name,
+                                                          const char *title_id,
+                                                          const char *installed,
+                                                          self_update_offer *offer,
+                                                          github_release_report *report);
+
+    /* The same for the running app, on the console (self_update_ps5.c), as
+     * self_update_check_self_from. */
+    self_update_check_result self_update_check_self_tests(const char *repository, const char *name,
+                                                          self_update_offer *offer,
+                                                          github_release_report *report);
 
     /* ---- ProsperoEden: another app's release (Nightshade's Apps, headless/apps.h) ---------- */
 

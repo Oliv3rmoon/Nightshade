@@ -147,6 +147,9 @@ class FakeServices : public ui::Services
         "https://github.com/blackbearreloaded/ProsperoEden/blob/main/README.md#updating\n\n"
         "Thanks\nThank you to everyone who tested this release and reported what they found.";
     bool update_notes_truncated = false;
+    // A test build (Settings > Diagnostics > Test builds): a GitHub pre-release and its title.
+    bool update_test_build = false;
+    std::string update_title;
     bool update_fails = false;
     int update_steps = -1; // looks since start_update; -1: not begun
     bool update_cancelled = false;
@@ -159,6 +162,8 @@ class FakeServices : public ui::Services
         offer->installable = update_installable;
         offer->notes = update_notes;
         offer->notes_truncated = update_notes_truncated;
+        offer->test_build = update_test_build;
+        offer->title = update_title;
         update_version.clear();
         return true;
     }

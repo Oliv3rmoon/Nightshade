@@ -229,7 +229,7 @@ std::array<bool, 8> Launcher::switch_states(Modal modal) const
     case Modal::wallpaper:
         return {}; // no switches: the dialog only lists the folder's images
     default:
-        return {prefs_.detailed_logging, prefs_.immediate_logs, prefs_.update_notices};
+        return {prefs_.detailed_logging, prefs_.immediate_logs, prefs_.update_notices, prefs_.test_builds};
     }
 }
 
@@ -587,6 +587,7 @@ void Launcher::update_offer(float dt)
             // "v1.000.050" and "1.000.050" both read as the number.
             const std::string &newer = offer.version;
             update_version_ = newer.size() > 1 && (newer[0] == 'v' || newer[0] == 'V') ? newer.substr(1) : newer;
+            update_test_build_ = offer.test_build;
             // Update notices off (Settings > Diagnostics): neither the dialog nor the notification.
             // The version stays known, and About names it.
             if (!prefs_.update_notices)
@@ -706,8 +707,9 @@ void Launcher::draw_update_notice(Canvas &c)
     list.line(cx + 8.0f, cy - 2.0f, cx, cy - 10.0f, 2.8f, t.on_accent);
     {
         const Heavy heavy(c, 0.6f);
-        text_shrink(c, tr("Update available"), card.x + 88.0f, baseline(card.y + 18.0f, 34.0f, t.size_text),
-                    t.size_text, t.title, card.w - 112.0f);
+        // A test build (Settings > Diagnostics > Test builds) says so.
+        text_shrink(c, update_test_build_ ? tr("Test build available") : tr("Update available"), card.x + 88.0f,
+                    baseline(card.y + 18.0f, 34.0f, t.size_text), t.size_text, t.title, card.w - 112.0f);
     }
     text_shrink(c, update_text(fill(tr("Version {0} is on homebrew.page"), {update_version_})), card.x + 88.0f,
                 baseline(card.y + 54.0f, 30.0f, t.size_small), t.size_small, t.copy, card.w - 112.0f);

@@ -42,6 +42,10 @@ struct UpdateOffer
     bool installable = false; // the app can install it itself (otherwise it is only announced)
     std::string notes;        // what the developer wrote on the release (plain text); may be empty
     bool notes_truncated = false; // the notes were cut; the rest is on the release's page
+    // A test build (Settings > Diagnostics > Test builds): a pre-release on GitHub, and its title
+    // there ("Nightshade v1.010.008 (test release)"; may be empty). Installed as any other release.
+    bool test_build = false;
+    std::string title;
 };
 // Where installing it is.
 enum class UpdatePhase : std::uint8_t
@@ -497,6 +501,9 @@ struct Preferences
     // The card naming the community's Discord server was closed (community.cpp): it shows once,
     // at a start of the app. About names the server whatever this says.
     bool community_seen = false;
+    // Settings > Diagnostics: the update offer includes test builds (GitHub pre-releases) of this
+    // version's line. Off by default; applies the next time the app opens.
+    bool test_builds = false;
 };
 
 // What one game does differently from Settings (Library > Game settings). Each value is -1 while
