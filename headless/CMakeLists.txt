@@ -863,6 +863,39 @@ foreach(bits 32 64)
           endif()
           string(REPLACE "std::uint32_t(16_MiB)" "std::uint32_t(${jit_cache_sizes})" wrapper "${wrapper}")
       endif()
+    # The guest's pc for a session's first 32 unmapped reads, not the process's first 32 (a session
+    # after one that used them up had none); the first 4 also go to stderr.log with the guest thread
+    # (headless/unmapped_log.h, Oliv3rmoon/Nightshade#1).
+    if(bits EQUAL 64)
+        set(unmapped_pc_old [=[        static std::atomic<u32> logged{};
+        if (logged.fetch_add(1) < 32) {
+            LOG_ERROR(Core_ARM, "Unmapped read {:#x} ({} bytes) at pc {:#x} lr {:#x} sp {:#x}", vaddr, size,
+                      m_parent.m_jit->GetPC(), m_parent.m_jit->GetRegister(30), m_parent.m_jit->GetSP());
+        }]=])
+        set(unmapped_pc_new [=[        if (u64 eden_seen; ::Eden::UnmappedLog::PcWanted(&eden_seen)) {
+            const u64 eden_pc = m_parent.m_jit->GetPC();
+            const u64 eden_lr = m_parent.m_jit->GetRegister(30);
+            const u64 eden_sp = m_parent.m_jit->GetSP();
+            LOG_ERROR(Core_ARM, "Unmapped read {:#x} ({} bytes) at pc {:#x} lr {:#x} sp {:#x}", vaddr, size,
+                      eden_pc, eden_lr, eden_sp);
+            if (::Eden::UnmappedLog::PcToStderr(eden_seen)) {
+                const Kernel::KThread* const eden_thread = Kernel::GetCurrentThreadPointer(m_parent.m_system.Kernel());
+                const std::string eden_name = eden_thread ? Core::GetThreadName(eden_thread).value_or("?") : "?";
+                std::fprintf(stderr, "EDEN_UNMAPPED_READ #%llu %#llx (%zu bytes) at pc %#llx lr %#llx sp %#llx, guest thread %llu %s\n",
+                             static_cast<unsigned long long>(eden_seen), static_cast<unsigned long long>(vaddr), size,
+                             static_cast<unsigned long long>(eden_pc), static_cast<unsigned long long>(eden_lr),
+                             static_cast<unsigned long long>(eden_sp),
+                             static_cast<unsigned long long>(eden_thread ? eden_thread->GetThreadId() : 0),
+                             eden_name.c_str());
+            }
+        }]=])
+        string(FIND "${wrapper}" "${unmapped_pc_old}" unmapped_pc_at)
+        if(unmapped_pc_at LESS 0)
+            message(FATAL_ERROR "Pinned A64 unmapped read pc log changed")
+        endif()
+        string(REPLACE "${unmapped_pc_old}" "${unmapped_pc_new}" wrapper "${wrapper}")
+        string(PREPEND wrapper "#include <cstdio>\n#include <string>\n#include \"${EDEN_PORT_DIR}/unmapped_log.h\"\n#include \"core/arm/debug.h\"\n#include \"core/hle/kernel/k_thread.h\"\n#include \"core/hle/kernel/kernel.h\"\n")
+    endif()
     set(derived "${PORT_BUILD_DIR}/arm_dynarmic_${bits}.cpp")
     # The overlay's four core loads (performance.h, SampleCoreCpu): each core reads its own CPU
     # time after a run when the overlay has asked, which on the console only the thread itself
@@ -1051,7 +1084,7 @@ string(REPLACE "${is_interrupted_old}"
     "bool PhysicalCore::IsInterrupted() const {\n    return m_is_interrupted.load(std::memory_order_acquire);\n}"
     physical_core_source "${physical_core_source}")
 string(REPLACE "${prefetch_old}"
-    "            } else {\n                interface->LogBacktrace(process);\n                if (prefetch_abort)\n                    ::Eden::RecordGuestFault(\"guest thread \" + Core::GetThreadName(thread).value_or(\"?\") +\n                                             \" jumped to an unmapped address\");\n            }\n            thread->RequestSuspend(kernel, SuspendType::Debug);"
+    "            } else {\n                interface->LogBacktrace(process);\n                if (prefetch_abort) {\n                    const std::string eden_name = Core::GetThreadName(thread).value_or(\"?\");\n                    ::Eden::RecordGuestFault(\"guest thread \" + eden_name + \" jumped to an unmapped address\");\n                    // stderr.log, which most reports include, gets where and from where (guest_fault.h).\n                    Kernel::Svc::ThreadContext eden_context{};\n                    interface->GetContext(eden_context);\n                    std::vector<u64> eden_calls;\n                    for (const auto& entry : Core::GetBacktraceFromContext(process, eden_context))\n                        eden_calls.push_back(entry.original_address);\n                    std::fprintf(stderr, \"%s\\n\", ::Eden::FaultLine(eden_name, thread->GetThreadId(), eden_context.pc,\n                                                                    eden_context.lr, eden_context.sp, eden_calls).c_str());\n                }\n            }\n            thread->RequestSuspend(kernel, SuspendType::Debug);"
     physical_core_source "${physical_core_source}")
 # Every emulated core has its own idle poll (performance.h kGuestCores).
 string(APPEND physical_core_source "\nstatic_assert(::Eden::Performance::kGuestCores >= ::Core::Hardware::NUM_CPU_CORES);\n")
@@ -3115,6 +3148,58 @@ ${dma_count_word}
             gpu_source "${gpu_source}")
     endif()
 endif()
+# A guest read of GPU-written memory (reactive flushing): each session logs its first copies with
+# the bytes the read sees before and after the copy, and the GPU thread marks the copy for the
+# texture cache's image lines (headless/reactive_flush_log.h, Oliv3rmoon/Nightshade#1).
+set(reactive_flush_old [=[        // A guest CPU read of GPU-written memory (reactive flushing): count them, they decide
+        // whether buffer data must be copied back at every fence (EDEN_NX2_BUFFER_DOWNLOADS).
+        if (static std::atomic<u64> reads{}; (reads.fetch_add(1, std::memory_order_relaxed) & 63) == 0) {
+            LOG_INFO(HW_GPU, "CPU read of GPU-written memory [{:#x}, {:#x}) ({} so far)",
+                     raster_area.start_address, raster_area.end_address,
+                     reads.load(std::memory_order_relaxed));
+        }
+        const u64 fence = RequestSyncOperation([this, &raster_area]() {
+            renderer->ReadRasterizer()->FlushRegion(raster_area.start_address, raster_area.end_address - raster_area.start_address);
+        });
+        gpu_thread.TickGPU(is_async);
+        WaitForSyncOperation(fence);
+        return raster_area;]=])
+set(reactive_flush_new [=[        // A guest CPU read of GPU-written memory (reactive flushing): a session's first copies are
+        // logged with the bytes the read sees before and after (headless/reactive_flush_log.h).
+        u64 eden_flush = 0;
+        const bool eden_logged = ::Eden::ReactiveFlushLog::Wanted(&eden_flush);
+        ::Eden::ReactiveFlushLog::Peek eden_before{}, eden_after{};
+        const auto eden_peek = [this, addr](::Eden::ReactiveFlushLog::Peek& peek) {
+            peek.size = ::Eden::ReactiveFlushLog::PeekSize(addr);
+            system.Host1x().MemoryManager().ReadBlockUnsafe(addr, peek.bytes, peek.size);
+        };
+        if (eden_logged) eden_peek(eden_before);
+        const u64 eden_active = eden_logged ? eden_flush : 0;
+        const u64 fence = RequestSyncOperation([this, &raster_area, eden_active]() {
+            ::Eden::ReactiveFlushLog::Active() = eden_active;
+            renderer->ReadRasterizer()->FlushRegion(raster_area.start_address, raster_area.end_address - raster_area.start_address);
+            ::Eden::ReactiveFlushLog::Active() = 0;
+        });
+        gpu_thread.TickGPU(is_async);
+        WaitForSyncOperation(fence);
+        if (eden_logged) {
+            eden_peek(eden_after);
+            const size_t eden_core = system.GetCurrentHostThreadID();
+            std::string line = ::Eden::ReactiveFlushLog::Line(eden_flush, addr, size, raster_area.start_address,
+                                                              raster_area.end_address, eden_core, eden_before, eden_after);
+            if (eden_core < 4)
+                if (const Kernel::KThread* const thread = Kernel::GetCurrentThreadPointer(system.Kernel()))
+                    line += " (guest thread " + std::to_string(thread->GetThreadId()) + ")";
+            LOG_WARNING(HW_GPU, "{}", line);
+            if (::Eden::ReactiveFlushLog::ToStderr(eden_flush)) std::fprintf(stderr, "%s\n", line.c_str());
+        }
+        return raster_area;]=])
+string(FIND "${gpu_source}" "${reactive_flush_old}" reactive_flush_at)
+if(reactive_flush_at LESS 0)
+    message(FATAL_ERROR "Pinned reactive flush in GPU::Impl::OnCPURead changed")
+endif()
+string(REPLACE "${reactive_flush_old}" "${reactive_flush_new}" gpu_source "${gpu_source}")
+string(PREPEND gpu_source "#include <cstdio>\n#include <string>\n#include \"${EDEN_PORT_DIR}/reactive_flush_log.h\"\n#include \"core/hle/kernel/k_thread.h\"\n")
 write_derived("${PORT_BUILD_DIR}/gpu.cpp" "${gpu_source}")
 list(APPEND video_sources "${PORT_BUILD_DIR}/gpu.cpp")
 # Guest writes queued while a cache lock was held (performance.h cpu_write_defer) run before the next

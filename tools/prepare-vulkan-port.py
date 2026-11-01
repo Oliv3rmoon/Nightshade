@@ -1356,7 +1356,7 @@ texture_partial = [
 ]
 adapt('src/video_core/texture_cache/texture_cache.h',
       'vulkan-cache/video_core/texture_cache/texture_cache.h', [
-    ('namespace VideoCommon {', '#include "performance.h"\n#include "texture_partial.h"\n#include "image_pages.h"\n#include "astc_policy.h"\n#include "texture_evictions.h"\n#include "common/scope_exit.h"\nnamespace Vulkan { class TextureCacheRuntime; }\n\nnamespace VideoCommon {'),
+    ('namespace VideoCommon {', '#include <cstdio>\n#include "performance.h"\n#include "texture_partial.h"\n#include "image_pages.h"\n#include "astc_policy.h"\n#include "texture_evictions.h"\n#include "reactive_flush_log.h"\n#include "common/scope_exit.h"\nnamespace Vulkan { class TextureCacheRuntime; }\n\nnamespace VideoCommon {'),
     # An ASTC texture kept as BC3 is converted in the background in a busy frame only, and in
     # place on a light screen (headless/astc_policy.h). The frame is counted where the texture
     # cache ends its own.
@@ -1380,6 +1380,14 @@ adapt('src/video_core/texture_cache/texture_cache.h',
      '            ::Eden::ImagePages::Mark(cpu_addr, size);\n'
      '            auto map_id = slot_map_views.insert(gpu_addr, cpu_addr, size, image_id);'),
     (download_prefix, download_prefix + (port / 'vulkan_download_batch.inc').read_text() + '\n'),
+    # A copy for a guest read (reactive flushing) names each image of its area, after the batch
+    # above went in: its anchor is part of download_prefix (headless/reactive_flush_image.inc,
+    # Oliv3rmoon/Nightshade#1).
+    ('    ForEachImageInRegion(cpu_addr, size, [this, &images](ImageId image_id, ImageBase& image) {\n'
+     '        if (!IsDownloadable(image)) {\n',
+     '    ForEachImageInRegion(cpu_addr, size, [this, &images](ImageId image_id, ImageBase& image) {\n' +
+     (port / 'reactive_flush_image.inc').read_text() +
+     '        if (!IsDownloadable(image)) {\n'),
     (gc_original, gc),
     # RADV reports all Vulkan allocations, not just cached textures. A game's
     # measured ~1.9 GiB working set triggered dirty eviction at the old 1.6 GiB

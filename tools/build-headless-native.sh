@@ -100,6 +100,7 @@ python3 -B "$root/tools/check-wallpapers.py"
 python3 -B "$root/tools/check-backup.py"
 python3 -B "$root/tools/check-migrate.py"
 python3 -B "$root/tools/check-unmapped-log.py"
+python3 -B "$root/tools/check-reactive-flush-log.py" "$scratch/source"
 python3 -B "$root/tools/launcher/strings.py" check
 python3 -B "$root/tools/check-nso-memory.py"
 python3 -B "$root/tools/check-performance.py"

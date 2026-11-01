@@ -22,7 +22,24 @@ inline bool Wanted(std::uint64_t* seen) {
     return n <= 64 || (n & (n - 1)) == 0;
 }
 
+// The guest's pc and thread for a session's first unmapped reads (the A64 JIT's read callback,
+// headless/CMakeLists.txt): its first 32 in eden_log.txt, the first 4 also in stderr.log. eden-nx2
+// logged the first 32 of the whole process, so a session after one that used them up had none.
+inline std::atomic<std::uint64_t>& PcCount() {
+    static std::atomic<std::uint64_t> count{0};
+    return count;
+}
+inline bool PcWanted(std::uint64_t* seen) {
+    const std::uint64_t n = PcCount().fetch_add(1, std::memory_order_relaxed) + 1;
+    *seen = n;
+    return n <= 32;
+}
+inline bool PcToStderr(std::uint64_t n) { return n <= 4; }
+
 // A new session counts from the start (main.cpp).
-inline void Reset() { Count().store(0, std::memory_order_relaxed); }
+inline void Reset() {
+    Count().store(0, std::memory_order_relaxed);
+    PcCount().store(0, std::memory_order_relaxed);
+}
 
 } // namespace Eden::UnmappedLog

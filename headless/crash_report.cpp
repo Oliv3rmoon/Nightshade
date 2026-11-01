@@ -559,12 +559,17 @@ void Restarter() {
     helper_failed.store(true, std::memory_order_release);
 }
 
+// Eden's log, written out after the two streams (SetLogFlush).
+std::atomic<void (*)()> log_flush{nullptr};
+
 // The buffered log stream: flushing it can wait forever on a lock the crashed thread holds,
-// which is why the thread above does not do it.
+// which is why the thread above does not do it. Eden's log comes last, so a wait there keeps
+// nothing else back.
 void Flusher() {
     WaitForReport();
     std::fflush(stderr);
     std::fflush(stdout);
+    if (void (*const flush)() = log_flush.load(std::memory_order_acquire)) flush();
 }
 
 void CopyText(char* target, std::size_t size, const char* text) noexcept {
@@ -574,6 +579,10 @@ void CopyText(char* target, std::size_t size, const char* text) noexcept {
 }
 
 } // namespace
+
+void SetLogFlush(void (*flush)()) noexcept {
+    log_flush.store(flush, std::memory_order_release);
+}
 
 bool Readable(const void* address, std::size_t bytes) noexcept {
     char buffer[4096];

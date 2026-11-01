@@ -80,6 +80,11 @@ void SetSession(const std::string& text, bool game) noexcept;
 // crash_report.cpp), and a crash after it closes the app like VK_ERROR_DEVICE_LOST.
 void NoteGpuStalled() noexcept;
 
+// Writes out Eden's own log (eden_log.txt), which writes a line below Error only when its file
+// buffer fills: after a crash, the helper thread that writes out stderr and stdout calls it too. A
+// GPU thread crash (Oliv3rmoon/Nightshade#1) left that log ending 160 s before the report.
+void SetLogFlush(void (*flush)()) noexcept;
+
 // For the checks (tools/check-crash-report.py).
 bool Readable(const void* address, std::size_t bytes) noexcept;
 } // namespace Eden::Crash

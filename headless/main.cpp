@@ -46,6 +46,7 @@
 #include "multiplayer_logging.h"
 #include "mods.h"
 #include "loose_addons.h"
+#include "reactive_flush_log.h"
 #include "unmapped_log.h"
 #include "controller_applet.h"
 #include "error_applet.h"
@@ -874,6 +875,8 @@ int main(int argc, char** argv) {
         Common::Log::Start();
         SCOPE_EXIT { Common::Log::Stop(); };
 #ifdef PS5_NATIVE
+        // After a crash the report's helper writes eden_log.txt out as well (crash_report.h).
+        Eden::Crash::SetLogFlush([] { Common::Log::Stop(); });
         {
             // The pool the guest's memory, the JIT, the heap and the Vulkan heaps share. A PS5 Pro
             // gives 13,504 MiB to a title with attribute3 bit 22 (sce_sys/param.json) and 12,288 MiB
@@ -2055,6 +2058,7 @@ int main(int argc, char** argv) {
                 }
                 Eden::TakeGuestFault(); // Nothing from an earlier session belongs to this one.
                 Eden::UnmappedLog::Reset();
+                Eden::ReactiveFlushLog::Reset();
                 Eden::Loading::Set(Eden::Loading::Step::starting);
                 // From here a read of a game played where it lies that its source can no longer
                 // answer waits for the stop below, instead of handing the game what did not come, and
