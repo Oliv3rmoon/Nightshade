@@ -2,6 +2,27 @@
 
 What changed in each release of ProsperoEden, newest first. A release's notes on GitHub are its section here.
 
+## v1.010.010
+
+**The freeze watchdog says where a frozen game is.** A tester's Tears of the Kingdom froze 110 minutes in, in the Mucktorch fight, on v1.010.009. Its `stderr.log` ended with `EDEN_STUCK core=0 state=guest`: one of the game's own threads kept running on the first core for 10 seconds without asking the system for anything. Nothing else was held: no request in progress, no graphics stall, no memory fault. The log couldn't say where that thread was. Now it can. Nothing a game does changes, and this isn't confirmed on a console yet.
+
+### New
+
+- **A core stuck in the game's code is looked at.** At 10, 60 and 300 seconds, `stderr.log` gets `EDEN_STUCK_GUEST`: the thread's name and priority, where it is in the game's code, its call chain, the code around it and the memory its registers point at. Four `EDEN_STUCK_PC` lines a second apart then show whether it loops. The core goes on running the same thread afterwards.
+- **What every other thread is doing.** With the first two reports, `EDEN_STUCK_THREAD` lines list each of the game's threads: its state, what it waits for and who holds it.
+- **A core that doesn't answer** gets `EDEN_STUCK_NO_ANSWER`: the emulator itself is held under the game's code there, not the game looping.
+- **A stuck memory fault** also names its address and what it waits for.
+
+Everything else is v1.010.009.
+
+### What to send
+
+When a game freezes, leave it frozen for about a minute before closing it, then send `/data/prosperoeden/logs` (`stderr.log` and `stderr.prev.log`) and `/data/prosperoeden/user/log/eden_log.txt`.
+
+### Install
+
+With **Settings > Diagnostics > Test builds** on in v1.010.009, **Update now** offers it. Otherwise download `Nightshade-v1.010.010.zip` below and copy its `PPSA99008` folder over yours.
+
 ## v1.010.009
 
 **Test builds through Update now.** A tester asked for each new test build to come through **Update now** instead of being copied over by hand. **Settings > Diagnostics > Test builds** (off by default) does it. Not confirmed on a console yet.
