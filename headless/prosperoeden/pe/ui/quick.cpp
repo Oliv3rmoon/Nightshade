@@ -186,8 +186,8 @@ void Launcher::press_quick(Key key)
     const int row = quick_kind(std::clamp(quick_rows_.selected, 0, quick_rows() - 1));
     if (row == quick_favorite)
     {
-        set_favorite(game.file, !is_favorite(game.file));
         message_.clear();
+        set_favorite(game.file, !is_favorite(game.file)); // says so when it could not be saved
         return;
     }
     if (row == quick_play || row == quick_safe)

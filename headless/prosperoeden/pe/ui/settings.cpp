@@ -1083,6 +1083,12 @@ void Launcher::press_dialog(Key key)
             settings_.pitch = th().showcase ? kColumnPitch : th().list_settings ? 84.0f : 88.0f;
             settings_.reset(settings_rows(), std::min(settings_.selected, settings_rows() - 1));
             use_accent(prefs_.accent);
+            textures_.reload_brand();
+            // The home screen's focus starts again in the new layout (each keeps its own).
+            home_on_grid_ = false;
+            home_on_recents_ = false;
+            home_focus_ = 0;
+            shelf_moved_ = false;
             // Nightshade's layout keeps lists of its own: its home row and the Library's view.
             if (th().showcase)
             {

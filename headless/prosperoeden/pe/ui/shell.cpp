@@ -68,7 +68,10 @@ int Launcher::section() const
 
 bool Launcher::at_section() const
 {
-    if (modal_ != Modal::none || !selected_game_.empty())
+    if (modal_ != Modal::none || !selected_game_.empty() || search_edit_.valid())
+        return false;
+    // Nightshade's: not while a dialog still fades out (one docked in Settings' panel stays there).
+    if (th().showcase && modal_shown_ != Modal::none)
         return false;
     if (screen_ == Screen::multiplayer)
         return room_page_ == RoomPage::choice && !room_edit_.valid();

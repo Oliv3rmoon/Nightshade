@@ -105,6 +105,20 @@ class Launcher
     {
         return home_on_grid_;
     }
+    // The game the screen shows and acts on (its title ID), and where the home row's focus is.
+    std::uint64_t shown_title() const
+    {
+        return library_.selected >= 0 && library_.selected < static_cast<int>(games_.size()) ?
+                   games_[static_cast<std::size_t>(library_.selected)].title_id : 0;
+    }
+    int shelf_focus() const
+    {
+        return shelf_.selected;
+    }
+    float shelf_scrolled() const
+    {
+        return shelf_.scroll();
+    }
 
   private:
     bool launcher_picker_ = false;
@@ -488,6 +502,13 @@ class Launcher
     void filter_library();
     // Where the Library's selection is in its grid, and the grid's scroll and highlight with it.
     void sync_showcase_grid(bool snap);
+    // The games the home row and the Library's grid have the focus on, by file, before the list of
+    // games changes (apply_games, drop_missing_games): the focus stays on them.
+    void remember_showcase_focus();
+    // Keeps the game acted on the one the screen shows: the home row's, or the grid's (update).
+    void keep_showcase_selection();
+    // A game's settings page over the home screen, for the game it shows.
+    void open_game_page_here();
     bool is_favorite(const std::string &file) const;
     void set_favorite(const std::string &file, bool favorite);
     void poll_search();
@@ -784,6 +805,8 @@ class Launcher
 
     // Nightshade's own layout (showcase.cpp).
     std::vector<int> shelf_games_;     // the home screen's row of covers (indexes into games_)
+    std::string shelf_file_;           // ... the game its focus is on
+    std::string library_file_;         // the game the Library's grid has the focus on
     ListView shelf_;                   // ... and where its focus is
     bool shelf_moved_ = false;         // the player has moved on the home screen: its focus stays theirs
     std::string art_wanted_;           // the art the selection asks for, shown once it rests there

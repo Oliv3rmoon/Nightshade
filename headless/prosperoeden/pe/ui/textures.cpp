@@ -46,6 +46,7 @@ bool Textures::load_art(const std::string &directory)
         *texture = create(image);
         return *texture != 0;
     };
+    art_directory_ = directory;
     // The theme names its artwork (theme.hpp).
     const std::string art = "art/";
     const bool backdrop = load(art + th().backdrop, &backdrop_);
@@ -54,6 +55,20 @@ bool Textures::load_art(const std::string &directory)
     // Only the home screen's controller display needs this one.
     (void)load("art/controller.tga", &controller_);
     return backdrop && blur && brand;
+}
+
+void Textures::reload_brand()
+{
+    if (art_directory_.empty())
+        return;
+    gfx::Image image;
+    if (!gfx::load_tga(art_directory_ + "/art/" + th().brand, &image))
+    {
+        sys::log("art %s could not be read", th().brand);
+        return;
+    }
+    batch_.delete_texture(brand_);
+    brand_ = create(image);
 }
 
 bool Textures::load_splash(const std::string &path)

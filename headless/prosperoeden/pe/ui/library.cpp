@@ -140,6 +140,8 @@ void Launcher::apply_games(std::vector<Game> games)
     bool same = games_loaded_ && games.size() == games_.size();
     for (std::size_t i = 0; same && i < games.size(); ++i)
         same = games[i].file == games_[i].file;
+    if (th().showcase)
+        remember_showcase_focus();
     const std::string selected = library_.selected < static_cast<int>(games_.size()) ?
                                      games_[static_cast<std::size_t>(library_.selected)].file :
                                      std::string{};
@@ -227,6 +229,8 @@ bool Launcher::drop_missing_games()
     const std::string selected =
         library_.selected < static_cast<int>(games_.size()) ? games_[static_cast<std::size_t>(library_.selected)].file :
                                                               std::string{};
+    if (th().showcase)
+        remember_showcase_focus();
     // A game on download sources has no file yet: it leaves when their lists do not have it.
     const auto gone = std::remove_if(games_.begin(), games_.end(), [this](const Game &game)
                                      { return !game.remote && !services_.game_exists(game.file); });

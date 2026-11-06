@@ -516,6 +516,9 @@ void Launcher::update(float dt)
     }
     library_.update(dt);
     grid_rows_.update(dt);
+    shelf_.update(dt);
+    if (th().showcase)
+        keep_showcase_selection();
     grid_x_.update(dt, t.cursor_spring);
     grid_y_.update(dt, t.cursor_spring);
     pane_.target = modal_ == Modal::game_options || modal_ == Modal::mods || modal_ == Modal::cheats ||

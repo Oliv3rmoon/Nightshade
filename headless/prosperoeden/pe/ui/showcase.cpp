@@ -450,13 +450,7 @@ void Launcher::draw_showcase_art(Canvas &c, float strength)
 void Launcher::collect_shelf()
 {
     const int count = static_cast<int>(games_.size());
-    std::string keep;
-    if (shelf_.selected >= 0 && shelf_.selected < static_cast<int>(shelf_games_.size()))
-    {
-        const int index = shelf_games_[static_cast<std::size_t>(shelf_.selected)];
-        if (index >= 0 && index < count)
-            keep = games_[static_cast<std::size_t>(index)].file;
-    }
+    const std::string keep = shelf_file_; // by file: the indexes may be of a list that changed
     shelf_games_.clear();
     const auto add = [&](int index)
     {
@@ -484,6 +478,8 @@ void Launcher::collect_shelf()
     shelf_.visible = kShelfShown;
     shelf_.pitch = kShelfPitch;
     shelf_.reset(static_cast<int>(shelf_games_.size()), at);
+    shelf_file_ = shelf_games_.empty() ? std::string{} :
+                  games_[static_cast<std::size_t>(shelf_games_[static_cast<std::size_t>(at)])].file;
     // Until the player moves, the focus is on the row's first cover: the game played last.
     if (shelf_games_.empty())
         home_on_grid_ = false;
@@ -499,10 +495,74 @@ void Launcher::select_shelf()
         return;
     const int at = std::clamp(shelf_.selected, 0, static_cast<int>(shelf_games_.size()) - 1);
     const int index = shelf_games_[static_cast<std::size_t>(at)];
-    if (index < 0 || index >= static_cast<int>(games_.size()) || index == library_.selected)
+    if (index < 0 || index >= static_cast<int>(games_.size()))
+        return;
+    shelf_file_ = games_[static_cast<std::size_t>(index)].file;
+    if (index == library_.selected)
         return;
     library_.selected = index;
     refresh_selected_game();
+}
+
+void Launcher::remember_showcase_focus()
+{
+    const int count = static_cast<int>(games_.size());
+    if (shelf_.selected >= 0 && shelf_.selected < static_cast<int>(shelf_games_.size()))
+    {
+        const int index = shelf_games_[static_cast<std::size_t>(shelf_.selected)];
+        if (index >= 0 && index < count)
+            shelf_file_ = games_[static_cast<std::size_t>(index)].file;
+    }
+    if (library_pos_ >= 0 && library_pos_ < static_cast<int>(library_view_.size()))
+    {
+        const int index = library_view_[static_cast<std::size_t>(library_pos_)];
+        if (index >= 0 && index < count)
+            library_file_ = games_[static_cast<std::size_t>(index)].file;
+    }
+}
+
+void Launcher::keep_showcase_selection()
+{
+    // Only while the screen itself has the buttons: a game's page or dialog keeps its game.
+    if (modal_ != Modal::none || !selected_game_.empty())
+        return;
+    if (screen_ == Screen::home)
+    {
+        select_shelf();
+        return;
+    }
+    if (screen_ != Screen::library || library_view_.empty())
+        return;
+    const auto at = std::find(library_view_.begin(), library_view_.end(), library_.selected);
+    if (at == library_view_.end())
+    {
+        // The game acted on is not in the grid (its filter changed while a dialog was open): the
+        // grid's focused game is.
+        library_pos_ = std::clamp(library_pos_, 0, static_cast<int>(library_view_.size()) - 1);
+        library_.selected = library_view_[static_cast<std::size_t>(library_pos_)];
+        refresh_selected_game();
+    }
+    else if (static_cast<int>(at - library_view_.begin()) != library_pos_)
+        sync_showcase_grid(false);
+}
+
+void Launcher::open_game_page_here()
+{
+    // As the Library opens it (library.cpp), over the home screen: Circle comes back here.
+    Game &chosen = games_[static_cast<std::size_t>(library_.selected)];
+    game_settings_ = services_.game_settings(chosen.title_id);
+    game_docked_ = selected_docked_;
+    game_from_home_ = true;
+    import_source_ = services_.save_transfer_available() ? services_.save_import_source(chosen.title_id) :
+                                                             SaveSource::none;
+    import_armed_ = false;
+    delete_armed_ = false;
+    read_mods(chosen);
+    open_modal(Modal::game);
+    pane_.snap(0.0f);
+    game_rows_.visible = 11;
+    game_rows_.pitch = game_kind_pitch();
+    game_rows_.reset(dialog_rows(Modal::game), 0);
 }
 
 void Launcher::press_showcase_home(Key key)
@@ -520,6 +580,8 @@ void Launcher::press_showcase_home(Key key)
             if (games_[static_cast<std::size_t>(i)].file == home_.last_file)
                 return open_quick(i, true);
     }
+    // What the screen shows is what is acted on: the row's game.
+    select_shelf();
     const bool has_game = library_.selected >= 0 && library_.selected < count;
     const Game *game = has_game ? &games_[static_cast<std::size_t>(library_.selected)] : nullptr;
     const bool settable = game != nullptr && !game->remote && game->title_id != 0;
@@ -566,7 +628,7 @@ void Launcher::press_showcase_home(Key key)
         if (!home_on_grid_ && home_focus_ == kGameSettings)
         {
             if (settable)
-                open_game_settings_from_home(game->file);
+                open_game_page_here();
             else
                 cue(Cue::error);
             return;
@@ -606,7 +668,7 @@ void Launcher::press_showcase_home(Key key)
             cue(Cue::error);
             return;
         }
-        open_game_settings_from_home(game->file);
+        open_game_page_here();
         return;
     case Key::square:
     {
@@ -844,13 +906,7 @@ void Launcher::set_favorite(const std::string &file, bool favorite)
 void Launcher::filter_library()
 {
     const int count = static_cast<int>(games_.size());
-    std::string keep;
-    if (library_pos_ >= 0 && library_pos_ < static_cast<int>(library_view_.size()))
-    {
-        const int index = library_view_[static_cast<std::size_t>(library_pos_)];
-        if (index >= 0 && index < count)
-            keep = games_[static_cast<std::size_t>(index)].file;
-    }
+    const std::string keep = library_file_; // by file: the indexes may be of a list that changed
     const std::string wanted = lower(library_search_);
     const auto passes = [&](int index)
     {
@@ -887,7 +943,11 @@ void Launcher::filter_library()
     if (shown == 0 && library_header_ < 0)
         library_header_ = library_filter_ + 1; // nothing to focus in the grid: the filters
     sync_showcase_grid(true);
-    if (screen_ == Screen::library && shown > 0)
+    library_file_ = shown > 0 ? games_[static_cast<std::size_t>(library_view_[static_cast<std::size_t>(library_pos_)])].file :
+                                std::string{};
+    // The selection follows only while the Library itself has the buttons: a game's page or
+    // dialog over it keeps its own game (its settings are saved for that one).
+    if (screen_ == Screen::library && shown > 0 && modal_ == Modal::none)
     {
         const int index = library_view_[static_cast<std::size_t>(library_pos_)];
         if (index != library_.selected)
@@ -915,6 +975,9 @@ void Launcher::sync_showcase_grid(bool snap)
         grid_rows_.select(library_pos_ / kColumns);
     grid_x_.target = static_cast<float>(library_pos_ % kColumns) * kTilePitchX;
     grid_y_.target = static_cast<float>(library_pos_ / kColumns) * kTilePitchY;
+    if (shown > 0 && library_view_[static_cast<std::size_t>(library_pos_)] == library_.selected &&
+        library_.selected >= 0 && library_.selected < static_cast<int>(games_.size()))
+        library_file_ = games_[static_cast<std::size_t>(library_.selected)].file;
     // The highlight glides only where it can be seen doing it.
     if (snap || screen_ != Screen::library || transition_.running)
     {
@@ -930,8 +993,9 @@ void Launcher::poll_search()
     try
     {
         const std::optional<std::string> typed = search_edit_.get();
-        if (!typed)
-            return; // cancelled: the search stays as it was
+        // Cancelled, or the Library is no longer what shows: the search stays as it was.
+        if (!typed || !th().showcase || screen_ != Screen::library || modal_ != Modal::none)
+            return;
         library_search_ = trimmed(*typed);
         filter_library();
         library_header_ = library_view_.empty() ? 0 : -1;
@@ -947,9 +1011,11 @@ void Launcher::poll_search()
 
 void Launcher::press_showcase_library(Key key)
 {
+    // The system keyboard is open over the menu: its answer comes first.
+    if (search_edit_.valid())
+        return;
     const int shown = static_cast<int>(library_view_.size());
-    // The selection may have been put on a game from elsewhere (the home screen's game settings):
-    // the grid finds it.
+    // The selection may have been put on a game from elsewhere: the grid finds it.
     sync_showcase_grid(false);
     const auto go = [&](int pos)
     {
@@ -990,22 +1056,32 @@ void Launcher::press_showcase_library(Key key)
             if (library_header_ == 0)
             {
                 // What to look for, on the system keyboard (it takes a moment; the menu goes on).
-                if (!search_edit_.valid())
+                search_edit_stop_ = false;
+                try
                 {
-                    search_edit_stop_ = false;
                     const std::string current = library_search_;
                     search_edit_ = std::async(std::launch::async, [this, current]
                                               { return services_.ask_search(current, search_edit_stop_); });
                     cue(Cue::open);
+                }
+                catch (const std::exception &)
+                {
+                    say(tr("The keyboard could not be opened."), true);
+                    cue(Cue::error);
                 }
                 return;
             }
             if (library_header_ - 1 != library_filter_)
             {
                 library_filter_ = library_header_ - 1;
-                library_pos_ = 0;
-                library_view_.clear(); // the first game of the new list takes the focus
                 filter_library();
+                // The first game of the new list takes the focus.
+                if (!library_view_.empty())
+                {
+                    library_pos_ = 0;
+                    library_.selected = library_view_.front();
+                    refresh_selected_game();
+                }
                 cue(Cue::toggle);
             }
             return;

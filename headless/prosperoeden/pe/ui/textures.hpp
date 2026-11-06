@@ -36,6 +36,9 @@ class Textures
 
     // The background art, its blurred copy (frosted panels) and the app icon.
     bool load_art(const std::string &directory);
+    // The theme's mark again, after a change of theme (themes name their own: Nightshade's is its
+    // flower). The backdrops stay until the launcher opens again.
+    void reload_brand();
     // The picture the console shows while the app starts (sce_sys/pic0.dds), for the opening:
     // the launcher's first frame is that picture, so the app appears without a cut.
     bool load_splash(const std::string &path);
@@ -149,6 +152,7 @@ class Textures
     GameArt game_art_[2]; // the one shown, and the one fading out
     float game_art_age_ = 0.0f;
     std::uint32_t brand_ = 0;
+    std::string art_directory_; // where load_art read the art
     std::uint32_t controller_ = 0;
     std::uint32_t splash_ = 0;
     std::unordered_map<std::string, Entry> covers_;
