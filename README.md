@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="sce_sys/icon0.png" width="128" alt="Nightshade icon">
+  <img src="docs/images/nightshade-logo.svg" width="160" alt="Nightshade logo">
 </p>
 
 <h1 align="center">Nightshade</h1>
