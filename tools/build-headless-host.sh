@@ -86,6 +86,9 @@ python3 -B "$root/tools/check-staging-chunks.py" "$scratch/source"
 python3 -B "$root/tools/check-memory-soak.py"
 # The shader cache built while a game plays: its shared state, and the Vulkan port that uses it.
 python3 -B "$root/tools/check-shader-start.py" "$scratch/source"
+# Tears of the Kingdom's asynchronous shaders, the port's rules for a draw whose pipeline is not
+# built (Eden PR #4639's small targets, upstream Eden's depth), their counts and SPIR-V hashes.
+python3 -B "$root/tools/check-totk-async-shaders.py" "$scratch/source"
 python3 -B "$root/tools/check-crash-report.py"
 python3 -B "$root/tools/check-stop-limit.py"
 python3 -B "$root/tools/check-image-pages.py"
