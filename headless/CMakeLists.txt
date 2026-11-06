@@ -1089,7 +1089,7 @@ string(REPLACE "${progress_exit_old}"
     "            ExitContext();\n            if (hr == Core::HaltReason::BreakLoop) {\n                if (const unsigned eden_look = ::Eden::Progress::LookWanted(m_core_index)) {\n                    ::Eden::Sample::Answer(kernel, *process, *interface, *thread, m_core_index, eden_look);\n                    // A look that waited for a kernel lock may go on on another core: that core marks it.\n                    if (kernel.CurrentPhysicalCoreIndex() != m_core_index) return;\n                }\n            }\n            ::Eden::Progress::CoreHost(m_core_index);\n        }\n"
     physical_core_source "${physical_core_source}")
 string(REPLACE "${progress_svc_old}"
-    "            // Perform call.\n            ::Eden::Progress::CoreSvc(m_core_index, interface->GetSvcNumber());\n            Svc::Call(system, interface->GetSvcNumber());"
+    "            // Perform call.\n            ::Eden::Progress::CoreSvc(m_core_index, interface->GetSvcNumber());\n            ::Eden::Sample::TotkTrap(*process, *interface, *thread, interface->GetSvcNumber());\n            Svc::Call(system, interface->GetSvcNumber());"
     physical_core_source "${physical_core_source}")
 string(REPLACE "${progress_idle_begin_old}"
     "${progress_idle_begin_old}    ::Eden::Progress::CoreIdle(m_core_index);\n"
@@ -1763,6 +1763,29 @@ if(PS5_NATIVE)
     string(REPLACE "${old_nso_cheats}" "${new_nso_cheats}" nso_source "${nso_source}")
     string(PREPEND nso_source "#include <cstdio>\n")
 endif()
+# Every module the loader maps is noted for the freeze watchdog's looks, which name addresses by
+# module (headless/guest_progress.h: Tears of the Kingdom's modules carry no path for Eden's own
+# search). Tears of the Kingdom's loop at main+0x6E1404, which ran away and ended sessions with a
+# count far above the 4 floats it copies, is bounded in the image about to be mapped, with the
+# count reported when it is above 4 (headless/totk_guard.h, PhysicalCore's system call, above).
+set(old_nso_mapped "    // Apply cheats if they exist and the program has a valid title ID\n")
+string(FIND "${nso_source}" "${old_nso_mapped}" nso_mapped_at)
+if(nso_mapped_at LESS 0)
+    message(FATAL_ERROR "Pinned NSO cheat step changed; review the module notes and the TOTK guard")
+endif()
+string(REPLACE "${old_nso_mapped}" [=[    // The module, for the watchdog's main+0x... (guest_progress.h); Tears of the Kingdom's runaway
+    // loop bounded before its code is mapped (totk_guard.h).
+    ::Eden::Progress::NoteModule(&process, nso_file.GetName().c_str(), load_base + module_start, image_size);
+    if (nso_file.GetName() == "main" && codeset.memory.size() > module_start) {
+        const auto totk = ::Eden::TotkGuard::Apply(codeset.memory.data() + module_start,
+                                                   codeset.memory.size() - module_start,
+                                                   nso_header.build_id.data(), load_base + module_start);
+        ::Eden::TotkGuard::ReportApplied(totk, load_base + module_start);
+    }
+
+    // Apply cheats if they exist and the program has a valid title ID
+]=] nso_source "${nso_source}")
+string(PREPEND nso_source "#include \"${EDEN_PORT_DIR}/guest_progress.h\"\n#include \"${EDEN_PORT_DIR}/totk_guard.h\"\n")
 write_derived("${PORT_BUILD_DIR}/nso.cpp" "${nso_source}")
 list(REMOVE_ITEM core_sources loader/nso.cpp)
 list(APPEND core_sources "${PORT_BUILD_DIR}/nso.cpp")

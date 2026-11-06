@@ -198,6 +198,44 @@ struct GuestModules {
     GuestModule entry[kGuestModules];
     unsigned count = 0;
 };
+// The modules the NSO loader mapped into the game's process (headless/CMakeLists.txt, nso.cpp), by
+// name. Core::FindModules names a module by the path its read-only data starts with, and Tears of
+// the Kingdom's carry none: v1.010.010's looks printed bare addresses (main+0x6E1404 read as
+// 0x80a03404). Written by the loader, read by a look on a core's thread. A module whose name the
+// table already has starts a new process's list (a new process may lie where the last one did).
+struct LoadedModuleTable {
+    std::mutex mutex;
+    const void* process = nullptr;
+    GuestModules modules;
+};
+inline LoadedModuleTable& LoadedTable() noexcept {
+    static LoadedModuleTable table;
+    return table;
+}
+inline void NoteModule(const void* process, const char* name, std::uint64_t base, std::uint64_t size) noexcept {
+    LoadedModuleTable& table = LoadedTable();
+    const std::lock_guard lock{table.mutex};
+    const char* const named = name && name[0] ? name : "?";
+    bool again = table.process != process;
+    for (unsigned i = 0; i < table.modules.count && !again; ++i)
+        again = std::strncmp(table.modules.entry[i].name, named, sizeof(table.modules.entry[i].name) - 1) == 0;
+    if (again) {
+        table.process = process;
+        table.modules.count = 0;
+    }
+    if (table.modules.count >= kGuestModules) return;
+    GuestModule& entry = table.modules.entry[table.modules.count++];
+    entry.base = base;
+    entry.end = base + size;
+    std::snprintf(entry.name, sizeof(entry.name), "%s", named);
+}
+// The loader's modules of `process` (none for another process).
+inline GuestModules LoadedModules(const void* process) noexcept {
+    LoadedModuleTable& table = LoadedTable();
+    const std::lock_guard lock{table.mutex};
+    return table.process == process ? table.modules : GuestModules{};
+}
+
 // "main+0x1a2b3c" for an address in a module, else "0x..." (always terminated).
 inline void Where(char* out, std::size_t size, const GuestModules& modules, std::uint64_t address) noexcept {
     for (unsigned i = 0; i < modules.count && i < kGuestModules; ++i) {

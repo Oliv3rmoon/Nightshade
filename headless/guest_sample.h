@@ -19,6 +19,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <string>
 #include <vector>
 #include "common/common_types.h"
@@ -32,7 +33,9 @@
 #include "core/hle/kernel/kernel.h"
 #include "core/hle/kernel/svc_types.h"
 #include "core/memory.h"
+#include "common/page_table.h"
 #include "guest_progress.h"
+#include "totk_guard.h"
 
 namespace Eden::Sample {
 
@@ -42,8 +45,11 @@ inline Progress::GuestModules& ModulesOf(std::size_t core) {
     return modules[core < Progress::kCores ? core : 0];
 }
 
+// The loader's list of the process's modules (Progress::NoteModule); Eden's own search, which
+// reads each module's path, where the loader noted none.
 inline void FindModules(Kernel::KProcess& process, Progress::GuestModules& out) {
-    out.count = 0;
+    out = Progress::LoadedModules(&process);
+    if (out.count != 0) return;
     for (const auto& [base, name] : Core::FindModules(&process)) {
         if (out.count >= Progress::kGuestModules) break;
         Progress::GuestModule& entry = out.entry[out.count++];
@@ -194,6 +200,55 @@ inline void Answer(Kernel::KernelCore& kernel, Kernel::KProcess& process, Core::
     Progress::PrintLookData(out);
     if (look >= Progress::kLookThreads) Threads(kernel, process, modules, core, &thread, context);
     Progress::LookAnswered(core, out.thread, kernel.CurrentPhysicalCoreIndex() == core);
+}
+
+// The bounded loop's system call in Tears of the Kingdom (headless/totk_guard.h), made before the
+// call itself (svcGetSystemTick) goes on as usual: the count it found, and around it.
+inline void TotkTrap(Kernel::KProcess& process, Core::ArmInterface& interface, Kernel::KThread& thread,
+                     unsigned svc) {
+    if (svc != TotkGuard::kTrapSvc) return;
+    const std::uint64_t base = TotkGuard::PatchedBase().load(std::memory_order_acquire);
+    if (base == 0) return;
+    Kernel::Svc::ThreadContext context{};
+    interface.GetContext(context);
+    if (context.pc != base + TotkGuard::kTrapReturn) return;
+    TotkGuard::Trap trap{};
+    trap.count = static_cast<std::uint32_t>(context.r[11]);
+    trap.count_at = context.r[10];
+    trap.src = context.r[9];
+    trap.dst = context.r[19];
+    trap.thread = thread.GetThreadId();
+    // Whether the GPU's caches track the count's page (a CPU read of it may download the GPU's copy).
+    const Common::PageTable& table = process.GetPageTable().GetImpl();
+    const std::uint64_t at = trap.count_at & 0xffffffffffffULL;
+    if ((at >> table.GetAddressSpaceBits()) == 0) {
+        switch (table.entries[at >> 12].Type()) {
+        case Common::PageType::Memory:
+            trap.page = "memory";
+            break;
+        case Common::PageType::RasterizerCachedMemory:
+            trap.page = "gpu-cached";
+            break;
+        case Common::PageType::DebugMemory:
+            trap.page = "debug";
+            break;
+        default:
+            trap.page = "unmapped";
+            break;
+        }
+    }
+    // The words around it as guest memory holds them, read past the GPU's caches (no download).
+    Core::Memory::Memory& memory = process.GetMemory();
+    const std::uint64_t from = trap.count_at - 0x20;
+    if (trap.count_at >= 0x20 && memory.IsValidVirtualAddressRange(from, 0x40)) {
+        trap.words_read = true;
+        for (unsigned i = 0; i < 16 && trap.words_read; ++i) {
+            const std::uint8_t* const word = memory.GetPointerSilent(from + 4 * i);
+            if (word == nullptr) trap.words_read = false;
+            else std::memcpy(&trap.words[i], word, sizeof(trap.words[i]));
+        }
+    }
+    TotkGuard::Report(trap);
 }
 
 } // namespace Eden::Sample
