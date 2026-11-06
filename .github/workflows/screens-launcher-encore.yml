@@ -45,7 +45,7 @@
      "name": "Check out the feature/launcher-redesign commit",
      "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
      "with": {
-      "ref": "0aa1829ca05c7171a6a7102542798c6692b013fe",
+      "ref": "21763b5d4da2ecd7b7c0695e460b3ecedb865417",
       "persist-credentials": false
      }
     },

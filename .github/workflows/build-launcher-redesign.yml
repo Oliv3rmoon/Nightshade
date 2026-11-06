@@ -1,6 +1,6 @@
 name: Nightshade launcher redesign build
 
-# release.yml's build of the release ZIP, for feature/launcher-redesign at 0aa1829: the
+# release.yml's build of the release ZIP, for feature/launcher-redesign at 21763b5: the
 # Release build workflow is switched off, and a test branch builds a feature branch so. Nothing is
 # published, attested or saved to the caches; the ZIP is kept as a 7-day artifact.
 on:
@@ -41,7 +41,7 @@ jobs:
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: 0aa1829ca05c7171a6a7102542798c6692b013fe
+          ref: 21763b5d4da2ecd7b7c0695e460b3ecedb865417
           persist-credentials: false
       - name: Locate the caches
         run: |
