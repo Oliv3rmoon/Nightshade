@@ -1,9 +1,9 @@
 {
- "name": "Nightshade test build updates formats checks",
+ "name": "Nightshade launcher redesign formats checks",
  "on": {
   "push": {
    "branches": [
-    "test/test-build-updates"
+    "test/launcher-redesign"
    ]
   },
   "workflow_dispatch": {}
@@ -23,15 +23,15 @@
    "env": {
     "XDG_CACHE_HOME": "/tmp/prosperoeden-dev-host-cache",
     "PROSPEROEDEN_DEPS_CACHE": "/tmp/prosperoeden-dev-downloads",
-    "DEV_HEAD": "c7cbd4b57a1bdeaa2899c35e116bd0ffc81ee76c",
+    "DEV_HEAD": "91e89c77ad889c2f53564a2223f87e4ff898f074",
     "GITHUB_TOKEN": "${{ github.token }}"
    },
    "steps": [
     {
-     "name": "Check out the feature/formats commit",
+     "name": "Check out the feature/launcher-redesign commit",
      "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
      "with": {
-      "ref": "c7cbd4b57a1bdeaa2899c35e116bd0ffc81ee76c",
+      "ref": "91e89c77ad889c2f53564a2223f87e4ff898f074",
       "persist-credentials": false
      }
     },

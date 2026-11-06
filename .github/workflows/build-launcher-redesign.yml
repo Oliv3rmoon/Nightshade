@@ -1,0 +1,193 @@
+name: Nightshade launcher redesign build
+
+# release.yml's build of the release ZIP, for feature/launcher-redesign at 91e89c7: the
+# Release build workflow is switched off, and a test branch builds a feature branch so. Nothing is
+# published, attested or saved to the caches; the ZIP is kept as a 7-day artifact.
+on:
+  push:
+    branches: [test/launcher-redesign]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: launcher-redesign-build
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 355
+    # The job's own list: reading the source.
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+    env:
+      CCACHE_MAXSIZE: 4G
+    steps:
+      # SDKs preinstalled on the runner that this build does not use: the build (Eden, Mesa,
+      # FFmpeg and their caches) needs the disk space.
+      - name: Free disk space
+        run: |
+          df -h "$GITHUB_WORKSPACE"
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
+            /usr/local/share/boost /opt/hostedtoolcache/CodeQL /opt/hostedtoolcache/go \
+            /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk /opt/hostedtoolcache/PyPy \
+            /opt/hostedtoolcache/Ruby
+          df -h "$GITHUB_WORKSPACE"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: 91e89c77ad889c2f53564a2223f87e4ff898f074
+          persist-credentials: false
+      - name: Locate the caches
+        run: |
+          # Beside the checkout, on the runner's disk; the paths stay the same between runs.
+          cache_root=$(dirname "$GITHUB_WORKSPACE")/ci-cache
+          mkdir -p "$cache_root"
+          {
+            echo "CACHE_ROOT=$cache_root"
+            echo "RADV_NATIVE=$(dirname "$GITHUB_WORKSPACE")/mihawk-vulkan-review/.deps/native"
+            echo "PROSPEROEDEN_DEPS_CACHE=$cache_root/downloads"
+            echo "CCACHE_DIR=$cache_root/ccache"
+            echo "XDG_CACHE_HOME=$cache_root/xdg"
+            echo "JOBS=$(nproc)"
+            echo "RADV_BUILD_JOBS=$(nproc)"
+            echo "SPIRV_TRANSLATOR=$cache_root/spirv-llvm-translator"
+          } >> "$GITHUB_ENV"
+
+      # Built from source by the next step when this finds nothing (a few minutes).
+      - name: Restore the SPIR-V LLVM translator
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: ${{ env.SPIRV_TRANSLATOR }}
+          key: spirv-llvm-translator-${{ hashFiles('tools/ci/setup-ubuntu-24.04.sh', 'tools/ci/ubuntu-24.04-packages.txt') }}
+
+      - name: Install the build tools (tools/ci/setup-ubuntu-24.04.sh)
+        run: |
+          bash tools/ci/setup-ubuntu-24.04.sh "$SPIRV_TRANSLATOR" 3>> "$GITHUB_ENV"
+          make toolchain
+
+      # A pull request's artifact is named by its number and its own commit (github.sha is a
+      # temporary merge commit there); the version in param.json stays the release's.
+      - name: Name this build
+        id: label
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [[ $GITHUB_EVENT_NAME == pull_request ]]; then
+            echo "artifact=${GITHUB_REPOSITORY##*/}-PR$PR_NUMBER-${PR_HEAD:0:7}" >> "$GITHUB_OUTPUT"
+          else
+            echo "artifact=ProsperoEden" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Restore downloads
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: ${{ env.CACHE_ROOT }}/downloads
+          key: downloads-${{ hashFiles('tools/deps.json') }}
+
+      - name: Fetch dependencies
+        # The job's read-only token: GitHub's hosts give it a higher rate limit (tools/deps.py).
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: make deps
+
+      # After `make deps`: a restored RADV folder would otherwise stand in for the git checkout
+      # it lives in, and deps.py would not fetch that checkout. With the driver go the Payload
+      # SDK and zlib its build sets up beside it: the final link takes libraries from that SDK.
+      # The key holds the driver's pins (tools/deps.json: Belladonna's commit and the build id its
+      # shader cache is keyed by) and the script that builds it: a driver built from anything else
+      # is not restored.
+      - name: Restore the RADV driver
+        id: radv
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: |
+            ${{ env.RADV_NATIVE }}/radv-release
+            ${{ env.RADV_NATIVE }}/ps5-payload-sdk
+            ${{ env.RADV_NATIVE }}/zlib
+            build/radv-isolated
+          key: radv-4-${{ hashFiles('tools/deps.json', 'tools/build-radv-dependencies.sh', 'tools/isolate-radv.py', 'tools/ci/ubuntu-24.04-packages.txt', 'tools/ci/setup-ubuntu-24.04.sh') }}
+
+      - name: Restore ccache
+        id: ccache
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: ${{ env.CACHE_ROOT }}/ccache
+          key: ccache-u24-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: ccache-u24-
+
+      # No ccache from GitHub's cache (expired, or none on main yet): start from the snapshot.
+      # The file's name carries the cache key's prefix, so a new toolchain starts a new file.
+      - name: Fetch the ccache snapshot
+        if: steps.ccache.outputs.cache-matched-key == ''
+        run: |
+          url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/build-cache/ccache-u24.tar"
+          if curl -fsSL --retry 3 -o "$RUNNER_TEMP/ccache-u24.tar" "$url"; then
+            mkdir -p "$CCACHE_DIR"
+            tar -xf "$RUNNER_TEMP/ccache-u24.tar" -C "$CCACHE_DIR"
+            rm "$RUNNER_TEMP/ccache-u24.tar"
+            echo "::notice title=ccache::Started from the build-cache snapshot ($(du -sh "$CCACHE_DIR" | cut -f1))."
+          else
+            echo "::notice title=ccache::No snapshot to start from; this run compiles everything."
+          fi
+
+      - name: Build and package
+        id: build
+        timeout-minutes: 315
+        run: |
+          ccache --zero-stats
+          bash tools/ci/build-release.sh
+
+      - name: Report disk, ccache and the linker
+        if: always()
+        run: |
+          df -h "$GITHUB_WORKSPACE"
+          ccache --show-stats || true
+          "$(dirname "$GITHUB_WORKSPACE")/ps5-native-app-boilerplate/.deps/native/ps5-payload-sdk/bin/prospero-lld" --version || true
+
+      # A pull request that built reuses main's ccache and saves none of its own (the
+      # repository's cache space is limited); one that stopped early saves it to continue.
+      - name: Check the ZIP and its checksum
+        run: |
+          set -euo pipefail
+          cd dist
+          python3 - Nightshade-v*.zip <<'PY'
+          import json, sys, zipfile
+          assert len(sys.argv) == 2, f"expected one ZIP: {sys.argv[1:]}"
+          archive = sys.argv[1]
+          with zipfile.ZipFile(archive) as z:
+              assert z.testzip() is None, "damaged entry"
+              names = z.namelist()
+              assert "PPSA99008/eboot.bin" in names, "no eboot.bin"
+              wrong = [i.filename for i in z.infolist() if (i.external_attr >> 16) & 0o777 != 0o777]
+              assert not wrong, f"entries not stored as 0777: {wrong[:3]}"
+              version = json.loads(z.read("PPSA99008/sce_sys/param.json"))["contentVersion"]
+              assert archive == f"Nightshade-v{version.removeprefix('0')}.zip", (archive, version)
+              print(f"{archive}: {len(names)} entries, all 0777, version {version}")
+          PY
+          sha256sum -c SHA256SUMS
+
+      # Signed provenance: this ZIP was built by this workflow from this commit. Anyone can check a
+      # downloaded copy with `gh attestation verify <file> -R <owner>/<repo>`. For a tag and a manual
+      # run only: a pull request's run cannot sign (a fork), the nightly builds of main are there
+      # for their caches and not to be handed out, and a private repository's plan does not include it.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.label.outputs.artifact }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+      # The unstripped executable that reads this build's crash reports (docs/BUILDING.md). The
+      # runner is discarded after the job, so it is kept as an artifact; it is not published.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.label.outputs.artifact }}-symbols
+          path: build/symbols/
+          retention-days: ${{ github.ref_type == 'tag' && 90 || 7 }}
