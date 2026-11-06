@@ -1463,6 +1463,182 @@ void pictures(Stage &s)
     }
 }
 
+// Nightshade's own layout (PE_THEME=nightly, Theme::showcase): its screens, and checks that its
+// walk does what it says. The walk of every other screen (pictures) follows Canopy's layout.
+void showcase_pictures(Stage &s)
+{
+    const auto expect = [&](bool good, const char *what)
+    {
+        if (!good)
+        {
+            std::fprintf(stderr, "error: %s\n", what);
+            s.ok = false;
+        }
+    };
+    s.restart(true);
+    s.frame();
+    s.shoot("S00a-opening");
+    s.wait(0.9f);
+    s.shoot("S00b-opening-mark");
+    s.wait(0.9f);
+    s.shoot("S00c-opening-to-bar");
+    // Home: the games are read on a thread of their own; then the focus is on the first cover.
+    for (int tries = 0; tries < 600 && !s.launcher->home_shelf_focused(); ++tries)
+    {
+        s.frame();
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+    s.wait(2.0f);
+    expect(s.launcher->home_shelf_focused(), "the home screen's focus did not start on its row of covers");
+    s.shoot("S01-home");
+    s.press({Key::right});
+    s.wait(0.25f);
+    s.shoot("S02a-home-art-changing");
+    s.wait(0.8f);
+    s.shoot("S02-home-second");
+    s.press({Key::up});
+    s.wait(0.6f);
+    expect(!s.launcher->home_shelf_focused(), "Up from the row of covers did not reach Play");
+    s.shoot("S03-home-play");
+    s.press({Key::right});
+    s.wait(0.5f);
+    s.shoot("S04-home-game-settings-button");
+    // The game's settings from the home screen, and back.
+    s.press({Key::triangle});
+    s.wait(0.9f);
+    s.shoot("S05-game-settings");
+    s.press({Key::right});
+    s.wait(0.6f);
+    s.shoot("S05b-game-settings-handheld");
+    s.press({Key::down, Key::cross});
+    s.wait(0.6f);
+    s.shoot("S05c-game-video");
+    s.press({Key::circle});
+    s.wait(0.4f);
+    s.press({Key::circle});
+    s.wait(0.9f);
+    expect(s.launcher->section_shown() == 0, "the game's settings did not go back to the home screen");
+    s.shoot("S06-home-after-game-settings");
+    // Quick settings over the home screen.
+    s.press({Key::down, Key::options});
+    s.wait(0.8f);
+    s.shoot("S07-home-quick-settings");
+    s.press({Key::circle});
+    s.wait(0.6f);
+
+    // The Library: R1, the grid, along it and down it.
+    s.press({Key::r1});
+    s.wait(1.4f);
+    expect(s.launcher->section_shown() == 1, "R1 from the home screen did not open the Library");
+    s.shoot("S10-library");
+    s.press({Key::right, Key::right, Key::down});
+    s.wait(0.8f);
+    s.shoot("S11-library-moved");
+    s.press({Key::down, Key::down});
+    s.wait(0.8f);
+    s.shoot("S12-library-scrolled");
+    // A favorite, from Quick settings: its row after the overlay's.
+    s.press({Key::options});
+    s.wait(0.8f);
+    s.shoot("S13-library-quick");
+    s.press({Key::down, Key::down, Key::down, Key::down, Key::down, Key::down, Key::down});
+    s.wait(0.5f);
+    s.shoot("S14-quick-favorite");
+    s.press({Key::cross});
+    s.wait(0.4f);
+    expect(s.services.favorite_files.size() == 1, "Quick settings' Favorite did not mark the game");
+    s.shoot("S14b-quick-favorite-on");
+    s.press({Key::circle});
+    s.wait(0.6f);
+    // The filters: up from the grid's first row, along to Favorites.
+    for (int up = 0; up < 8; ++up)
+        s.press({Key::up});
+    s.wait(0.5f);
+    s.shoot("S15-library-filters");
+    s.press({Key::right, Key::right, Key::cross});
+    s.wait(0.8f);
+    expect(s.launcher->library_shown() == 1, "the Favorites filter did not leave the one favorite");
+    s.shoot("S16-library-favorites");
+    s.press({Key::left, Key::cross});
+    s.wait(0.8f);
+    s.shoot("S17-library-recent");
+    s.press({Key::left, Key::cross});
+    s.wait(0.4f);
+    // The search: the keyboard's answer (on a thread of its own) filters the games.
+    s.press({Key::left});
+    s.services.typed_search = "sample software 1";
+    s.press({Key::cross});
+    for (int tries = 0; tries < 400 && s.launcher->library_shown() > 12; ++tries)
+    {
+        s.frame();
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+    s.wait(0.8f);
+    expect(s.launcher->library_shown() > 0 && s.launcher->library_shown() <= 12,
+           "the search did not leave the games it names");
+    s.shoot("S18-library-search");
+    // Circle clears the search.
+    s.press({Key::circle});
+    s.wait(0.6f);
+    s.shoot("S19-library-search-cleared");
+
+    // Settings: R1 twice (Multiplayer between); the column and the focused category's panel.
+    s.press({Key::down});
+    s.press({Key::r1});
+    s.wait(1.2f);
+    expect(s.launcher->section_shown() == 2, "R1 from the Library did not open Multiplayer");
+    s.shoot("S30-multiplayer");
+    s.press({Key::r1});
+    s.wait(1.2f);
+    expect(s.launcher->section_shown() == 3, "R1 from Multiplayer did not open Settings");
+    s.shoot("S20-settings");
+    s.press({Key::down});
+    s.wait(0.8f);
+    s.shoot("S21-settings-video");
+    s.press({Key::cross});
+    s.wait(0.8f);
+    s.shoot("S22-settings-video-open");
+    s.press({Key::circle});
+    s.wait(0.6f);
+    s.press({Key::down});
+    s.wait(0.6f);
+    s.shoot("S23-settings-performance");
+    s.press({Key::down, Key::down, Key::down});
+    s.wait(0.6f);
+    s.shoot("S24-settings-accessibility");
+    s.press({Key::cross});
+    s.wait(0.8f);
+    s.shoot("S25-settings-accessibility-open");
+    s.press({Key::circle});
+    s.wait(0.6f);
+    for (int down = 0; down < 12; ++down)
+        s.press({Key::down});
+    s.wait(0.8f);
+    s.shoot("S26-settings-about-row");
+    s.press({Key::cross});
+    s.wait(1.0f);
+    s.shoot("S27-about");
+    expect(s.launcher->section_shown() == 3, "About is not a page of Settings");
+    s.press({Key::circle});
+    s.wait(0.8f);
+    s.press({Key::l1, Key::l1, Key::l1});
+    s.wait(1.2f);
+    expect(s.launcher->section_shown() == 0, "L1 from Settings did not come back home");
+    s.shoot("S28-home-again");
+
+    // What the home screen says when something is wrong.
+    s.services.setup_ready = false;
+    s.restart();
+    s.wait(2.0f);
+    s.shoot("S40-home-setup-required");
+    s.services.setup_ready = true;
+    s.services.launch_error = "The game's keys are missing from prod.keys.";
+    s.restart();
+    s.wait(2.0f);
+    s.shoot("S41-home-launch-failed");
+    s.services.launch_error.clear();
+}
+
 // The first seconds after the app is started, one frame per call of frame().
 void opening_tour(Stage &s)
 {
@@ -1792,6 +1968,8 @@ int main(int argc, char **argv)
         opening_tour(stage);
     else if (make_tour)
         tour(stage);
+    else if (pe::ui::th().showcase)
+        showcase_pictures(stage);
     else
         pictures(stage);
     std::fprintf(stderr, "cues heard: %zu\n", stage.heard.size());
