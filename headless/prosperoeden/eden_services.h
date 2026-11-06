@@ -146,6 +146,9 @@ public:
     void leave_room() override;
     std::optional<std::string> room_text(int, const std::string&, const std::atomic<bool>&) override;
     std::optional<std::int64_t> ask_seed(std::int64_t, const std::atomic<bool>&) override;
+    std::optional<std::string> ask_search(const std::string&, const std::atomic<bool>&) override;
+    std::vector<std::string> favorites() override;
+    bool set_favorite(const std::string& file, bool favorite) override;
     bool can_launch_game() override;
     void arm_safe_launch(std::uint64_t title_id) override;
 private:

@@ -435,6 +435,27 @@ class FakeServices : public ui::Services
     {
         return typed_seed;
     }
+    // What the keyboard gives the next time the Library's search asks (nothing: cancelled).
+    std::optional<std::string> typed_search;
+    std::optional<std::string> ask_search(const std::string &, const std::atomic<bool> &) override
+    {
+        return typed_search;
+    }
+    // The Library's favorites, kept in memory.
+    std::vector<std::string> favorite_files;
+    std::vector<std::string> favorites() override
+    {
+        return favorite_files;
+    }
+    bool set_favorite(const std::string &file, bool favorite) override
+    {
+        const auto at = std::find(favorite_files.begin(), favorite_files.end(), file);
+        if (favorite && at == favorite_files.end())
+            favorite_files.push_back(file);
+        else if (!favorite && at != favorite_files.end())
+            favorite_files.erase(at);
+        return true;
+    }
     ui::Preferences preferences() override
     {
         return preferences_;
