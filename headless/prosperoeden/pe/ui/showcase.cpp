@@ -39,7 +39,8 @@ constexpr float kBarHeight = 88.0f;
 constexpr float kTabSize = 30.0f;
 constexpr float kTabPad = 40.0f;       // either side of a tab's name
 constexpr float kTabsCentre = 1000.0f; // the tabs are a group around here...
-constexpr float kTabsRoom = 1040.0f;   // ... no wider than this (a long translation gets smaller)
+constexpr float kTabsLeft = 600.0f;    // ... starting no further left than this (the wordmark's end)
+constexpr float kTabsRight = 1700.0f;  // ... and ending before the clock (a long translation gets smaller)
 constexpr float kUnderline = 100.0f;
 constexpr const char *kTabNames[] = {TR("Home"), TR("Library"), TR("Multiplayer"), TR("Settings")};
 constexpr float kClockRight = 1868.0f;
@@ -79,7 +80,7 @@ constexpr int kColumns = 6;
 constexpr float kTileWidth = 276.0f;
 constexpr float kTileHeight = 220.0f;
 constexpr float kTilePitchX = (kRight - kLeft - kTileWidth) / static_cast<float>(kColumns - 1);
-constexpr float kTilePitchY = 246.0f;
+constexpr float kTilePitchY = 236.0f; // three rows, and the top of a fourth under them
 constexpr float kGridTop = 248.0f;
 constexpr int kGridRowsShown = 3;
 constexpr Rect kGridWindow{40.0f, 228.0f, 1840.0f, 772.0f}; // down to the hints
@@ -291,10 +292,12 @@ void Launcher::draw_top_bar(Canvas &c)
         widths[i] = text_width(c, tr(kTabNames[i]), kTabSize) + 2.0f * kTabPad;
         total += widths[i];
     }
-    const float fit = std::min(1.0f, kTabsRoom / total);
+    // Around their place when there is room; further right, then smaller, when the names are long.
+    const float fit = std::min(1.0f, (kTabsRight - kTabsLeft) / total);
+    const float start = std::max(kTabsLeft, kTabsCentre - total * fit * 0.5f);
     const float cy = kBarTop + kBarHeight * 0.5f;
-    list.push_transform(fit, kTabsCentre, cy, 0.0f, 0.0f);
-    float x = kTabsCentre - total * 0.5f;
+    list.push_transform(fit, start, cy, 0.0f, 0.0f);
+    float x = start;
     const bool connected = services_.room_status().phase == Eden::Multiplayer::Phase::Connected;
     for (int i = 0; i < 4; ++i)
     {
@@ -1192,7 +1195,7 @@ void Launcher::draw_showcase_library(Canvas &c)
         list.pop_clip();
         // The row under the window fades toward the hints.
         if (!look().high_contrast)
-            list.gradient_rect({0.0f, 930.0f, 1920.0f, 72.0f}, 0.0f, t.base.with_alpha(0.0f), t.base.with_alpha(0.9f));
+            list.gradient_rect({0.0f, 944.0f, 1920.0f, 58.0f}, 0.0f, t.base.with_alpha(0.0f), t.base.with_alpha(0.92f));
         if (grid_rows_.count > grid_rows_.visible)
             scrollbar(c, grid_rows_, 1876.0f, kGridTop, kTilePitchY * (kGridRowsShown - 1) + kTileHeight);
     }
