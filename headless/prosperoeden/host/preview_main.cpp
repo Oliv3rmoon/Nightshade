@@ -1529,6 +1529,10 @@ void showcase_pictures(Stage &s)
     // The Library: R1, the grid, along it and down it.
     s.press({Key::r1});
     s.wait(1.4f);
+    // (The preview draws only for a picture: one frame drawn asks for the grid's covers, which are
+    // then read a few a frame, as on the console where every frame is drawn.)
+    s.render();
+    s.wait(0.4f);
     expect(s.launcher->section_shown() == 1, "R1 from the home screen did not open the Library");
     s.shoot("S10-library");
     s.press({Key::right, Key::right, Key::down});
