@@ -492,6 +492,9 @@ class Launcher
     // the selection rests on a game (Textures::show_game_art), shaded toward the text. strength:
     // 1 on the home screen, less behind the Library's grid.
     void draw_showcase_art(Canvas &c, float strength);
+    // Over Nightshade's plate (its backdrop): its flowers frame the screen while the middle, where
+    // the words, the covers and the panels are, stays dark enough to read.
+    void draw_showcase_veil(Canvas &c);
     // The home screen's row of covers: the recent games first, then the rest of the Library.
     void collect_shelf();
     // Puts the shelf's game in the home screen (the Library's selection follows it).

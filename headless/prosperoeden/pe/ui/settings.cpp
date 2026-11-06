@@ -366,7 +366,8 @@ void Launcher::draw_showcase_settings(Canvas &c, const std::string *summaries)
             plate(c, row_plate(), r, f);
         else
         {
-            list.bordered_rect(r, t.radius_row, t.panel.with_alpha(0.72f), 1.0f, kWhite.with_alpha(0.11f));
+            list.shadow({r.x + 4.0f, r.y + 8.0f, r.w - 8.0f, r.h}, t.radius_row, 20.0f, Color{0.0f, 0.0f, 0.0f, 0.5f});
+            list.bordered_rect(r, t.radius_row, t.panel.with_alpha(0.78f), 1.0f, kWhite.with_alpha(0.11f));
             if (f > 0.001f)
             {
                 list.shadow({r.x - 2.0f, r.y + 4.0f, r.w + 4.0f, r.h}, t.radius_row + 2.0f, t.focus_glow,
@@ -400,7 +401,14 @@ void Launcher::draw_showcase_settings(Canvas &c, const std::string *summaries)
     const float opened = docked ? tween::clamp01(modal_open_.value) : 0.0f;
     const float here = arrive(1);
     list.push_opacity(here);
-    glass(c, kShowcasePanel, t.radius_panel, t.panel.with_alpha(0.84f), kWhite.with_alpha(0.13f), 1.0f);
+    // With its dialog open the panel has the focus: it is ringed and lit as a focused card is.
+    if (opened > 0.01f && !look().high_contrast)
+        list.shadow({kShowcasePanel.x, kShowcasePanel.y + 6.0f, kShowcasePanel.w, kShowcasePanel.h}, t.radius_panel,
+                    t.focus_glow + 8.0f, t.accent.with_alpha(std::min(1.0f, 0.22f * t.glow) * opened));
+    glass(c, kShowcasePanel, t.radius_panel, t.panel.with_alpha(0.86f), kWhite.with_alpha(0.13f), 1.0f);
+    if (opened > 0.01f)
+        list.bordered_rect(kShowcasePanel, t.radius_panel, kWhite.with_alpha(0.0f), t.focus_width * 0.75f,
+                           t.accent_pale.with_alpha(0.85f * opened));
     if (opened < 0.99f)
     {
         const int row = std::clamp(settings_.selected, 0, rows - 1);

@@ -81,6 +81,7 @@ struct Theme
     float border = 1.0f;        // hairlines
     float focus_width = 2.0f;   // the focus ring's stroke
     float focus_glow = 30.0f;   // how far its light reaches
+    float glow = 1.0f;          // how strong that light is (1: the launcher's own)
     bool glass_panels = true;   // panels show the blurred artwork behind them
     float shadow_blur = 48.0f;
     float shadow_offset = 20.0f;

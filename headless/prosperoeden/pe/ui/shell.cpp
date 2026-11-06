@@ -192,6 +192,9 @@ void Launcher::draw_scrims(Canvas &c)
     // A picture of the user's own stays visible through a lighter shade; the theme's own art keeps
     // the full one it was drawn for.
     const bool picture = textures_.custom_backdrop();
+    // Nightshade's plate frames the screen with its flowers: a veil keeps the middle dark instead.
+    if (th().showcase && !picture)
+        return draw_showcase_veil(c);
     const float away_left = picture ? 0.70f : 0.92f;
     const float away_right = picture ? 0.50f : 0.76f;
     // One scrim whose two ends are the home look and the away look, moved by `away`. The home

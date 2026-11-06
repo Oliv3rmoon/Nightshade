@@ -1061,10 +1061,17 @@ void Launcher::draw_game_page(Canvas &c, float open)
     // Its own ground over the Library: the artwork again, further back (Nightshade's: the game's).
     list.rounded_rect({0.0f, 0.0f, 1920.0f, 1080.0f}, 0.0f, t.base);
     if (t.showcase)
-        draw_showcase_art(c, 0.5f);
+    {
+        // Nightshade's plate, as behind Settings.
+        if (textures_.backdrop() != 0)
+            list.image(textures_.backdrop(), c.backdrop.picture(textures_), {0.0f, 0.0f, 1.0f, 1.0f},
+                       Color{1.0f, 1.0f, 1.0f, 1.0f});
+        draw_showcase_veil(c);
+    }
     else if (!look().high_contrast && textures_.backdrop() != 0)
         list.image(textures_.backdrop(), c.backdrop.picture(textures_), {0.0f, 0.0f, 1.0f, 1.0f}, Color{1.0f, 1.0f, 1.0f, 0.22f});
-    list.hgradient_rect({0.0f, 0.0f, 1920.0f, 1080.0f}, 0.0f, t.base.with_alpha(0.55f), t.base.with_alpha(0.25f));
+    if (!t.showcase)
+        list.hgradient_rect({0.0f, 0.0f, 1920.0f, 1080.0f}, 0.0f, t.base.with_alpha(0.55f), t.base.with_alpha(0.25f));
     list.push_transform(1.0f, 0.0f, 0.0f, (1.0f - open) * 48.0f * motion(), 0.0f);
 
     // ---- which game, and how much it has of its own ----
@@ -1090,7 +1097,7 @@ void Launcher::draw_game_page(Canvas &c, float open)
     // Nightshade's: the kinds on a panel of their own, as its other columns are.
     if (t.showcase)
         glass(c, {kinds.x - 14.0f, kinds.y - 14.0f, kinds.w + 28.0f, kinds.h + 4.0f}, t.radius_panel,
-              t.panel.with_alpha(0.72f), t.panel_edge.with_alpha(0.40f), 0.6f);
+              t.panel.with_alpha(0.88f), t.panel_edge.with_alpha(0.40f), 1.0f);
     const int rows = game_rows_.count;
     const int chosen = std::clamp(game_rows_.selected, 0, std::max(0, rows - 1));
     const int kind = game_row(chosen);

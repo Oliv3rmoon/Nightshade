@@ -88,6 +88,11 @@ class Textures
     {
         return brand_;
     }
+    // The theme's own backdrop, whatever shows over it (Nightshade lays its frame over a game's art).
+    std::uint32_t theme_backdrop() const
+    {
+        return backdrop_;
+    }
     // 0 when the launch picture was not loaded.
     std::uint32_t splash() const
     {

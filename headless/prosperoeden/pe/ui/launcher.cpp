@@ -448,12 +448,12 @@ void Launcher::update(float dt)
         else
             textures_.clear_game_backdrop();
     }
-    // Nightshade's home screen and Library show the selected game's art: made once the selection
-    // rests on a game (at once when there is none yet), never every frame.
+    // Nightshade's home screen shows the selected game's art: made once the selection rests on a
+    // game (at once when there is none yet), never every frame.
     if (th().showcase)
     {
         std::string wanted = textures_.game_art_path();
-        if (screen_ == Screen::home || screen_ == Screen::library)
+        if (screen_ == Screen::home)
         {
             if (library_.selected >= 0 && library_.selected < static_cast<int>(games_.size()))
                 wanted = games_[static_cast<std::size_t>(library_.selected)].cover;

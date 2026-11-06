@@ -228,6 +228,8 @@ void outline_pill(Canvas &c, const Rect &r, std::string_view label, Icon mark, f
     list.push_opacity(enabled ? 1.0f : 0.45f);
     const float scale = 1.0f + (0.03f * focus - 0.035f * press * focus) * motion();
     list.push_transform(scale, r.x + r.w * 0.5f, r.y + r.h * 0.5f, 0.0f, 0.0f);
+    if (!look().high_contrast)
+        list.shadow({r.x + 4.0f, r.y + 8.0f, r.w - 8.0f, r.h}, r.h * 0.5f, 22.0f, kBlack.with_alpha(0.5f));
     focus_ring(c, r, r.h * 0.5f, focus);
     pill(c, r, gfx::mix(t.panel, t.row_focus, focus).with_alpha(0.62f), kWhite.with_alpha(0.50f + 0.3f * focus));
     const float glyph = 44.0f;
@@ -358,7 +360,7 @@ void Launcher::draw_showcase_footer(Canvas &c, const Hint *hints, int count, std
         notice(c, message_, kLeft, line, t.size_small, message_warning_ ? t.warning : t.accent_pale, room,
                message_warning_);
     else if (!status.empty())
-        text_shrink(c, status, kLeft, line, t.size_small, t.meta, room);
+        text_shrink(c, status, kLeft, line, t.size_small, t.copy, room);
 
     list.push_transform(fit, kClockRight, cy, 0.0f, 0.0f);
     float x = kClockRight - total;
@@ -395,6 +397,7 @@ void Launcher::draw_showcase_intro(Canvas &c)
                         room_page_ == RoomPage::public_rooms ? TR("Public rooms") :
                                                                TR("Private room");
     const float here = arrive(0);
+    c.list.hgradient_rect({0.0f, 0.0f, 1000.0f, 1080.0f}, 0.0f, t.base.with_alpha(0.92f), t.base.with_alpha(0.0f));
     c.list.push_opacity(here);
     {
         const Heavy heavy(c);
@@ -411,37 +414,68 @@ void Launcher::draw_showcase_intro(Canvas &c)
 
 // ---------------------------------------------------------------- the game's art
 
+void Launcher::draw_showcase_veil(Canvas &c)
+{
+    gfx::DrawList &list = c.list;
+    const Theme &t = th();
+    // The whole plate a little darker, and its middle much darker, fading out toward the edges and
+    // the corners where the flowers are. (High contrast: the plate steps back further.)
+    const bool contrast = look().high_contrast;
+    list.rounded_rect(kScreen, 0.0f, t.base.with_alpha(contrast ? 0.70f : 0.26f));
+    list.shadow({300.0f, 210.0f, 1320.0f, 660.0f}, 240.0f, 300.0f, t.base.with_alpha(0.90f));
+    // The bands where words cross the frame from edge to edge: the top bar and the row under it
+    // (the Library's count, a page's title), and the hints. The flowers show between them.
+    list.rounded_rect({0.0f, 0.0f, 1920.0f, 222.0f}, 0.0f, t.base.with_alpha(0.80f));
+    list.gradient_rect({0.0f, 222.0f, 1920.0f, 110.0f}, 0.0f, t.base.with_alpha(0.80f), t.base.with_alpha(0.0f));
+    list.gradient_rect({0.0f, 870.0f, 1920.0f, 110.0f}, 0.0f, t.base.with_alpha(0.0f), t.base.with_alpha(0.90f));
+    list.rounded_rect({0.0f, 980.0f, 1920.0f, 100.0f}, 0.0f, t.base.with_alpha(0.90f));
+}
+
 void Launcher::draw_showcase_art(Canvas &c, float strength)
 {
     gfx::DrawList &list = c.list;
     const Theme &t = th();
     const std::uint32_t now = textures_.game_art();
     const std::uint32_t before = textures_.game_art_before();
-    if (now == 0 && before == 0)
-        return; // the theme's own backdrop shows
-    const float fade = look().reduce_motion ? 1.0f : tween::cubic_out(textures_.game_art_age() / 0.45f);
-    list.rounded_rect(kScreen, 0.0f, t.base);
-    // The art at the right, as wide as it is tall times 1.43: its middle part, darkened.
-    constexpr Rect kArt{380.0f, 0.0f, 1540.0f, 1080.0f};
-    constexpr float kTall = 1080.0f / 1540.0f;
-    const Rect uv{0.0f, (1.0f - kTall) * 0.5f, 1.0f, kTall};
-    const float light = look().high_contrast ? 0.30f : 0.30f + 0.42f * strength;
-    const Color tint{light, light, light, 1.0f};
-    if (before != 0 && fade < 1.0f)
-        list.image(before, kArt, uv, tint.with_alpha(now != 0 ? 1.0f : 1.0f - fade));
-    if (now != 0)
-        list.image(now, kArt, uv, tint.with_alpha(fade));
-    // Dark at the left where the words are, opening toward the right; dark under the covers and
-    // the hints.
-    list.hgradient_rect({kArt.x - 1.0f, 0.0f, 820.0f, 1080.0f}, 0.0f, t.base, t.base.with_alpha(0.0f));
+    const bool art = now != 0 || before != 0;
+    if (art)
+    {
+        const float fade = look().reduce_motion ? 1.0f : tween::cubic_out(textures_.game_art_age() / 0.45f);
+        list.rounded_rect(kScreen, 0.0f, t.base);
+        // The art at the right, as wide as it is tall times 1.43: its middle part, darkened.
+        constexpr Rect kArt{380.0f, 0.0f, 1540.0f, 1080.0f};
+        constexpr float kTall = 1080.0f / 1540.0f;
+        const Rect uv{0.0f, (1.0f - kTall) * 0.5f, 1.0f, kTall};
+        const float light = look().high_contrast ? 0.30f : 0.30f + 0.42f * strength;
+        const Color tint{light, light, light, 1.0f};
+        if (before != 0 && fade < 1.0f)
+            list.image(before, kArt, uv, tint.with_alpha(now != 0 ? 1.0f : 1.0f - fade));
+        if (now != 0)
+            list.image(now, kArt, uv, tint.with_alpha(fade));
+    }
+    // Dark at the left where the words are, opening toward the right.
+    list.hgradient_rect({art ? 379.0f : 0.0f, 0.0f, art ? 820.0f : 1100.0f, 1080.0f}, 0.0f,
+                        t.base.with_alpha(art ? 1.0f : 0.92f), t.base.with_alpha(0.0f));
+    // Nightshade's own frame over the art: the plate's flowers at the right edge, where no words
+    // are (the left is under the title, the bottom under the covers). Not over a wallpaper.
+    if (art && !textures_.custom_backdrop() && textures_.theme_backdrop() != 0 && !look().high_contrast)
+    {
+        list.push_clip({960.0f, 0.0f, 960.0f, 1080.0f});
+        list.image(textures_.theme_backdrop(), c.backdrop.art(), {0.0f, 0.0f, 1.0f, 1.0f},
+                   kWhite.with_alpha(0.85f * strength));
+        list.pop_clip();
+    }
+    // Dark under the covers and the hints, and behind the game's name and its buttons.
     list.gradient_rect({0.0f, 540.0f, 1920.0f, 540.0f}, 0.0f, t.base.with_alpha(0.0f), t.base.with_alpha(0.94f));
+    if (art)
+        list.shadow({40.0f, 230.0f, 1100.0f, 330.0f}, 120.0f, 160.0f, t.base.with_alpha(0.62f));
     // The theme's crimson, low in the dark: a vignette from black to red.
     if (!look().high_contrast)
     {
         list.shadow({-260.0f, 720.0f, 1200.0f, 560.0f}, 280.0f, 280.0f, t.accent_deep.with_alpha(0.50f * strength));
         list.shadow({1560.0f, -240.0f, 760.0f, 900.0f}, 320.0f, 320.0f, t.accent_deep.with_alpha(0.32f * strength));
     }
-    if (strength < 1.0f)
+    if (art && strength < 1.0f)
         list.rounded_rect(kScreen, 0.0f, t.base.with_alpha(0.45f * (1.0f - strength)));
 }
 
@@ -1169,13 +1203,16 @@ void Launcher::draw_showcase_library(Canvas &c)
     const int shown = static_cast<int>(library_view_.size());
     const bool active = screen_ == Screen::library && modal_ == Modal::none;
 
-    draw_showcase_art(c, 0.38f);
+    // (Behind it: Nightshade's plate, with its veil: Backdrop and draw_scrims.)
 
     // ---- the search, the filters, how many games ----
     {
         const float f = active && library_header_ == 0 ? 1.0f : 0.0f;
         const float here = arrive(0);
         list.push_opacity(here);
+        if (!look().high_contrast)
+            list.shadow({kSearch.x + 4.0f, kSearch.y + 8.0f, kSearch.w - 8.0f, kSearch.h}, kSearch.h * 0.5f, 20.0f,
+                        kBlack.with_alpha(0.5f));
         pill(c, kSearch, gfx::mix(t.panel, t.row_focus, f).with_alpha(0.66f), kWhite.with_alpha(0.24f + 0.3f * f));
         focus_ring(c, kSearch, kSearch.h * 0.5f, f);
         const float cy = kSearch.y + kSearch.h * 0.5f;
@@ -1250,9 +1287,10 @@ void Launcher::draw_showcase_library(Canvas &c)
             const float sc = 1.0f + (0.05f * f - 0.035f * press_ * f) * motion();
             list.push_transform(sc, r.x + r.w * 0.5f, r.y + r.h * 0.5f, 0.0f, (1.0f - here) * 14.0f * motion());
             focus_ring(c, r, t.radius_card, f);
-            if (f > 0.01f && !look().high_contrast)
-                list.shadow({r.x + 4.0f, r.y + 14.0f, r.w - 8.0f, r.h - 4.0f}, t.radius_card, 26.0f,
-                            kBlack.with_alpha(0.5f * f));
+            // Depth: every cover casts a soft shadow, the focused one a longer one.
+            if (!look().high_contrast)
+                list.shadow({r.x + 4.0f, r.y + 10.0f + 6.0f * f, r.w - 8.0f, r.h - 2.0f}, t.radius_card,
+                            22.0f + 10.0f * f, kBlack.with_alpha(0.55f + 0.15f * f));
             if (game.remote)
                 remote_cover(c, game.cover, r, t.radius_card, 0.3f);
             else

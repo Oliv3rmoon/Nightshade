@@ -167,7 +167,7 @@ Theme nightly()
 
     t.accent = rgb(0xd4142f);
     t.accent_deep = rgb(0x5c0715);
-    t.accent_pale = rgb(0xff5a70);
+    t.accent_pale = rgb(0xff3d5a); // the focus ring: crimson, as bright as text needs
     t.on_accent = rgb(0xffffff);
     t.highlight = rgb(0xff3b55);
 
@@ -200,11 +200,13 @@ Theme nightly()
     t.radius_panel = 28.0f;
     t.pill_chips = true;
     t.border = 1.0f;
-    t.focus_width = 3.0f;
-    t.focus_glow = 34.0f;
-    t.shadow_blur = 40.0f;
-    t.shadow_offset = 14.0f;
-    t.motes = 10;
+    // The focus: a crimson ring of 4 pixels and a strong soft light; panels and cards cast shadows.
+    t.focus_width = 4.0f;
+    t.focus_glow = 40.0f;
+    t.glow = 1.7f;
+    t.shadow_blur = 44.0f;
+    t.shadow_offset = 16.0f;
+    t.motes = 0; // the plate has its own bokeh
     t.drift = 0.0f;
 
     t.list_settings = true;
@@ -248,7 +250,7 @@ const AccentPreset kCanopyAccents[] = {
 };
 
 const AccentPreset kNightlyAccents[] = {
-    {"red",      "Red",      Color::rgb(0xd4142f), Color::rgb(0x5c0715), Color::rgb(0xff5a70), Color::rgb(0xffffff), Color::rgb(0xff3b55)},
+    {"red",      "Red",      Color::rgb(0xd4142f), Color::rgb(0x5c0715), Color::rgb(0xff3d5a), Color::rgb(0xffffff), Color::rgb(0xff3b55)},
     {"crimson",  "Crimson",  Color::rgb(0xb0102a), Color::rgb(0x4a0c16), Color::rgb(0xec98a6), Color::rgb(0xffffff), Color::rgb(0xf05068)},
     {"rose",     "Rose",     Color::rgb(0xe88ca0), Color::rgb(0x5c2232), Color::rgb(0xf2c0cc), Color::rgb(0x0b0b0d), Color::rgb(0xf5d4dc)},
     {"white",    "White",    Color::rgb(0xe6e6ea), Color::rgb(0x3a3a40), Color::rgb(0xf4f4f6), Color::rgb(0x0b0b0d), Color::rgb(0xffffff)},
