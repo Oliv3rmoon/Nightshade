@@ -2,6 +2,27 @@
 
 What changed in each release of ProsperoEden, newest first. A release's notes on GitHub are its section here.
 
+## v1.010.011
+
+**Tears of the Kingdom: the crash after a long freeze should be gone.** v1.010.010's freeze watchdog caught it twice on a tester's console, on the way up Death Mountain and later in the same game. The game's main thread spent about 90 seconds in one loop of its own code (`main+0x6E1404`) that copies 4 numbers but was handed a count near a billion. It wrote over a large part of the game's memory, and then jumped through one of the pointers it had overwritten: "guest thread MainThread jumped to an unmapped address". Not confirmed on a console yet.
+
+### Fixed
+
+- **That loop stops at 4 in Tears of the Kingdom** (this build of the game only, and only when its code is exactly what the logs showed). With a sane count it does just what it did before. With a wrong one it copies its 4 numbers and goes on, and `stderr.log` gets an `EDEN_TOTK_LOOP_BOUNDED` line with the count, where it was read, and whether that memory had last been written by the graphics side (`page=`). What writes the wrong count is still unknown, and those lines should say.
+- **The freeze watchdog names modules:** `EDEN_STUCK_GUEST` and its other lines now say `main+0x...` instead of a raw address.
+
+The frame drops in big areas are not from running out of memory: the logs show plenty free while the frame rate dips. They are still being looked into.
+
+Everything else is v1.010.010.
+
+### What to send
+
+Play as usual and send `/data/prosperoeden/logs` (`stderr.log` and `stderr.prev.log`) after each session, even one that doesn't crash. For the frame drops, say where they start (desert, volcano and so on) and about how long they last.
+
+### Install
+
+With **Settings > Diagnostics > Test builds** on in v1.010.009 or later, **Update now** offers it. Otherwise download `Nightshade-v1.010.011.zip` below and copy its `PPSA99008` folder over yours.
+
 ## v1.010.010
 
 **The freeze watchdog says where a frozen game is.** A tester's Tears of the Kingdom froze 110 minutes in, in the Mucktorch fight, on v1.010.009. Its `stderr.log` ended with `EDEN_STUCK core=0 state=guest`: one of the game's own threads kept running on the first core for 10 seconds without asking the system for anything. Nothing else was held: no request in progress, no graphics stall, no memory fault. The log couldn't say where that thread was. Now it can. Nothing a game does changes, and this isn't confirmed on a console yet.
