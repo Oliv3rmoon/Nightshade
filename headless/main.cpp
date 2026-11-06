@@ -37,6 +37,7 @@
 #include "devices.h"
 #include "amiibo.h"
 #include "memory_layout_guard.h"
+#include "title_defaults.h"
 #include "diagnostics.h"
 #include "hud.h"
 #include "loading_art.h"
@@ -1352,8 +1353,18 @@ int main(int argc, char** argv) {
             // one is off unless chosen there, for every game or for this one. The levels start
             // every session at their exact values (above), so one that is not chosen is off.
             auto speed = Eden::LoadPerformance(eden_game_title_id(guest));
+            // Asynchronous shaders on for a game listed in title_defaults.h (Tears of the Kingdom)
+            // unless its own Performance settings have the switch, which then decides.
+            static_assert(std::string_view{Eden::kPerformanceKeys[1]} == "async_shaders");
+            const auto async_shaders = Eden::TitleDefaults::AsyncShadersFor(
+                eden_game_title_id(guest), speed.async_shaders,
+                Eden::LoadGameSettings(eden_game_title_id(guest)).performance[1]);
+            speed.async_shaders = async_shaders.on;
             // A safe start: every switch at its default, 4 GiB, 100% (Safe Launch).
             if (Eden::SafeLaunch::On()) Eden::SafeLaunch::Apply(speed);
+            else if (async_shaders.by_title)
+                Eden::Report("launch", "Asynchronous shaders on: this game's own default (title_defaults.h); its "
+                                       "Performance switch in the Library decides instead once it has one");
             // Clock adjustment is an explicit per-game workaround, not a default speed change.
             // This runs before Core::System creates any of the new guest's threads.
             Eden::GuestClock::Reset(Eden::LoadAdaptiveClock(eden_game_title_id(guest)));

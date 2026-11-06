@@ -6,6 +6,7 @@
 
 #include "pe/ui/launcher.hpp"
 #include "pe/ui/video_profiles.hpp"
+#include "../../../title_defaults.h"
 
 #include <algorithm>
 #include <chrono>
@@ -198,10 +199,14 @@ std::vector<Option> options(int category, const GameSettings &game, Preferences 
             TR("Skip CPU invalidation"), TR("Compact memory")};
         for (int i = 0; i < 8; ++i)
         {
-            // Asynchronous shaders act with Vulkan only (settings.cpp).
+            // Asynchronous shaders act with Vulkan only (settings.cpp). A game of title_defaults.h
+            // (Tears of the Kingdom) has them on until it has the switch of its own: what it runs
+            // with is shown, not Settings' value.
+            const bool title_default = static_cast<std::size_t>(i) == kAsyncShadersSwitch &&
+                                       Eden::TitleDefaults::AsyncShadersListed(title_id);
             rows.push_back({std::string(tr(kNames[i])) + (i == 1 ? " (Vulkan)" : ""), off_on,
                             game.performance[static_cast<std::size_t>(i)],
-                            on_off(*performance_switch(prefs, i))});
+                            on_off(title_default || *performance_switch(prefs, i))});
         }
         // How fast this game may run (kSpeedLimitRow).
         const std::vector<std::string> speeds = speed_limit_names();

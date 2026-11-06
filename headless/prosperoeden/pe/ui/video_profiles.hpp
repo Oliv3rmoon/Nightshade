@@ -69,14 +69,16 @@ inline constexpr TitleProfiles kTitleProfiles[] = {
     // The Legend of Zelda: Tears of the Kingdom. With the 8 GiB layout and no mods it wrote gigabytes
     // of new memory 19 to 74 minutes in and stopped (v1.010.005, headless/memory_layout_guard.h); its
     // texture arrays take 816 MiB decoded and 204 MiB as BC3. Every tier keeps the console's 4 GiB
-    // and BC3, whatever Settings > Performance > Memory says.
+    // and BC3, whatever Settings > Performance > Memory says. Every tier also has asynchronous
+    // shaders on, the game's own default (headless/title_defaults.h): with them off it waits for
+    // each new pipeline, and it builds hundreds of them after a save loads and in new areas.
     {0x0100F2C0115B6000ULL,
      TR("Tears of the Kingdom: 4 GiB and compressed ASTC in every tier, what it needs to play for hours."),
      {{
          {1, 1, 0, true, true, 0},
-         {2, 0, 0, false, false, 0},
-         {3, 2, 0, false, false, 0},
-         {4, 2, 0, false, false, 0},
+         {2, 0, 0, false, true, 0},
+         {3, 2, 0, false, true, 0},
+         {4, 2, 0, false, true, 0},
      }}},
 };
 
