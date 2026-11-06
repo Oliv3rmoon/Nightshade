@@ -62,8 +62,9 @@ follows per call instead of in one static buffer, since downloads can now run at
 Insider builds (`insider.h`, `insider.c`) are ProsperoEden's own too: a build that names the
 nightly insider service (`EDEN_INSIDER_URL`) asks it first, with Test builds on and an insider
 code kept, through `insider_check_tests_from` (`self_update_check_self_insider` in
-`self_update_ps5.c`, whose `console_post` is the one POST the kit makes: HTTPS, no redirects, a
-5 s connect and 10 s overall limit, 16 KB of answer). Only an answer `"status": "update"` whose
+`self_update_ps5.c`, whose `console_post` is the one POST the kit makes: HTTPS, no redirects,
+`Content-Type: application/json` and no `Origin`, a 5 s connect and 10 s overall limit, 16 KB of
+answer). Only an answer `"status": "update"` whose
 build passes every check fills the offer, a pre-release with its title; anything else asks
 GitHub's test builds exactly as before. `self_update.c` has `self_update_insider_url` and
 `self_update_allow_insider`: once the build names the service, `self_update_url_allowed` also

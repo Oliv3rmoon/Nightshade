@@ -12,7 +12,8 @@
  *
  * Only HTTP 200 with "status": "update" and a build that passes every check below is an offer: a
  * newer version of the installed one's line, a SHA-256, a size the kit takes and a download address
- * on the service's own host (<base>/v1/download/<token>, short-lived and signed). That offer fills
+ * on the service's own host (<base>/v1/download/<token>, short-lived and signed; it answers 403 once
+ * it expires or the member's code is removed, a failed download as any other). That offer fills
  * the same self_update_offer GitHub's check fills (a pre-release, with the build's title), so the
  * download, its SHA-256 and the helper are the kit's, unchanged. Anything else (none, not_qualified,
  * invalid_code, expired_code, another status or HTTP code, no network, a timeout, an answer it can't
@@ -83,10 +84,12 @@ extern "C"
         char file[128];     /* the build's file name ("Nightshade-v1.010.013.zip"), when it is a plain name */
     } insider_report;
 
-    /* POSTs `json` (Content-Type: application/json) to `url` with User-Agent `agent`, the answer
-     * into body (at most capacity bytes). As self_update_platform's fetch: 0, an answer arrived
-     * (*status set); negative, failed; SELF_UPDATE_FETCH_TOO_LARGE, an answer longer than capacity.
-     * HTTPS only, no redirects, INSIDER_CONNECT_MS and INSIDER_TIMEOUT_MS. */
+    /* POSTs `json` to `url` with User-Agent `agent`, the answer into body (at most capacity
+     * bytes). As self_update_platform's fetch: 0, an answer arrived (*status set); negative, failed;
+     * SELF_UPDATE_FETCH_TOO_LARGE, an answer longer than capacity. HTTPS only, no redirects,
+     * INSIDER_CONNECT_MS and INSIDER_TIMEOUT_MS. The service takes only Content-Type:
+     * application/json, set as such (anything else is 415), and refuses a request with an Origin
+     * header or a Sec-Fetch-Site other than none (403, a web page's): an app sends neither. */
     typedef int (*insider_post_fn)(void *user, const char *url, const char *agent, const char *json, char *body,
                                    size_t capacity, size_t *length, int *status);
 

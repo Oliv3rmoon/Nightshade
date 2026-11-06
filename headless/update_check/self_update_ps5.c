@@ -141,7 +141,9 @@ static int console_fetch(void *user, const char *url, char *body, size_t capacit
 
 /* ProsperoEden: insider builds (insider.h): a small JSON body POSTed, its answer read as
  * console_fetch reads one. HTTPS only and no redirects (new_request), a shorter wait than the
- * catalog's, the app's own User-Agent. */
+ * catalog's, the app's own User-Agent. Content-Type is set to application/json here (the service
+ * answers 415 to the form type CURLOPT_POSTFIELDS alone sends), and no Origin or Sec-Fetch-Site
+ * header is sent (403 for a web page's). */
 static int console_post(void *user, const char *url, const char *agent, const char *json, char *body,
                         size_t capacity, size_t *length, int *status)
 {

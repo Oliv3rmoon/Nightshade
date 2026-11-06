@@ -1909,6 +1909,17 @@ void InsiderDownload() {
         const self_update_status status = RunJob(offer, fake, false);
         assert(status.phase == SELF_UPDATE_FAILED && !fake.ended && fake.after.empty());
     }
+    // The address refused (403: it expired, or the member's code was removed since the answer):
+    // the download fails as any other, and nothing is staged.
+    {
+        network = Network{};
+        network.files[offer.artifact] = release;
+        network.failure = -403; // as console_download answers a status that isn't 200
+        FakeHelper fake;
+        const self_update_status status = RunJob(offer, fake, false);
+        assert(status.phase == SELF_UPDATE_FAILED && std::strcmp(status.error, "The download failed") == 0);
+        assert(!fake.ended && fake.after.empty() && fake.received == 0);
+    }
     // A build without the service named: its address is not one the kit downloads from.
     assert(self_update_allow_insider(nullptr) == 1);
     {
@@ -2004,6 +2015,6 @@ int main(int argc, char** argv) {
               "escaping, update/none/not_qualified/invalid_code/expired_code, other statuses, answers cut short or "
               "unreadable, builds refused (address, SHA-256, size, version, line, tag, app), GitHub's test builds "
               "after any answer but an offer and offline, the insider build first when offered, a download whose "
-              "SHA-256 or size differs refused with nothing staged PASS");
+              "SHA-256 or size differs, or that is refused (403), failed with nothing staged PASS");
     return 0;
 }
