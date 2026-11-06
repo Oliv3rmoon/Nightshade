@@ -9,7 +9,7 @@ The settings that take more than a line to explain: the Performance switches and
 | Setting | In the file | Default | What it does |
 |---|---|---|---|
 | Compile ahead | `block_list` | off | The code a 64-bit game compiled in earlier sessions is compiled again on a spare CPU as it starts, so the game stutters less when it reaches that code. In the one large game it was measured in, the game loaded sooner and its first seconds of play held their frame rate, while the emulated processor worked about a tenth harder afterwards. It has run in one game on the console so far; switch it off if a game misbehaves. |
-| Asynchronous shaders | `async_shaders` | off | A new effect is drawn once its shader is ready instead of pausing the game for it. Things can be missing for a moment. With the Vulkan renderer only: the OpenGL renderer ignores it. |
+| Asynchronous shaders | `async_shaders` | off (on for Tears of the Kingdom) | A new effect is drawn once its shader is ready instead of pausing the game for it. Things can be missing for a moment. With the Vulkan renderer only: the OpenGL renderer ignores it. See [Asynchronous shaders](#asynchronous-shaders). |
 | Faster GPU emulation | `fast_gpu` | off | The emulator's lowest GPU accuracy. Faster in demanding games; graphics can be wrong. |
 | Faster CPU emulation | `unsafe_cpu` | off | Less exact floating-point math. A few games misbehave. |
 | Faster DMA | `unsafe_dma` | off | Less exact memory transfers to the GPU. A few games show wrong graphics. |
@@ -27,6 +27,38 @@ A game can have its own values: in its settings, **Performance** (see [Settings 
   "games": { "0100000000010000": { "performance": { "fast_gpu": true } } }
 }
 ```
+
+### Asynchronous shaders
+
+With **Asynchronous shaders** off, a draw whose pipeline is not built yet waits for it, and so does the frame. With them on, the draw is left out until the pipeline is ready, except where leaving it out would show for longer than a frame. Such a draw waits:
+
+- when it draws into a target smaller than 640x360 (lookup tables, noise or fog textures a game makes once and keeps: left out, they would be missing for the rest of the session; the rule of [Eden PR #4639](https://git.eden-emu.dev/eden-emu/eden/pulls/4639));
+- when it has 6 indices or vertices or fewer and does not use depth (a full-screen pass).
+
+A draw that uses depth is left out even when it is small (upstream Eden's rule): the scene draws it again next frame.
+
+**Tears of the Kingdom has them on** unless its own Performance settings (Library > Game settings > Performance) have the switch: there it builds hundreds of new pipelines for minutes after a save loads and wherever new scenery streams in, and with the switch off each one holds the frame. Its own switch, on or off, always decides; **Settings > Performance** does not, because saving that page writes the switch for every game. A safe start ([Safe Launch](#safe-launch)) turns them off. The launch report says `Asynchronous shaders on: this game's own default` when the default decided, and the `Performance:` line says `async shaders on` or `off`.
+
+Every 5 s while a game plays, `stderr.log` gets a line with what the session did so far with draws that found their pipeline unbuilt, when that changed: each draw counts every time it is drawn before its pipeline is ready. For example:
+
+```
+EDEN_ASYNC_SHADERS on=1 skipped=812 skipped_depth=2304 waited_small_target=96 waited_small_draw=40 waited_sync=0
+```
+
+`skipped` and `skipped_depth` were left out, `waited_small_target` and `waited_small_draw` waited for the rules above, and `waited_sync` waited because the switch was off.
+
+### A timing run
+
+With an empty file named `cost-run.txt` in the app's folder (where it is installed, usually `/data/homebrew/PPSA99008`), the Vulkan renderer times where its work goes, in any build. The launch report says `Timing run: cost-run.txt is in the app's folder`, and every 5 s `heap.log` (beside `stderr.log` in `/data/prosperoeden/logs`) gets one `EDEN_VULKAN_COST api=<name> calls=<n> ns=<n>` line for each of the renderer's timers, with the session's totals so far: the time between two lines is the difference. The ones about new pipelines:
+
+| `api=` | What it times |
+|---|---|
+| `graphics_pipeline` | the driver building a pipeline, on the builder threads (the shader cache's at the start too) |
+| `shader_prepare` | the GPU thread making a new pipeline: Eden's translation of the game's shaders and the rest |
+| `shader_ir`, `shader_spirv` | that translation's two parts |
+| `pipeline_ready_wait` | draws waiting for a pipeline still being built (asynchronous shaders off, or a rule above) |
+
+The timers cost a little on every draw: take the file out after the test. Send `heap.log` and `stderr.log` with the session's `.prev.log` copies.
 
 ### The shader cache while the game plays
 
@@ -263,7 +295,7 @@ Every profile also turns frame generation and post-processing off. Recommended i
 
 A profile is not saved as such: choosing one writes those settings, and the menu reads back which profile they match. Change one of them by hand (or turn frame generation on) and the profile shows **Custom**; choose a profile again to set them all back. Settings saved before profiles existed are not changed: they show as the profile they match, or Custom. In a game's own settings, **Default** keeps Settings' values (and shows Settings' profile), and choosing a profile gives the game those values of its own; going back to **Default** takes back only what a profile sets.
 
-Some games have profiles of their own. **Tears of the Kingdom** keeps the console's 4 GiB and compressed ASTC textures in every one (see [Console memory](#console-memory)): its profiles set the game's own memory to 4 GiB, so with a mod that needs more, set its **Memory** by hand afterwards (the profile then shows Custom).
+Some games have profiles of their own. **Tears of the Kingdom** keeps the console's 4 GiB, compressed ASTC textures and asynchronous shaders in every one (see [Console memory](#console-memory) and [Asynchronous shaders](#asynchronous-shaders)): its profiles set the game's own memory to 4 GiB, so with a mod that needs more, set its **Memory** by hand afterwards (the profile then shows Custom).
 
 ## Safe Launch
 

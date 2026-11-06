@@ -2,6 +2,25 @@
 
 What changed in each release of ProsperoEden, newest first. A release's notes on GitHub are its section here.
 
+## Unreleased
+
+**Tears of the Kingdom: asynchronous shaders on, for the frame drops when new areas load.** In two testers' sessions on v1.010.011 the drops (after loading a save, in the desert, on the volcano) came with bursts of new graphics pipelines: 800 and 1,961 built while playing, after the shader cache, up to 96 in 30 seconds. Both had **Asynchronous shaders** off, so each new pipeline held the frame until the driver had built it. Not confirmed on a console yet.
+
+### Changed
+
+- **Asynchronous shaders are on for Tears of the Kingdom** unless its own Performance settings (Library > Game settings > Performance) have the switch: that switch, on or off, still decides. A safe start still turns them off, and the game's video profiles keep them on. Something new can be missing for a frame or two where it first appears; say where if you see it.
+- **Two rules for a draw whose pipeline is not built yet,** with asynchronous shaders on, in every game: a draw into a target smaller than 640x360 waits for it, since what a game draws there once (lookup tables, fog or noise textures) would otherwise be missing for the rest of the session (the rule of [Eden PR #4639](https://git.eden-emu.dev/eden-emu/eden/pulls/4639), by John); and a draw that uses depth is left out even when it is small, as upstream Eden does, since the scene draws it again next frame.
+
+### New
+
+- **`stderr.log` says what happened to those draws:** every 5 seconds, when it changed, an `EDEN_ASYNC_SHADERS` line with how many were left out (`skipped`, `skipped_depth`) and how many waited (`waited_small_target`, `waited_small_draw`, and `waited_sync` with the switch off). The launch report says `Asynchronous shaders on: this game's own default` when the default decided.
+- **Each `EDEN_PIPELINE` line ends with `spv=`,** a hash of each shader stage as the GPU gets it. A new pipeline whose stages were all seen before differs only in state outside its shaders: `tools/analyze-pipeline-reuse.py stderr.log` counts those, which says how much graphics pipeline libraries could save.
+- **A timing run in every build:** an empty `cost-run.txt` in the app's folder makes `heap.log` get `EDEN_VULKAN_COST` lines every 5 seconds: the driver's pipeline builds, the shader translation, the draws that waited for a pipeline and the rest ([A timing run](SETTINGS.md#a-timing-run)). It costs a little speed; take the file out afterwards.
+
+### What to send
+
+Play as usual, go where the drops were, and send `/data/prosperoeden/logs` (`stderr.log` and `stderr.prev.log`) after each session. With a timing run, `heap.log` and `heap.prev.log` too. Say whether the drops changed and whether anything was missing for a moment.
+
 ## v1.010.011
 
 **Tears of the Kingdom: the crash after a long freeze should be gone.** v1.010.010's freeze watchdog caught it twice on a tester's console, on the way up Death Mountain and later in the same game. The game's main thread spent about 90 seconds in one loop of its own code (`main+0x6E1404`) that copies 4 numbers but was handed a count near a billion. It wrote over a large part of the game's memory, and then jumped through one of the pointers it had overwritten: "guest thread MainThread jumped to an unmapped address". Not confirmed on a console yet.
