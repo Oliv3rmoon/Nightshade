@@ -965,6 +965,65 @@ void pictures(Stage &s)
     }
     s.press({Key::circle});
     s.wait(0.4f);
+    // Insider builds, in a build that names the insider service (EDEN_INSIDER_URL; above, without
+    // it, there is no Insider code row): Test builds switched on with no code kept asks for one,
+    // once, on the keyboard, and stays on when it is cancelled, its line saying where to get one.
+    // The Insider code row under it says whether one is kept, takes one, refuses what is not one
+    // and removes it when nothing is typed.
+    {
+        // The keyboard answers on a thread of its own: it is given a moment before the frames
+        // that take its answer.
+        const auto settle = [&s] {
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            s.wait(0.4f);
+        };
+        s.press({Key::circle});
+        s.wait(0.4f);
+        s.services.insider_url = true;
+        s.services.typed_insider.reset();
+        s.press({Key::cross});
+        s.wait(0.8f);
+        s.press({Key::down, Key::down, Key::down, Key::right});
+        settle();
+        s.shoot("18m-diagnostics-insider-hint");
+        const bool asked_once = s.services.insider_asked == 1 && s.services.preferences().test_builds &&
+                                s.services.insider_code.empty();
+        s.press({Key::down});
+        s.wait(0.6f);
+        s.shoot("18n-diagnostics-insider-code-not-set");
+        s.services.typed_insider = std::string{"abcd efgh"};
+        s.press({Key::cross});
+        settle();
+        s.shoot("18o-diagnostics-insider-code-set");
+        const bool kept = s.services.insider_code == "ABCDEFGH";
+        s.services.typed_insider = std::string{"ABCD-EFG0"};
+        s.press({Key::cross});
+        settle();
+        s.shoot("18p-diagnostics-insider-code-wrong");
+        const bool refused = s.services.insider_code == "ABCDEFGH";
+        s.press({Key::left}); // closes the card
+        s.services.typed_insider = std::string{};
+        s.press({Key::cross});
+        settle();
+        const bool removed = s.services.insider_code.empty();
+        // The service refused the code kept at this start: Test builds' line says where to get one.
+        s.services.insider_code = "ABCDEFGH";
+        s.services.insider_refused = true;
+        s.press({Key::up});
+        s.wait(0.6f);
+        s.shoot("18q-diagnostics-insider-code-refused");
+        s.press({Key::right});
+        settle();
+        if (!asked_once || !kept || !refused || !removed || s.services.insider_asked != 4 ||
+            s.services.preferences().test_builds)
+        {
+            std::fprintf(stderr, "error: the insider code did not follow what was typed\n");
+            s.ok = false;
+        }
+        s.services.insider_url = false;
+        s.services.insider_code.clear();
+        s.services.insider_refused = false;
+    }
     s.press({Key::circle});
     s.walk_settings(6, 7);
     s.press({Key::cross});

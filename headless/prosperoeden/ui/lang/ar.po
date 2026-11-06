@@ -35,6 +35,11 @@ msgstr "3x (أبطأ)"
 msgid "4x (slowest)"
 msgstr "4x (الأبطأ)"
 
+#. About the Insider code row: entering nothing on the keyboard removes the code; nightly is the Discord server's name and stays as it is.
+#: pe/ui/settings.cpp
+msgid "A code from the nightly Discord brings test builds first. Empty removes it."
+msgstr "رمز من Discord nightly يجلب لك الإصدارات التجريبية أولًا. اتركه فارغًا لإزالته."
+
 #: eden_services.cpp
 msgid "A firmware NCA cannot be read. Reinstall the firmware dump."
 msgstr "تعذّرت قراءة أحد ملفات NCA للبرنامج الثابت. أعد تثبيت البرنامج الثابت."
@@ -117,6 +122,11 @@ msgstr "التطبيق الذي ليس له إصدار من Nightshade بعد ي
 #: pe/ui/settings.cpp
 msgid "An image of your own behind this menu."
 msgstr "صورة من اختيارك خلف هذه القائمة."
+
+#. Shown when what was typed on the keyboard is not an insider code.
+#: pe/ui/settings.cpp
+msgid "An insider code has 8 letters and digits."
+msgstr "رمز المختبِرين من 8 أحرف وأرقام."
 
 #: eden_services.cpp
 msgid "Another language"
@@ -1008,6 +1018,16 @@ msgstr "قيد الاستخدام"
 msgid "Incompatible"
 msgstr "غير متوافقة"
 
+#. Shown under the Test builds switch when no insider code can be used; nightly is the Discord server's name, and discord.gg/pSqgRU3YP9 is an address: keep both as they are. One line.
+#: pe/ui/settings.cpp
+msgid "Insider builds: get a code in the nightly Discord, discord.gg/pSqgRU3YP9"
+msgstr "إصدارات المختبِرين: احصل على رمز في Discord nightly، discord.gg/pSqgRU3YP9"
+
+#. Settings > Diagnostics, under Test builds: the code a member of the nightly Discord server gets there; with it, new test builds of this app arrive before everyone else's.
+#: pe/ui/settings.cpp
+msgid "Insider code"
+msgstr "رمز المختبِرين"
+
 #. Settings > Apps: the app is installed as a disk image file, which this menu can't update.
 #: pe/ui/apps.cpp
 msgid "Installed as an image: replace the image to update it."
@@ -1418,6 +1438,11 @@ msgstr "لم يتم الاقتران"
 #: pe/ui/remote.cpp
 msgid "Not reachable"
 msgstr "تعذّر الوصول"
+
+#. Value of the Insider code row: no code is kept. Keep it short.
+#: pe/ui/settings.cpp
+msgid "Not set"
+msgstr "غير محفوظ"
 
 #: pe/ui/settings.cpp
 msgid "Not set up"
@@ -1977,6 +2002,11 @@ msgstr "ملف ROM المحدَّد لم يعد متوفرًا"
 #: pe/ui/save_sync.cpp
 msgid "Server too old for save sync"
 msgstr "الخادم أقدم من أن يدعم مزامنة الحفظ"
+
+#. Value of the Insider code row: a code is kept (the code itself is not shown). Keep it short.
+#: pe/ui/settings.cpp
+msgid "Set"
+msgstr "محفوظ"
 
 #: pe/ui/home.cpp, pe/ui/settings.cpp, pe/ui/shell.cpp
 msgid "Settings"

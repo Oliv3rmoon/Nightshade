@@ -35,6 +35,11 @@ msgstr "3x（較慢）"
 msgid "4x (slowest)"
 msgstr "4x（最慢）"
 
+#. About the Insider code row: entering nothing on the keyboard removes the code; nightly is the Discord server's name and stays as it is.
+#: pe/ui/settings.cpp
+msgid "A code from the nightly Discord brings test builds first. Empty removes it."
+msgstr "使用 nightly Discord 的內測碼，可搶先取得測試版。留空即可移除。"
+
 #: eden_services.cpp
 msgid "A firmware NCA cannot be read. Reinstall the firmware dump."
 msgstr "無法讀取韌體 NCA。請重新安裝韌體。"
@@ -117,6 +122,11 @@ msgstr "尚無 Nightshade 發行版的應用程式會從其所依據的專案提
 #: pe/ui/settings.cpp
 msgid "An image of your own behind this menu."
 msgstr "在此選單後方顯示你自己的圖片。"
+
+#. Shown when what was typed on the keyboard is not an insider code.
+#: pe/ui/settings.cpp
+msgid "An insider code has 8 letters and digits."
+msgstr "內測碼由 8 個字母和數字組成。"
 
 #: eden_services.cpp
 msgid "Another language"
@@ -1008,6 +1018,16 @@ msgstr "使用中"
 msgid "Incompatible"
 msgstr "不相容"
 
+#. Shown under the Test builds switch when no insider code can be used; nightly is the Discord server's name, and discord.gg/pSqgRU3YP9 is an address: keep both as they are. One line.
+#: pe/ui/settings.cpp
+msgid "Insider builds: get a code in the nightly Discord, discord.gg/pSqgRU3YP9"
+msgstr "內測版：在 nightly Discord 取得內測碼，discord.gg/pSqgRU3YP9"
+
+#. Settings > Diagnostics, under Test builds: the code a member of the nightly Discord server gets there; with it, new test builds of this app arrive before everyone else's.
+#: pe/ui/settings.cpp
+msgid "Insider code"
+msgstr "內測碼"
+
 #. Settings > Apps: the app is installed as a disk image file, which this menu can't update.
 #: pe/ui/apps.cpp
 msgid "Installed as an image: replace the image to update it."
@@ -1418,6 +1438,11 @@ msgstr "未配對"
 #: pe/ui/remote.cpp
 msgid "Not reachable"
 msgstr "無法連線"
+
+#. Value of the Insider code row: no code is kept. Keep it short.
+#: pe/ui/settings.cpp
+msgid "Not set"
+msgstr "未設定"
 
 #: pe/ui/settings.cpp
 msgid "Not set up"
@@ -1977,6 +2002,11 @@ msgstr "所選的 ROM 已不存在"
 #: pe/ui/save_sync.cpp
 msgid "Server too old for save sync"
 msgstr "伺服器版本過舊，無法同步存檔"
+
+#. Value of the Insider code row: a code is kept (the code itself is not shown). Keep it short.
+#: pe/ui/settings.cpp
+msgid "Set"
+msgstr "已設定"
 
 #: pe/ui/home.cpp, pe/ui/settings.cpp, pe/ui/shell.cpp
 msgid "Settings"

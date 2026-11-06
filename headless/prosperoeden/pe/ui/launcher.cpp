@@ -157,6 +157,8 @@ Launcher::~Launcher()
     if (room_edit_.valid()) room_edit_.wait();
     seed_edit_stop_ = true;
     if (seed_edit_.valid()) seed_edit_.wait();
+    insider_edit_stop_ = true;
+    if (insider_edit_.valid()) insider_edit_.wait();
     search_edit_stop_ = true;
     if (search_edit_.valid()) search_edit_.wait();
     if (app_open_.valid()) app_open_.wait();
@@ -480,6 +482,7 @@ void Launcher::update(float dt)
     refresh_sync_setup(dt);
     update_multiplayer();
     update_game_options();
+    update_insider_code();
     update_controllers(dt);
     transition_.update(dt);
     press_ = std::max(0.0f, press_ - dt / 0.18f);

@@ -7,6 +7,8 @@
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
+#include <future>
 #include <string>
 #include <vector>
 
@@ -151,16 +153,22 @@ constexpr int kAccentRowsShown = 6;
 constexpr Rect kAccentWindow{592.0f, kVideoRowsTop, 736.0f,
                              kAccentRowPitch * (kAccentRowsShown - 1) + kAccentRowHeight};
 // The Diagnostics dialog's rows, under the setup's state: three of the five show and the list
-// scrolls, as Controls' do.
+// scrolls, as Controls' do. Insider code is a sixth in a build that names the insider service
+// (EDEN_INSIDER_URL); without it the rows after Test builds move up one (Launcher::diagnostics_row).
 enum DiagnosticsRow : int
 {
     diagnostics_logging,
     diagnostics_immediate,
     diagnostics_notices,
     diagnostics_test_builds, // the update offer includes test builds (GitHub pre-releases)
-    diagnostics_backup,      // opens Back up to USB (backup.cpp, kDiagnosticsRow)
+    diagnostics_insider,     // the insider code: insider builds come first (update_check/insider.h)
+    diagnostics_backup,      // opens Back up to USB (backup.cpp)
     kDiagnosticsRows,
 };
+// What the Insider code row is for; and, under Test builds' line, where a code comes from when
+// there is none to use.
+constexpr const char *kInsiderAbout = TR("A code from the nightly Discord brings test builds first. Empty removes it.");
+constexpr const char *kInsiderHint = TR("Insider builds: get a code in the nightly Discord, discord.gg/pSqgRU3YP9");
 constexpr float kDiagnosticsRowsTop = 470.0f;
 constexpr int kDiagnosticsRowsShown = 3;
 constexpr Rect kDiagnosticsWindow{592.0f, kDiagnosticsRowsTop, 736.0f,
@@ -721,7 +729,7 @@ void Launcher::press_settings(Key key)
             open_modal(Modal::diagnostics);
             diagnostics_rows_.visible = kDiagnosticsRowsShown;
             diagnostics_rows_.pitch = kVideoRowPitch;
-            diagnostics_rows_.reset(kDiagnosticsRows, 0);
+            diagnostics_rows_.reset(dialog_rows(Modal::diagnostics), 0);
             break;
         }
         return;
@@ -953,10 +961,15 @@ int Launcher::dialog_rows(Modal modal) const
     case Modal::controls:     // vibration, its strength, the button mapping, the menu's own buttons
         return kControlRows;
     case Modal::diagnostics:  // detailed logging, logs written at once, update notices, test builds, the backup
-        return kDiagnosticsRows;
+        return services_.insider_available() ? kDiagnosticsRows : kDiagnosticsRows - 1; // and the insider code
     default:
         return 1;
     }
+}
+
+int Launcher::diagnostics_row(int row) const
+{
+    return !services_.insider_available() && row >= diagnostics_insider ? row + 1 : row;
 }
 
 float Launcher::dialog_row_top(Modal modal, int row) const
@@ -989,6 +1002,14 @@ float Launcher::dialog_row_top(Modal modal, int row) const
 
 void Launcher::press_dialog(Key key)
 {
+    // The keyboard asking for the insider code is open: Circle takes it away, nothing else is for
+    // this dialog.
+    if (insider_edit_.valid())
+    {
+        if (key == Key::circle)
+            insider_edit_stop_ = true;
+        return;
+    }
     const int rows = dialog_rows(modal_);
     const bool adjust = key == Key::left || key == Key::right;
     const bool activate = key == Key::cross;
@@ -1296,22 +1317,32 @@ void Launcher::press_dialog(Key key)
             prefs_.reduce_motion = !prefs_.reduce_motion;
         break;
     case Modal::diagnostics:
-        if (option_ == diagnostics_backup)
+    {
+        const int row = diagnostics_row(option_);
+        if (row == diagnostics_backup)
         {
             // Back up to USB has its own dialog (backup.cpp).
             if (activate)
                 open_backup();
             return;
         }
-        if (option_ == diagnostics_logging)
+        if (row == diagnostics_insider)
+        {
+            // The code is typed on the system keyboard (update_insider_code keeps it).
+            if (activate)
+                edit_insider_code();
+            return;
+        }
+        if (row == diagnostics_logging)
             prefs_.detailed_logging = !prefs_.detailed_logging;
-        else if (option_ == diagnostics_immediate)
+        else if (row == diagnostics_immediate)
             prefs_.immediate_logs = !prefs_.immediate_logs;
-        else if (option_ == diagnostics_test_builds)
+        else if (row == diagnostics_test_builds)
             prefs_.test_builds = !prefs_.test_builds;
         else
             prefs_.update_notices = !prefs_.update_notices;
         break;
+    }
     case Modal::wallpaper:
         if (!activate)
             return;
@@ -1357,13 +1388,75 @@ void Launcher::press_dialog(Key key)
         // change arrives.
         say(tr("Saved. Applies when a game starts."));
     }
-    else if (modal_ == Modal::diagnostics && (option_ == diagnostics_notices || option_ == diagnostics_test_builds))
+    else if (modal_ == Modal::diagnostics &&
+             (diagnostics_row(option_) == diagnostics_notices || diagnostics_row(option_) == diagnostics_test_builds))
     {
         // Update notices and Test builds: the check and its answer come as the app opens.
         say(tr("Saved. Applies the next time Nightshade opens."));
+        // Test builds switched on in a build with insider builds and no code kept: the code is
+        // asked for once, on the system keyboard. Cancelled or left empty, Test builds stays on
+        // without one.
+        if (diagnostics_row(option_) == diagnostics_test_builds && prefs_.test_builds &&
+            services_.insider_available() && !services_.insider_code_set())
+            edit_insider_code();
     }
     apply_look();
     cue(sound);
+}
+
+// Insider builds (Settings > Diagnostics > Insider code): the code on the system keyboard. What
+// was typed is kept normalised; nothing typed removes it; a cancel changes nothing.
+void Launcher::edit_insider_code()
+{
+    if (insider_edit_.valid())
+        return;
+    insider_edit_stop_ = false;
+    try
+    {
+        insider_edit_ = std::async(std::launch::async,
+                                   [this] { return services_.ask_insider_code(insider_edit_stop_); });
+    }
+    catch (const std::exception &)
+    {
+        say(tr("The keyboard could not be opened."), true);
+        cue(Cue::error);
+    }
+}
+
+void Launcher::update_insider_code()
+{
+    if (!insider_edit_.valid() || insider_edit_.wait_for(std::chrono::seconds{0}) != std::future_status::ready)
+        return;
+    std::optional<std::string> typed;
+    try
+    {
+        typed = insider_edit_.get();
+    }
+    catch (const std::exception &)
+    {
+        say(tr("The keyboard could not be opened."), true);
+        cue(Cue::error);
+        return;
+    }
+    if (!typed || insider_edit_stop_)
+        return;
+    switch (services_.set_insider_code(*typed))
+    {
+    case Services::InsiderCode::saved:
+    case Services::InsiderCode::cleared:
+        // The check that uses it comes as the app opens.
+        say(tr("Saved. Applies the next time Nightshade opens."));
+        cue(Cue::saved);
+        break;
+    case Services::InsiderCode::invalid:
+        say(tr("An insider code has 8 letters and digits."), true);
+        cue(Cue::error);
+        break;
+    default:
+        say(tr("Could not save. Please try again."), true);
+        cue(Cue::error);
+        break;
+    }
 }
 
 void Launcher::draw_dialog(Canvas &c, Modal modal, float open)
@@ -1380,6 +1473,7 @@ void Launcher::draw_dialog(Canvas &c, Modal modal, float open)
     const char *title = "";
     const char *copy = "";
     std::string sourced; // an update text with the place the check asks in it
+    bool insider_hint = false; // a second line under Diagnostics' copy (kInsiderHint)
     switch (modal)
     {
     case Modal::video:
@@ -1427,19 +1521,30 @@ void Launcher::draw_dialog(Canvas &c, Modal modal, float open)
         copy = tr("The accent colour of the current theme.");
         break;
     default:
+    {
         title = tr("Diagnostics");
         sourced = update_text(tr("Says when homebrew.page has a newer version. Off, only About names it."));
-        copy = option_ == diagnostics_logging     ? tr("Detailed logs apply to the next game launch.") :
-               option_ == diagnostics_immediate   ? tr("Keeps the last line before a crash, but games stutter. From the next start.") :
-               option_ == diagnostics_test_builds ? tr("Update offers include test builds of this version line. They can have new bugs.") :
-               option_ == diagnostics_backup      ? tr("Copies settings, profiles and save data to a USB drive.") :
-                                                    sourced.c_str();
+        const int row = diagnostics_row(option_);
+        copy = row == diagnostics_logging     ? tr("Detailed logs apply to the next game launch.") :
+               row == diagnostics_immediate   ? tr("Keeps the last line before a crash, but games stutter. From the next start.") :
+               row == diagnostics_test_builds ? tr("Update offers include test builds of this version line. They can have new bugs.") :
+               row == diagnostics_insider     ? tr(kInsiderAbout) :
+               row == diagnostics_backup      ? tr("Copies settings, profiles and save data to a USB drive.") :
+                                                sourced.c_str();
+        // Test builds' line says where an insider code comes from when there is none to use: none
+        // is kept with Test builds on, or this start's answer from the service refused the one kept.
+        insider_hint = row == diagnostics_test_builds && services_.insider_available() &&
+                       ((prefs_.test_builds && !services_.insider_code_set()) || services_.insider_code_refused());
         break;
+    }
     }
     text_shrink(c, title, 592.0f, baseline(218.0f, 62.0f, th().size_display), th().size_display,
                 th().title, 736.0f);
     text_shrink(c, copy, 592.0f, baseline(291.0f, 32.0f, th().size_small), th().size_small,
                 th().copy, 736.0f);
+    if (insider_hint)
+        text_shrink(c, tr(kInsiderHint), 592.0f, baseline(291.0f, 32.0f, th().size_small) + 28.0f, th().size_small,
+                    th().accent_pale, 736.0f);
 
     const int rows = dialog_rows(modal);
     // Video's rows scroll in a window of five, Performance's in one of four, Controls' in one
@@ -1802,27 +1907,39 @@ void Launcher::draw_dialog(Canvas &c, Modal modal, float open)
                    th().size_text, 38.0f, th().body, 736.0f, 3, kShrink);
         static constexpr const char *kNames[kDiagnosticsRows] = {TR("Detailed logging"), TR("Write logs at once"),
                                                                  TR("Update notices"), TR("Test builds"),
-                                                                 TR("Back up to USB")};
+                                                                 TR("Insider code"), TR("Back up to USB")};
         static constexpr const char *kAbout[kDiagnosticsRows] = {
             TR("Eden's debug messages in the logs of a game."),
             TR("Keeps the last line before a crash, but games stutter. From the next start."),
             TR("Says when homebrew.page has a newer version. Off, only About names it."),
             TR("Update offers include test builds of this version line. They can have new bugs."),
+            kInsiderAbout,
             TR("Copies settings, profiles and save data to a USB drive.")};
         for (int row = first; row <= last; ++row)
         {
+            const int kind = diagnostics_row(row);
             list.push_opacity(rows_view.row_alpha(row, kVideoRowHeight));
-            if (row == diagnostics_backup)
+            if (kind == diagnostics_backup)
             {
                 // Opens Back up to USB (backup.cpp): a hint that more is inside, as Overlay options has.
                 const float shown = text_shrink(c, ">", 1292.0f,
                                                 baseline(dialog_row_top(modal, row), 94.0f, th().size_small),
                                                 th().size_small, th().meta, 320.0f, Align::right);
-                label(row, tr(kNames[row]), shown);
+                label(row, tr(kNames[kind]), shown);
+            }
+            else if (kind == diagnostics_insider)
+            {
+                // Whether a code is kept, never the code itself; Cross asks for one.
+                const bool kept = services_.insider_code_set();
+                const float shown = text_shrink(c, kept ? tr("Set") : tr("Not set"), 1292.0f,
+                                                baseline(dialog_row_top(modal, row), 94.0f, th().size_small),
+                                                th().size_small, kept ? th().accent_pale : th().meta, 320.0f,
+                                                Align::right);
+                label(row, tr(kNames[kind]), shown);
             }
             else
             {
-                label(row, tr(kNames[row]), kToggle);
+                label(row, tr(kNames[kind]), kToggle);
                 toggle(c, 1292.0f, row_centre(row),
                        tween::clamp01(switches_[static_cast<std::size_t>(row)].value));
             }
@@ -1830,7 +1947,7 @@ void Launcher::draw_dialog(Canvas &c, Modal modal, float open)
         }
         // The folder stays available after the startup notice is gone.
         const std::string reports = services_.crash_reports_folder();
-        text_block(c, reports.empty() ? update_text(tr(kAbout[std::clamp(option_, 0, kDiagnosticsRows - 1)])) :
+        text_block(c, reports.empty() ? update_text(tr(kAbout[diagnostics_row(std::clamp(option_, 0, rows - 1))])) :
                        fill(tr("Crash reports (FTP): {0}\nAttach crash-*.txt and its matching logs to your issue."), {reports}),
                    592.0f, baseline(772.0f, 26.0f, th().size_small),
                    th().size_small, 26.0f, th().body, 736.0f, 3, kShrink);
@@ -1886,8 +2003,15 @@ void Launcher::draw_dialog(Canvas &c, Modal modal, float open)
             {Pad::updown, TR("Select")}, {Pad::cross, TR("Open")}, {Pad::circle, TR("Back")}};
         draw_menu_hints(c, kOpen, 3, 592.0f, foot, th().copy, 736.0f);
     }
+    else if (modal == Modal::diagnostics && diagnostics_row(option_) == diagnostics_insider)
+    {
+        // The insider code is typed on the system keyboard.
+        static constexpr Hint kEdit[] = {
+            {Pad::updown, TR("Select")}, {Pad::cross, TR("Edit")}, {Pad::circle, TR("Back")}};
+        draw_menu_hints(c, kEdit, 3, 592.0f, foot, th().copy, 736.0f);
+    }
     else if ((modal == Modal::video && option_ == video_overlay_options) ||
-             (modal == Modal::diagnostics && option_ == diagnostics_backup))
+             (modal == Modal::diagnostics && diagnostics_row(option_) == diagnostics_backup))
     {
         static constexpr Hint kOpen[] = {
             {Pad::updown, TR("Select")}, {Pad::cross, TR("Open")}, {Pad::circle, TR("Back")}};

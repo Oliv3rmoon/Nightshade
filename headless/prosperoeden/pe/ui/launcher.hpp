@@ -363,6 +363,12 @@ class Launcher
     void draw_dialog(Canvas &c, Modal modal, float open);
     int dialog_rows(Modal modal) const;
     float dialog_row_top(Modal modal, int row) const;
+    // The Diagnostics row shown at `row`: Insider code is there only in a build that names the
+    // insider service (settings.cpp).
+    int diagnostics_row(int row) const;
+    // Insider builds: the insider code asked for on the system keyboard, and kept when it answers.
+    void edit_insider_code();
+    void update_insider_code();
     // The overlay's options, opened from Settings > Video > Overlay options (settings.cpp).
     void open_hud();
     void press_hud(Key key);
@@ -713,6 +719,8 @@ class Launcher
     ListView option_rows_;          // its rows
     std::atomic<bool> seed_edit_stop_{false};
     std::future<std::optional<std::int64_t>> seed_edit_;  // the keyboard, while it is open
+    std::atomic<bool> insider_edit_stop_{false};
+    std::future<std::optional<std::string>> insider_edit_; // the keyboard asking for the insider code
     bool mapping_for_game_ = false; // the mapping dialog edits the game's own mapping
     ListView mapping_rows_;
     ListView menu_mapping_rows_; // the menu keybinds dialog's rows

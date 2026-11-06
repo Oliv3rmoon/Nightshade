@@ -35,6 +35,11 @@ msgstr "3x (πιο αργό)"
 msgid "4x (slowest)"
 msgstr "4x (το πιο αργό)"
 
+#. About the Insider code row: entering nothing on the keyboard removes the code; nightly is the Discord server's name and stays as it is.
+#: pe/ui/settings.cpp
+msgid "A code from the nightly Discord brings test builds first. Empty removes it."
+msgstr "Ένας κωδικός από το Discord nightly σάς δίνει πρώτα τις δοκιμαστικές εκδόσεις. Κενό για αφαίρεση."
+
 #: eden_services.cpp
 msgid "A firmware NCA cannot be read. Reinstall the firmware dump."
 msgstr "Δεν είναι δυνατή η ανάγνωση ενός NCA του firmware. Εγκαταστήστε ξανά το firmware."
@@ -117,6 +122,11 @@ msgstr "Μια εφαρμογή χωρίς έκδοση Nightshade ακόμη π
 #: pe/ui/settings.cpp
 msgid "An image of your own behind this menu."
 msgstr "Μια δική σας εικόνα πίσω από αυτό το μενού."
+
+#. Shown when what was typed on the keyboard is not an insider code.
+#: pe/ui/settings.cpp
+msgid "An insider code has 8 letters and digits."
+msgstr "Ο κωδικός Insider έχει 8 γράμματα και ψηφία."
 
 #: eden_services.cpp
 msgid "Another language"
@@ -1008,6 +1018,16 @@ msgstr "ΣΕ ΧΡΗΣΗ"
 msgid "Incompatible"
 msgstr "Μη συμβατό"
 
+#. Shown under the Test builds switch when no insider code can be used; nightly is the Discord server's name, and discord.gg/pSqgRU3YP9 is an address: keep both as they are. One line.
+#: pe/ui/settings.cpp
+msgid "Insider builds: get a code in the nightly Discord, discord.gg/pSqgRU3YP9"
+msgstr "Εκδόσεις Insider: πάρτε κωδικό στο Discord nightly, discord.gg/pSqgRU3YP9"
+
+#. Settings > Diagnostics, under Test builds: the code a member of the nightly Discord server gets there; with it, new test builds of this app arrive before everyone else's.
+#: pe/ui/settings.cpp
+msgid "Insider code"
+msgstr "Κωδικός Insider"
+
 #. Settings > Apps: the app is installed as a disk image file, which this menu can't update.
 #: pe/ui/apps.cpp
 msgid "Installed as an image: replace the image to update it."
@@ -1418,6 +1438,11 @@ msgstr "Χωρίς σύζευξη"
 #: pe/ui/remote.cpp
 msgid "Not reachable"
 msgstr "Χωρίς πρόσβαση"
+
+#. Value of the Insider code row: no code is kept. Keep it short.
+#: pe/ui/settings.cpp
+msgid "Not set"
+msgstr "Δεν ορίστηκε"
 
 #: pe/ui/settings.cpp
 msgid "Not set up"
@@ -1977,6 +2002,11 @@ msgstr "Το επιλεγμένο ROM δεν είναι πλέον διαθέσ�
 #: pe/ui/save_sync.cpp
 msgid "Server too old for save sync"
 msgstr "Διακομιστής πολύ παλιός για συγχρονισμό"
+
+#. Value of the Insider code row: a code is kept (the code itself is not shown). Keep it short.
+#: pe/ui/settings.cpp
+msgid "Set"
+msgstr "Ορίστηκε"
 
 #: pe/ui/home.cpp, pe/ui/settings.cpp, pe/ui/shell.cpp
 msgid "Settings"

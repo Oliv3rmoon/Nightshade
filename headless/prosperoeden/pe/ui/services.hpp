@@ -635,6 +635,43 @@ class Services
     virtual void finish_update()
     {
     }
+    // Insider builds (Settings > Diagnostics, under Test builds): a build that names the insider
+    // service (EDEN_INSIDER_URL) asks it first for a new test build, with the code a member of the
+    // nightly Discord got there (headless/update_notice.h). Without the service there is no Insider
+    // code row and nothing is asked.
+    virtual bool insider_available()
+    {
+        return false;
+    }
+    // Whether a code is kept.
+    virtual bool insider_code_set()
+    {
+        return false;
+    }
+    // The service's answer at this start said the code is unknown, expired or no longer qualifies.
+    virtual bool insider_code_refused()
+    {
+        return false;
+    }
+    // Asks for the code on the system keyboard: what was typed; nothing when the keyboard was
+    // cancelled. Throws when it cannot be opened.
+    virtual std::optional<std::string> ask_insider_code(const std::atomic<bool> & /*stop*/)
+    {
+        return std::nullopt;
+    }
+    // Keeps what was typed as the code, normalised (upper case, spaces and hyphens dropped); an
+    // empty text removes it.
+    enum class InsiderCode
+    {
+        saved,
+        cleared,
+        invalid, // not a code: nothing changed
+        failed,  // it could not be kept
+    };
+    virtual InsiderCode set_insider_code(const std::string & /*typed*/)
+    {
+        return InsiderCode::failed;
+    }
 
     // ---- library ----
     virtual std::vector<Game> games() = 0; // reads every game file: slow

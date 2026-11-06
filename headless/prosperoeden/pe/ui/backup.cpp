@@ -37,8 +37,6 @@ constexpr float kPollSeconds = 0.25f;
 constexpr float kMessageSeconds = 8.0f;
 // Where a backup goes on the drive (headless/backup.h, kFolder).
 constexpr const char *kBackupFolder = "/nightshade-backup";
-// The Diagnostics row that opens this dialog (settings.cpp, diagnostics_backup), under Test builds.
-constexpr int kDiagnosticsRow = 4;
 
 // A size as the other dialogs write it: MB, or GB from one on.
 std::string size_text(std::uint64_t bytes)
@@ -143,9 +141,10 @@ void Launcher::press_backup(Key key)
     switch (key)
     {
     case Key::circle:
-        // Back to Diagnostics, on the row that opened this dialog (diagnostics_rows_ never left it).
+        // Back to Diagnostics, on the row that opened this dialog (diagnostics_rows_ never left it;
+        // it is the fifth or, under Insider code, the sixth).
         modal_ = modal_shown_ = Modal::diagnostics;
-        option_ = kDiagnosticsRow;
+        option_ = diagnostics_rows_.selected;
         option_cursor_.snap(dialog_row_top(Modal::diagnostics, option_));
         message_.clear();
         cue(Cue::back);

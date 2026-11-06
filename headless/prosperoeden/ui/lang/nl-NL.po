@@ -35,6 +35,11 @@ msgstr "3x (trager)"
 msgid "4x (slowest)"
 msgstr "4x (traagst)"
 
+#. About the Insider code row: entering nothing on the keyboard removes the code; nightly is the Discord server's name and stays as it is.
+#: pe/ui/settings.cpp
+msgid "A code from the nightly Discord brings test builds first. Empty removes it."
+msgstr "Een code uit de nightly-Discord geeft je testversies als eerste. Leeg verwijdert hem."
+
 #: eden_services.cpp
 msgid "A firmware NCA cannot be read. Reinstall the firmware dump."
 msgstr "Een firmware-NCA kan niet worden gelezen. Installeer de firmwaredump opnieuw."
@@ -117,6 +122,11 @@ msgstr "Een app zonder Nightshade-release wordt aangeboden vanuit het project wa
 #: pe/ui/settings.cpp
 msgid "An image of your own behind this menu."
 msgstr "Een eigen afbeelding achter dit menu."
+
+#. Shown when what was typed on the keyboard is not an insider code.
+#: pe/ui/settings.cpp
+msgid "An insider code has 8 letters and digits."
+msgstr "Een insidercode heeft 8 letters en cijfers."
 
 #: eden_services.cpp
 msgid "Another language"
@@ -1008,6 +1018,16 @@ msgstr "IN GEBRUIK"
 msgid "Incompatible"
 msgstr "Incompatibel"
 
+#. Shown under the Test builds switch when no insider code can be used; nightly is the Discord server's name, and discord.gg/pSqgRU3YP9 is an address: keep both as they are. One line.
+#: pe/ui/settings.cpp
+msgid "Insider builds: get a code in the nightly Discord, discord.gg/pSqgRU3YP9"
+msgstr "Insiderversies: haal een code in de nightly-Discord, discord.gg/pSqgRU3YP9"
+
+#. Settings > Diagnostics, under Test builds: the code a member of the nightly Discord server gets there; with it, new test builds of this app arrive before everyone else's.
+#: pe/ui/settings.cpp
+msgid "Insider code"
+msgstr "Insidercode"
+
 #. Settings > Apps: the app is installed as a disk image file, which this menu can't update.
 #: pe/ui/apps.cpp
 msgid "Installed as an image: replace the image to update it."
@@ -1418,6 +1438,11 @@ msgstr "Niet gekoppeld"
 #: pe/ui/remote.cpp
 msgid "Not reachable"
 msgstr "Niet bereikbaar"
+
+#. Value of the Insider code row: no code is kept. Keep it short.
+#: pe/ui/settings.cpp
+msgid "Not set"
+msgstr "Niet ingesteld"
 
 #: pe/ui/settings.cpp
 msgid "Not set up"
@@ -1977,6 +2002,11 @@ msgstr "De geselecteerde ROM is niet meer beschikbaar"
 #: pe/ui/save_sync.cpp
 msgid "Server too old for save sync"
 msgstr "Server te oud voor synchronisatie"
+
+#. Value of the Insider code row: a code is kept (the code itself is not shown). Keep it short.
+#: pe/ui/settings.cpp
+msgid "Set"
+msgstr "Ingesteld"
 
 #: pe/ui/home.cpp, pe/ui/settings.cpp, pe/ui/shell.cpp
 msgid "Settings"

@@ -1023,6 +1023,34 @@ bool EdenServices::apply_update() { return Eden::UpdateNotice::Apply(); }
 
 void EdenServices::finish_update() { Eden::UpdateNotice::Finish(); }
 
+// Insider builds (update_notice.h): the code kept in the config folder.
+bool EdenServices::insider_available() { return Eden::UpdateNotice::InsiderAvailable(); }
+
+bool EdenServices::insider_code_set() { return Eden::UpdateNotice::InsiderCodeSet(); }
+
+bool EdenServices::insider_code_refused() { return Eden::UpdateNotice::InsiderRefused(); }
+
+std::optional<std::string> EdenServices::ask_insider_code(const std::atomic<bool>& stop) {
+    Eden::TextRequest request;
+    request.title = u"Insider code";
+    request.placeholder = u"ABCD-EFGH";
+    request.max_length = 32;  // a code as the page shows it, with room for spaces
+    const auto answer = Eden::AskSystemKeyboard(request, stop);
+    if (answer.outcome == Eden::TextOutcome::unavailable)
+        throw std::runtime_error("The system keyboard is unavailable");
+    if (answer.outcome != Eden::TextOutcome::accepted) return std::nullopt;
+    return Common::UTF16ToUTF8(answer.text);
+}
+
+pe::ui::Services::InsiderCode EdenServices::set_insider_code(const std::string& typed) {
+    switch (Eden::UpdateNotice::SetInsiderCode(typed)) {
+    case Eden::UpdateNotice::InsiderCode::saved: return InsiderCode::saved;
+    case Eden::UpdateNotice::InsiderCode::cleared: return InsiderCode::cleared;
+    case Eden::UpdateNotice::InsiderCode::invalid: return InsiderCode::invalid;
+    default: return InsiderCode::failed;
+    }
+}
+
 // Settings > Apps (apps.h).
 std::vector<pe::ui::AppState> EdenServices::apps() { return Eden::Apps::List(); }
 

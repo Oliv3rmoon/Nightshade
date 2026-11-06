@@ -35,6 +35,11 @@ msgstr "3x (chậm hơn)"
 msgid "4x (slowest)"
 msgstr "4x (chậm nhất)"
 
+#. About the Insider code row: entering nothing on the keyboard removes the code; nightly is the Discord server's name and stays as it is.
+#: pe/ui/settings.cpp
+msgid "A code from the nightly Discord brings test builds first. Empty removes it."
+msgstr "Mã từ Discord nightly giúp bạn nhận bản thử nghiệm trước. Để trống sẽ xóa mã."
+
 #: eden_services.cpp
 msgid "A firmware NCA cannot be read. Reinstall the firmware dump."
 msgstr "Không đọc được một tệp NCA của firmware. Hãy cài đặt lại bản dump firmware."
@@ -117,6 +122,11 @@ msgstr "Ứng dụng chưa có bản phát hành Nightshade sẽ được đề 
 #: pe/ui/settings.cpp
 msgid "An image of your own behind this menu."
 msgstr "Một hình ảnh của riêng bạn phía sau menu này."
+
+#. Shown when what was typed on the keyboard is not an insider code.
+#: pe/ui/settings.cpp
+msgid "An insider code has 8 letters and digits."
+msgstr "Mã insider gồm 8 chữ cái và chữ số."
 
 #: eden_services.cpp
 msgid "Another language"
@@ -1008,6 +1018,16 @@ msgstr "ĐANG DÙNG"
 msgid "Incompatible"
 msgstr "Không tương thích"
 
+#. Shown under the Test builds switch when no insider code can be used; nightly is the Discord server's name, and discord.gg/pSqgRU3YP9 is an address: keep both as they are. One line.
+#: pe/ui/settings.cpp
+msgid "Insider builds: get a code in the nightly Discord, discord.gg/pSqgRU3YP9"
+msgstr "Bản insider: nhận mã trong Discord nightly, discord.gg/pSqgRU3YP9"
+
+#. Settings > Diagnostics, under Test builds: the code a member of the nightly Discord server gets there; with it, new test builds of this app arrive before everyone else's.
+#: pe/ui/settings.cpp
+msgid "Insider code"
+msgstr "Mã insider"
+
 #. Settings > Apps: the app is installed as a disk image file, which this menu can't update.
 #: pe/ui/apps.cpp
 msgid "Installed as an image: replace the image to update it."
@@ -1418,6 +1438,11 @@ msgstr "Chưa ghép đôi"
 #: pe/ui/remote.cpp
 msgid "Not reachable"
 msgstr "Không kết nối được"
+
+#. Value of the Insider code row: no code is kept. Keep it short.
+#: pe/ui/settings.cpp
+msgid "Not set"
+msgstr "Chưa đặt"
 
 #: pe/ui/settings.cpp
 msgid "Not set up"
@@ -1977,6 +2002,11 @@ msgstr "ROM đã chọn không còn khả dụng"
 #: pe/ui/save_sync.cpp
 msgid "Server too old for save sync"
 msgstr "Máy chủ quá cũ để đồng bộ dữ liệu lưu"
+
+#. Value of the Insider code row: a code is kept (the code itself is not shown). Keep it short.
+#: pe/ui/settings.cpp
+msgid "Set"
+msgstr "Đã đặt"
 
 #: pe/ui/home.cpp, pe/ui/settings.cpp, pe/ui/shell.cpp
 msgid "Settings"

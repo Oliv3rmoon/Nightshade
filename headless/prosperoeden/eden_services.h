@@ -147,6 +147,11 @@ public:
     std::optional<std::string> room_text(int, const std::string&, const std::atomic<bool>&) override;
     std::optional<std::int64_t> ask_seed(std::int64_t, const std::atomic<bool>&) override;
     std::optional<std::string> ask_search(const std::string&, const std::atomic<bool>&) override;
+    bool insider_available() override;
+    bool insider_code_set() override;
+    bool insider_code_refused() override;
+    std::optional<std::string> ask_insider_code(const std::atomic<bool>&) override;
+    InsiderCode set_insider_code(const std::string&) override;
     std::vector<std::string> favorites() override;
     bool set_favorite(const std::string& file, bool favorite) override;
     bool can_launch_game() override;

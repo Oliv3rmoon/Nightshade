@@ -8,6 +8,10 @@
 #include "pe/ui/services.hpp"
 
 #include <algorithm>
+#include <atomic>
+#include <cctype>
+#include <cstring>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -443,6 +447,54 @@ class FakeServices : public ui::Services
     std::optional<std::string> ask_search(const std::string &, const std::atomic<bool> &) override
     {
         return typed_search;
+    }
+    // Insider builds (Settings > Diagnostics): a build that names the service, the code kept, the
+    // service's last answer refusing it, what the keyboard gives the next time it asks for the code
+    // (nothing: cancelled) and how often it was asked.
+    bool insider_url = false;
+    std::string insider_code;
+    bool insider_refused = false;
+    std::optional<std::string> typed_insider;
+    std::atomic<int> insider_asked{0};
+    bool insider_available() override
+    {
+        return insider_url;
+    }
+    bool insider_code_set() override
+    {
+        return !insider_code.empty();
+    }
+    bool insider_code_refused() override
+    {
+        return insider_refused;
+    }
+    std::optional<std::string> ask_insider_code(const std::atomic<bool> &) override
+    {
+        ++insider_asked;
+        return typed_insider;
+    }
+    InsiderCode set_insider_code(const std::string &typed) override
+    {
+        // As the app keeps it (update_check/insider.h): upper case, what is outside the code's
+        // alphabet dropped, 8 characters left; nothing typed removes it.
+        if (typed.find_first_not_of(" \t\r\n") == std::string::npos)
+        {
+            insider_code.clear();
+            insider_refused = false;
+            return InsiderCode::cleared;
+        }
+        std::string code;
+        for (const char typed_char : typed)
+        {
+            const char c = static_cast<char>(std::toupper(static_cast<unsigned char>(typed_char)));
+            if (c != '\0' && std::strchr("23456789ABCDEFGHJKMNPQRSTVWXYZ", c) != nullptr)
+                code += c;
+        }
+        if (code.size() != 8)
+            return InsiderCode::invalid;
+        insider_code = code;
+        insider_refused = false;
+        return InsiderCode::saved;
     }
     // The Library's favorites, kept in memory.
     std::vector<std::string> favorite_files;
