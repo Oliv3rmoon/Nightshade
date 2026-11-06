@@ -248,7 +248,367 @@ int WallpaperRow(const std::string &chosen, const std::vector<std::string> &file
     return 0;
 }
 
+// What each category is about, in a line (English, marked for translation).
+const char *category_about(int category)
+{
+    switch (category)
+    {
+    case kProfiles:
+        return TR("Who is playing. Each profile keeps its own save data and settings.");
+    case kVideo:
+        return TR("Graphics backend and how games are scaled to your TV.");
+    case kPerformance:
+        return TR("Faster games, at some cost in accuracy.");
+    case kAudio:
+        return TR("Game volume, and the sounds of this menu.");
+    case kControls:
+        return TR("Vibration, button mapping and the shortcuts during a game.");
+    case kAccessibility:
+        return TR("Make the menu easier to see and follow.");
+    case kDiagnostics:
+        return TR("Setup status, detailed logs and a backup to USB.");
+    case kFiles:
+        return TR("The folder that holds your keys, firmware and games.");
+    case kDownloads:
+        return TR("Games on your network, downloaded when you play them.");
+    case kSaveSync:
+        return TR("Each profile's save data on a server of its own, synced before and after a game.");
+    case kLanguage:
+        return TR("The language games use when they offer it.");
+    case kAppearance:
+        return TR("Choose a theme or change the launcher layout.");
+    case kApps:
+        return TR("Get, update and open Physalis, Datura and Mandrake.");
+    default:
+        return "";
+    }
+}
+
+// Nightshade's Settings (Theme::showcase): a column of the categories, then About, beside the
+// panel of the one focused.
+constexpr float kColumnLeft = 72.0f;
+constexpr float kColumnWidth = 664.0f;
+constexpr float kColumnTop = 168.0f;
+constexpr float kColumnRow = 78.0f;
+constexpr float kColumnPitch = 88.0f;
+constexpr int kColumnRows = 9;
+const Color kWhite{1.0f, 1.0f, 1.0f, 1.0f};
+
+// A switch drawn large, as it reads from a couch: its knob at the right when on.
+void big_switch(Canvas &c, float right, float cy, bool on)
+{
+    const Theme &t = th();
+    constexpr float kW = 92.0f;
+    constexpr float kH = 48.0f;
+    const Rect track{right - kW, cy - kH * 0.5f, kW, kH};
+    if (look().high_contrast)
+        c.list.bordered_rect(track, kH * 0.5f, on ? t.accent : gfx::mix(t.scrim, t.row, 0.6f), 2.0f, t.title);
+    else if (on)
+    {
+        c.list.shadow({track.x, track.y + 4.0f, track.w, track.h}, kH * 0.5f, 24.0f, t.accent.with_alpha(0.35f));
+        c.list.hgradient_rect(track, kH * 0.5f, t.accent, gfx::mix(t.accent, t.accent_deep, 0.3f), 1.5f,
+                              t.accent_pale.with_alpha(0.6f));
+    }
+    else
+        c.list.bordered_rect(track, kH * 0.5f, kWhite.with_alpha(0.08f), 1.0f, kWhite.with_alpha(0.26f));
+    const float knob = on ? track.x + kW - kH * 0.5f : track.x + kH * 0.5f;
+    c.list.shadow({knob - 16.0f, cy - 14.0f, 32.0f, 32.0f}, 16.0f, 8.0f, Color{0.0f, 0.0f, 0.0f, 0.4f});
+    c.list.circle(knob, cy, kH * 0.38f, on ? kWhite : gfx::mix(t.copy, kWhite, 0.5f));
+}
+
 } // namespace
+
+int Launcher::settings_rows() const
+{
+    return kCategoryCount + (th().showcase ? 1 : 0); // Nightshade's has About as its last row
+}
+
+bool Launcher::dialog_docked(Modal modal) const
+{
+    if (!th().showcase || screen_ != Screen::settings)
+        return false;
+    switch (modal)
+    {
+    case Modal::video:
+    case Modal::performance:
+    case Modal::audio:
+    case Modal::controls:
+    case Modal::accessibility:
+    case Modal::diagnostics:
+    case Modal::appearance:
+    case Modal::theme:
+    case Modal::wallpaper:
+    case Modal::accent:
+        return true;
+    default:
+        return false;
+    }
+}
+
+void Launcher::draw_showcase_settings(Canvas &c, const std::string *summaries)
+{
+    gfx::DrawList &list = c.list;
+    const Theme &t = th();
+    const int rows = settings_rows();
+
+    // ---- the column: each category with its icon and what it is set to; About last ----
+    const float window = settings_.pitch * static_cast<float>(settings_.visible - 1) + kColumnRow;
+    list.push_clip({kColumnLeft - 40.0f, kColumnTop - 24.0f, kColumnWidth + 80.0f, window + 48.0f});
+    for (int row = settings_.first_row(); row <= settings_.last_row() && row < rows; ++row)
+    {
+        const Rect r{kColumnLeft, kColumnTop + static_cast<float>(row) * settings_.pitch - settings_.scroll(),
+                     kColumnWidth, kColumnRow};
+        const float f = tween::clamp01(settings_springs_[static_cast<std::size_t>(row)].value);
+        const float here = arrive(row, 0.02f);
+        list.push_opacity(settings_.row_alpha(row, kColumnRow) * here);
+        list.push_transform(1.0f, 0.0f, 0.0f, -(1.0f - here) * 18.0f * motion(), 0.0f);
+        if (look().high_contrast)
+            plate(c, row_plate(), r, f);
+        else
+        {
+            list.bordered_rect(r, t.radius_row, t.panel.with_alpha(0.72f), 1.0f, kWhite.with_alpha(0.11f));
+            if (f > 0.001f)
+            {
+                list.shadow({r.x - 2.0f, r.y + 4.0f, r.w + 4.0f, r.h}, t.radius_row + 2.0f, t.focus_glow,
+                            t.accent.with_alpha(0.40f * f));
+                list.hgradient_rect(r, t.radius_row, gfx::mix(t.accent, kWhite, 0.04f).with_alpha(f),
+                                    gfx::mix(t.accent, t.accent_deep, 0.62f).with_alpha(f), 1.5f,
+                                    t.accent_pale.with_alpha(0.85f * f));
+            }
+        }
+        const bool category = row < kCategoryCount;
+        icon(c, category ? kIcons[row] : Icon::about, r.x + 54.0f, r.y + r.h * 0.5f, 40.0f, t.title);
+        const std::string &value = category ? summaries[row] : version_;
+        const float taken = text_shrink(c, value, r.x + r.w - 28.0f, baseline(r.y, r.h, 24.0f), 24.0f,
+                                        gfx::mix(t.copy, t.title, f), r.w * 0.42f, Align::right);
+        {
+            const Heavy heavy(c, 0.8f);
+            text_shrink(c, category ? tr(kCategories[row]) : tr("About"), r.x + 100.0f, baseline(r.y, r.h, 30.0f),
+                        30.0f, t.title, r.w - 100.0f - taken - 40.0f);
+        }
+        list.pop_transform();
+        list.pop_opacity();
+    }
+    list.pop_clip();
+    if (settings_.count > settings_.visible)
+        scrollbar(c, settings_, kColumnLeft + kColumnWidth + 14.0f, kColumnTop, window);
+    if (screen_ != Screen::settings)
+        return; // About draws its own page beside the column
+
+    // ---- the panel: the focused category, or the dialog it opened ----
+    const bool docked = modal_shown_ != Modal::none && dialog_docked(modal_shown_);
+    const float opened = docked ? tween::clamp01(modal_open_.value) : 0.0f;
+    const float here = arrive(1);
+    list.push_opacity(here);
+    glass(c, kShowcasePanel, t.radius_panel, t.panel.with_alpha(0.84f), kWhite.with_alpha(0.13f), 1.0f);
+    if (opened < 0.99f)
+    {
+        const int row = std::clamp(settings_.selected, 0, rows - 1);
+        list.push_opacity((1.0f - opened) * (0.4f + 0.6f * tween::clamp01(section_.value)));
+        draw_settings_overview(c, kShowcasePanel, row, row < kCategoryCount ? summaries[row] : version_);
+        list.pop_opacity();
+    }
+    list.pop_opacity();
+    if (modal_shown_ == Modal::none)
+    {
+        static constexpr Hint kHints[] = {{Pad::cross, TR("Select")},
+                                          {Pad::circle, TR("Home")},
+                                          {Pad::options, TR("Launcher")},
+                                          {Pad::l1, TR("Sections"), Pad::r1}};
+        draw_footer(c, kHints, 4);
+    }
+}
+
+void Launcher::draw_settings_overview(Canvas &c, const Rect &panel, int category, const std::string &summary)
+{
+    gfx::DrawList &list = c.list;
+    const Theme &t = th();
+    const float x = panel.x + 52.0f;
+    const float w = panel.w - 104.0f;
+    const float bottom = panel.y + panel.h - 28.0f;
+    {
+        const Heavy heavy(c);
+        text_shrink(c, category < kCategoryCount ? tr(kCategories[category]) : tr("About"), x,
+                    baseline(panel.y + 36.0f, 84.0f, 66.0f), 66.0f, t.title, w);
+    }
+    const char *about = category < kCategoryCount ? category_about(category) : "";
+    if (about[0] != 0)
+        text_block(c, tr(about), x, baseline(panel.y + 128.0f, 34.0f, 24.0f), 24.0f, 34.0f, t.copy, w, 2, kShrink);
+    float y = panel.y + 214.0f;
+
+    // A row of the panel: a name, and a switch or a value at its right.
+    const auto row_face = [&](float height)
+    {
+        const Rect r{x, y, w, height};
+        if (look().high_contrast)
+            list.bordered_rect(r, t.radius_row, gfx::mix(t.scrim, t.row, 0.6f), 1.5f, t.faint);
+        else
+            list.bordered_rect(r, t.radius_row, t.panel.with_alpha(0.55f), 1.0f, kWhite.with_alpha(0.11f));
+        return r;
+    };
+    const auto switch_row = [&](const char *name, bool on)
+    {
+        if (y + 84.0f > bottom)
+            return;
+        const Rect r = row_face(84.0f);
+        {
+            const Heavy heavy(c, 0.7f);
+            text_shrink(c, name, r.x + 32.0f, baseline(r.y, r.h, 30.0f), 30.0f, t.title, r.w - 32.0f - 160.0f);
+        }
+        big_switch(c, r.x + r.w - 32.0f, r.y + r.h * 0.5f, on);
+        y += 100.0f;
+    };
+    const auto value_row = [&](const std::string &name, const std::string &value)
+    {
+        if (y + 84.0f > bottom)
+            return;
+        const Rect r = row_face(84.0f);
+        const float taken = text_shrink(c, value, r.x + r.w - 32.0f, baseline(r.y, r.h, 26.0f), 26.0f,
+                                        t.accent_pale, r.w * 0.5f, Align::right);
+        const Heavy heavy(c, 0.7f);
+        text_shrink(c, name, r.x + 32.0f, baseline(r.y, r.h, 30.0f), 30.0f, t.title, r.w - 64.0f - taken - 24.0f);
+        y += 100.0f;
+    };
+
+    switch (category)
+    {
+    case kVideo:
+    {
+        // The profiles as tiles, the one Settings has marked; then the switches players reach for.
+        static constexpr Icon kTierIcons[kVideoProfiles] = {Icon::performance, Icon::video, Icon::tv, Icon::disc};
+        const int tier = profile_of(prefs_);
+        constexpr float kGap = 18.0f;
+        const float tile_w = (w - kGap * static_cast<float>(kVideoProfiles - 1)) / static_cast<float>(kVideoProfiles);
+        constexpr float kTileH = 272.0f;
+        for (int i = 0; i < kVideoProfiles; ++i)
+        {
+            const Rect r{x + static_cast<float>(i) * (tile_w + kGap), y, tile_w, kTileH};
+            const bool chosen = i == tier;
+            if (look().high_contrast)
+                list.bordered_rect(r, t.radius_card, gfx::mix(t.scrim, t.row, 0.6f), chosen ? 3.0f : 1.5f,
+                                   chosen ? t.title : t.faint);
+            else if (chosen)
+            {
+                list.shadow({r.x, r.y + 6.0f, r.w, r.h}, t.radius_card, t.focus_glow, t.accent.with_alpha(0.32f));
+                list.bordered_rect(r, t.radius_card, gfx::mix(t.row_focus, t.panel, 0.25f).with_alpha(0.94f), 2.0f,
+                                   t.accent_pale.with_alpha(0.9f));
+            }
+            else
+                list.bordered_rect(r, t.radius_card, t.panel.with_alpha(0.55f), 1.0f, kWhite.with_alpha(0.12f));
+            icon(c, kTierIcons[i], r.x + 50.0f, r.y + 56.0f, 52.0f, t.title);
+            if (chosen)
+            {
+                list.circle(r.x + r.w - 36.0f, r.y + 36.0f, 19.0f, t.accent);
+                icon(c, Icon::check, r.x + r.w - 36.0f, r.y + 36.0f, 24.0f, t.on_accent);
+            }
+            {
+                const Heavy heavy(c, 0.8f);
+                text_shrink(c, profile_name(i), r.x + 22.0f, baseline(r.y + 102.0f, 44.0f, 30.0f), 30.0f, t.title,
+                            r.w - 44.0f, Align::left, 0.0f, 0.7f);
+            }
+            text_block(c, profile_summary(0, i), r.x + 22.0f, baseline(r.y + 150.0f, 28.0f, 21.0f), 21.0f, 28.0f,
+                       t.copy, r.w - 44.0f, 4, kShrink);
+        }
+        y += kTileH + 32.0f;
+        if (services_.frame_gen_state() != 0 || services_.mihawkgen_state() != 0)
+            switch_row(tr("Frame generation"), prefs_.frame_gen);
+        switch_row(tr("Post-processing"), prefs_.post_processing > 0);
+        switch_row(tr("FPS overlay"), prefs_.hud);
+        break;
+    }
+    case kPerformance:
+    {
+        // Its switches, two to a row.
+        static constexpr const char *kNames[kPerformanceSwitches] = {
+            TR("Compile ahead"),        TR("Asynchronous shaders"), TR("Faster GPU emulation"),
+            TR("Faster CPU emulation"), TR("Faster DMA"),           TR("Reactive flushing"),
+            TR("Skip CPU invalidation"), TR("Compact memory")};
+        const std::array<bool, 8> states = switch_states(Modal::performance);
+        constexpr float kGap = 18.0f;
+        const float half = (w - kGap) * 0.5f;
+        for (int i = 0; i < kPerformanceSwitches; ++i)
+        {
+            const Rect r{x + static_cast<float>(i % 2) * (half + kGap), y + static_cast<float>(i / 2) * 92.0f, half, 78.0f};
+            if (r.y + r.h > bottom)
+                break;
+            list.bordered_rect(r, t.radius_row, t.panel.with_alpha(0.55f), 1.0f, kWhite.with_alpha(0.11f));
+            text_shrink(c, tr(kNames[i]), r.x + 24.0f, baseline(r.y, r.h, 24.0f), 24.0f, t.title, r.w - 24.0f - 130.0f);
+            big_switch(c, r.x + r.w - 20.0f, r.y + r.h * 0.5f, states[static_cast<std::size_t>(i)]);
+        }
+        break;
+    }
+    case kAudio:
+        value_row(tr("Game volume"), prefs_.mute ? std::string{tr("Muted")} : percent(prefs_.volume));
+        value_row(tr("Menu sounds"), prefs_.menu_volume > 0 ? percent(prefs_.menu_volume) : std::string{tr("Off")});
+        switch_row(tr("Mute"), prefs_.mute);
+        break;
+    case kControls:
+        switch_row(tr("Vibration"), prefs_.vibration);
+        value_row(tr("Controls"), summary);
+        break;
+    case kAccessibility:
+        switch_row(tr("Larger text"), prefs_.large_text);
+        switch_row(tr("High contrast"), prefs_.high_contrast);
+        switch_row(tr("Reduce motion"), prefs_.reduce_motion);
+        break;
+    case kDiagnostics:
+        value_row(tr("Diagnostics"), summary);
+        switch_row(tr("Detailed logging"), prefs_.detailed_logging);
+        switch_row(tr("Update notices"), prefs_.update_notices);
+        switch_row(tr("Test builds"), prefs_.test_builds);
+        break;
+    case kProfiles:
+        for (const Profile &profile : profiles_)
+            value_row(profile.name, profile.playing ? std::string{tr("Playing")} : std::string{});
+        break;
+    case kAppearance:
+        value_row(tr("Theme"), t.name);
+        value_row(tr("Wallpaper"), prefs_.wallpaper.empty() ? std::string{tr("None")} : prefs_.wallpaper);
+        break;
+    case kColour:
+    {
+        // The theme's colours as swatches, the one in use ringed.
+        const auto presets = accent_presets();
+        float sx = x + 34.0f;
+        for (int i = -1; i < static_cast<int>(presets.size()) && sx < x + w - 34.0f; ++i)
+        {
+            const Color ink = i < 0 ? themes()[static_cast<std::size_t>(theme_index())].accent
+                                    : presets[static_cast<std::size_t>(i)].accent;
+            list.circle(sx, y + 40.0f, 28.0f, ink);
+            if (i == accent_index())
+                list.ring(sx, y + 40.0f, 38.0f, 3.0f, t.title);
+            sx += 96.0f;
+        }
+        y += 112.0f;
+        value_row(tr("Colour"), summary);
+        break;
+    }
+    default:
+        // The others: what they are set to, at a size that reads.
+        if (category < kCategoryCount)
+        {
+            const Rect r = row_face(110.0f);
+            icon(c, kIcons[category], r.x + 60.0f, r.y + r.h * 0.5f, 48.0f, t.accent_pale);
+            const Heavy heavy(c, 0.7f);
+            text_shrink(c, summary, r.x + 112.0f, baseline(r.y, r.h, 34.0f), 34.0f, t.title, r.w - 140.0f);
+        }
+        else
+        {
+            // About: this build, who made it, and a newer release when there is one.
+            {
+                const Heavy heavy(c, 0.7f);
+                text(c, std::string{kBuildLabel} + "  " + version_, x, baseline(y, 50.0f, 34.0f), 34.0f, t.title);
+            }
+            y += 70.0f;
+            text_block(c, kBuildCredit, x, baseline(y, 34.0f, 24.0f), 24.0f, 34.0f, t.copy, w, 3);
+            y += 120.0f;
+            if (!update_version_.empty())
+                notice(c, update_text(fill(tr("Version {0} is on homebrew.page"), {update_version_})), x,
+                       baseline(y, 34.0f, 24.0f), 24.0f, t.accent_pale, w, false);
+        }
+        break;
+    }
+}
 
 void Launcher::press_settings(Key key)
 {
@@ -263,18 +623,20 @@ void Launcher::press_settings(Key key)
         go_section(0);
         return;
     case Key::up:
-        if (th().list_settings)
+        if (th().list_settings || th().showcase)
             settings_.move(-1);
         else if (at >= kTileColumns)
             at -= kTileColumns;
         break;
     case Key::down:
-        if (th().list_settings)
+        if (th().list_settings || th().showcase)
             settings_.move(1);
         else if (at < kTileColumns * (kTileRows - 1) && at + kTileColumns < kCategoryCount)
             at += kTileColumns;
         break;
     case Key::left:
+        if (th().showcase)
+            return;
         if (th().list_settings || at % kTileColumns == 0)
             return focus_rail();
         at -= 1;
@@ -285,6 +647,12 @@ void Launcher::press_settings(Key key)
         break;
     case Key::cross:
         press_ = 1.0f;
+        if (at >= kCategoryCount)
+        {
+            // Nightshade's last row: About, a page of Settings.
+            open(Screen::about, true);
+            return;
+        }
         switch (at)
         {
         case kFiles:
@@ -408,6 +776,8 @@ void Launcher::draw_settings(Canvas &c)
                           : std::string{"TV, Stream, Station"};
         }(),
     };
+    if (t.showcase)
+        return draw_showcase_settings(c, summaries);
     if (t.list_settings)
     {
         constexpr float kListRowHeight = 78.0f;
@@ -487,51 +857,7 @@ void Launcher::draw_settings(Canvas &c)
         if (!t.top_nav)
         {
         glass(c, kStrip, t.radius_row + 2.0f, t.panel.with_alpha(0.80f), t.panel_edge.with_alpha(0.34f), 0.5f);
-        const char *about = "";
-        switch (settings_.selected)
-        {
-        case kProfiles:
-            about = tr("Who is playing. Each profile keeps its own save data and settings.");
-            break;
-        case kVideo:
-            about = tr("Graphics backend and how games are scaled to your TV.");
-            break;
-        case kPerformance:
-            about = tr("Faster games, at some cost in accuracy.");
-            break;
-        case kAudio:
-            about = tr("Game volume, and the sounds of this menu.");
-            break;
-        case kControls:
-            about = tr("Vibration, button mapping and the shortcuts during a game.");
-            break;
-        case kAccessibility:
-            about = tr("Make the menu easier to see and follow.");
-            break;
-        case kDiagnostics:
-            about = tr("Setup status, detailed logs and a backup to USB.");
-            break;
-        case kFiles:
-            about = tr("The folder that holds your keys, firmware and games.");
-            break;
-        case kDownloads:
-            about = tr("Games on your network, downloaded when you play them.");
-            break;
-        case kSaveSync:
-            about = tr("Each profile's save data on a server of its own, synced before and after a game.");
-            break;
-        case kLanguage:
-            about = tr("The language games use when they offer it.");
-            break;
-        case kAppearance:
-            about = tr("Choose a theme or change the launcher layout.");
-            break;
-        case kApps:
-            about = tr("Get, update and open Physalis, Datura and Mandrake.");
-            break;
-        default:
-            break;
-        }
+        const char *about = tr(category_about(settings_.selected));
         const float version = text(c, version_, kStrip.x + kStrip.w - 28.0f, baseline(kStrip.y, kStrip.h, t.size_small),
                                    t.size_small, t.faint, Align::right);
         const float shown = tween::clamp01(section_.value);
@@ -753,10 +1079,16 @@ void Launcher::press_dialog(Key key)
         if (saved)
         {
             use_theme(chosen.id);
-            settings_.visible = th().list_settings ? 10 : kCategoryCount;
-            settings_.pitch = th().list_settings ? 84.0f : 88.0f;
-            settings_.reset(kCategoryCount, settings_.selected);
+            settings_.visible = th().showcase ? kColumnRows : th().list_settings ? 10 : kCategoryCount;
+            settings_.pitch = th().showcase ? kColumnPitch : th().list_settings ? 84.0f : 88.0f;
+            settings_.reset(settings_rows(), std::min(settings_.selected, settings_rows() - 1));
             use_accent(prefs_.accent);
+            // Nightshade's layout keeps lists of its own: its home row and the Library's view.
+            if (th().showcase)
+            {
+                collect_shelf();
+                filter_library();
+            }
         }
         else
         {
@@ -1026,8 +1358,10 @@ void Launcher::draw_dialog(Canvas &c, Modal modal, float open)
     list.push_opacity(open);
     list.push_transform(1.0f - 0.03f * (1.0f - open) * motion(), 960.0f, 540.0f, 0.0f,
                         (1.0f - open) * 26.0f * motion());
-    glass(c, kDialog, th().radius_panel, th().panel.with_alpha(0.97f), th().panel_edge.with_alpha(0.66f),
-          1.6f);
+    // Docked in Nightshade's Settings panel, which is its face (draw_showcase_settings).
+    if (!dialog_docked(modal))
+        glass(c, kDialog, th().radius_panel, th().panel.with_alpha(0.97f), th().panel_edge.with_alpha(0.66f),
+              1.6f);
 
     const char *title = "";
     const char *copy = "";

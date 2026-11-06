@@ -2817,3 +2817,35 @@ msgstr "{0}: {1}. Генерация кадров и постобработка 
 #: pe/ui/settings.cpp
 msgid "Crash reports (FTP): {0}\nAttach crash-*.txt and its matching logs to your issue."
 msgstr "Отчёты о сбоях (FTP): {0}\nПриложите crash-*.txt и соответствующие журналы к сообщению о проблеме."
+
+#: pe/ui/showcase.cpp
+msgid "All"
+msgstr "Все"
+
+#: pe/ui/showcase.cpp
+msgid "Recently played"
+msgstr "Недавние"
+
+#: pe/ui/showcase.cpp
+msgid "Favorites"
+msgstr "Избранное"
+
+#: pe/ui/showcase.cpp
+msgid "Search games"
+msgstr "Поиск игр"
+
+#: pe/ui/quick.cpp
+msgid "Favorite"
+msgstr "В избранном"
+
+#: pe/ui/showcase.cpp
+msgid "No games match your search."
+msgstr "Нет игр по вашему запросу."
+
+#: pe/ui/showcase.cpp
+msgid "No favorites yet. Add one from Quick settings."
+msgstr "Избранного пока нет. Добавьте игру в быстрых настройках."
+
+#: pe/ui/quick.cpp
+msgid "Shows the game under Favorites in the Library."
+msgstr "Показывает игру в разделе «Избранное» библиотеки."

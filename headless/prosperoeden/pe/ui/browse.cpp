@@ -517,8 +517,10 @@ void Launcher::draw_about(Canvas &c)
         if (!update_version_.empty())
             text_shrink(c, update_text(fill(tr("Version {0} is on homebrew.page"), {update_version_})), x,
                         baseline(920.0f, 26.0f, t.size_small), t.size_small, t.meta, w - 200.0f);
+        // Nightshade's About is a page of Settings: Circle goes back there.
         static constexpr Hint kHints[] = {{Pad::circle, TR("Home")}, {Pad::l1, TR("Sections"), Pad::r1}};
-        draw_footer(c, kHints, 2);
+        static constexpr Hint kBackHints[] = {{Pad::circle, TR("Back")}, {Pad::l1, TR("Sections"), Pad::r1}};
+        draw_footer(c, t.showcase ? kBackHints : kHints, 2);
         return;
     }
 

@@ -2817,3 +2817,35 @@ msgstr "{0}: {1}. Kare oluşturma ve son işleme kapalı; bunlardan birini deği
 #: pe/ui/settings.cpp
 msgid "Crash reports (FTP): {0}\nAttach crash-*.txt and its matching logs to your issue."
 msgstr "Çökme raporları (FTP): {0}\nSorun bildiriminize crash-*.txt ve ilgili günlükleri ekleyin."
+
+#: pe/ui/showcase.cpp
+msgid "All"
+msgstr "Tümü"
+
+#: pe/ui/showcase.cpp
+msgid "Recently played"
+msgstr "Son oynananlar"
+
+#: pe/ui/showcase.cpp
+msgid "Favorites"
+msgstr "Favoriler"
+
+#: pe/ui/showcase.cpp
+msgid "Search games"
+msgstr "Oyun ara"
+
+#: pe/ui/quick.cpp
+msgid "Favorite"
+msgstr "Favori"
+
+#: pe/ui/showcase.cpp
+msgid "No games match your search."
+msgstr "Aramanızla eşleşen oyun yok."
+
+#: pe/ui/showcase.cpp
+msgid "No favorites yet. Add one from Quick settings."
+msgstr "Henüz favori yok. Hızlı ayarlar'dan ekleyin."
+
+#: pe/ui/quick.cpp
+msgid "Shows the game under Favorites in the Library."
+msgstr "Oyunu Kütüphane'de Favoriler altında gösterir."

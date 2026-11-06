@@ -2817,3 +2817,35 @@ msgstr "{0}: {1}. Генерацію кадрів і постобробку ви
 #: pe/ui/settings.cpp
 msgid "Crash reports (FTP): {0}\nAttach crash-*.txt and its matching logs to your issue."
 msgstr "Звіти про збої (FTP): {0}\nДодайте crash-*.txt і відповідні журнали до повідомлення про проблему."
+
+#: pe/ui/showcase.cpp
+msgid "All"
+msgstr "Усі"
+
+#: pe/ui/showcase.cpp
+msgid "Recently played"
+msgstr "Нещодавні"
+
+#: pe/ui/showcase.cpp
+msgid "Favorites"
+msgstr "Обране"
+
+#: pe/ui/showcase.cpp
+msgid "Search games"
+msgstr "Пошук ігор"
+
+#: pe/ui/quick.cpp
+msgid "Favorite"
+msgstr "В обраному"
+
+#: pe/ui/showcase.cpp
+msgid "No games match your search."
+msgstr "Немає ігор за вашим запитом."
+
+#: pe/ui/showcase.cpp
+msgid "No favorites yet. Add one from Quick settings."
+msgstr "Обраного ще немає. Додайте гру у швидких налаштуваннях."
+
+#: pe/ui/quick.cpp
+msgid "Shows the game under Favorites in the Library."
+msgstr "Показує гру в розділі «Обране» бібліотеки."

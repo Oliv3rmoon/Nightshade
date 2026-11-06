@@ -48,7 +48,7 @@ msgid "ABOUT"
 msgstr ""
 
 #. The menu's last section: about this app (its credits, where its files go). One short word.
-#: pe/ui/shell.cpp
+#: pe/ui/settings.cpp, pe/ui/shell.cpp
 msgid "About"
 msgstr ""
 
@@ -90,6 +90,10 @@ msgstr ""
 
 #: pe/ui/profiles.cpp
 msgid "Added. Cross plays as this profile; left and right change its name."
+msgstr ""
+
+#: pe/ui/showcase.cpp
+msgid "All"
 msgstr ""
 
 #: pe/ui/library.cpp
@@ -176,7 +180,7 @@ msgid "Average frame time"
 msgstr ""
 
 #. Button hint: go back one screen.
-#: pe/ui/apps.cpp, pe/ui/backup.cpp, pe/ui/browse.cpp, pe/ui/game_options.cpp, pe/ui/library.cpp, pe/ui/multiplayer.cpp, pe/ui/pairing.cpp, pe/ui/profiles.cpp, pe/ui/quick.cpp, pe/ui/remote.cpp, pe/ui/save_sync.cpp, pe/ui/settings.cpp, pe/ui/update.cpp
+#: pe/ui/apps.cpp, pe/ui/backup.cpp, pe/ui/browse.cpp, pe/ui/game_options.cpp, pe/ui/library.cpp, pe/ui/multiplayer.cpp, pe/ui/pairing.cpp, pe/ui/profiles.cpp, pe/ui/quick.cpp, pe/ui/remote.cpp, pe/ui/save_sync.cpp, pe/ui/settings.cpp, pe/ui/showcase.cpp, pe/ui/update.cpp
 msgid "Back"
 msgstr ""
 
@@ -317,7 +321,7 @@ msgstr ""
 msgid "Choose"
 msgstr ""
 
-#: pe/ui/home.cpp
+#: pe/ui/home.cpp, pe/ui/showcase.cpp
 msgid "Choose a game from your library."
 msgstr ""
 
@@ -372,15 +376,15 @@ msgstr ""
 msgid "Connect using a room address, port and password."
 msgstr ""
 
-#: pe/ui/home.cpp, pe/ui/multiplayer.cpp
+#: pe/ui/home.cpp, pe/ui/multiplayer.cpp, pe/ui/showcase.cpp
 msgid "Connected"
 msgstr ""
 
-#: pe/ui/multiplayer.cpp
+#: pe/ui/multiplayer.cpp, pe/ui/showcase.cpp
 msgid "Connecting..."
 msgstr ""
 
-#: pe/ui/multiplayer.cpp
+#: pe/ui/multiplayer.cpp, pe/ui/showcase.cpp
 msgid "Connection failed"
 msgstr ""
 
@@ -454,7 +458,7 @@ msgstr ""
 msgid "Could not save the folder. Please try again."
 msgstr ""
 
-#: pe/ui/browse.cpp, pe/ui/game_options.cpp, pe/ui/home.cpp, pe/ui/library.cpp, pe/ui/profiles.cpp, pe/ui/quick.cpp
+#: pe/ui/browse.cpp, pe/ui/game_options.cpp, pe/ui/home.cpp, pe/ui/library.cpp, pe/ui/profiles.cpp, pe/ui/quick.cpp, pe/ui/showcase.cpp
 msgid "Could not save. Please try again."
 msgstr ""
 
@@ -561,7 +565,7 @@ msgid "Diagnostics"
 msgstr ""
 
 #. Console mode: the console as if connected to a TV. Keep it short (about 9 letters).
-#: pe/ui/home.cpp, pe/ui/library.cpp, pe/ui/shell.cpp
+#: pe/ui/home.cpp, pe/ui/library.cpp, pe/ui/shell.cpp, pe/ui/showcase.cpp
 msgid "Docked"
 msgstr ""
 
@@ -598,7 +602,7 @@ msgstr ""
 msgid "Download size: {0}"
 msgstr ""
 
-#: pe/ui/home.cpp, pe/ui/library.cpp, pe/ui/quick.cpp
+#: pe/ui/home.cpp, pe/ui/library.cpp, pe/ui/quick.cpp, pe/ui/showcase.cpp
 msgid "Download the game to change its settings."
 msgstr ""
 
@@ -715,6 +719,14 @@ msgstr ""
 #. A switch: the emulated graphics processor is less exact and faster. GPU stays.
 #: pe/ui/game_options.cpp, pe/ui/settings.cpp
 msgid "Faster GPU emulation"
+msgstr ""
+
+#: pe/ui/quick.cpp
+msgid "Favorite"
+msgstr ""
+
+#: pe/ui/showcase.cpp
+msgid "Favorites"
 msgstr ""
 
 #. What a mod is made of: files that replace the game's own.
@@ -851,7 +863,7 @@ msgstr ""
 msgid "Game files"
 msgstr ""
 
-#: pe/ui/game_options.cpp, pe/ui/home.cpp, pe/ui/library.cpp
+#: pe/ui/game_options.cpp, pe/ui/home.cpp, pe/ui/library.cpp, pe/ui/showcase.cpp
 msgid "Game settings"
 msgstr ""
 
@@ -941,7 +953,7 @@ msgid "Graphics backend initialization failed. Try another backend in Settings; 
 msgstr ""
 
 #. Console mode: the console as if held in the hands. Keep it short (about 9 letters).
-#: pe/ui/game_options.cpp, pe/ui/home.cpp, pe/ui/library.cpp, pe/ui/shell.cpp
+#: pe/ui/game_options.cpp, pe/ui/home.cpp, pe/ui/library.cpp, pe/ui/shell.cpp, pe/ui/showcase.cpp
 msgid "Handheld"
 msgstr ""
 
@@ -956,7 +968,7 @@ msgid "High contrast"
 msgstr ""
 
 #. The menu's first section, its opening screen (not a house, and not the PS5's own home screen).
-#: pe/ui/browse.cpp, pe/ui/library.cpp, pe/ui/multiplayer.cpp, pe/ui/settings.cpp, pe/ui/shell.cpp
+#: pe/ui/browse.cpp, pe/ui/library.cpp, pe/ui/multiplayer.cpp, pe/ui/settings.cpp, pe/ui/shell.cpp, pe/ui/showcase.cpp
 msgid "Home"
 msgstr ""
 
@@ -1049,7 +1061,7 @@ msgstr ""
 msgid "Japanese"
 msgstr ""
 
-#: pe/ui/multiplayer.cpp
+#: pe/ui/multiplayer.cpp, pe/ui/showcase.cpp
 msgid "Join a room before launching a game, then choose Local Wireless in the game."
 msgstr ""
 
@@ -1147,7 +1159,7 @@ msgstr ""
 msgid "Leaving the room. Select the profile again when disconnected."
 msgstr ""
 
-#: pe/ui/multiplayer.cpp
+#: pe/ui/multiplayer.cpp, pe/ui/showcase.cpp
 msgid "Leaving..."
 msgstr ""
 
@@ -1172,7 +1184,7 @@ msgstr ""
 msgid "LIBRARY"
 msgstr ""
 
-#: pe/ui/library.cpp, pe/ui/shell.cpp
+#: pe/ui/library.cpp, pe/ui/shell.cpp, pe/ui/showcase.cpp
 msgid "Library"
 msgstr ""
 
@@ -1237,11 +1249,11 @@ msgid "MODS"
 msgstr ""
 
 #. Changes to a game that the player added: patches, replaced files, cheats. Keep the word 'mod' if the language uses it.
-#: pe/ui/home.cpp, pe/ui/library.cpp
+#: pe/ui/home.cpp, pe/ui/library.cpp, pe/ui/showcase.cpp
 msgid "Mods"
 msgstr ""
 
-#: pe/ui/home.cpp, pe/ui/multiplayer.cpp, pe/ui/shell.cpp
+#: pe/ui/home.cpp, pe/ui/multiplayer.cpp, pe/ui/shell.cpp, pe/ui/showcase.cpp
 msgid "Multiplayer"
 msgstr ""
 
@@ -1267,7 +1279,7 @@ msgstr ""
 msgid "Nearest"
 msgstr ""
 
-#: pe/ui/pairing.cpp, pe/ui/settings.cpp
+#: pe/ui/pairing.cpp, pe/ui/settings.cpp, pe/ui/showcase.cpp
 msgid "Needs attention"
 msgstr ""
 
@@ -1334,6 +1346,10 @@ msgstr ""
 msgid "No downloads. In the Library, Square puts a game from a source in the queue."
 msgstr ""
 
+#: pe/ui/showcase.cpp
+msgid "No favorites yet. Add one from Quick settings."
+msgstr ""
+
 #: pe/ui/browse.cpp
 msgid "No firmware folder"
 msgstr ""
@@ -1344,6 +1360,10 @@ msgstr ""
 
 #: pe/ui/browse.cpp
 msgid "No folders here."
+msgstr ""
+
+#: pe/ui/showcase.cpp
+msgid "No games match your search."
 msgstr ""
 
 #. Shown on the Mods row of a game that has none.
@@ -1374,7 +1394,7 @@ msgstr ""
 msgid "No release yet."
 msgstr ""
 
-#: pe/ui/library.cpp
+#: pe/ui/library.cpp, pe/ui/showcase.cpp
 msgid "No ROM files found."
 msgstr ""
 
@@ -1457,7 +1477,7 @@ msgstr ""
 msgid "Off"
 msgstr ""
 
-#: pe/ui/multiplayer.cpp
+#: pe/ui/multiplayer.cpp, pe/ui/showcase.cpp
 msgid "Offline"
 msgstr ""
 
@@ -1480,7 +1500,7 @@ msgstr ""
 msgid "Open it again to use version {0}."
 msgstr ""
 
-#: pe/ui/home.cpp
+#: pe/ui/home.cpp, pe/ui/showcase.cpp
 msgid "Open library"
 msgstr ""
 
@@ -1568,7 +1588,7 @@ msgid "Ping"
 msgstr ""
 
 #. Button and button hint: start the game shown. Keep it to one short word.
-#: pe/ui/home.cpp, pe/ui/library.cpp, pe/ui/quick.cpp
+#: pe/ui/home.cpp, pe/ui/library.cpp, pe/ui/quick.cpp, pe/ui/showcase.cpp
 msgid "Play"
 msgstr ""
 
@@ -1602,7 +1622,7 @@ msgstr ""
 msgid "playing"
 msgstr ""
 
-#: pe/ui/profiles.cpp
+#: pe/ui/profiles.cpp, pe/ui/settings.cpp
 msgid "Playing"
 msgstr ""
 
@@ -1645,7 +1665,7 @@ msgstr ""
 msgid "Press again to replace this game's save. The current one is backed up."
 msgstr ""
 
-#: pe/ui/multiplayer.cpp
+#: pe/ui/multiplayer.cpp, pe/ui/showcase.cpp
 msgid "Private room"
 msgstr ""
 
@@ -1694,7 +1714,7 @@ msgstr ""
 msgid "PS5 EDITION"
 msgstr ""
 
-#: pe/ui/multiplayer.cpp
+#: pe/ui/multiplayer.cpp, pe/ui/showcase.cpp
 msgid "Public rooms"
 msgstr ""
 
@@ -1715,7 +1735,7 @@ msgid "Queued, from {0}"
 msgstr ""
 
 #. A panel of a game's most used settings, opened with the Options button.
-#: pe/ui/home.cpp, pe/ui/library.cpp, pe/ui/quick.cpp
+#: pe/ui/home.cpp, pe/ui/library.cpp, pe/ui/quick.cpp, pe/ui/showcase.cpp
 msgid "Quick settings"
 msgstr ""
 
@@ -1737,7 +1757,7 @@ msgstr ""
 msgid "Reading the game lists..."
 msgstr ""
 
-#: pe/ui/apps.cpp, pe/ui/backup.cpp, pe/ui/library.cpp, pe/ui/remote.cpp
+#: pe/ui/apps.cpp, pe/ui/backup.cpp, pe/ui/library.cpp, pe/ui/remote.cpp, pe/ui/showcase.cpp
 msgid "Reading..."
 msgstr ""
 
@@ -1752,6 +1772,10 @@ msgstr ""
 
 #: pe/ui/home.cpp
 msgid "RECENTLY PLAYED"
+msgstr ""
+
+#: pe/ui/showcase.cpp
+msgid "Recently played"
 msgstr ""
 
 #. Video profile name: the settings a new install has.
@@ -1896,7 +1920,7 @@ msgstr ""
 msgid "save-sync.json cannot be read: correct it over FTP first."
 msgstr ""
 
-#: pe/ui/game_options.cpp, pe/ui/home.cpp, pe/ui/library.cpp, pe/ui/quick.cpp
+#: pe/ui/game_options.cpp, pe/ui/home.cpp, pe/ui/library.cpp, pe/ui/quick.cpp, pe/ui/showcase.cpp
 msgid "Saved for this game. Applies on next launch."
 msgstr ""
 
@@ -1948,17 +1972,21 @@ msgstr ""
 msgid "Scroll"
 msgstr ""
 
+#: pe/ui/showcase.cpp
+msgid "Search games"
+msgstr ""
+
 #: pe/ui/game_options.cpp
 msgid "Secondary"
 msgstr ""
 
 #. Button hint beside L1 and R1: they move between the menu's sections (Home, Library, Multiplayer, Settings, About).
-#: pe/ui/browse.cpp, pe/ui/home.cpp, pe/ui/library.cpp, pe/ui/multiplayer.cpp, pe/ui/settings.cpp
+#: pe/ui/browse.cpp, pe/ui/home.cpp, pe/ui/library.cpp, pe/ui/multiplayer.cpp, pe/ui/settings.cpp, pe/ui/showcase.cpp
 msgid "Sections"
 msgstr ""
 
 #. Button hint: choose the highlighted item (not the Select button).
-#: pe/ui/backup.cpp, pe/ui/game_options.cpp, pe/ui/home.cpp, pe/ui/library.cpp, pe/ui/multiplayer.cpp, pe/ui/pairing.cpp, pe/ui/quick.cpp, pe/ui/remote.cpp, pe/ui/save_sync.cpp, pe/ui/settings.cpp, pe/ui/update.cpp
+#: pe/ui/backup.cpp, pe/ui/game_options.cpp, pe/ui/home.cpp, pe/ui/library.cpp, pe/ui/multiplayer.cpp, pe/ui/pairing.cpp, pe/ui/quick.cpp, pe/ui/remote.cpp, pe/ui/save_sync.cpp, pe/ui/settings.cpp, pe/ui/showcase.cpp, pe/ui/update.cpp
 msgid "Select"
 msgstr ""
 
@@ -1976,7 +2004,7 @@ msgstr ""
 msgid "Server too old for save sync"
 msgstr ""
 
-#: pe/ui/home.cpp, pe/ui/settings.cpp, pe/ui/shell.cpp
+#: pe/ui/home.cpp, pe/ui/settings.cpp, pe/ui/shell.cpp, pe/ui/showcase.cpp
 msgid "Settings"
 msgstr ""
 
@@ -2024,6 +2052,10 @@ msgstr ""
 
 #: pe/ui/multiplayer.cpp
 msgid "Showing the previous list."
+msgstr ""
+
+#: pe/ui/quick.cpp
+msgid "Shows the game under Favorites in the Library."
 msgstr ""
 
 #: pe/ui/pairing.cpp
@@ -2098,7 +2130,7 @@ msgid "Start in safe mode"
 msgstr ""
 
 #. Under a message that a game failed to start: start that game once in safe mode.
-#: pe/ui/home.cpp
+#: pe/ui/home.cpp, pe/ui/showcase.cpp
 msgid "Start it in safe mode"
 msgstr ""
 
@@ -2227,7 +2259,7 @@ msgstr ""
 msgid "The game starts when the download is done."
 msgstr ""
 
-#: pe/ui/game_options.cpp, pe/ui/multiplayer.cpp
+#: pe/ui/game_options.cpp, pe/ui/multiplayer.cpp, pe/ui/showcase.cpp
 msgid "The keyboard could not be opened."
 msgstr ""
 
@@ -2327,7 +2359,7 @@ msgstr ""
 msgid "This game has no save to export yet."
 msgstr ""
 
-#: pe/ui/home.cpp, pe/ui/library.cpp, pe/ui/quick.cpp
+#: pe/ui/home.cpp, pe/ui/library.cpp, pe/ui/quick.cpp, pe/ui/showcase.cpp
 msgid "This game's settings cannot be saved (no title ID)."
 msgstr ""
 
@@ -2503,7 +2535,7 @@ msgid "Version {0}"
 msgstr ""
 
 #. {0}: the newer release's number, for example 1.000.050; homebrew.page is a site's name and stays as it is.
-#: pe/ui/browse.cpp, pe/ui/launcher.cpp
+#: pe/ui/browse.cpp, pe/ui/launcher.cpp, pe/ui/settings.cpp
 msgid "Version {0} is on homebrew.page"
 msgstr ""
 
@@ -2636,7 +2668,7 @@ msgid "Your games, saves and settings are kept."
 msgstr ""
 
 #. Headline when no game has been played yet.
-#: pe/ui/home.cpp
+#: pe/ui/home.cpp, pe/ui/showcase.cpp
 msgid "Your next adventure"
 msgstr ""
 
@@ -2655,7 +2687,7 @@ msgid "{0} ASTC"
 msgstr ""
 
 #. How many settings of a kind this game has of its own; {0} is a number.
-#: pe/ui/home.cpp, pe/ui/library.cpp
+#: pe/ui/home.cpp, pe/ui/library.cpp, pe/ui/showcase.cpp
 msgid "{0} changed"
 msgstr ""
 
@@ -2680,7 +2712,7 @@ msgid "{0} free"
 msgstr ""
 
 #. Exactly one game. In a language with more than two plural forms, word it so that it reads well with any number (Games: {0}).
-#: pe/ui/browse.cpp, pe/ui/remote.cpp
+#: pe/ui/browse.cpp, pe/ui/remote.cpp, pe/ui/showcase.cpp
 msgid "{0} game"
 msgstr ""
 
@@ -2694,7 +2726,7 @@ msgid "{0} game lists could not be read."
 msgstr ""
 
 #. Any number of games other than one (also 0). See '{0} game'.
-#: pe/ui/browse.cpp, pe/ui/library.cpp, pe/ui/remote.cpp
+#: pe/ui/browse.cpp, pe/ui/library.cpp, pe/ui/remote.cpp, pe/ui/showcase.cpp
 msgid "{0} games"
 msgstr ""
 

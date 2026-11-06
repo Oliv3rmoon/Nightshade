@@ -2817,3 +2817,35 @@ msgstr "{0}: {1}. Geração de fotogramas e pós-processamento desativados; alte
 #: pe/ui/settings.cpp
 msgid "Crash reports (FTP): {0}\nAttach crash-*.txt and its matching logs to your issue."
 msgstr "Relatórios de falha (FTP): {0}\nAnexe crash-*.txt e os registos correspondentes ao relato do problema."
+
+#: pe/ui/showcase.cpp
+msgid "All"
+msgstr "Todos"
+
+#: pe/ui/showcase.cpp
+msgid "Recently played"
+msgstr "Jogados recentemente"
+
+#: pe/ui/showcase.cpp
+msgid "Favorites"
+msgstr "Favoritos"
+
+#: pe/ui/showcase.cpp
+msgid "Search games"
+msgstr "Pesquisar jogos"
+
+#: pe/ui/quick.cpp
+msgid "Favorite"
+msgstr "Favorito"
+
+#: pe/ui/showcase.cpp
+msgid "No games match your search."
+msgstr "Nenhum jogo corresponde à tua pesquisa."
+
+#: pe/ui/showcase.cpp
+msgid "No favorites yet. Add one from Quick settings."
+msgstr "Ainda não há favoritos. Adiciona um nas Definições rápidas."
+
+#: pe/ui/quick.cpp
+msgid "Shows the game under Favorites in the Library."
+msgstr "Mostra o jogo nos Favoritos da Biblioteca."

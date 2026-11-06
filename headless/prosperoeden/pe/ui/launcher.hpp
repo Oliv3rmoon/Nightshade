@@ -25,6 +25,15 @@ inline constexpr const char* kBuildLabel = "Nightshade";
 inline constexpr const char* kBuildCredit =
     "Nightshade by Oliv3rmoon  /  discord.gg/pSqgRU3YP9  /  buymeacoffee.com/oliv3rmoon";
 
+// Nightshade's Settings (Theme::showcase): the panel beside the categories, and how a dialog's own
+// place (around the screen's middle) is moved into it and drawn a little larger there.
+inline constexpr Rect kShowcasePanel{776.0f, 168.0f, 1092.0f, 782.0f};
+inline constexpr float kDockScale = 1.06f;
+inline constexpr float kDockX = kShowcasePanel.x + kShowcasePanel.w * 0.5f - 960.0f;
+inline constexpr float kDockY = kShowcasePanel.y + kShowcasePanel.h * 0.5f - 540.0f;
+// Where Nightshade's top bar has its mark (showcase.cpp; the opening flies the mark there).
+inline constexpr Rect kShowcaseMark{48.0f, 20.0f, 88.0f, 88.0f};
+
 // Every screen of the launcher as one state machine. The frontend feeds it
 // pressed buttons and frame time, draws its list and plays its cues; it ends
 // when a game is chosen (and the closing animation has run).
@@ -81,6 +90,20 @@ class Launcher
     bool community_open() const
     {
         return modal_ == Modal::community;
+    }
+    // Nightshade's layout, for the preview's checks: the games the Library's filter and search
+    // leave, the section shown, and whether the home screen's focus is on its row of covers.
+    int library_shown() const
+    {
+        return static_cast<int>(library_view_.size());
+    }
+    int section_shown() const
+    {
+        return section();
+    }
+    bool home_shelf_focused() const
+    {
+        return home_on_grid_;
     }
 
   private:
@@ -445,6 +468,41 @@ class Launcher
     // An update text with the place the check asks in it (Services::update_source).
     std::string update_text(std::string_view text);
 
+    // ---- Nightshade's own layout (showcase.cpp; Theme::showcase) ----
+    // The top bar: the mark, the wordmark, the four tabs and the clock.
+    void draw_top_bar(Canvas &c);
+    // The hints at the bottom right, each after a hairline; what the menu last said (or `status`)
+    // at the bottom left.
+    void draw_showcase_footer(Canvas &c, const Hint *hints, int count, std::string_view status = {});
+    // The selected game's art behind the home screen and the Library: darkened and blurred once when
+    // the selection rests on a game (Textures::show_game_art), shaded toward the text. strength:
+    // 1 on the home screen, less behind the Library's grid.
+    void draw_showcase_art(Canvas &c, float strength);
+    // The home screen's row of covers: the recent games first, then the rest of the Library.
+    void collect_shelf();
+    // Puts the shelf's game in the home screen (the Library's selection follows it).
+    void select_shelf();
+    void press_showcase_home(Key key);
+    void draw_showcase_home(Canvas &c);
+    // The Library's games as the filter and the search leave them (indexes into games_).
+    void filter_library();
+    // Where the Library's selection is in its grid, and the grid's scroll and highlight with it.
+    void sync_showcase_grid(bool snap);
+    bool is_favorite(const std::string &file) const;
+    void set_favorite(const std::string &file, bool favorite);
+    void poll_search();
+    void press_showcase_library(Key key);
+    void draw_showcase_library(Canvas &c);
+    // Settings: the column of categories and the panel of the focused one. Its rows are the
+    // categories and then About.
+    int settings_rows() const;
+    void draw_showcase_settings(Canvas &c, const std::string *summaries);
+    void draw_settings_overview(Canvas &c, const Rect &panel, int category, const std::string &summary);
+    // A dialog opened from Settings is drawn in that panel (draw_dialog's own place moved there).
+    bool dialog_docked(Modal modal) const;
+    // Multiplayer's title and state at the left, beside its panels.
+    void draw_showcase_intro(Canvas &c);
+
     // ---- the community (community.cpp) ----
     // The card that names the community's Discord server (Modal::community): its name, its
     // address and a QR code that opens it. It opens by itself once, at a start of the app when the
@@ -588,13 +646,14 @@ class Launcher
     bool selected_read_ = true;
     int selected_changes_ = 0;       // how many settings the selected game has of its own
     std::string selected_session_;   // what it runs with (session_line)
+    int selected_refresh_ = -1;      // its own refresh rate (GameSettings::refresh), -1: Settings' one
     bool game_from_home_ = false;    // its settings were opened from the home screen: back goes there
     tween::Spring pane_;             // the game page's focus: 0 on the kinds, 1 on the rows
 
     // settings and dialogs
     Preferences prefs_;
     ListView settings_;
-    std::array<tween::Spring, 14> settings_springs_{}; // the highlight on each tile
+    std::array<tween::Spring, 16> settings_springs_{}; // the highlight on each tile (and About's row)
     tween::Spring section_;
     int option_ = 0;
     tween::Spring option_cursor_; // highlight position in pixels
@@ -722,6 +781,27 @@ class Launcher
     float pairing_time_ = 0.0f;
     QrCode pairing_qr_;
     std::string pairing_qr_text_;      // the address pairing_qr_ is of
+
+    // Nightshade's own layout (showcase.cpp).
+    std::vector<int> shelf_games_;     // the home screen's row of covers (indexes into games_)
+    ListView shelf_;                   // ... and where its focus is
+    bool shelf_moved_ = false;         // the player has moved on the home screen: its focus stays theirs
+    std::string art_wanted_;           // the art the selection asks for, shown once it rests there
+    float art_wait_ = 0.0f;
+    std::vector<int> library_view_;    // the Library's games as filtered and searched (indexes into games_)
+    int library_pos_ = 0;              // the selection's place in it
+    int library_filter_ = 0;           // 0 every game, 1 recently played, 2 favorites
+    int library_header_ = -1;          // the focus on the search (0) or a filter (1-3); -1 on the grid
+    std::string library_search_;       // what the search keeps (empty: every game)
+    std::vector<std::string> favorites_; // the games' files marked as favorites (Services::favorites)
+    std::atomic<bool> search_edit_stop_{false};
+    std::future<std::optional<std::string>> search_edit_; // the keyboard, while it is open
+    // The pages drawn a little smaller under the top bar (Multiplayer, About, Game files, Language):
+    // their hints wait (draw_footer) and are drawn at full size after them.
+    bool defer_footer_ = false;
+    bool footer_pending_ = false;
+    std::vector<Hint> footer_hints_;
+    std::string footer_status_;
 };
 
 } // namespace pe::ui

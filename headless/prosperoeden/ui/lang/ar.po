@@ -2817,3 +2817,35 @@ msgstr "{0}: {1}. توليد الإطارات والمعالجة اللاحقة 
 #: pe/ui/settings.cpp
 msgid "Crash reports (FTP): {0}\nAttach crash-*.txt and its matching logs to your issue."
 msgstr "تقارير الأعطال (FTP): {0}\nأرفق crash-*.txt والسجلات المطابقة مع بلاغك."
+
+#: pe/ui/showcase.cpp
+msgid "All"
+msgstr "الكل"
+
+#: pe/ui/showcase.cpp
+msgid "Recently played"
+msgstr "لُعبت مؤخرًا"
+
+#: pe/ui/showcase.cpp
+msgid "Favorites"
+msgstr "المفضلة"
+
+#: pe/ui/showcase.cpp
+msgid "Search games"
+msgstr "ابحث عن الألعاب"
+
+#: pe/ui/quick.cpp
+msgid "Favorite"
+msgstr "مفضلة"
+
+#: pe/ui/showcase.cpp
+msgid "No games match your search."
+msgstr "لا توجد ألعاب تطابق بحثك."
+
+#: pe/ui/showcase.cpp
+msgid "No favorites yet. Add one from Quick settings."
+msgstr "لا توجد ألعاب مفضلة بعد. أضف لعبة من الإعدادات السريعة."
+
+#: pe/ui/quick.cpp
+msgid "Shows the game under Favorites in the Library."
+msgstr "يعرض اللعبة ضمن المفضلة في المكتبة."

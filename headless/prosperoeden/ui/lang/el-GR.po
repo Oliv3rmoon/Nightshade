@@ -2817,3 +2817,35 @@ msgstr "{0}: {1}. Δημιουργία καρέ και μεταεπεξεργα�
 #: pe/ui/settings.cpp
 msgid "Crash reports (FTP): {0}\nAttach crash-*.txt and its matching logs to your issue."
 msgstr "Αναφορές σφαλμάτων (FTP): {0}\nΕπισυνάψτε το crash-*.txt και τα αντίστοιχα αρχεία καταγραφής στην αναφορά σας."
+
+#: pe/ui/showcase.cpp
+msgid "All"
+msgstr "Όλα"
+
+#: pe/ui/showcase.cpp
+msgid "Recently played"
+msgstr "Παίχτηκαν πρόσφατα"
+
+#: pe/ui/showcase.cpp
+msgid "Favorites"
+msgstr "Αγαπημένα"
+
+#: pe/ui/showcase.cpp
+msgid "Search games"
+msgstr "Αναζήτηση παιχνιδιών"
+
+#: pe/ui/quick.cpp
+msgid "Favorite"
+msgstr "Αγαπημένο"
+
+#: pe/ui/showcase.cpp
+msgid "No games match your search."
+msgstr "Κανένα παιχνίδι δεν ταιριάζει με την αναζήτηση."
+
+#: pe/ui/showcase.cpp
+msgid "No favorites yet. Add one from Quick settings."
+msgstr "Δεν υπάρχουν ακόμη αγαπημένα. Προσθέστε ένα από τις Γρήγορες ρυθμίσεις."
+
+#: pe/ui/quick.cpp
+msgid "Shows the game under Favorites in the Library."
+msgstr "Εμφανίζει το παιχνίδι στα Αγαπημένα της Βιβλιοθήκης."

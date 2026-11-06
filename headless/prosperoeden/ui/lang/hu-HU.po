@@ -2817,3 +2817,35 @@ msgstr "{0}: {1}. Képkockagenerálás és utófeldolgozás kikapcsolva; ha mód
 #: pe/ui/settings.cpp
 msgid "Crash reports (FTP): {0}\nAttach crash-*.txt and its matching logs to your issue."
 msgstr "Összeomlási jelentések (FTP): {0}\nCsatold a crash-*.txt fájlt és a hozzá tartozó naplókat a hibajelentéshez."
+
+#: pe/ui/showcase.cpp
+msgid "All"
+msgstr "Összes"
+
+#: pe/ui/showcase.cpp
+msgid "Recently played"
+msgstr "Legutóbb játszott"
+
+#: pe/ui/showcase.cpp
+msgid "Favorites"
+msgstr "Kedvencek"
+
+#: pe/ui/showcase.cpp
+msgid "Search games"
+msgstr "Játékok keresése"
+
+#: pe/ui/quick.cpp
+msgid "Favorite"
+msgstr "Kedvenc"
+
+#: pe/ui/showcase.cpp
+msgid "No games match your search."
+msgstr "Egy játék sem felel meg a keresésnek."
+
+#: pe/ui/showcase.cpp
+msgid "No favorites yet. Add one from Quick settings."
+msgstr "Még nincsenek kedvencek. Adj hozzá egyet a Gyorsbeállításokban."
+
+#: pe/ui/quick.cpp
+msgid "Shows the game under Favorites in the Library."
+msgstr "A játékot a Játéktár Kedvencek szűrőjében mutatja."

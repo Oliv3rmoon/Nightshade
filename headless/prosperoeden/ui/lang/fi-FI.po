@@ -2817,3 +2817,35 @@ msgstr "{0}: {1}. Kehysten luonti ja jälkikäsittely pois; jos muutat jotain n�
 #: pe/ui/settings.cpp
 msgid "Crash reports (FTP): {0}\nAttach crash-*.txt and its matching logs to your issue."
 msgstr "Kaatumisraportit (FTP): {0}\nLiitä crash-*.txt ja siihen liittyvät lokit virheilmoitukseesi."
+
+#: pe/ui/showcase.cpp
+msgid "All"
+msgstr "Kaikki"
+
+#: pe/ui/showcase.cpp
+msgid "Recently played"
+msgstr "Viimeksi pelatut"
+
+#: pe/ui/showcase.cpp
+msgid "Favorites"
+msgstr "Suosikit"
+
+#: pe/ui/showcase.cpp
+msgid "Search games"
+msgstr "Hae pelejä"
+
+#: pe/ui/quick.cpp
+msgid "Favorite"
+msgstr "Suosikki"
+
+#: pe/ui/showcase.cpp
+msgid "No games match your search."
+msgstr "Haullasi ei löytynyt pelejä."
+
+#: pe/ui/showcase.cpp
+msgid "No favorites yet. Add one from Quick settings."
+msgstr "Ei vielä suosikkeja. Lisää niitä Pika-asetuksista."
+
+#: pe/ui/quick.cpp
+msgid "Shows the game under Favorites in the Library."
+msgstr "Näyttää pelin Kirjaston Suosikeissa."

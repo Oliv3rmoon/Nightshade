@@ -2817,3 +2817,35 @@ msgstr "{0}: {1}. Frame-Generierung und Nachbearbeitung aus; wenn du eines davon
 #: pe/ui/settings.cpp
 msgid "Crash reports (FTP): {0}\nAttach crash-*.txt and its matching logs to your issue."
 msgstr "Absturzberichte (FTP): {0}\nFüge crash-*.txt und die zugehörigen Protokolle deinem Fehlerbericht bei."
+
+#: pe/ui/showcase.cpp
+msgid "All"
+msgstr "Alle"
+
+#: pe/ui/showcase.cpp
+msgid "Recently played"
+msgstr "Zuletzt gespielt"
+
+#: pe/ui/showcase.cpp
+msgid "Favorites"
+msgstr "Favoriten"
+
+#: pe/ui/showcase.cpp
+msgid "Search games"
+msgstr "Spiele suchen"
+
+#: pe/ui/quick.cpp
+msgid "Favorite"
+msgstr "Favorit"
+
+#: pe/ui/showcase.cpp
+msgid "No games match your search."
+msgstr "Keine Spiele passen zu deiner Suche."
+
+#: pe/ui/showcase.cpp
+msgid "No favorites yet. Add one from Quick settings."
+msgstr "Noch keine Favoriten. Füge einen in den Schnelleinstellungen hinzu."
+
+#: pe/ui/quick.cpp
+msgid "Shows the game under Favorites in the Library."
+msgstr "Zeigt das Spiel in der Bibliothek unter Favoriten."

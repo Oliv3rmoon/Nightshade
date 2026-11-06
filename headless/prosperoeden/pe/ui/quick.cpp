@@ -34,7 +34,11 @@ enum QuickRow : int
     quick_overlay,
     quick_frame_gen, // in a build with frame generation; last
     kQuickRows,
+    // Nightshade's layout (Theme::showcase): the game among the Library's favorites, a row of its
+    // own after the overlay's (before frame generation).
+    quick_favorite = kQuickRows,
 };
+constexpr int kFavoriteRow = quick_frame_gen;
 
 constexpr Rect kPanel{360.0f, 120.0f, 1200.0f, 820.0f};
 constexpr Rect kArt{408.0f, 176.0f, 300.0f, 300.0f};
@@ -63,7 +67,16 @@ int cycle(int value, int count, int step)
 
 int Launcher::quick_rows() const
 {
-    return services_.frame_gen_state() == 0 && services_.mihawkgen_state() == 0 ? kQuickRows - 1 : kQuickRows;
+    return (services_.frame_gen_state() == 0 && services_.mihawkgen_state() == 0 ? kQuickRows - 1 : kQuickRows) +
+           (th().showcase ? 1 : 0);
+}
+
+// What a row of Quick settings is: its place, with Nightshade's Favorite row before frame generation.
+static int quick_kind(int row)
+{
+    if (!th().showcase || row < kFavoriteRow)
+        return row;
+    return row == kFavoriteRow ? quick_favorite : row - 1;
 }
 
 void Launcher::open_quick(int index, bool after_failure)
@@ -170,7 +183,13 @@ void Launcher::press_quick(Key key)
     default:
         return;
     }
-    const int row = std::clamp(quick_rows_.selected, 0, quick_rows() - 1);
+    const int row = quick_kind(std::clamp(quick_rows_.selected, 0, quick_rows() - 1));
+    if (row == quick_favorite)
+    {
+        set_favorite(game.file, !is_favorite(game.file));
+        message_.clear();
+        return;
+    }
     if (row == quick_play || row == quick_safe)
     {
         if (key != Key::cross)
@@ -270,7 +289,7 @@ void Launcher::draw_quick(Canvas &c, float open)
         y += 40.0f * static_cast<float>(std::max(1, lines)) + 10.0f;
     }
     const int rows = quick_rows();
-    const int focused = std::clamp(quick_rows_.selected, 0, rows - 1);
+    const int focused = quick_kind(std::clamp(quick_rows_.selected, 0, rows - 1));
     const bool docked = game_docked_;
     std::string about;
     bool warning = false;
@@ -311,6 +330,9 @@ void Launcher::draw_quick(Canvas &c, float open)
             about = tr("Frame rate, frame time, CPU, GPU and memory over the game. Touchpad + R1 shows or hides it "
                        "while playing.");
             break;
+        case quick_favorite:
+            about = tr("Shows the game under Favorites in the Library.");
+            break;
         default:
             about = tr("Frames made between the game's own, up to the output's rate (Vulkan).");
             break;
@@ -338,12 +360,13 @@ void Launcher::draw_quick(Canvas &c, float open)
     const int method = game_settings_.frame_gen_method >= 0 ? game_settings_.frame_gen_method : prefs_.frame_gen_method;
     const bool frame_gen_locked =
         (method == 0 ? services_.frame_gen_state() : services_.mihawkgen_state()) != 2;
-    for (int row = quick_rows_.first_row(); row <= quick_rows_.last_row() && row < rows; ++row)
+    for (int place = quick_rows_.first_row(); place <= quick_rows_.last_row() && place < rows; ++place)
     {
-        const float top = row_top(row);
-        const bool on = row == focused;
+        const int row = quick_kind(place);
+        const float top = row_top(place);
+        const bool on = place == std::clamp(quick_rows_.selected, 0, rows - 1);
         const float line = baseline(top, kRowHeight, t.size_text);
-        list.push_opacity(quick_rows_.row_alpha(row, kRowHeight));
+        list.push_opacity(quick_rows_.row_alpha(place, kRowHeight));
         if (row == quick_play || row == quick_safe)
         {
             // The two starts: their name, and the button that starts them.
@@ -396,6 +419,11 @@ void Launcher::draw_quick(Canvas &c, float open)
             name = tr("FPS overlay");
             own = game_settings_.hud;
             value = own >= 0 ? pick(off_on, own) : fill(tr("Default ({0})"), {pick(off_on, prefs_.hud ? 1 : 0)});
+            break;
+        case quick_favorite:
+            name = tr("Favorite");
+            own = is_favorite(game.file) ? 1 : -1; // marked with the accent when it is one
+            value = pick(off_on, own > 0 ? 1 : 0);
             break;
         default:
             name = tr("Frame generation");

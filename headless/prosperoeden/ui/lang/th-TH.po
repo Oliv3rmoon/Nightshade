@@ -2817,3 +2817,35 @@ msgstr "{0}: {1} ปิด​การสร้างเฟรม​และ​
 #: pe/ui/settings.cpp
 msgid "Crash reports (FTP): {0}\nAttach crash-*.txt and its matching logs to your issue."
 msgstr "รายงานข้อขัดข้อง (FTP): {0}\nแนบ crash-*.txt และบันทึกที่เกี่ยวข้องในรายงานปัญหาของคุณ"
+
+#: pe/ui/showcase.cpp
+msgid "All"
+msgstr "ทั้งหมด"
+
+#: pe/ui/showcase.cpp
+msgid "Recently played"
+msgstr "เล่นล่าสุด"
+
+#: pe/ui/showcase.cpp
+msgid "Favorites"
+msgstr "รายการโปรด"
+
+#: pe/ui/showcase.cpp
+msgid "Search games"
+msgstr "ค้นหา​เกม"
+
+#: pe/ui/quick.cpp
+msgid "Favorite"
+msgstr "รายการโปรด"
+
+#: pe/ui/showcase.cpp
+msgid "No games match your search."
+msgstr "ไม่มี​เกม​ที่​ตรง​กับ​การ​ค้นหา"
+
+#: pe/ui/showcase.cpp
+msgid "No favorites yet. Add one from Quick settings."
+msgstr "ยัง​ไม่มี​รายการโปรด เพิ่ม​ได้​จาก​การตั้งค่า​ด่วน"
+
+#: pe/ui/quick.cpp
+msgid "Shows the game under Favorites in the Library."
+msgstr "แสดง​เกม​ใน​รายการโปรด​ของ​คลังเกม"

@@ -2817,3 +2817,35 @@ msgstr "{0}: {1}. Generowanie klatek i przetwarzanie końcowe wyłączone; zmian
 #: pe/ui/settings.cpp
 msgid "Crash reports (FTP): {0}\nAttach crash-*.txt and its matching logs to your issue."
 msgstr "Raporty awarii (FTP): {0}\nDo zgłoszenia dołącz crash-*.txt i odpowiadające mu dzienniki."
+
+#: pe/ui/showcase.cpp
+msgid "All"
+msgstr "Wszystkie"
+
+#: pe/ui/showcase.cpp
+msgid "Recently played"
+msgstr "Ostatnio grane"
+
+#: pe/ui/showcase.cpp
+msgid "Favorites"
+msgstr "Ulubione"
+
+#: pe/ui/showcase.cpp
+msgid "Search games"
+msgstr "Szukaj gier"
+
+#: pe/ui/quick.cpp
+msgid "Favorite"
+msgstr "Ulubiona"
+
+#: pe/ui/showcase.cpp
+msgid "No games match your search."
+msgstr "Żadna gra nie pasuje do wyszukiwania."
+
+#: pe/ui/showcase.cpp
+msgid "No favorites yet. Add one from Quick settings."
+msgstr "Brak ulubionych. Dodaj je w Szybkich ustawieniach."
+
+#: pe/ui/quick.cpp
+msgid "Shows the game under Favorites in the Library."
+msgstr "Pokazuje grę w Ulubionych w Bibliotece."

@@ -60,7 +60,7 @@ int Launcher::section() const
     case Screen::multiplayer:
         return 2;
     case Screen::about:
-        return 4;
+        return th().showcase ? 3 : 4; // Nightshade's About is a row of Settings
     default: // Settings, and its own pages: game files, language
         return 3;
     }
@@ -89,6 +89,9 @@ void Launcher::go_section(int target)
             return;
         open(Screen::home, forward);
         home_session_ = session_line(home_.last_title_id);
+        // Nightshade's home screen shows the game its row of covers has the focus on.
+        if (th().showcase)
+            select_shelf();
         return;
     case 1:
         if (screen_ == Screen::library)
@@ -230,6 +233,8 @@ void Launcher::draw_rail(Canvas &c)
     gfx::DrawList &list = c.list;
     const Theme &t = th();
 
+    if (t.showcase)
+        return draw_top_bar(c);
     if (t.top_nav)
     {
         // Horizontal tabs: Home, Multiplayer, Settings, About (Library is on the home screen).
@@ -346,6 +351,8 @@ void Launcher::draw_rail(Canvas &c)
 
 void Launcher::draw_clock(Canvas &c)
 {
+    if (th().showcase)
+        return; // in the top bar (draw_top_bar)
     text(c, clock_, layout::kRight, baseline(layout::kTop, 64.0f, th().size_heading), th().size_heading,
          th().title, Align::right);
 }
@@ -369,6 +376,15 @@ void Launcher::draw_frame(Canvas &c, const char *title, const char *copy)
 
 void Launcher::draw_footer(Canvas &c, const Hint *hints, int count, std::string_view status)
 {
+    if (th().showcase && defer_footer_)
+    {
+        footer_hints_.assign(hints, hints + count);
+        footer_status_ = std::string{status};
+        footer_pending_ = true;
+        return;
+    }
+    if (th().showcase)
+        return draw_showcase_footer(c, hints, count, status);
     const Theme &t = th();
     const float line = layout::kFooter + t.size_small * 0.35f;
     // What the menu last said takes the status's place (a dialog says its own).

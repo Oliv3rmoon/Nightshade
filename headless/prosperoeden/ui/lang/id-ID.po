@@ -2817,3 +2817,35 @@ msgstr "{0}: {1}. Pembuatan bingkai dan pascaproses nonaktif; mengubah salah sat
 #: pe/ui/settings.cpp
 msgid "Crash reports (FTP): {0}\nAttach crash-*.txt and its matching logs to your issue."
 msgstr "Laporan crash (FTP): {0}\nLampirkan crash-*.txt dan log terkait pada laporan masalah Anda."
+
+#: pe/ui/showcase.cpp
+msgid "All"
+msgstr "Semua"
+
+#: pe/ui/showcase.cpp
+msgid "Recently played"
+msgstr "Baru dimainkan"
+
+#: pe/ui/showcase.cpp
+msgid "Favorites"
+msgstr "Favorit"
+
+#: pe/ui/showcase.cpp
+msgid "Search games"
+msgstr "Cari game"
+
+#: pe/ui/quick.cpp
+msgid "Favorite"
+msgstr "Favorit"
+
+#: pe/ui/showcase.cpp
+msgid "No games match your search."
+msgstr "Tidak ada game yang cocok dengan pencarian Anda."
+
+#: pe/ui/showcase.cpp
+msgid "No favorites yet. Add one from Quick settings."
+msgstr "Belum ada favorit. Tambahkan dari Pengaturan cepat."
+
+#: pe/ui/quick.cpp
+msgid "Shows the game under Favorites in the Library."
+msgstr "Menampilkan game di Favorit pada Perpustakaan."

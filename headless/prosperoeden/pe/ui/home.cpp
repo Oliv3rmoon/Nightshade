@@ -88,6 +88,12 @@ void Launcher::collect_home_recents()
     if (home_recent_games_.empty())
         home_on_recents_ = false;
     home_recent_y_.snap(kRecentPitch * static_cast<float>(home_recent_));
+    // Nightshade's home screen has a row of covers instead (showcase.cpp).
+    if (th().showcase)
+    {
+        home_on_recents_ = false;
+        collect_shelf();
+    }
 }
 
 void Launcher::open_game_settings_from_home(const std::string &file)
@@ -111,6 +117,8 @@ void Launcher::open_game_settings_from_home(const std::string &file)
 
 void Launcher::press_home(Key key)
 {
+    if (th().showcase)
+        return press_showcase_home(key);
     // Quick settings need the game in the list: the list is read as the launcher opens, and Options
     // pressed before that ends waits for it, as the Library does.
     if (key == Key::options && !games_loaded_)
@@ -541,6 +549,8 @@ void Launcher::draw_home_status(Canvas &c)
 
 void Launcher::draw_home(Canvas &c)
 {
+    if (th().showcase)
+        return draw_showcase_home(c);
     gfx::DrawList &list = c.list;
     const Theme &t = th();
     const bool ready = home_.setup_ready;

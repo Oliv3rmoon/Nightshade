@@ -2817,3 +2817,35 @@ msgstr "{0}：{1}。フレーム生成とポストプロセスはオフです。
 #: pe/ui/settings.cpp
 msgid "Crash reports (FTP): {0}\nAttach crash-*.txt and its matching logs to your issue."
 msgstr "クラッシュレポート (FTP): {0}\n不具合報告に crash-*.txt と対応するログを添付してください。"
+
+#: pe/ui/showcase.cpp
+msgid "All"
+msgstr "すべて"
+
+#: pe/ui/showcase.cpp
+msgid "Recently played"
+msgstr "最近プレイ"
+
+#: pe/ui/showcase.cpp
+msgid "Favorites"
+msgstr "お気に入り"
+
+#: pe/ui/showcase.cpp
+msgid "Search games"
+msgstr "ゲームを検索"
+
+#: pe/ui/quick.cpp
+msgid "Favorite"
+msgstr "お気に入り"
+
+#: pe/ui/showcase.cpp
+msgid "No games match your search."
+msgstr "検索に一致するゲームはありません。"
+
+#: pe/ui/showcase.cpp
+msgid "No favorites yet. Add one from Quick settings."
+msgstr "お気に入りはまだありません。クイック設定から追加できます。"
+
+#: pe/ui/quick.cpp
+msgid "Shows the game under Favorites in the Library."
+msgstr "ライブラリのお気に入りにゲームを表示します。"

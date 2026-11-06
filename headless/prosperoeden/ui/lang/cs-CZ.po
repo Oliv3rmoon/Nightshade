@@ -2817,3 +2817,35 @@ msgstr "{0}: {1}. Generování snímků a následné zpracování vypnuto; když
 #: pe/ui/settings.cpp
 msgid "Crash reports (FTP): {0}\nAttach crash-*.txt and its matching logs to your issue."
 msgstr "Zprávy o pádu (FTP): {0}\nK hlášení přiložte crash-*.txt a odpovídající protokoly."
+
+#: pe/ui/showcase.cpp
+msgid "All"
+msgstr "Vše"
+
+#: pe/ui/showcase.cpp
+msgid "Recently played"
+msgstr "Naposledy hrané"
+
+#: pe/ui/showcase.cpp
+msgid "Favorites"
+msgstr "Oblíbené"
+
+#: pe/ui/showcase.cpp
+msgid "Search games"
+msgstr "Hledat hry"
+
+#: pe/ui/quick.cpp
+msgid "Favorite"
+msgstr "Oblíbená"
+
+#: pe/ui/showcase.cpp
+msgid "No games match your search."
+msgstr "Hledání neodpovídá žádná hra."
+
+#: pe/ui/showcase.cpp
+msgid "No favorites yet. Add one from Quick settings."
+msgstr "Zatím žádné oblíbené. Přidej je v Rychlých nastaveních."
+
+#: pe/ui/quick.cpp
+msgid "Shows the game under Favorites in the Library."
+msgstr "Zobrazí hru v Knihovně mezi oblíbenými."

@@ -3807,6 +3807,7 @@ endif()
                 "${launcher_dir}/pe/ui/library.cpp"
                 "${launcher_dir}/pe/ui/settings.cpp"
                 "${launcher_dir}/pe/ui/shell.cpp"
+                "${launcher_dir}/pe/ui/showcase.cpp"
                 "${launcher_dir}/pe/ui/textures.cpp"
                 "${launcher_dir}/pe/ui/theme.cpp"
                 "${launcher_dir}/pe/ui/theme_kit.cpp"

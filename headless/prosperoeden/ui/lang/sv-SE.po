@@ -2817,3 +2817,35 @@ msgstr "{0}: {1}. Bildgenerering och efterbehandling av; ändrar du något av de
 #: pe/ui/settings.cpp
 msgid "Crash reports (FTP): {0}\nAttach crash-*.txt and its matching logs to your issue."
 msgstr "Kraschrapporter (FTP): {0}\nBifoga crash-*.txt och tillhörande loggar till din felrapport."
+
+#: pe/ui/showcase.cpp
+msgid "All"
+msgstr "Alla"
+
+#: pe/ui/showcase.cpp
+msgid "Recently played"
+msgstr "Senast spelade"
+
+#: pe/ui/showcase.cpp
+msgid "Favorites"
+msgstr "Favoriter"
+
+#: pe/ui/showcase.cpp
+msgid "Search games"
+msgstr "Sök spel"
+
+#: pe/ui/quick.cpp
+msgid "Favorite"
+msgstr "Favorit"
+
+#: pe/ui/showcase.cpp
+msgid "No games match your search."
+msgstr "Inga spel matchar sökningen."
+
+#: pe/ui/showcase.cpp
+msgid "No favorites yet. Add one from Quick settings."
+msgstr "Inga favoriter ännu. Lägg till en från Snabbinställningar."
+
+#: pe/ui/quick.cpp
+msgid "Shows the game under Favorites in the Library."
+msgstr "Visar spelet under Favoriter i Biblioteket."

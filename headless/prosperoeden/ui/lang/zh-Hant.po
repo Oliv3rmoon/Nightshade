@@ -2817,3 +2817,35 @@ msgstr "{0}：{1}。幀生成和後期處理已關閉；變更其中任何一項
 #: pe/ui/settings.cpp
 msgid "Crash reports (FTP): {0}\nAttach crash-*.txt and its matching logs to your issue."
 msgstr "當機報告 (FTP)：{0}\n請在問題回報中附上 crash-*.txt 和對應的記錄。"
+
+#: pe/ui/showcase.cpp
+msgid "All"
+msgstr "全部"
+
+#: pe/ui/showcase.cpp
+msgid "Recently played"
+msgstr "最近遊玩"
+
+#: pe/ui/showcase.cpp
+msgid "Favorites"
+msgstr "收藏"
+
+#: pe/ui/showcase.cpp
+msgid "Search games"
+msgstr "搜尋遊戲"
+
+#: pe/ui/quick.cpp
+msgid "Favorite"
+msgstr "收藏"
+
+#: pe/ui/showcase.cpp
+msgid "No games match your search."
+msgstr "沒有符合搜尋的遊戲。"
+
+#: pe/ui/showcase.cpp
+msgid "No favorites yet. Add one from Quick settings."
+msgstr "還沒有收藏。可在快速設定中新增。"
+
+#: pe/ui/quick.cpp
+msgid "Shows the game under Favorites in the Library."
+msgstr "在遊戲庫的收藏中顯示此遊戲。"

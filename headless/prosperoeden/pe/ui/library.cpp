@@ -160,6 +160,8 @@ void Launcher::apply_games(std::vector<Game> games)
         refresh_selected_game();
         mode_.snap(selected_docked_ ? 0.0f : 1.0f);
     }
+    if (th().showcase)
+        filter_library();
     name_home_games();
 }
 
@@ -238,6 +240,11 @@ bool Launcher::drop_missing_games()
             index = i;
     library_.reset(static_cast<int>(games_.size()), index);
     refresh_selected_game();
+    if (th().showcase)
+    {
+        filter_library();
+        collect_shelf();
+    }
     return true;
 }
 
@@ -315,6 +322,22 @@ void Launcher::enter_library()
         finish_scan(true);
     }
     library_.wrap = false;
+    if (th().showcase)
+    {
+        // Nightshade's Library opens on the game the home screen shows, within its filter and search.
+        library_.count = static_cast<int>(games_.size());
+        library_header_ = -1;
+        filter_library();
+        if (!library_view_.empty())
+        {
+            library_.selected = library_view_[static_cast<std::size_t>(library_pos_)];
+            refresh_selected_game();
+        }
+        sync_grid(true);
+        detail_.snap(1.0f);
+        mode_.snap(selected_docked_ ? 0.0f : 1.0f);
+        return;
+    }
     library_.reset(static_cast<int>(games_.size()), 0);
     refresh_selected_game();
     sync_grid(true);
@@ -336,11 +359,14 @@ void Launcher::refresh_selected_game()
     selected_read_ = false;
     selected_changes_ = 0;
     selected_session_.clear();
+    selected_refresh_ = -1;
     sync_grid(false);
 }
 
 void Launcher::sync_grid(bool snap)
 {
+    if (th().showcase)
+        return sync_showcase_grid(snap);
     const int count = static_cast<int>(games_.size());
     const int rows = (count + kColumns - 1) / kColumns;
     const int row = count > 0 ? library_.selected / kColumns : 0;
@@ -375,6 +401,7 @@ void Launcher::read_selected_details()
     const GameSettings own = services_.game_settings(game.title_id);
     selected_changes_ = changes_of(own);
     selected_session_ = session_line(own, selected_docked_);
+    selected_refresh_ = own.refresh;
 }
 
 void Launcher::press_library(Key key)
@@ -1027,15 +1054,17 @@ void Launcher::draw_game_page(Canvas &c, float open)
     const Game &game = games_[static_cast<std::size_t>(library_.selected)];
     const float pane = tween::clamp01(pane_.value);
     list.push_opacity(open);
-    // Its own ground over the Library: the artwork again, further back.
+    // Its own ground over the Library: the artwork again, further back (Nightshade's: the game's).
     list.rounded_rect({0.0f, 0.0f, 1920.0f, 1080.0f}, 0.0f, t.base);
-    if (!look().high_contrast && textures_.backdrop() != 0)
+    if (t.showcase)
+        draw_showcase_art(c, 0.5f);
+    else if (!look().high_contrast && textures_.backdrop() != 0)
         list.image(textures_.backdrop(), c.backdrop.picture(textures_), {0.0f, 0.0f, 1.0f, 1.0f}, Color{1.0f, 1.0f, 1.0f, 0.22f});
     list.hgradient_rect({0.0f, 0.0f, 1920.0f, 1080.0f}, 0.0f, t.base.with_alpha(0.55f), t.base.with_alpha(0.25f));
     list.push_transform(1.0f, 0.0f, 0.0f, (1.0f - open) * 48.0f * motion(), 0.0f);
 
     // ---- which game, and how much it has of its own ----
-    const float hdr = t.top_nav ? 96.0f : 36.0f;
+    const float hdr = t.showcase ? 44.0f : t.top_nav ? 96.0f : 36.0f;
     cover(c, game.cover, {layout::kLeft, hdr, 84.0f, 84.0f}, 20.0f, 0.6f);
     kicker(c, tr("Game settings"), layout::kLeft + 108.0f, baseline(hdr + 2.0f, 28.0f, t.size_small), t.accent, 900.0f);
     const float clock = text_width(c, clock_, t.size_heading) + 28.0f;
@@ -1054,6 +1083,10 @@ void Launcher::draw_game_page(Canvas &c, float open)
     const Rect kinds{kKinds.x, kKinds.y + shift, kKinds.w, kKinds.h - shift};
     const Rect middle{kMiddle.x, kMiddle.y + shift, kMiddle.w, kMiddle.h - shift};
     const Rect explain{kExplain.x, kExplain.y + shift, kExplain.w, kExplain.h - shift};
+    // Nightshade's: the kinds on a panel of their own, as its other columns are.
+    if (t.showcase)
+        glass(c, {kinds.x - 14.0f, kinds.y - 14.0f, kinds.w + 28.0f, kinds.h + 4.0f}, t.radius_panel,
+              t.panel.with_alpha(0.72f), t.panel_edge.with_alpha(0.40f), 0.6f);
     const int rows = game_rows_.count;
     const int chosen = std::clamp(game_rows_.selected, 0, std::max(0, rows - 1));
     const int kind = game_row(chosen);
@@ -1133,7 +1166,13 @@ void Launcher::draw_game_page(Canvas &c, float open)
     // ---- hints ----
     const float cy = layout::kFooter;
     const auto hints = [&](const Hint *list_of, int count)
-    { draw_menu_hints(c, list_of, count, layout::kLeft, cy, t.copy, layout::kWidth); };
+    {
+        // Nightshade's hints are at the bottom right, as on its other screens.
+        if (t.showcase)
+            draw_footer(c, list_of, count);
+        else
+            draw_menu_hints(c, list_of, count, layout::kLeft, cy, t.copy, layout::kWidth);
+    };
     if (modal_shown_ == Modal::mods)
     {
         if (mods_.empty())

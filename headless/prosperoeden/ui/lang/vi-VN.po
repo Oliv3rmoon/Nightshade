@@ -2817,3 +2817,35 @@ msgstr "{0}: {1}. Tắt tạo khung hình và hậu kỳ; đổi một trong s�
 #: pe/ui/settings.cpp
 msgid "Crash reports (FTP): {0}\nAttach crash-*.txt and its matching logs to your issue."
 msgstr "Báo cáo sự cố (FTP): {0}\nĐính kèm crash-*.txt và nhật ký tương ứng vào báo cáo lỗi."
+
+#: pe/ui/showcase.cpp
+msgid "All"
+msgstr "Tất cả"
+
+#: pe/ui/showcase.cpp
+msgid "Recently played"
+msgstr "Đã chơi gần đây"
+
+#: pe/ui/showcase.cpp
+msgid "Favorites"
+msgstr "Yêu thích"
+
+#: pe/ui/showcase.cpp
+msgid "Search games"
+msgstr "Tìm trò chơi"
+
+#: pe/ui/quick.cpp
+msgid "Favorite"
+msgstr "Yêu thích"
+
+#: pe/ui/showcase.cpp
+msgid "No games match your search."
+msgstr "Không có trò chơi nào khớp với tìm kiếm."
+
+#: pe/ui/showcase.cpp
+msgid "No favorites yet. Add one from Quick settings."
+msgstr "Chưa có mục yêu thích. Thêm từ Cài đặt nhanh."
+
+#: pe/ui/quick.cpp
+msgid "Shows the game under Favorites in the Library."
+msgstr "Hiển thị trò chơi trong mục Yêu thích của Thư viện."

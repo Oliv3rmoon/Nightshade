@@ -2817,3 +2817,35 @@ msgstr "{0}: {1}. Framegenerering og efterbehandling slået fra; ændrer du en a
 #: pe/ui/settings.cpp
 msgid "Crash reports (FTP): {0}\nAttach crash-*.txt and its matching logs to your issue."
 msgstr "Fejlrapporter (FTP): {0}\nVedhæft crash-*.txt og de tilhørende logfiler til din fejlrapport."
+
+#: pe/ui/showcase.cpp
+msgid "All"
+msgstr "Alle"
+
+#: pe/ui/showcase.cpp
+msgid "Recently played"
+msgstr "Senest spillet"
+
+#: pe/ui/showcase.cpp
+msgid "Favorites"
+msgstr "Favoritter"
+
+#: pe/ui/showcase.cpp
+msgid "Search games"
+msgstr "Søg i spil"
+
+#: pe/ui/quick.cpp
+msgid "Favorite"
+msgstr "Favorit"
+
+#: pe/ui/showcase.cpp
+msgid "No games match your search."
+msgstr "Ingen spil matcher din søgning."
+
+#: pe/ui/showcase.cpp
+msgid "No favorites yet. Add one from Quick settings."
+msgstr "Ingen favoritter endnu. Tilføj en fra Hurtige indstillinger."
+
+#: pe/ui/quick.cpp
+msgid "Shows the game under Favorites in the Library."
+msgstr "Viser spillet under Favoritter i Bibliotek."
