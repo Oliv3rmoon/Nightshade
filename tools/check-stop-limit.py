@@ -19,10 +19,10 @@ root = pathlib.Path(__file__).resolve().parents[1]
 main = (root / 'headless/main.cpp').read_text()
 assert main.count('Eden::StopLimit::Begin();') == 3, 'the shortcut (while loading and in the game) and the stop path arm the limit'
 # While the game loads: the limit is armed at the press, and the session then ends at once.
-loading = main.index('if (pad->TakeReturnToMenu() || asked) {')
+loading = main.index('if (shortcut_held || asked) {')
 assert main.index('Eden::StopLimit::Begin();', loading) < main.index('left_while_loading = true;', loading) < main.index('loaded = system.Load(')
 assert main.index('system.Run();') < main.index('load_watch.request_stop();') < main.index('if (left_while_loading) {') < main.index('std::jthread input_worker;')
-shortcut = main.index('if (pad->TakeReturnToMenu() || room_lost) {')
+shortcut = main.index('if (shortcut_held || room_lost) {')
 assert main.index('room_lost = rooms.GameConnectionLost();') < shortcut
 assert main.index('Eden::StopLimit::Begin();', shortcut) < main.index('completion->return_to_menu = true;', shortcut)
 stop = main.index('Eden::StopLimit::Begin();', shortcut + 200)

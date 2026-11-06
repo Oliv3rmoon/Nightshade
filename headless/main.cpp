@@ -45,6 +45,7 @@
 #include "display_refresh.h"
 #include "guest_clock.h"
 #include "log_flusher.h"
+#include "log_stamp.h"
 #include "multiplayer_logging.h"
 #include "mods.h"
 #include "loose_addons.h"
@@ -379,6 +380,16 @@ int main(int argc, char** argv) {
         // unless Settings > Diagnostics asks for every line at once (to find a crash).
         static Eden::LogFlusher log_flusher;
         if (!log_flusher.Start(Eden::LoadPreferences().immediate_logs)) return 2;
+        // The first line of both logs, once the flusher has set their buffers (which comes before
+        // anything is written to them): the version, when this start of the app began (UTC) and an
+        // ID of its own, so that two starts run together in one copied file show (log_stamp.h).
+        {
+            char started[Eden::LogStamp::kUtcSize];
+            Eden::LogStamp::Utc(started);
+            for (std::FILE* stream : {stderr, stdout})
+                std::fprintf(stream, "EDEN_LOG_START version=%s started_utc=%s session=%s\n", Eden::kAppVersion,
+                             started, Eden::LogStamp::SessionId());
+        }
         // A crash report says which build it came from: this one is not an official release.
         static const std::string crash_version = std::string{Eden::kAppVersion} + " (Nightshade)";
         Eden::Crash::Install(Eden::LogsDir(), crash_version.c_str(), last_crash.restarted);
@@ -1704,6 +1715,11 @@ int main(int argc, char** argv) {
                     bool exited = false;
                     bool captured = false;
                     bool return_to_menu = false;
+                    // Why return_to_menu was set (EDEN_SESSION_END), and the hold of Touchpad + L1
+                    // when it was that.
+                    const char* leave = nullptr;
+                    bool held = false;
+                    Eden::Pad::ReturnToMenuPress press{};
                     bool room_lost = false;
                     bool stream_lost = false; // a game played where it lies: its source failed for good
                     std::exception_ptr failure;
@@ -1793,6 +1809,10 @@ int main(int argc, char** argv) {
                 // load that finishes within it ends as a normal stop, one that does not ends with
                 // the app starting again at the launcher.
                 std::atomic<bool> left_while_loading{false};
+                // How, for EDEN_SESSION_END; set before left_while_loading.
+                const char* left_how = nullptr;
+                bool left_held = false;
+                Eden::Pad::ReturnToMenuPress left_press{};
                 std::stop_source shader_cache_stop;
                 std::jthread load_watch;
                 if (pad && game) load_watch = std::jthread([&](std::stop_token stop) {
@@ -1806,7 +1826,11 @@ int main(int argc, char** argv) {
 #else
                         const bool asked = false;
 #endif
-                        if (pad->TakeReturnToMenu() || asked) {
+                        const bool shortcut_held = pad->TakeReturnToMenu();
+                        if (shortcut_held || asked) {
+                            left_held = shortcut_held;
+                            if (shortcut_held) left_press = pad->LastReturnToMenu();
+                            left_how = shortcut_held ? "shortcut_while_loading" : "development_leave_loading";
                             Eden::Report("exit", "Touchpad + L1 while the game loads: leaving as soon as it can be stopped");
                             Eden::Ncz::SetUnpackAllowed(false);  // an NSZ being unpacked stops (ncz_vfs.h)
                             Eden::StopLimit::Begin();
@@ -2074,6 +2098,9 @@ int main(int argc, char** argv) {
                 if (left_while_loading) {
                     std::lock_guard lock(completion->mutex);
                     completion->return_to_menu = true;
+                    completion->leave = left_how;
+                    completion->held = left_held;
+                    completion->press = left_press;
                 }
 #endif
                 const auto session_start = std::chrono::steady_clock::now();
@@ -2195,12 +2222,18 @@ int main(int argc, char** argv) {
 #ifdef PS5_NATIVE
                         room_lost = rooms.GameConnectionLost();
 #endif
-                        if (pad->TakeReturnToMenu() || room_lost) {
+                        const bool shortcut_held = pad->TakeReturnToMenu();
+                        if (shortcut_held || room_lost) {
                             // From here the player is waiting to leave (stop_limit.h).
                             Eden::StopLimit::Begin();
                             std::lock_guard lock(completion->mutex);
                             completion->return_to_menu = true;
                             completion->room_lost = room_lost;
+                            if (!completion->leave) {
+                                completion->leave = shortcut_held ? "shortcut_return_to_menu" : "room_lost";
+                                completion->held = shortcut_held;
+                                if (shortcut_held) completion->press = pad->LastReturnToMenu();
+                            }
                             completion->wake.notify_one();
                             break;
                         }
@@ -2299,6 +2332,7 @@ int main(int argc, char** argv) {
                             if (completion->wake.wait_for(lock, std::chrono::seconds(5), completed)) break;
                             if (sample == observation_samples - 1) {
                                 completion->return_to_menu = true;
+                                if (!completion->leave) completion->leave = "development_observation_limit";
                                 break;
                             }
                             lock.unlock();
@@ -2324,6 +2358,41 @@ int main(int argc, char** argv) {
                         launch_error = "The room connection was lost. Rejoin from Multiplayer before launching again.";
 #endif
                     session_seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - session_start).count();
+                    {
+                        // Why the session stopped, in one line (the stage below names fewer reasons:
+                        // every return to the menu was shortcut_return_to_menu there). For a hold of
+                        // Touchpad + L1: how long, by which player, the touch and the buttons down.
+                        const char* reason = completion->return_to_menu
+                            ? (completion->leave ? completion->leave : "return_to_menu")
+                            : guest_exited ? "guest_exit"
+                            : !completion->guest_fault.empty() ? "guest_fault"
+                            : completion->failure ? "gpu_failure"
+                            : completion->stream_lost ? "stream_lost"
+                            : completion->captured ? "game_capture_shutdown" : "game_observation_complete";
+                        char utc[Eden::LogStamp::kUtcSize];
+                        Eden::LogStamp::Utc(utc);
+                        char line[512];
+                        const int at = std::snprintf(line, sizeof(line), "EDEN_SESSION_END reason=%s seconds=%.1f utc=%s",
+                                                     reason, session_seconds, utc);
+                        if (completion->held && at > 0 && at < int(sizeof(line))) {
+                            // As the controller sent it (Pad::ReturnToMenuPress), so that a press
+                            // nobody made shows what it was made of.
+                            const auto& press = completion->press;
+                            std::snprintf(line + at, sizeof(line) - at,
+                                          " held_ms=%lld player=%zu samples=%u buttons=0x%08x first_buttons=0x%08x "
+                                          "touches=%u x=%d y=%d id=%d click_touches=%u click_x=%d width=%u "
+                                          "timestamp_us=%llu",
+                                          press.held_ms, press.player + 1, press.samples,
+                                          static_cast<unsigned>(press.buttons), static_cast<unsigned>(press.first_buttons),
+                                          press.touches, press.x, press.y, press.id, press.click_touches, press.click_x,
+                                          press.width, static_cast<unsigned long long>(press.timestamp_us));
+                        }
+                        std::fprintf(stderr, "%s\n", line);
+#ifdef PS5_NATIVE
+                        // Beside the stages in heap.log (the host's stdout holds only the stages).
+                        std::printf("%s\n", line);
+#endif
+                    }
                     if (!guest_exited && !game) {
                         std::fputs("Guest exit timed out\n", stderr);
                         return 1;

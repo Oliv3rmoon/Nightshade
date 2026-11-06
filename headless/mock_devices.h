@@ -19,6 +19,7 @@ struct State {
     int user_init_result = 0, user_result = 0, pad_open_result = 7, read_result = 0;
     int foreground_user = 84, last_pad_user = -1;
     int user_terminations = 0, pad_closes = 0, pad_opens = 0;
+    int controller_info_result = 0;  // not 0: no controller information (touchpad width 0)
     std::vector<ps5::pad::Vibration> vibrations;
     std::vector<std::pair<int, int>> vibration_modes;
     int vibration_mode_1_result = 0;

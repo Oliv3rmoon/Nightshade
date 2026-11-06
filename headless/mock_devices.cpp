@@ -103,7 +103,9 @@ int scePadOpen(int user, int type, int index, const void*) {
 }
 int scePadGetHandle(int, int, int) { return -1; }
 int scePadGetControllerInformation(int, ps5::pad::ControllerInformation* info) {
-    *info = {}; info->touchpad.resolution_x = 1920; return 0;
+    *info = {};
+    if (state.controller_info_result != 0) return state.controller_info_result;
+    info->touchpad.resolution_x = 1920; return 0;
 }
 int scePadClose(int) { ++state.pad_closes; return 0; }
 int scePadSetVibrationMode(int handle, int mode) {

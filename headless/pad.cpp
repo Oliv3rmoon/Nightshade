@@ -2,6 +2,7 @@
 #include "devices.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <numbers>
 #include <stdexcept>
 #include "common/input.h"
@@ -388,6 +389,35 @@ bool Pad::Poll() {
     }
     return primary;
 }
+// Touchpad + L1 going down and up, as the controller sent them, in stderr.log beside the line that
+// says why a game stopped (main.cpp, EDEN_SESSION_END): a game once ended at a press its player
+// says nobody made. down: the first sample's buttons and touch, the click that latched the side,
+// and whether it counts (one finger on the left half). up: how long, in how many samples, whether
+// it ended the game, and the sample that ended it as read (its buttons, with the system's
+// interception bit, and whether the controller was connected). The first kChordLines of a
+// session, so that something stuck pressing them cannot fill the log.
+void Pad::ChordLine(const Slot& slot, bool down, bool counts, long long held_ms, const ps5::pad::Data& raw) {
+    constexpr unsigned kChordLines = 64;
+    if (chord_lines > kChordLines) return;
+    if (chord_lines++ == kChordLines) {
+        std::fprintf(stderr, "EDEN_PAD_MENU_CHORD more holds are not logged this session\n");
+        return;
+    }
+    const auto& held = slot.chord;
+    if (down)
+        std::fprintf(stderr,
+                     "EDEN_PAD_MENU_CHORD player=%zu down buttons=0x%08x touches=%u x=%d y=%d id=%d "
+                     "click_touches=%u click_x=%d width=%u counts=%d\n",
+                     held.player + 1, static_cast<unsigned>(held.first_buttons), held.touches, held.x, held.y,
+                     held.id, held.click_touches, held.click_x, held.width, counts ? 1 : 0);
+    else
+        std::fprintf(stderr,
+                     "EDEN_PAD_MENU_CHORD player=%zu up held_ms=%lld samples=%u counts=%d fired=%d "
+                     "last_buttons=0x%08x ended_by=0x%08x connected=%d\n",
+                     held.player + 1, held_ms, held.samples, counts ? 1 : 0, slot.menu_fired ? 1 : 0,
+                     static_cast<unsigned>(held.buttons), static_cast<unsigned>(raw.buttons),
+                     static_cast<int>(raw.connected));
+}
 void Pad::Consume(std::size_t player, std::span<const ps5::pad::Data> samples) {
     using namespace ps5::pad;
     using Button = InputCommon::VirtualGamepad::VirtualButton;
@@ -445,6 +475,9 @@ void Pad::Consume(std::size_t player, std::span<const ps5::pad::Data> samples) {
     // Player 1's states go to the recording before the substitutions below take them for usable
     // or not (gameplay_test.h): replaying puts them back through the same substitutions.
     const bool recording = player == 0 && GameplayTest::Recording();
+    // A hold of Touchpad + L1 is timed on the clock, not counted in samples: a poll can read none
+    // while both stay down. Every sample of this poll counts as read now.
+    const auto now = clock();
     for (const auto& raw : samples) {
         if (recording) GameplayTest::Record(raw);
         auto sample = is_usable(raw) ? raw : neutral_data(raw.timestamp_us);
@@ -456,17 +489,48 @@ void Pad::Consume(std::size_t player, std::span<const ps5::pad::Data> samples) {
             slot.touch_chord = false;
             slot.touch_polls = 0;
             slot.select_pulse = 0;
-            slot.touch_right = slot.touch_width > 0 && sample.touch.count == 1 &&
-                sample.touch.points[0].x < slot.touch_width &&
-                sample.touch.points[0].x >= slot.touch_width / 2;
+            // One finger says the half. A click with no point or two is neither: as a game
+            // button it is the left half's (the configured touchpad mapping), as a shortcut nothing.
+            const bool one = slot.touch_width > 0 && sample.touch.count == 1 &&
+                sample.touch.points[0].x < slot.touch_width;
+            slot.touch_right = one && sample.touch.points[0].x >= slot.touch_width / 2;
+            slot.touch_left = one && sample.touch.points[0].x < slot.touch_width / 2;
+            slot.click_touches = sample.touch.count;
+            slot.click_x = sample.touch.count > 0 ? static_cast<int>(sample.touch.points[0].x) : -1;
         }
         // Only the Select (left) side owns shortcuts; the right side remains game input.
         constexpr ButtonMask menu_chord = kButtonTouchPad | kButtonL1;
         constexpr ButtonMask hud_chord = kButtonTouchPad | kButtonR1;
-        const bool menu = !slot.touch_right && (pressed & menu_chord) == menu_chord;
+        const bool chord = (pressed & menu_chord) == menu_chord;
+        const bool menu = slot.touch_left && chord;
         const bool hud = !slot.touch_right && (pressed & hud_chord) == hud_chord;
-        if (menu && (last_buttons & menu_chord) != menu_chord)
-            return_to_menu = true;
+        // Touchpad + L1 ends the game once held for kReturnToMenuHold with the click latched left
+        // (below, once per poll); letting go of either starts the time again. Every hold of the
+        // two is followed, whatever the click, and said in stderr.log (ChordLine).
+        if (chord) {
+            auto& held = slot.chord;
+            if (!slot.chord_held) {
+                slot.chord_held = true;
+                slot.menu_fired = false;
+                slot.chord_since = now;
+                held = {.player = player, .first_buttons = pressed, .click_touches = slot.click_touches,
+                        .click_x = slot.click_x, .width = slot.touch_width};
+            }
+            const auto& touch_data = sample.touch;
+            const bool point = touch_data.count > 0;
+            ++held.samples;
+            held.buttons = pressed;
+            held.touches = touch_data.count;
+            held.x = point ? static_cast<int>(touch_data.points[0].x) : -1;
+            held.y = point ? static_cast<int>(touch_data.points[0].y) : -1;
+            held.id = point ? static_cast<int>(touch_data.points[0].id) : -1;
+            held.timestamp_us = sample.timestamp_us;
+            if (held.samples == 1) ChordLine(slot, true, menu, 0, raw);
+        } else if (slot.chord_held) {
+            slot.chord_held = false;
+            ChordLine(slot, false, slot.touch_left,
+                      std::chrono::duration_cast<std::chrono::milliseconds>(now - slot.chord_since).count(), raw);
+        }
         if (hud && (last_buttons & hud_chord) != hud_chord)
             hud_toggle = true;
         if (menu || hud)
@@ -593,7 +657,15 @@ void Pad::Consume(std::size_t player, std::span<const ps5::pad::Data> samples) {
             }
         }
     }
-    // Once per poll: a touchpad held long enough becomes a held press, and a tap's press runs out.
+    // Once per poll: Touchpad + L1 held long enough ends the game, once for each hold...
+    if (slot.chord_held && slot.touch_left && !slot.menu_fired && now - slot.chord_since >= kReturnToMenuHold) {
+        slot.menu_fired = true;
+        last_return_to_menu = slot.chord;
+        last_return_to_menu.held_ms =
+            std::chrono::duration_cast<std::chrono::milliseconds>(now - slot.chord_since).count();
+        return_to_menu = true;
+    }
+    // ...a touchpad held long enough becomes a held press, and a tap's press runs out.
     if ((last_buttons & kButtonTouchPad) != 0 && !slot.touch_chord && !slot.select_held &&
         ++slot.touch_polls >= kSelectHoldPolls)
         slot.select_held = true;

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "performance.h"
 #include "crash_report.h"
+#include "log_stamp.h"
 #include "stall_watchdog.h"
 #include "../src/fastmem.h"
 #include "common/cpu_features.h"
@@ -978,11 +979,13 @@ void ReportMemory() {
     const std::size_t hole_bytes = eden_heap_hole_usage ? eden_heap_hole_usage(&holes) : 0;
     const auto used = graphics_memory_used.load(std::memory_order_acquire);
     const auto caches = graphics_caches_free.load(std::memory_order_relaxed);
-    std::printf("EDEN_MEMORY guest=%zuMiB heap=%zuMiB large=%zuMiB/%u tables=%zuMiB graphics=%lluMiB "
+    char utc[LogStamp::kUtcSize];  // the time, to tell logs run together apart (log_stamp.h)
+    LogStamp::Utc(utc);
+    std::printf("EDEN_MEMORY utc=%s guest=%zuMiB heap=%zuMiB large=%zuMiB/%u tables=%zuMiB graphics=%lluMiB "
                 "free=%lluMiB largest_free=%zuMiB short=%d waits_won=%llu waits_lost=%llu refused=%llu "
                 "reserve=%zuMiB/%zuMiB heap_used=%zuMiB heap_returned=%zuMiB heap_arenas=%zuMiB/%u "
                 "heap_holes=%zuMiB graphics_used=%lluMiB caches_free=%lluMiB caches_short=%d\n",
-                guest >> 20, (eden_heap_committed ? eden_heap_committed() : std::size_t{0}) >> 20, large >> 20,
+                utc, guest >> 20, (eden_heap_committed ? eden_heap_committed() : std::size_t{0}) >> 20, large >> 20,
                 large_blocks, tables >> 20, held ? held() >> 20 : 0ULL, free_bytes >> 20, largest >> 20,
                 int(graphics_memory_short.load(std::memory_order_relaxed)), won, lost, refused, reserve >> 20,
                 reserve_target >> 20, heap_used >> 20, heap_returned >> 20, arena_bytes >> 20, arenas,

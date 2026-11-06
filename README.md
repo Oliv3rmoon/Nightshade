@@ -114,7 +114,7 @@ Test releases are marked **Pre-release** on the [Releases page](https://github.c
 - **v1.011.x: Nightshade as its own app.** It runs under its own title ID, `PPSA64448`, with its own data folder, `/data/nightshade`, beside the official app instead of in its place. v1.011.002 has everything in v1.010.006. An earlier install moves over by itself: the old tile turns into a bridge that installs the new app, and the first start asks once whether to **Move** your data, **Copy** it or **Start fresh**. Nothing in `/data/prosperoeden` is ever deleted. See the notes of [v1.011.000](https://github.com/Oliv3rmoon/Nightshade/releases/tag/v1.011.000).
 - **v1.012.x: Switch 2 games, experimental.** These builds sit on Takoroka's [eden-nx2](https://git.eden-emu.dev/Takoroka/eden-nx2), the newer emulator core with experimental Switch 2 support. A Switch 2 game is a game folder with its ExeFS and RomFS, dumped from your own game. No Switch 2 game has been run on a PS5 yet, and Switch 1 games have not been played on the newer core on a console either. See the notes of [v1.012.000](https://github.com/Oliv3rmoon/Nightshade/releases/tag/v1.012.000).
 
-**Sending logs.** Play once with the settings as they are, quit with Touchpad + L1, then send `/data/nightshade/logs` (`eden_log.txt`, `stderr.log` and any crash report), or `/data/prosperoeden/logs` on v1.010 and earlier. Add the game's name and title ID, the Nightshade version, and how the same game went on the version before. For a big game, start it twice: the `EDEN_SHADER_START` and `heap:` lines in `stderr.log` say where the start's time and memory went. Post it as an issue here or in [nightly on Discord](https://discord.gg/pSqgRU3YP9).
+**Sending logs.** Play once with the settings as they are, quit by holding Touchpad (left half) + L1 for a second, then send `/data/nightshade/logs` (`eden_log.txt`, `stderr.log` and any crash report), or `/data/prosperoeden/logs` on v1.010 and earlier. Add the game's name and title ID, the Nightshade version, and how the same game went on the version before. For a big game, start it twice: the `EDEN_SHADER_START` and `heap:` lines in `stderr.log` say where the start's time and memory went. Post it as an issue here or in [nightly on Discord](https://discord.gg/pSqgRU3YP9).
 
 ## Guides and docs
 
@@ -140,12 +140,12 @@ Reading this from a release ZIP? The guides are at <https://github.com/Oliv3rmoo
 
 ### In-game shortcuts
 
-The touchpad is pressed as a button: its left half is Minus and its right half is Plus (or whatever your [button mapping](docs/SETTINGS.md#button-mapping) says). Touchpad + L1/R1 shortcuts work from either half and never reach the game.
+The touchpad is pressed as a button: its left half is Minus and its right half is Plus (or whatever your [button mapping](docs/SETTINGS.md#button-mapping) says). The shortcuts take its left half and never reach the game. Ending the game takes one finger on the left half and a hold of a second, so a brief press of both by accident no longer ends it.
 
 | Shortcut | Action |
 |---|---|
-| Touchpad + R1 | Toggle the performance HUD |
-| Touchpad + L1 | End the running game and return to the library |
+| Touchpad (left half) + R1 | Toggle the performance HUD |
+| Hold Touchpad (left half) + L1 for a second | End the running game and return to the library |
 
 ## Support and reports
 

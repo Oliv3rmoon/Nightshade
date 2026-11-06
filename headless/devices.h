@@ -4,6 +4,7 @@
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <span>
@@ -76,7 +77,34 @@ public:
     Pad& operator=(const Pad&) = delete;
     bool Open();
     bool Poll();
+    // Touchpad + L1 ends the game only once held this long, with the touchpad clicked on its left
+    // half by one finger. It used to end it at the first 4 ms sample with both down, a click with
+    // no finger counting as the left half, and a tester's Tears of the Kingdom session ended at it
+    // in the game's throw menu, though she says she was pressing neither.
+    static constexpr std::chrono::milliseconds kReturnToMenuHold{1000};
+    // The hold that ended the game, as the controller sent it, for the log (EDEN_SESSION_END):
+    // so that a press nobody made shows what it was made of.
+    struct ReturnToMenuPress {
+        std::size_t player = 0;   // 0 is player 1
+        long long held_ms = 0;
+        unsigned samples = 0;     // samples read with both down
+        u32 first_buttons = 0;    // the buttons down in its first sample (ps5_pad.hpp's masks)
+        u32 buttons = 0;          // and in its last
+        // The last sample's touch points, and its first point's x, y and id (-1 with none).
+        unsigned touches = 0;
+        int x = -1, y = -1, id = -1;
+        // The click that latched the side: its touch points and its first point's x.
+        unsigned click_touches = 0;
+        int click_x = -1;
+        unsigned width = 0;       // the touchpad's width in the units of x, 0 when unknown
+        u64 timestamp_us = 0;     // the last sample's
+    };
     bool TakeReturnToMenu() { return return_to_menu.exchange(false); }
+    // The hold behind the last TakeReturnToMenu that said true, read on the thread that polls.
+    ReturnToMenuPress LastReturnToMenu() const { return last_return_to_menu; }
+    // The clock a hold is timed on: the steady clock, or a check's own.
+    using Clock = std::chrono::steady_clock;
+    void SetClock(std::function<Clock::time_point()> now) { clock = std::move(now); }
     bool TakeHudToggle() { return hud_toggle.exchange(false); }
     // Players with a controller (bit per player), and those whose controller came or went.
     unsigned ConnectedPlayers() const { return connected_players.load(); }
@@ -115,6 +143,17 @@ private:
         unsigned select_pulse = 0; // polls left of a tap's press
         unsigned touch_width = 0; // no coordinates: retain the configured touchpad mapping
         bool touch_right = false; // latched when clicked, until the release pulse ends
+        // Latched when clicked too: one touch point, on the left half. Only such a click owns
+        // Touchpad + L1; a click with no point or two is neither half.
+        bool touch_left = false;
+        unsigned click_touches = 0; // what that click had
+        int click_x = -1;
+        // Touchpad + L1 both down (from any click; only one latched left ends the game): since
+        // when, whether this hold ended the game already, and what it was made of.
+        bool chord_held = false;
+        bool menu_fired = false;
+        Clock::time_point chord_since{};
+        ReturnToMenuPress chord{};
         unsigned errors_in_a_row = 0; // reads that failed since the last one that worked
         unsigned polls_to_reopen = 0; // failed polls left before the handle is opened again
         unsigned reopens = 0;         // since the last read that worked
@@ -123,6 +162,7 @@ private:
         bool stale = false;
     };
     void Rescan();
+    void ChordLine(const Slot& slot, bool down, bool counts, long long held_ms, const ps5::pad::Data& raw);
     void OpenSlot(std::size_t player, int user);
     void ReopenSlot(std::size_t player);
     void CloseSlot(std::size_t player);
@@ -134,6 +174,9 @@ private:
     std::array<std::atomic<Grip>, kMaxPlayers> grips{};
     bool owns_user_service = false;
     std::atomic<bool> return_to_menu = false;
+    ReturnToMenuPress last_return_to_menu{};
+    std::function<Clock::time_point()> clock = [] { return Clock::now(); };
+    unsigned chord_lines = 0;  // EDEN_PAD_MENU_CHORD lines printed (pad.cpp)
     std::atomic<bool> hud_toggle = false;
     std::atomic<unsigned> connected_players = 0;
     std::atomic<unsigned> connection_changes = 0;

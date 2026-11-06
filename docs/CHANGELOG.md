@@ -2,6 +2,10 @@
 
 What changed in each release of ProsperoEden, newest first. A release's notes on GitHub are its section here.
 
+## Unreleased
+
+- **Ending a game takes a hold of Touchpad + L1 for a second,** with one finger on the touchpad's left half; letting go of either starts the second again, and a click with no finger or two on it is not the shortcut. A single 4 ms sample of both used to end the game, and a click with no finger on the touchpad counted as its left half: a tester's Tears of the Kingdom session ended at the shortcut in the throw menu, though she says she was pressing neither. The logs now say why a game stopped (`EDEN_SESSION_END reason=`, with the hold's length and its buttons and touch as the controller sent them when it was the shortcut), `stderr.log` has a line each time Touchpad + L1 go down and up together (`EDEN_PAD_MENU_CHORD`), `stderr.log` and `heap.log` start with the version, the start time in UTC and an ID of that start (`EDEN_LOG_START`), and the `EDEN_PROGRESS` and `EDEN_MEMORY` lines carry the time (`utc=`), so logs from two starts run together show it.
+
 ## v1.010.012
 
 **The launcher, redrawn, and asynchronous shaders on in Tears of the Kingdom for the frame drops when new areas load.** In two testers' sessions on v1.010.011 the drops (after loading a save, in the desert, on the volcano) came with bursts of new graphics pipelines: 800 and 1,961 built while playing, after the shader cache, up to 96 in 30 seconds. Both had **Asynchronous shaders** off, so each new pipeline held the frame until the driver had built it. Not confirmed on a console yet.

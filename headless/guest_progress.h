@@ -28,9 +28,10 @@
 //   EDEN_STUCK   at once, when a core has stayed in one busy state, a request has been in
 //                progress, or the fault handler busy, for 10 s, and again at 60 s and 300 s. At
 //                60 s it also prints the last service calls (EDEN_IPC_RING, headless/ipc_ring.h).
-//   EDEN_PROGRESS every 30 s: each core's state and how often it changed, the requests finished
-//                by kind (files, GPU, audio, the display, others), the oldest one in progress,
-//                and the guest threads that made many requests and then none for 60 s or more.
+//   EDEN_PROGRESS every 30 s: the time (UTC), each core's state and how often it changed, the
+//                requests finished by kind (files, GPU, audio, the display, others), the oldest
+//                one in progress, and the guest threads that made many requests and then none
+//                for 60 s or more.
 //
 // The next freeze then says which it was: a core stuck in a system call names the call; a request
 // in progress names its service and command; and with none of those, which threads went quiet
@@ -71,6 +72,7 @@
 #include <string_view>
 #include <thread>
 #include "ipc_ring.h"
+#include "log_stamp.h"
 
 extern "C" unsigned eden_guest_fault_busy(long long* since_ns) __attribute__((weak));
 extern "C" std::uintptr_t eden_guest_fault_detail(unsigned* stage, unsigned* slot_state) __attribute__((weak));
@@ -817,8 +819,11 @@ private:
                 continue;
             }
             next_progress = now + Times().progress_ms * 1000000;
-            // EDEN_PROGRESS: cores, finished requests by kind, the oldest one in progress, quiet threads.
-            int at = std::snprintf(line, sizeof(line), "EDEN_PROGRESS cores=");
+            // EDEN_PROGRESS: the time (log_stamp.h), cores, finished requests by kind, the oldest one
+            // in progress, quiet threads.
+            char utc[LogStamp::kUtcSize];
+            LogStamp::Utc(utc);
+            int at = std::snprintf(line, sizeof(line), "EDEN_PROGRESS utc=%s cores=", utc);
             for (std::size_t core = 0; core < kCores && at > 0 && at < int(sizeof(line)); ++core) {
                 const Core& entry = Cores()[core];
                 const std::uint64_t changes = entry.changes.load(std::memory_order_acquire);

@@ -230,7 +230,10 @@ void CheckPad() {
     using namespace ps5::pad;
     Reject([] { Eden::Pad pad(1.0f); });
     {
+        // The clock Touchpad + L1 is held on: this check's own, moved on by hand.
+        Eden::Pad::Clock::time_point now{};
         Eden::Pad pad;
+        pad.SetClock([&] { return now; });
         CHECK(pad.Open()); CHECK(pad.Open()); CHECK(state.pad_opens == 1);
         CHECK(state.last_pad_user == 84); // Foreground user differs from initial login (42).
         CHECK(state.haptic_opens == 1);
@@ -278,11 +281,114 @@ void CheckPad() {
             return true;
         };
         sample.triggers = {};
+        // Touchpad + L1 ends the game once held for a second (Pad::kReturnToMenuHold), with the
+        // touchpad clicked on its left half by one finger; its keys never reach the game.
+        const auto left_finger = [&] {
+            sample.touch = {}; sample.touch.count = 1;
+            sample.touch.points[0].x = 100; sample.touch.points[0].y = 400; sample.touch.points[0].id = 7;
+        };
+        left_finger();
         sample.buttons = kButtonTouchPad | kButtonL1; consume();
+        CHECK(!pad.TakeReturnToMenu()); CHECK(none_pressed());
+        now += 999ms; consume();
+        CHECK(!pad.TakeReturnToMenu()); CHECK(none_pressed());
+        now += 1ms; consume();
         CHECK(pad.TakeReturnToMenu()); CHECK(!pad.TakeReturnToMenu());
         CHECK(none_pressed());
-        consume(); CHECK(!pad.TakeReturnToMenu());
-        sample.buttons = 0; consume();
+        {
+            // What the log says of it (EDEN_SESSION_END): the samples as the controller sent them.
+            const auto press = pad.LastReturnToMenu();
+            CHECK(press.player == 0); CHECK(press.held_ms == 1000); CHECK(press.samples == 3);
+            CHECK(press.first_buttons == (kButtonTouchPad | kButtonL1));
+            CHECK(press.buttons == (kButtonTouchPad | kButtonL1));
+            CHECK(press.touches == 1); CHECK(press.x == 100); CHECK(press.y == 400); CHECK(press.id == 7);
+            CHECK(press.click_touches == 1); CHECK(press.click_x == 100); CHECK(press.width == 1920);
+        }
+        // Once for each hold, however long it goes on.
+        now += 5s; consume(); CHECK(!pad.TakeReturnToMenu()); CHECK(none_pressed());
+        sample.buttons = 0; sample.touch = {}; consume(); CHECK(none_pressed());
+        for (int i = 0; i < 30; ++i) { consume(); CHECK(none_pressed()); }
+        // A short press does nothing, and the next one starts from nothing.
+        left_finger();
+        sample.buttons = kButtonTouchPad | kButtonL1; consume();
+        now += 999ms; consume(); CHECK(!pad.TakeReturnToMenu());
+        sample.buttons = 0; sample.touch = {}; consume(); CHECK(none_pressed());
+        now += 5s; consume(); CHECK(!pad.TakeReturnToMenu());
+        left_finger();
+        sample.buttons = kButtonTouchPad | kButtonL1; consume();
+        now += 999ms; consume(); CHECK(!pad.TakeReturnToMenu());
+        now += 1ms; consume(); CHECK(pad.TakeReturnToMenu());
+        sample.buttons = 0; sample.touch = {}; consume();
+        for (int i = 0; i < 30; ++i) { consume(); CHECK(none_pressed()); }
+        // Letting go of L1 midway starts the second again; so does letting go of the touchpad.
+        left_finger();
+        sample.buttons = kButtonTouchPad | kButtonL1; consume();
+        now += 600ms; consume();
+        sample.buttons = kButtonTouchPad; consume(); CHECK(none_pressed());
+        now += 100ms; consume();
+        sample.buttons = kButtonTouchPad | kButtonL1; consume();
+        now += 600ms; consume(); CHECK(!pad.TakeReturnToMenu());
+        now += 399ms; consume(); CHECK(!pad.TakeReturnToMenu());
+        now += 1ms; consume(); CHECK(pad.TakeReturnToMenu());
+        CHECK(pad.LastReturnToMenu().held_ms == 1000);
+        sample.buttons = 0; sample.touch = {}; consume();
+        for (int i = 0; i < 30; ++i) consume();
+        left_finger();
+        sample.buttons = kButtonTouchPad | kButtonL1; consume();
+        now += 600ms; consume();
+        sample.buttons = kButtonL1; sample.touch = {}; consume();
+        CHECK(pad.Engine().GetButton({}, 6)); CHECK(!pad.Engine().GetButton({}, 11));
+        left_finger();
+        sample.buttons = kButtonTouchPad | kButtonL1; consume();
+        now += 600ms; consume(); CHECK(!pad.TakeReturnToMenu());
+        now += 400ms; consume(); CHECK(pad.TakeReturnToMenu());
+        sample.buttons = 0; sample.touch = {}; consume();
+        for (int i = 0; i < 30; ++i) { consume(); CHECK(none_pressed()); }
+        // A click with two touch points, or none, is neither half: never the shortcut, however
+        // long it is held. Its keys are the game's: L1 its L (6), the touchpad its Minus (11).
+        for (const unsigned points : {2u, 0u}) {
+            sample.touch = {}; sample.touch.count = static_cast<u8>(points);
+            sample.touch.points[0].x = 100; sample.touch.points[1].x = 300;
+            sample.buttons = kButtonTouchPad | kButtonL1; consume();
+            now += 1s; consume(); now += 5s; consume();
+            CHECK(!pad.TakeReturnToMenu());
+            CHECK(pad.Engine().GetButton({}, 6));
+            sample.buttons = 0; sample.touch = {}; consume();
+            CHECK(pad.Engine().GetButton({}, 11)); CHECK(!pad.TakeReturnToMenu());
+            for (int i = 0; i < 30; ++i) consume();
+            CHECK(none_pressed());
+        }
+        // Nothing else is the shortcut, however long it is held with a finger resting on the left
+        // half: not R1 and R2 (Tears of the Kingdom's throw is held on R), not every other button
+        // at once, under the usual mapping or one that puts the game's R and ZR on L1 and the
+        // touchpad. The shortcut is the controller's own Touchpad and L1, whatever the mapping.
+        for (const bool remapped : {false, true}) {
+            auto moved = Eden::kDefaultMapping;
+            if (remapped) {
+                moved = Eden::Assign(moved, Eden::game_r, Eden::pad_l1);
+                moved = Eden::Assign(moved, Eden::game_zr, Eden::pad_touchpad);
+            }
+            pad.SetMapping(moved);
+            constexpr ButtonMask others = kButtonCreate | kButtonL3 | kButtonR3 | kButtonOptions | kButtonUp |
+                kButtonRight | kButtonDown | kButtonLeft | kButtonL2 | kButtonR2 | kButtonR1 | kButtonTriangle |
+                kButtonCircle | kButtonCross | kButtonSquare;
+            for (const ButtonMask held : {kButtonR1, kButtonR1 | kButtonR2, others}) {
+                left_finger();
+                sample.buttons = held; sample.triggers = {255, 255}; consume();
+                now += 1s; consume(); now += 5s; consume();
+                CHECK(!pad.TakeReturnToMenu()); CHECK(!pad.TakeHudToggle());
+                sample.buttons = 0; sample.triggers = {}; sample.touch = {}; consume();
+                for (int i = 0; i < 30; ++i) consume();
+            }
+            // ...and with that mapping Touchpad + L1 is still the shortcut, held for a second.
+            left_finger();
+            sample.buttons = kButtonTouchPad | kButtonL1; consume();
+            now += 1s; consume(); CHECK(pad.TakeReturnToMenu());
+            sample.buttons = 0; sample.touch = {}; consume();
+            for (int i = 0; i < 30; ++i) consume();
+        }
+        pad.SetMapping(Eden::kDefaultMapping);
+        CHECK(none_pressed());
         sample.buttons = kButtonTouchPad | kButtonR1; consume();
         CHECK(pad.TakeHudToggle()); CHECK(!pad.TakeHudToggle());
         CHECK(none_pressed());
@@ -312,10 +418,12 @@ void CheckPad() {
         sample.connected = 0; consume(); CHECK(none_pressed());
         sample.connected = 1; sample.buttons = 0; consume(); CHECK(none_pressed());
         // Create is Minus directly, also while the touchpad is down.
+        left_finger();
         sample.buttons = kButtonCreate | kButtonTouchPad; consume(); CHECK(pad.Engine().GetButton({}, 11));
         sample.buttons = kButtonTouchPad; consume(); CHECK(none_pressed());
-        sample.buttons = kButtonTouchPad | kButtonL1; consume(); CHECK(pad.TakeReturnToMenu());
-        sample.buttons = 0; consume(); CHECK(none_pressed());
+        sample.buttons = kButtonTouchPad | kButtonL1; consume(); CHECK(!pad.TakeReturnToMenu());
+        now += 1s; consume(); CHECK(pad.TakeReturnToMenu());
+        sample.buttons = 0; sample.touch = {}; consume(); CHECK(none_pressed());
 
         // A button mapping (button_mapping.h): A on Cross and B on Circle, ZL on the touchpad
         // (tap and hold as for Minus) and Minus on L2 with its analog trigger; Create, which has
@@ -336,8 +444,10 @@ void CheckPad() {
         for (int i = 0; i < 30; ++i) consume();
         CHECK(none_pressed());
         sample.buttons = kButtonCreate; consume(); CHECK(pad.Engine().GetButton({}, 8));
-        sample.buttons = kButtonTouchPad | kButtonL1; consume(); CHECK(pad.TakeReturnToMenu());
-        sample.buttons = 0; consume(); CHECK(none_pressed());
+        left_finger();
+        sample.buttons = kButtonTouchPad | kButtonL1; consume(); CHECK(!pad.TakeReturnToMenu());
+        now += 1s; consume(); CHECK(pad.TakeReturnToMenu());
+        sample.buttons = 0; sample.touch = {}; consume(); CHECK(none_pressed());
         // A mapping that names a button twice is not taken: the usual one stays.
         auto twice = Eden::kDefaultMapping;
         twice[Eden::game_x] = twice[Eden::game_y];
@@ -617,10 +727,12 @@ void CheckPad() {
                     }
                     sample.buttons = kButtonTouchPad | shoulder; consume();
                     CHECK(pad.TakeHudToggle() == (x < 960 && shoulder == kButtonR1));
-                    CHECK(pad.TakeReturnToMenu() == (x < 960 && shoulder == kButtonL1));
+                    CHECK(!pad.TakeReturnToMenu());  // not before it is held for a second
                     // Crossing the midpoint while held must not change the latched side.
                     sample.touch.points[0].x = x < 960 ? 1500 : 100; consume();
-                    CHECK(!pad.TakeHudToggle()); CHECK(!pad.TakeReturnToMenu());
+                    now += 1s; consume();
+                    CHECK(!pad.TakeHudToggle());
+                    CHECK(pad.TakeReturnToMenu() == (x < 960 && shoulder == kButtonL1));
                     CHECK(pad.Engine().GetButton({}, shoulder == kButtonL1 ? 6 : 7) == (x >= 960));
                     sample.buttons = 0; sample.touch = {}; consume();
                     CHECK(pad.Engine().GetButton({}, 10) == (x >= 960));
@@ -834,6 +946,25 @@ void CheckPad() {
         for (unsigned i = 0; i < 300; ++i) CHECK(pad.Poll());
         CHECK(state.pad_opens == opens + 3);  // working reads open nothing
     }
+    // Without the controller's information the touchpad's width is not known: a click is on
+    // neither half, and Touchpad + L1 never ends the game, however long it is held (before, every
+    // such click counted as the left half). Its keys are the game's.
+    state.controller_info_result = -1;
+    {
+        Eden::Pad::Clock::time_point now{};
+        Eden::Pad pad;
+        pad.SetClock([&] { return now; });
+        CHECK(pad.Open());
+        auto sample = neutral_data(); sample.connected = 1;
+        sample.touch.count = 1; sample.touch.points[0].x = 100;
+        sample.buttons = kButtonTouchPad | kButtonL1; pad.Consume({&sample, 1});
+        now += 1s; pad.Consume({&sample, 1}); now += 5s; pad.Consume({&sample, 1});
+        CHECK(!pad.TakeReturnToMenu());
+        CHECK(pad.Engine().GetButton({}, 6));
+        sample.buttons = 0; sample.touch = {}; pad.Consume({&sample, 1});
+        CHECK(pad.Engine().GetButton({}, 11));
+    }
+    state.controller_info_result = 0;
     std::puts("Pad mappings, a changed button mapping, calibration, motion, HD rumble over audio haptics with motor fallback, 64-sample edges, disconnect and ownership, a controller opened again after failed reads PASS");
 }
 
