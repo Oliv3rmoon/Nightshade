@@ -1741,7 +1741,7 @@ for name in ('vk_graphics_pipeline', 'vk_compute_pipeline'):
     # Once the pipeline exists, Eden's hashes beside its VkPipeline on stderr
     # (headless/pipeline_identity.h): the driver's stall dump names the handle whose shader the
     # GPU stopped in.
-    identity = ('::Eden::PipelineIdentity::Graphics(*pipeline, key.Hash(), key.unique_hashes);'
+    identity = ('::Eden::PipelineIdentity::Graphics(*pipeline, key.Hash(), key.unique_hashes, eden_spirv);'
                 if name == 'vk_graphics_pipeline' else
                 '::Eden::PipelineIdentity::Compute(*pipeline, shader_hash);')
     anchors = [
@@ -1759,8 +1759,12 @@ for name in ('vk_graphics_pipeline', 'vk_compute_pipeline'):
             ('      descriptor_buffer_ring{descriptor_buffer_ring_}, spv_modules{std::move(stages)} {\n',
              '      descriptor_buffer_ring{descriptor_buffer_ring_}, spv_modules{std::move(stages)} {\n'
              '    ::Eden::ShaderStart::Clock eden_layout{::Eden::ShaderStart::layout};\n'),
+            # The SPIR-V hashes the pipeline cache noted on this thread for this pipeline go with the
+            # build to the line it prints (headless/pipeline_identity.h, spv=).
             ('    auto func{[this, shader_notify, &render_pass_cache, pipeline_statistics] {',
-             '    eden_layout.Stop();\n    auto func{[this, shader_notify, &render_pass_cache, pipeline_statistics] {'),
+             '    eden_layout.Stop();\n'
+             '    auto func{[this, shader_notify, &render_pass_cache, pipeline_statistics,\n'
+             '                eden_spirv = ::Eden::PipelineIdentity::TakeSpirv()] {'),
         ]
     else:
         anchors += [
@@ -1951,7 +1955,7 @@ GraphicsPipeline* PipelineCache::CurrentGraphicsPipeline() {"""),
     # - Upstream Eden (master 5df59912, vk_pipeline_cache.cpp:792-796): a draw with a depth buffer
     #   (zeta_enable) is skipped even when small; a scene's geometry is drawn again next frame.
     ('#include "video_core/renderer_vulkan/vk_pipeline_cache.h"\n',
-     '#include "video_core/renderer_vulkan/vk_pipeline_cache.h"\n#include "async_shaders.h"\n'),
+     '#include "video_core/renderer_vulkan/vk_pipeline_cache.h"\n#include "async_shaders.h"\n#include "pipeline_identity.h"\n'),
     ("""GraphicsPipeline* PipelineCache::BuiltPipeline(GraphicsPipeline* pipeline) const noexcept {
     if (pipeline->IsBuilt()) {
         return pipeline;
@@ -2007,6 +2011,14 @@ GraphicsPipeline* PipelineCache::CurrentGraphicsPipeline() {"""),
     return nullptr;
 }
 """),
+    # Each stage's SPIR-V hash for the pipeline's EDEN_PIPELINE line (headless/pipeline_identity.h):
+    # noted on this thread as the stage is written; the GraphicsPipeline made below takes them.
+    ('    LOG_DEBUG(Render_Vulkan, "{:#016x}", hash);\n    size_t env_index{0};\n',
+     '    LOG_DEBUG(Render_Vulkan, "{:#016x}", hash);\n    ::Eden::PipelineIdentity::BeginSpirv();\n'
+     '    size_t env_index{0};\n'),
+    ('        device.SaveShader(code);\n        modules[stage_index] = ',
+     '        device.SaveShader(code);\n        ::Eden::PipelineIdentity::NoteSpirv(stage_index, code);\n'
+     '        modules[stage_index] = '),
 ]
 # Time both graphics and compute preparation, without modifying the compiler or
 # reading guest state on another thread. These intervals overlap shader_prepare.

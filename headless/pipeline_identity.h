@@ -14,9 +14,18 @@
 // uses), a compute pipeline's program hash (cs). A handle can be reused once a pipeline is
 // destroyed, so the line printed last before the stall is the one that counts.
 //
-// stderr is fully buffered (log_flusher.h): a line of about a hundred bytes, once per pipeline.
+// A graphics line ends with spv=: a hash of the SPIR-V Eden made for each host stage the pipeline
+// has (vs, tc, te, gs, fs; a stage it lacks is left out), e.g. spv=vs:1f..,fs:9a... Eden writes a
+// stage's SPIR-V from its program and some of the pipeline's state (attribute types, alpha test,
+// point size, y negation, early z...), so two pipelines with the same stage hashes can still differ
+// there. A new pipeline whose every stage hash was printed before differs from earlier ones only
+// in state outside its shaders: with graphics pipeline libraries it would need a link and no
+// shader compile (tools/analyze-pipeline-reuse.py counts them in a stderr.log).
+//
+// stderr is fully buffered (log_flusher.h): a line of about 150 bytes, once per pipeline.
 #pragma once
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <type_traits>
@@ -33,16 +42,60 @@ inline std::uint64_t HandleValue(Handle handle) {
     }
 }
 
+// The SPIR-V hashes of the pipeline being made on this thread (PipelineCache::CreateGraphicsPipeline
+// notes each stage as it is written; the GraphicsPipeline it then constructs takes them). Host
+// stages: 0 vertex, 1 tessellation control, 2 tessellation evaluation, 3 geometry, 4 fragment.
+using SpirvHashes = std::array<std::uint64_t, 5>;
+inline thread_local SpirvHashes spirv_hashes{};
+inline constexpr const char* kSpirvStages[] = {"vs", "tc", "te", "gs", "fs"};
+
+// 64-bit FNV-1a taking the code a 32-bit word at a time (a stage of tens of kilobytes in a few
+// microseconds), then mixed; never 0, which is a stage the pipeline lacks.
+template <typename Words>
+inline std::uint64_t SpirvHash(const Words& code) {
+    std::uint64_t hash = 0xcbf29ce484222325ULL;
+    for (const auto word : code) {
+        hash ^= static_cast<std::uint32_t>(word);
+        hash *= 0x100000001b3ULL;
+    }
+    hash ^= hash >> 33;
+    hash *= 0xff51afd7ed558ccdULL;
+    hash ^= hash >> 33;
+    return hash != 0 ? hash : 1;
+}
+inline void BeginSpirv() {
+    spirv_hashes = {};
+}
+template <typename Words>
+inline void NoteSpirv(std::size_t stage, const Words& code) {
+    if (stage < spirv_hashes.size()) spirv_hashes[stage] = SpirvHash(code);
+}
+inline SpirvHashes TakeSpirv() {
+    const SpirvHashes taken = spirv_hashes;
+    spirv_hashes = {};
+    return taken;
+}
+
 template <typename Handle>
-inline void Graphics(Handle pipeline, std::uint64_t key_hash, const std::array<std::uint64_t, 6>& stages) {
-    std::fprintf(stderr,
-                 "EDEN_PIPELINE vk=0x%llx graphics key=%llx va=%llx vb=%llx tc=%llx te=%llx gs=%llx "
-                 "fs=%llx\n",
-                 static_cast<unsigned long long>(HandleValue(pipeline)),
-                 static_cast<unsigned long long>(key_hash), static_cast<unsigned long long>(stages[0]),
-                 static_cast<unsigned long long>(stages[1]), static_cast<unsigned long long>(stages[2]),
-                 static_cast<unsigned long long>(stages[3]), static_cast<unsigned long long>(stages[4]),
-                 static_cast<unsigned long long>(stages[5]));
+inline void Graphics(Handle pipeline, std::uint64_t key_hash, const std::array<std::uint64_t, 6>& stages,
+                     const SpirvHashes& spirv = {}) {
+    char line[320];
+    int at = std::snprintf(line, sizeof(line),
+                           "EDEN_PIPELINE vk=0x%llx graphics key=%llx va=%llx vb=%llx tc=%llx te=%llx gs=%llx "
+                           "fs=%llx",
+                           static_cast<unsigned long long>(HandleValue(pipeline)),
+                           static_cast<unsigned long long>(key_hash), static_cast<unsigned long long>(stages[0]),
+                           static_cast<unsigned long long>(stages[1]), static_cast<unsigned long long>(stages[2]),
+                           static_cast<unsigned long long>(stages[3]), static_cast<unsigned long long>(stages[4]),
+                           static_cast<unsigned long long>(stages[5]));
+    const char* separator = " spv=";
+    for (std::size_t stage = 0; stage < spirv.size(); ++stage) {
+        if (spirv[stage] == 0 || at <= 0 || at >= static_cast<int>(sizeof(line))) continue;
+        at += std::snprintf(line + at, sizeof(line) - static_cast<std::size_t>(at), "%s%s:%llx", separator,
+                            kSpirvStages[stage], static_cast<unsigned long long>(spirv[stage]));
+        separator = ",";
+    }
+    std::fprintf(stderr, "%s\n", line);
 }
 
 template <typename Handle>

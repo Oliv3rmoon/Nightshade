@@ -689,9 +689,18 @@ int main(int argc, char** argv) {
         // reads its settings below and takes the safe ones where it does; the file is not touched.
         if (Eden::SafeLaunch::Begin(eden_game_title_id(selected_game.c_str())))
             Eden::Report("launch", Eden::SafeLaunch::kReport);
-#ifdef EDEN_DEV_VULKAN
+        // A timing run, in every build: with an empty cost-run.txt in the app's folder, the Vulkan
+        // renderer's timers are on (performance.h, VulkanTimer), and every 5 s heap.log gets the
+        // session's totals so far, one EDEN_VULKAN_COST line each: pipeline builds by the driver
+        // (graphics_pipeline), the GPU thread's guest shader translation (shader_prepare, shader_ir,
+        // shader_spirv), draws waiting for a pipeline (pipeline_ready_wait) and the rest. The timers
+        // cost a little on every draw, so the file is for a test session (docs/SETTINGS.md).
         Eden::Performance::vulkan_cost_enabled = std::filesystem::exists(Eden::AppFile("cost-run.txt"));
-        if (Eden::Performance::vulkan_cost_enabled) Eden::Performance::timers_on = true;  // a cost run
+        if (Eden::Performance::vulkan_cost_enabled) {
+            Eden::Performance::timers_on = true;
+            Eden::Report("launch", "Timing run: cost-run.txt is in the app's folder; EDEN_VULKAN_COST lines go to heap.log");
+        }
+#ifdef EDEN_DEV_VULKAN
         const bool performance_run = std::filesystem::exists(Eden::AppFile("performance-run.txt"));
 #ifdef EDEN_DEV_PROFILE
         Eden::Performance::texture_budget_log = true;  // EDEN_VULKAN_TEXTURE_BUDGET every 300 frames

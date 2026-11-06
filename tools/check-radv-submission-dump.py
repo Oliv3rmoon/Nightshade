@@ -36,7 +36,8 @@ notes = []
 
 # 1. Eden's side: each pipeline's hashes beside its handle.
 port = (root / 'tools/prepare-vulkan-port.py').read_text()
-assert "'::Eden::PipelineIdentity::Graphics(*pipeline, key.Hash(), key.unique_hashes);'" in port
+assert "'::Eden::PipelineIdentity::Graphics(*pipeline, key.Hash(), key.unique_hashes, eden_spirv);'" in port
+assert "eden_spirv = ::Eden::PipelineIdentity::TakeSpirv()] {'" in port
 assert "'::Eden::PipelineIdentity::Compute(*pipeline, shader_hash);'" in port
 assert '#include "pipeline_identity.h"' in port
 assert (root / 'headless/pipeline_identity.h').is_file()
@@ -512,6 +513,10 @@ int main() {
     auto* const graphics = reinterpret_cast<VkPipeline_T*>(std::uintptr_t{0x80c41f000});
     ::Eden::PipelineIdentity::Graphics(graphics, 0x0123456789abcdefull,
                                        {0, 0x1111111111111111ull, 0, 0, 0, 0x6666666666666666ull});
+    // With the SPIR-V hashes of the stages it has (vertex and fragment here).
+    ::Eden::PipelineIdentity::Graphics(graphics, 0x0123456789abcdefull,
+                                       {0, 0x1111111111111111ull, 0, 0, 0, 0x6666666666666666ull},
+                                       {0xaull, 0, 0, 0, 0xbbbbbbbbbbbbbbbbull});
     ::Eden::PipelineIdentity::Compute(reinterpret_cast<VkPipeline_T*>(std::uintptr_t{0x80c41f100}),
                                       0xfedcba9876543210ull);
     ::Eden::PipelineIdentity::Compute(std::uint64_t{0x1234}, 1);
@@ -529,6 +534,8 @@ int main() {
         assert eden == [
             'EDEN_PIPELINE vk=0x80c41f000 graphics key=123456789abcdef va=0 vb=1111111111111111 tc=0 te=0 gs=0 '
             'fs=6666666666666666',
+            'EDEN_PIPELINE vk=0x80c41f000 graphics key=123456789abcdef va=0 vb=1111111111111111 tc=0 te=0 gs=0 '
+            'fs=6666666666666666 spv=vs:a,fs:bbbbbbbbbbbbbbbb',
             'EDEN_PIPELINE vk=0x80c41f100 compute cs=fedcba9876543210',
             'EDEN_PIPELINE vk=0x1234 compute cs=1',
         ], eden
