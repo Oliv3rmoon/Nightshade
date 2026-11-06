@@ -1611,6 +1611,27 @@ void showcase_pictures(Stage &s)
     s.shoot("S25-settings-accessibility-open");
     s.press({Key::circle});
     s.wait(0.6f);
+    // Profiles, Game files and Language from the column (Accessibility is its sixth row).
+    s.press({Key::up, Key::up, Key::up, Key::up, Key::up, Key::cross});
+    s.wait(0.8f);
+    s.shoot("S25b-settings-profiles");
+    s.press({Key::circle});
+    s.wait(0.6f);
+    s.press({Key::down, Key::down, Key::down, Key::down, Key::down, Key::down, Key::down, Key::cross});
+    s.wait(1.0f);
+    s.shoot("S25c-game-files");
+    s.press({Key::circle});
+    s.wait(0.8f);
+    s.press({Key::down, Key::down, Key::down, Key::cross});
+    s.wait(1.0f);
+    s.shoot("S25d-language");
+    s.press({Key::circle});
+    s.wait(0.8f);
+    s.press({Key::down, Key::down, Key::down, Key::cross});
+    s.wait(1.0f);
+    s.shoot("S25e-apps");
+    s.press({Key::circle});
+    s.wait(0.6f);
     for (int down = 0; down < 12; ++down)
         s.press({Key::down});
     s.wait(0.8f);
