@@ -475,8 +475,8 @@ class FakeServices : public ui::Services
     }
     InsiderCode set_insider_code(const std::string &typed) override
     {
-        // As the app keeps it (update_check/insider.h): upper case, what is outside the code's
-        // alphabet dropped, 8 characters left; nothing typed removes it.
+        // As the app keeps it (update_check/insider.h): upper case, spaces and hyphens removed, then
+        // 8 characters of the code's alphabet or it is refused; nothing typed removes it.
         if (typed.find_first_not_of(" \t\r\n") == std::string::npos)
         {
             insider_code.clear();
@@ -486,9 +486,12 @@ class FakeServices : public ui::Services
         std::string code;
         for (const char typed_char : typed)
         {
+            if (typed_char == ' ' || typed_char == '-')
+                continue;
             const char c = static_cast<char>(std::toupper(static_cast<unsigned char>(typed_char)));
-            if (c != '\0' && std::strchr("23456789ABCDEFGHJKMNPQRSTVWXYZ", c) != nullptr)
-                code += c;
+            if (c == '\0' || std::strchr("23456789ABCDEFGHJKMNPQRSTVWXYZ", c) == nullptr)
+                return InsiderCode::invalid;
+            code += c;
         }
         if (code.size() != 8)
             return InsiderCode::invalid;

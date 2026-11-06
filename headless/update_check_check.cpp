@@ -1355,18 +1355,19 @@ void Answer(int status, const std::string& body) {
 void InsiderCodes() {
     char code[INSIDER_CODE_LENGTH + 1];
     // As the service takes them: any case, spaces and hyphens, the code as the page shows it.
-    for (const char* typed : {"ABCDEFGH", "abcdefgh", "ABCD-EFGH", "abcd efgh", " ab-cd ef-gh\n", "aBcD\tEfGh"}) {
+    for (const char* typed : {"ABCDEFGH", "abcdefgh", "ABCD-EFGH", "abcd efgh", " ab-cd ef-gh ", "aBcD EfGh", "--ABCDEFGH--"}) {
         assert(insider_code_normalise(typed, code) == 1 && std::strcmp(code, "ABCDEFGH") == 0);
     }
     assert(insider_code_normalise("2345-6789", code) == 1 && std::strcmp(code, "23456789") == 0);
     assert(insider_code_normalise("wxyz-wxyz", code) == 1 && std::strcmp(code, "WXYZWXYZ") == 0);
-    // What is outside the alphabet goes (0 O 1 I L U too): what is left must be 8 characters.
-    for (const char* typed : {"", "ABCDEFG", "ABCDEFGHJ", "ABCD-EFG0", "ABCD-EFGO", "ABCD-EFG1", "ABCD-EFGI", "ABCD-EFGL",
-                              "ABCD-EFGU", "ABCD-EFGH-J", "\xc3\x84" "BCDEFGH", "--------", "OIL0U1OI"}) {
+    // Anything else is refused, never repaired: a character outside the alphabet (0 O 1 I L U too,
+    // so "ABCD0EFGH" is not "ABCDEFGH"), another separator, another length.
+    for (const char* typed : {"", "ABCDEFG", "ABCDEFGHJ", "ABCD0EFGH", "ABCD-EFG0", "ABCD-EFGO", "ABCD-EFG1", "ABCD-EFGI",
+                              "ABCD-EFGL", "ABCD-EFGU", "ABCD-EFGH-J", "\xc3\x84" "BCDEFGH", "ABCDEFG\xc3\x84H", "--------",
+                              "OIL0U1OI", "ABCD_EFGH", "ABCD.EFGH", "ABCD\tEFGH", "ABCDEFGH\n", "\nABCDEFGH", "ABCD/EFGH"}) {
         code[0] = 'x';
         assert(insider_code_normalise(typed, code) == 0 && code[0] == '\0');
     }
-    assert(insider_code_normalise("ABCDEFG\xc3\x84H", code) == 1 && std::strcmp(code, "ABCDEFGH") == 0);
     assert(insider_code_normalise(nullptr, code) == 0 && code[0] == '\0');
     assert(insider_code_normalise("ABCDEFGH", nullptr) == 0);
 
@@ -1537,6 +1538,8 @@ void InsiderAnswers() {
     for (const auto& [http, body] : std::vector<std::pair<int, std::string>>{
              {400, "{\"status\":\"bad_request\"}"}, {404, "{\"status\":\"unknown_app\"}"}, {405, ""},
              {429, "{\"status\":\"rate_limited\"}"}, {503, "{\"status\":\"unavailable\"}"}, {201, update},
+             // A redirect is not followed (the POST makes none): it is an answer like any other.
+             {301, ""}, {302, update}, {307, update}, {308, "{\"status\":\"none\"}"},
              {500, "<html>error</html>"}, {200, "{\"status\":\"rate_limited\"}"}, {200, "{\"status\":\"Update\"}"}}) {
         assert(Insider(body, http, "01.010.012", nullptr, &report) == INSIDER_OTHER && report.http_status == http);
     }
@@ -1729,6 +1732,7 @@ void InsiderFallback() {
     }
     for (const auto& [http, body] : std::vector<std::pair<int, std::string>>{
              {429, "{\"status\":\"rate_limited\"}"}, {503, "{\"status\":\"unavailable\"}"}, {200, "garbage"},
+             {302, InsiderUpdate("1.010.009")}, {307, InsiderUpdate("1.010.009")},
              {200, InsiderUpdate("1.010.009").substr(0, 200)}, {200, InsiderUpdate("1.010.009", std::string(64, 'X'))},
              {200, With(InsiderUpdate("1.010.009"), InsiderUrl("v1.010.009"), "https://evil.example/v1/download/x")},
              {200, InsiderUpdate("1.011.000")}, {200, InsiderUpdate("1.010.007")}}) {

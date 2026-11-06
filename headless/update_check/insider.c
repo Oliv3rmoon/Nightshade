@@ -36,14 +36,15 @@ int insider_code_normalise(const char *typed, char code[INSIDER_CODE_LENGTH + 1]
     for (; *typed != '\0'; ++typed)
     {
         char c = *typed;
+        if (c == ' ' || c == '-')
+            continue;
         if (c >= 'a' && c <= 'z')
             c = (char)(c - 'a' + 'A');
-        if (!in_alphabet(c))
-            continue;
-        if (used == INSIDER_CODE_LENGTH)
+        /* Anything else outside the alphabet, or more than a code, is refused, never repaired. */
+        if (!in_alphabet(c) || used == INSIDER_CODE_LENGTH)
         {
             code[0] = '\0';
-            return 0; /* more than a code */
+            return 0;
         }
         code[used++] = c;
     }

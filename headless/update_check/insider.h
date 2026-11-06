@@ -93,10 +93,11 @@ extern "C"
     typedef int (*insider_post_fn)(void *user, const char *url, const char *agent, const char *json, char *body,
                                    size_t capacity, size_t *length, int *status);
 
-    /* A code as the player typed it, normalised as the service does: upper case, everything that
-     * isn't one of INSIDER_ALPHABET's characters dropped ("abcd-efgh" and "ABCD EFGH" are
-     * "ABCDEFGH"). 1 when exactly INSIDER_CODE_LENGTH characters remain: then they are in code.
-     * 0 otherwise, and code is empty. */
+    /* A code as the player typed it, normalised as the service does: upper case, spaces and
+     * hyphens removed ("abcd-efgh" and "ABCD EFGH" are "ABCDEFGH"). 1 when exactly
+     * INSIDER_CODE_LENGTH characters of INSIDER_ALPHABET remain: then they are in code. 0 for
+     * anything else (another character, "ABCD0EFGH" too, or another length): refused, never
+     * repaired, and code is empty. */
     int insider_code_normalise(const char *typed, char code[INSIDER_CODE_LENGTH + 1]);
 
     /* 1 when `code` is INSIDER_CODE_LENGTH characters of INSIDER_ALPHABET and nothing else. */
