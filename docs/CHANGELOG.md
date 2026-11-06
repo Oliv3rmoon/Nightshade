@@ -2,9 +2,9 @@
 
 What changed in each release of ProsperoEden, newest first. A release's notes on GitHub are its section here.
 
-## Unreleased
+## v1.010.012
 
-**Tears of the Kingdom: asynchronous shaders on, for the frame drops when new areas load.** In two testers' sessions on v1.010.011 the drops (after loading a save, in the desert, on the volcano) came with bursts of new graphics pipelines: 800 and 1,961 built while playing, after the shader cache, up to 96 in 30 seconds. Both had **Asynchronous shaders** off, so each new pipeline held the frame until the driver had built it. Not confirmed on a console yet.
+**The launcher, redrawn, and asynchronous shaders on in Tears of the Kingdom for the frame drops when new areas load.** In two testers' sessions on v1.010.011 the drops (after loading a save, in the desert, on the volcano) came with bursts of new graphics pipelines: 800 and 1,961 built while playing, after the shader cache, up to 96 in 30 seconds. Both had **Asynchronous shaders** off, so each new pipeline held the frame until the driver had built it. Not confirmed on a console yet.
 
 ### Changed
 
@@ -13,7 +13,8 @@ What changed in each release of ProsperoEden, newest first. A release's notes on
 
 ### New
 
-- **The launcher, redrawn.** The Nightshade theme has a layout of its own: a top bar with the flower, the tabs Home, Library, Multiplayer and Settings, and the clock; a home screen over the selected game's art with its name, a crimson Play and a row of covers (the games played last first); a Library of six covers to a row with a search on the system keyboard and the filters All, Recently played and Favorites (a game becomes a favorite in its Quick settings); and Settings as a column beside a panel of the category, where its options open. The type is larger, to read from a couch. About is the last row of Settings. Canopy and Slate are as they were.
+- **The launcher, redrawn.** The Nightshade theme has a layout of its own: a top bar with the flower, the tabs Home, Library, Multiplayer and Settings, and the clock; a home screen over the selected game's art with its name, a crimson Play and a row of covers (the games played last first); a Library of six covers to a row with a search on the system keyboard and the filters All, Recently played and Favorites (a game becomes a favorite in its Quick settings); and Settings as a column beside a panel of the category, where its options open. The type is larger, to read from a couch. About is the last row of Settings. Behind it all, nightshade flowers frame the screen, and what is chosen has a crimson ring and glow. Canopy and Slate are as they were.
+- **A new icon:** Nightshade's flower, crimson with a white star and two berries.
 - **`stderr.log` says what happened to those draws:** every 5 seconds, when it changed, an `EDEN_ASYNC_SHADERS` line with how many were left out (`skipped`, `skipped_depth`) and how many waited (`waited_small_target`, `waited_small_draw`, and `waited_sync` with the switch off). The launch report says `Asynchronous shaders on: this game's own default` when the default decided.
 - **Each `EDEN_PIPELINE` line ends with `spv=`,** a hash of each shader stage as the GPU gets it. A new pipeline whose stages were all seen before differs only in state outside its shaders: `tools/analyze-pipeline-reuse.py stderr.log` counts those, which says how much graphics pipeline libraries could save.
 - **A timing run in every build:** an empty `cost-run.txt` in the app's folder makes `heap.log` get `EDEN_VULKAN_COST` lines every 5 seconds: the driver's pipeline builds, the shader translation, the draws that waited for a pipeline and the rest ([A timing run](SETTINGS.md#a-timing-run)). It costs a little speed; take the file out afterwards.
@@ -21,6 +22,10 @@ What changed in each release of ProsperoEden, newest first. A release's notes on
 ### What to send
 
 Play as usual, go where the drops were, and send `/data/prosperoeden/logs` (`stderr.log` and `stderr.prev.log`) after each session. With a timing run, `heap.log` and `heap.prev.log` too. Say whether the drops changed and whether anything was missing for a moment.
+
+### Install
+
+With **Settings > Diagnostics > Test builds** on in v1.010.009 or later, **Update now** offers it. Otherwise download `Nightshade-v1.010.012.zip` below and copy its `PPSA99008` folder over yours.
 
 ## v1.010.011
 

@@ -4,7 +4,7 @@
 
 usage: python3 tools/render-home-art.py   (needs Pillow and NumPy)
 
-Writes sce_sys/icon0.png and icon-source.png (512x512), background-source.png and
+Writes icon-source.png (512x512; sce_sys/icon0.png is the logo, not drawn here), background-source.png and
 launch-background-source.png (3840x2160), and from those pic0.dds and pic1.dds (BC7, the format
 the console's pictures were in). Everything is procedural: a nightshade flower (five red petals
 round a pale cone), its black berries and dark leaves, on near black with a red glow and faint
@@ -338,7 +338,7 @@ def dds(picture, alpha_mode):
 
 def main():
     icon_picture = to_image(icon())
-    icon_picture.save(sce / 'icon0.png', optimize=True)
+    # icon0.png is Nightshade's logo (assets/branding/nightshade-logo-1024.png at 512x512), not drawn here.
     icon_picture.save(sce / 'icon-source.png', optimize=True)
     for source, target, alpha_mode, draw in (('background-source.png', 'pic0.dds', 3, background),
                                              ('launch-background-source.png', 'pic1.dds', 1, launch)):
@@ -351,7 +351,7 @@ def main():
         print(f'{target}: {psnr:.1f} dB against {source}')
         if psnr < 38:
             sys.exit(f'{target}: the BC7 blocks are too far from the picture')
-    print('icon0.png, icon-source.png, background-source.png, launch-background-source.png, pic0.dds, pic1.dds')
+    print('icon-source.png, background-source.png, launch-background-source.png, pic0.dds, pic1.dds')
 
 
 if __name__ == '__main__':
