@@ -6,10 +6,24 @@ and still). Nightshade is the default for a new install; a theme chosen before s
 Appearance > Theme** lists the themes a build has; the choice is kept in the settings file as
 `"launcher": { "theme": "nightly" }`.
 
-Nightshade takes Slate's layout variants over a near-black backdrop with a low red glow and a few
-stars (`tools/launcher/render-art.py nightly-backdrop`), smaller corners, ten slow motes in the
-red highlight and a red accent; its warnings are amber, so they never read as the accent. Its
-accent presets are Red, Crimson, Rose, White, Violet and Ice.
+Nightshade has a layout of its own, `showcase`: a top bar with its flower
+(`render-art.py nightshade-mark`, from `tools/launcher/art/nightshade-logo.svg`), the NIGHTSHADE
+wordmark, the tabs Home, Library, Multiplayer and Settings, and the clock; the home screen over
+the selected game's art, with the game's name, its facts as pills, a crimson Play and an
+outlined Game settings, and a row of covers under them (the recent games first); a Library of six
+covers to a row with a search (the system keyboard) and the filters All, Recently played and
+Favorites; and Settings as a column of categories beside a glass panel of the focused one, where
+its dialog opens. About is Settings' last row. The hints are at the bottom right. Its colours are
+black `#0b0b0d` and crimson `#d4142f` with white on the accent, its type is larger than the other
+themes' (it is read from a couch), and its warnings are amber, so they never read as the accent.
+Where there is no game art it shows a near-black backdrop with a low red glow and a few stars
+(`render-art.py nightly-backdrop`). Its accent presets are Red, Crimson, Rose, White, Violet and
+Ice.
+
+The game's art is its cover, made small and blurred once when the selection rests on a game
+(`Textures::show_game_art`), never every frame; the art before it fades out (at once with Reduce
+motion). Real blur behind panels is not something the renderer does: a panel shows a blurred copy
+of the art it lies on, as every theme's glass does.
 
 **Settings > Appearance > Launcher** selects a separately installed runtime launcher.
 Runtime packs can replace layout, navigation, assets and sounds without rebuilding the
@@ -40,7 +54,7 @@ Everything below is one structure, `pe::ui::Theme` in
 | Shape | corner radii for rows, cards and panels; whether chips are pills; hairline and focus ring widths; how far the focus ring's light reaches; whether panels are glass |
 | Motion | the springs of the focus, the highlight and scrolling; how long a screen change and a game's start take; the delay between the parts of a screen as it arrives; the focus glow's pulse |
 | Artwork | the backdrop, its blurred copy (behind glass panels) and the app's mark, as files in `ui/art`; where the artwork's light is |
-| Layout variants | `list_settings` (settings as a vertical list instead of tiles), `game_backdrop` (the selected game's cover art fills the background), `minimal_home` (clean home layout: a detail card on the left with the Library grid on the right, no floating cover or controllers, no recently-played shelf), `top_nav` (horizontal section tabs — Home, Multiplayer, Settings, About — at the top instead of the sidebar rail; the Library grid lives on the home screen, and the other sections draw as right-side panels), `scrim_opacity` (>0: a flat scrim at this alpha over the backdrop; 0: the directional gradient scrim), `game_page_offset` (pixels to push the game settings columns below their base position) |
+| Layout variants | `list_settings` (settings as a vertical list instead of tiles), `game_backdrop` (the selected game's cover art fills the background), `minimal_home` (clean home layout: a detail card on the left with the Library grid on the right, no floating cover or controllers, no recently-played shelf), `top_nav` (horizontal section tabs — Home, Multiplayer, Settings, About — at the top instead of the sidebar rail; the Library grid lives on the home screen, and the other sections draw as right-side panels), `scrim_opacity` (>0: a flat scrim at this alpha over the backdrop; 0: the directional gradient scrim), `game_page_offset` (pixels to push the game settings columns below their base position), `showcase` (Nightshade's own layout, described above: it takes the place of `top_nav`, `minimal_home` and `list_settings` on the screens it draws) |
 | Ambient light | how many motes of light rise over the artwork, and how far the artwork drifts |
 | Sound | a folder of `ui/sounds` with its own cues (none: the launcher's own) |
 
@@ -52,7 +66,7 @@ four of these colours with it: `accent`, `accent_pale`, `accent_deep` and `base`
 
 - **Where things are.** A theme can choose between predefined layout variants
   (`list_settings`, `game_backdrop`, `minimal_home`, `top_nav`, `scrim_opacity`,
-  `game_page_offset`) but not invent new ones. `top_nav` is the largest: a two-column
+  `game_page_offset`, `showcase`) but not invent new ones. `top_nav` is the largest: a two-column
   dashboard where the detail card and Library grid share the home screen, and the other
   sections draw as right-side panels.
 - **Text.** The words and their translations are the launcher's.
