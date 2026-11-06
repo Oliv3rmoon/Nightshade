@@ -115,6 +115,12 @@ The released app (v1.010.x) installs as `PPSA99008` and keeps its data in `/data
 
 **Updating:** from 1.005.102 on, **Update now** in the app installs the next release. If it doesn't take, send `/data/prosperoeden/logs/updater.log`. **Going back:** the version an update replaces is kept, or copy an official release over the app the same way; see [Updating](docs/INSTALL.md#updating) and [Going back](docs/INSTALL.md#going-back-to-the-previous-version).
 
+## nightly insider
+
+New Nightshade builds after v1.010.012 go to **nightly insiders** first and are published here for everyone about two months later. Insiders update in the app with a free insider code, which you type in once the builds with the code check are out. Without a code the app runs the same and still tells you when a release is out; you update by hand from this page.
+
+To become one, join [nightly on Discord](https://discord.gg/pSqgRU3YP9), verify, run `/rank Tester` in #bot-commands, then sign in with Discord at [nightly-insider.nightly-ps5.workers.dev](https://nightly-insider.nightly-ps5.workers.dev) to get your code.
+
 ## Testing builds
 
 Test releases are marked **Pre-release** on the [Releases page](https://github.com/Oliv3rmoon/Nightshade/releases). They are for trying what is next and sending logs back; keep the latest normal release for playing.
