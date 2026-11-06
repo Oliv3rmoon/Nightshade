@@ -112,6 +112,12 @@ struct Theme
     bool top_nav = false;        // horizontal section tabs at the top instead of the sidebar rail
     float scrim_opacity = 0.0f;  // >0: flat scrim at this alpha; 0: directional gradient scrim
     float game_page_offset = 0.0f; // px to push the game settings columns below their base position
+    // Nightshade's own layout (docs/THEMES.md): a top bar with the mark, the wordmark and four
+    // tabs (Home, Library, Multiplayer, Settings); the home screen is the selected game's art with
+    // a row of covers under its title; the Library a grid of covers with a search and filters; and
+    // Settings a column of categories beside a panel of the chosen one. About is a row of Settings.
+    // It takes top_nav's place: a theme that sets it needs no other layout variant.
+    bool showcase = false;
 
     // ---- sound: a folder of ui/sounds with its own cues ("": the launcher's) ----
     const char *sounds = "";

@@ -10,11 +10,17 @@
   brand.tga          the app icon, for the header and for games without cover art
   controller.tga     a controller in white on transparent, tinted by the home screen: 144x100,
                      twice the size it is drawn at
+  nightshade-mark.tga  Nightshade's flower (tools/launcher/art/nightshade-logo.svg) on transparent,
+                     256x256: the Nightshade theme's mark in its top bar and its opening (needs
+                     rsvg-convert, from librsvg)
 
 render-art.py [name...] renders only the named pictures (backdrop, brand, controller,
-                     slate-backdrop, nightly-backdrop).
+                     slate-backdrop, nightly-backdrop, nightshade-mark).
 """
 
+import io
+import re
+import subprocess
 import sys
 
 from pathlib import Path
@@ -189,6 +195,15 @@ def nightly_backdrop():
     return art
 
 
+def nightshade_mark():
+    """The flower of tools/launcher/art/nightshade-logo.svg without its square of black behind it."""
+    svg = (ROOT / "tools/launcher/art/nightshade-logo.svg").read_text()
+    svg = re.sub(r"\s*<rect[^>]*/>", "", svg, count=1)
+    png = subprocess.run(["rsvg-convert", "-w", "256", "-h", "256", "-f", "png"], input=svg.encode(),
+                         capture_output=True, check=True).stdout
+    return Image.open(io.BytesIO(png)).convert("RGBA")
+
+
 def main():
     ART.mkdir(parents=True, exist_ok=True)
     wanted = set(sys.argv[1:]) or {"backdrop", "brand", "controller"}
@@ -214,6 +229,8 @@ def main():
         save_tga(icon.resize((384, 384), Image.Resampling.LANCZOS), "brand.tga")
     if "controller" in wanted:
         save_tga(controller(), "controller.tga")
+    if "nightshade-mark" in wanted:
+        save_tga(nightshade_mark(), "nightshade-mark.tga")
 
 
 if __name__ == "__main__":

@@ -143,9 +143,11 @@ Theme canopy()
     return t;
 }
 
-// Nightshade: black and red, clean and dark. Slate's clean layout (tabs at the top, a quiet home
-// screen, settings as a list) over a near-black sky with a low red glow and a few stars, and a
-// red accent. The look of Oliv3rmoon's builds, and the one they start with.
+// Nightshade: black and crimson, clean and dark. Its own layout (showcase): the top bar with the
+// flower and the wordmark, the selected game's art behind the home screen, a grid of covers with a
+// search and filters, and Settings as a column beside a panel. Frosted dark glass with hairline
+// edges, a crimson accent, and type sized to read from across the room. The look of Oliv3rmoon's
+// builds, and the one they start with.
 Theme nightly()
 {
     Theme t;
@@ -154,46 +156,54 @@ Theme nightly()
     t.name = "Nightshade";
     t.summary = TR("Black and red, clean and dark.");
 
-    t.base = rgb(0x09090b);
+    t.base = rgb(0x0b0b0d);
     t.scrim = rgb(0x050506);
-    t.glass = rgb(0x141417);
-    t.panel = rgb(0x0e0e11);
-    t.panel_edge = rgb(0x2b2b31);
-    t.row = rgb(0x161619);
-    t.row_edge = rgb(0x27272d);
-    t.row_focus = rgb(0x26161a);
+    t.glass = rgb(0x17171b);
+    t.panel = rgb(0x0f0f12);
+    t.panel_edge = rgb(0x3a3a42);
+    t.row = rgb(0x151519);
+    t.row_edge = rgb(0x34343c);
+    t.row_focus = rgb(0x3a0a14);
 
-    t.accent = rgb(0xe5484d);
-    t.accent_deep = rgb(0x5a1419);
-    t.accent_pale = rgb(0xf3a9ad);
-    t.on_accent = rgb(0x0b0b0d);
-    t.highlight = rgb(0xff6b72);
+    t.accent = rgb(0xd4142f);
+    t.accent_deep = rgb(0x5c0715);
+    t.accent_pale = rgb(0xff5a70);
+    t.on_accent = rgb(0xffffff);
+    t.highlight = rgb(0xff3b55);
 
     t.text = rgb(0xededf0);
-    t.title = rgb(0xf6f6f8);
+    t.title = rgb(0xf8f8fa);
     t.value = rgb(0xe8e8ec);
-    t.body = rgb(0xcacad0);
-    t.copy = rgb(0xa9a9b1);
-    t.meta = rgb(0x8f8f98);
-    t.label = rgb(0x80808a);
-    t.muted = rgb(0x70707a);
-    t.faint = rgb(0x50505a);
+    t.body = rgb(0xcfcfd5);
+    t.copy = rgb(0xb0b0b8);
+    t.meta = rgb(0x9a9aa3);
+    t.label = rgb(0x8a8a94);
+    t.muted = rgb(0x7a7a84);
+    t.faint = rgb(0x5a5a64);
     t.warning = rgb(0xf0a35e); // amber: never the accent's red, so a warning still reads as one
-    t.rule = rgb(0x27272d);
+    t.rule = rgb(0x2c2c33);
 
-    t.size_hero = 64.0f;
-    t.size_display = 38.0f;
-    t.size_heading = 28.0f;
+    // Larger than the other themes': read from a couch.
+    t.size_hero = 100.0f;
+    t.size_display = 44.0f;
+    t.size_lead = 44.0f;
+    t.size_brand = 30.0f;
+    t.size_heading = 34.0f;
+    t.size_clock = 34.0f;
+    t.size_text = 26.0f;
+    t.size_small = 22.0f;
+    t.weight_title = 1.0f;
     t.tracking_kicker = 3.0f;
 
-    t.radius_row = 12.0f;
-    t.radius_card = 14.0f;
-    t.radius_panel = 20.0f;
+    t.radius_row = 18.0f;
+    t.radius_card = 16.0f;
+    t.radius_panel = 28.0f;
     t.pill_chips = true;
-    t.focus_width = 2.0f;
-    t.focus_glow = 22.0f;
-    t.shadow_blur = 32.0f;
-    t.shadow_offset = 12.0f;
+    t.border = 1.0f;
+    t.focus_width = 3.0f;
+    t.focus_glow = 34.0f;
+    t.shadow_blur = 40.0f;
+    t.shadow_offset = 14.0f;
     t.motes = 10;
     t.drift = 0.0f;
 
@@ -202,11 +212,12 @@ Theme nightly()
     t.minimal_home = true;
     t.top_nav = true;
     t.scrim_opacity = 0.88f;
-    t.game_page_offset = 60.0f;
+    t.game_page_offset = 0.0f; // its page has no top bar over it
+    t.showcase = true;
 
     t.backdrop = "nightly-backdrop.tga";
     t.backdrop_blur = "nightly-backdrop-blur.tga";
-    t.brand = "brand.tga";
+    t.brand = "nightshade-mark.tga";
     t.light_x = 0.78f;
     t.light_y = 0.86f;
     return t;
@@ -237,8 +248,8 @@ const AccentPreset kCanopyAccents[] = {
 };
 
 const AccentPreset kNightlyAccents[] = {
-    {"red",      "Red",      Color::rgb(0xe5484d), Color::rgb(0x5a1419), Color::rgb(0xf3a9ad), Color::rgb(0x0b0b0d), Color::rgb(0xff6b72)},
-    {"crimson",  "Crimson",  Color::rgb(0xc8243c), Color::rgb(0x4a0c16), Color::rgb(0xec98a6), Color::rgb(0x0b0b0d), Color::rgb(0xf05068)},
+    {"red",      "Red",      Color::rgb(0xd4142f), Color::rgb(0x5c0715), Color::rgb(0xff5a70), Color::rgb(0xffffff), Color::rgb(0xff3b55)},
+    {"crimson",  "Crimson",  Color::rgb(0xb0102a), Color::rgb(0x4a0c16), Color::rgb(0xec98a6), Color::rgb(0xffffff), Color::rgb(0xf05068)},
     {"rose",     "Rose",     Color::rgb(0xe88ca0), Color::rgb(0x5c2232), Color::rgb(0xf2c0cc), Color::rgb(0x0b0b0d), Color::rgb(0xf5d4dc)},
     {"white",    "White",    Color::rgb(0xe6e6ea), Color::rgb(0x3a3a40), Color::rgb(0xf4f4f6), Color::rgb(0x0b0b0d), Color::rgb(0xffffff)},
     {"violet",   "Violet",   Color::rgb(0xa080d0), Color::rgb(0x342060), Color::rgb(0xccb8e8), Color::rgb(0x0b0b0d), Color::rgb(0xdcc8f0)},
