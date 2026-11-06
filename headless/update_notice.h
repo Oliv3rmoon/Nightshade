@@ -65,4 +65,26 @@ void Cancel();
 bool Apply();
 // After a cancel or a failure, before beginning again.
 void Finish();
+
+// Insider builds (update_check/insider.h): with Test builds on, a build that names the insider
+// service (EDEN_INSIDER_URL, headless/CMakeLists.txt) asks it first for a new test build, with the
+// insider code a member of the nightly Discord got there; when it offers nothing (or can't be
+// reached), the check is the one above, unchanged. Only the code and the version are sent, and the
+// app works as it always did without the service, a code or a network.
+// Whether this build names the service: without it there is no code to ask for, and nothing changes.
+bool InsiderAvailable();
+// Whether a code is kept (the config folder's insider-code).
+bool InsiderCodeSet();
+// This launch's answer from the service said the code is unknown, expired or no longer qualifies:
+// the settings say where to get one. Never after no answer at all.
+bool InsiderRefused();
+enum class InsiderCode {
+    saved,    // kept, normalised
+    cleared,  // an empty text: no code is kept now
+    invalid,  // not 8 of the code's characters once normalised: nothing changed
+    failed,   // it could not be written (or removed), or this build names no service
+};
+// Keeps what the player typed as the code, normalised as the service does (upper case, spaces and
+// hyphens dropped); an empty text removes it. It is used from the next check, at the next start.
+InsiderCode SetInsiderCode(const std::string& typed);
 } // namespace Eden::UpdateNotice

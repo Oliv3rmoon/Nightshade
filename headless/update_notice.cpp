@@ -9,9 +9,11 @@
 #include <string>
 
 #include "diagnostics.h"
+#include "insider_url.h"
 #include "prosperoeden/version.h"
 #include "storage_paths.h"
 #include "update_check/github_release.h"
+#include "update_check/insider.h"
 #include "update_check/self_update.h"
 #include "update_check/update_check.h"
 #include "update_repository.h"
@@ -38,6 +40,10 @@ constexpr const char* kRepository = EDEN_UPDATE_REPOSITORY;
 // The app's name as the update says it (the helper's notification: "Nightshade was updated to
 // v1.005.100"): a build that asks a repository's releases is the Nightshade release line.
 constexpr const char* kAppName = kRepository[0] != '\0' ? "Nightshade" : "ProsperoEden";
+// The insider service (EDEN_INSIDER_URL, headless/CMakeLists.txt): empty, no insider builds at all.
+constexpr const char* kInsiderUrl = EDEN_INSIDER_URL;
+// The app's id at the service (nightly-insider's docs/API.md).
+constexpr const char* kInsiderApp = "nightshade";
 
 std::mutex lock;
 bool started = false;
@@ -47,6 +53,44 @@ self_update_check_result answer = SELF_UPDATE_UNKNOWN;
 self_update_offer offer{};
 self_update_job job{};  // zero until the first Begin, as the kit asks
 bool begun = false;
+// Insider builds: the kept code (read once), and what the service said at this launch's check.
+bool code_read = false;
+std::string code;
+insider_status insider_answer = INSIDER_NOT_ASKED;
+
+std::string CodeFile() { return ConfigFile("insider-code"); }
+
+// The kept code: the file holds it and a line end, nothing else (insider_code_read). With `lock` held.
+const std::string& KeptCode() {
+    if (!code_read && kInsiderUrl[0] != '\0') {
+        code_read = true;
+        char text[16];
+        std::size_t length = 0;
+        if (FILE* file = std::fopen(CodeFile().c_str(), "rb")) {
+            length = std::fread(text, 1, sizeof(text), file);
+            std::fclose(file);
+        }
+        char kept[INSIDER_CODE_LENGTH + 1];
+        if (insider_code_read(text, length, kept)) code = kept;
+    }
+    return code;
+}
+
+// The service's answer as the log says it, on one line: never the code, never the download's token
+// (its host and the build's file name).
+std::string InsiderLine(const insider_report& report) {
+    std::string line = std::string("insider: status=") +
+                       (report.answer[0] ? report.answer : insider_status_text(report.status)) +
+                       " http=" + std::to_string(report.http_status);
+    if (report.platform_error) line += " error=" + std::to_string(report.platform_error);
+    if (report.status == INSIDER_REFUSED)
+        line += std::string(" refused=") + (report.why ? report.why : "?");
+    else if (report.answer[0] && std::strcmp(report.answer, insider_status_text(report.status)) != 0)
+        line += std::string(" result=") + insider_status_text(report.status);
+    if (report.tag[0]) line += std::string(" tag=") + report.tag;
+    if (report.host[0]) line += std::string(" host=") + report.host + " file=" + (report.file[0] ? report.file : "-");
+    return line;
+}
 
 const char* ResultName(self_update_check_result result) {
     static const char* const names[] = {"available", "up-to-date", "unknown", "untrusted", "not-installable"};
@@ -86,13 +130,33 @@ bool DevelopmentOffer(self_update_offer& out) {
 void* Check(void*) {
     self_update_offer result{};
     github_release_report github{};
+    insider_report insider{};
+    insider.status = INSIDER_NOT_ASKED;
     // Test builds ask the repository's releases list, pre-releases with it; a build that asks the
     // catalog has none to offer, and asks as it always does.
     const bool tests = test_builds && kRepository[0] != '\0';
+    // With Test builds on, a build that names the insider service and a kept code ask the service
+    // first; when it offers nothing, the same check as below follows (insider_check_tests_from).
+    std::string kept;
+    if (test_builds && kInsiderUrl[0] != '\0') {
+        const std::lock_guard guard(lock);
+        kept = KeptCode();
+    }
     // With no repository named, this is self_update_check_self(): the catalog, as before.
-    self_update_check_result state = tests ? self_update_check_self_tests(kRepository, kAppName, &result, &github)
-                                           : self_update_check_self_from(kRepository, kAppName, &result, &github);
-    if (tests) {
+    self_update_check_result state =
+        !kept.empty() ? self_update_check_self_insider(kInsiderUrl, kept.c_str(), kInsiderApp, kRepository, kAppName,
+                                                       kAppVersion, &result, &insider, &github)
+        : tests       ? self_update_check_self_tests(kRepository, kAppName, &result, &github)
+                      : self_update_check_self_from(kRepository, kAppName, &result, &github);
+    if (insider.status != INSIDER_NOT_ASKED) {
+        Report("update check", InsiderLine(insider).c_str());
+        const std::lock_guard guard(lock);
+        insider_answer = insider.status;
+    }
+    const bool from_insider = insider.status == INSIDER_UPDATE;
+    if (from_insider) {
+        // The insider build: GitHub was not asked.
+    } else if (tests) {
         char line[640];
         std::snprintf(line, sizeof(line),
                       "GitHub %s releases (test builds): reason=%s http=%d redirects=%d error=%d releases=%d tag=%s "
@@ -119,7 +183,8 @@ void* Check(void*) {
 #endif
     // A test build is of the program's own line as well as of sce_sys/param.json's: an install of
     // 01.010 is never offered 01.011 (another title ID and folder) or 01.012 (the Switch 2 test line).
-    if (tests && (state == SELF_UPDATE_AVAILABLE || state == SELF_UPDATE_NOT_INSTALLABLE) &&
+    // An insider build is a test build too.
+    if ((tests || from_insider) && (state == SELF_UPDATE_AVAILABLE || state == SELF_UPDATE_NOT_INSTALLABLE) &&
         !github_release_same_line(result.available, kAppVersion)) {
         Report("update check", (std::string{"Test builds: "} + result.available + " is not of the program's line (" +
                                 kAppVersion + "): not offered")
@@ -175,6 +240,9 @@ void Start(bool tests) {
         started = true;
         test_builds = tests;
     }
+    // An insider build is downloaded from the service's own host; nothing else changes.
+    if (kInsiderUrl[0] != '\0' && !self_update_allow_insider(kInsiderUrl))
+        Report("update check", "insider: the service's address is not one the kit downloads from");
     pthread_attr_t attributes;
     if (pthread_attr_init(&attributes) != 0) return;
     pthread_attr_setstacksize(&attributes, kStackSize);
@@ -245,5 +313,48 @@ void Finish() {
     if (!begun) return;
     self_update_finish(&job);
     begun = false;
+}
+
+bool InsiderAvailable() { return kInsiderUrl[0] != '\0'; }
+
+bool InsiderCodeSet() {
+    const std::lock_guard guard(lock);
+    return !KeptCode().empty();
+}
+
+bool InsiderRefused() {
+    const std::lock_guard guard(lock);
+    return kInsiderUrl[0] != '\0' && insider_status_hints(insider_answer);
+}
+
+InsiderCode SetInsiderCode(const std::string& typed) {
+    if (kInsiderUrl[0] == '\0') return InsiderCode::failed;
+    const std::string file = CodeFile();
+    // Nothing typed (spaces aside): no code is kept.
+    if (typed.find_first_not_of(" \t\r\n") == std::string::npos) {
+        if (std::remove(file.c_str()) != 0 && FileExists(file)) return InsiderCode::failed;
+        const std::lock_guard guard(lock);
+        code_read = true;
+        code.clear();
+        insider_answer = INSIDER_NOT_ASKED; // that answer was about the code that is gone
+        return InsiderCode::cleared;
+    }
+    char normalised[INSIDER_CODE_LENGTH + 1];
+    if (!insider_code_normalise(typed.c_str(), normalised)) return InsiderCode::invalid;
+    // The code and a line end, written beside the file and moved over it.
+    const std::string temporary = file + ".tmp";
+    FILE* out = std::fopen(temporary.c_str(), "wb");
+    if (!out) return InsiderCode::failed;
+    bool written = std::fprintf(out, "%s\n", normalised) == INSIDER_CODE_LENGTH + 1;
+    written = std::fclose(out) == 0 && written;
+    if (!written || std::rename(temporary.c_str(), file.c_str()) != 0) {
+        std::remove(temporary.c_str());
+        return InsiderCode::failed;
+    }
+    const std::lock_guard guard(lock);
+    code_read = true;
+    code = normalised;
+    insider_answer = INSIDER_NOT_ASKED;
+    return InsiderCode::saved;
 }
 } // namespace Eden::UpdateNotice
