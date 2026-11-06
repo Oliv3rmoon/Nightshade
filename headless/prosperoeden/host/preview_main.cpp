@@ -1647,6 +1647,47 @@ void showcase_pictures(Stage &s)
     expect(s.launcher->section_shown() == 0, "L1 from Settings did not come back home");
     s.shoot("S28-home-again");
 
+    // Far along the home row: the focus and the row move with it.
+    s.press({Key::down});
+    for (int right = 0; right < 9; ++right)
+        s.press({Key::right});
+    s.wait(1.0f);
+    expect(s.launcher->shelf_focus() >= 9 && s.launcher->shelf_scrolled() > 100.0f,
+           "the home row's focus or scroll did not follow Right");
+    s.shoot("S29-home-row-scrolled");
+    // A game the Library's filter leaves out (Recently played) has its settings saved for itself:
+    // its page opens over the home screen, for the game shown.
+    {
+        const std::uint64_t shown = s.launcher->shown_title();
+        s.press({Key::r1});
+        s.wait(1.0f);
+        for (int up = 0; up < 6; ++up)
+            s.press({Key::up});
+        s.press({Key::right, Key::cross});
+        s.wait(0.6f);
+        s.press({Key::l1});
+        s.wait(1.0f);
+        expect(s.launcher->shown_title() == shown, "the home screen did not show its row's game again");
+        s.press({Key::triangle});
+        s.wait(0.9f);
+        // (Let a reading of the games land while the page is open.)
+        for (int tries = 0; tries < 100; ++tries)
+        {
+            s.frame();
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        }
+        s.press({Key::down, Key::cross, Key::right});
+        s.wait(0.6f);
+        expect(s.services.saved_title == shown, "a game's settings were saved for another game");
+        s.shoot("S29b-home-page-saved");
+        s.press({Key::left, Key::circle});
+        s.wait(0.4f);
+        s.press({Key::circle});
+        s.wait(0.9f);
+        expect(s.launcher->section_shown() == 0 && s.launcher->shown_title() == shown,
+               "the game's page did not come back to the home screen's game");
+    }
+
     // What the home screen says when something is wrong.
     s.services.setup_ready = false;
     s.restart();

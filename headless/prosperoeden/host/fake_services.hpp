@@ -423,9 +423,12 @@ class FakeServices : public ui::Services
     {
         return game_settings_;
     }
-    bool set_game_settings(std::uint64_t, const ui::GameSettings &settings) override
+    // The game whose settings were saved last (the walk checks they reach the game shown).
+    std::uint64_t saved_title = 0;
+    bool set_game_settings(std::uint64_t title_id, const ui::GameSettings &settings) override
     {
         game_settings_ = settings;
+        saved_title = title_id;
         return true;
     }
     // What the keyboard gives the next time a game's RNG seed is asked for: a seed, -1 for a
