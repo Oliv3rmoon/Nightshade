@@ -18,8 +18,8 @@
 Nightshade runs your own Switch games on a jailbroken PS5. It is made by **[Oliv3rmoon](https://github.com/Oliv3rmoon)**: big games start right away, long sessions last, the emulator gives memory back to the console, and the launcher has a look of its own in black and red. Every release lists exactly what is in it: see [Releases](https://github.com/Oliv3rmoon/Nightshade/releases) and the [changelog](docs/CHANGELOG.md).
 
 <p align="center">
-  <img src="docs/images/launcher-home.png" width="32%" alt="Nightshade's home screen: the library beside the selected game's details">
-  <img src="docs/images/launcher-settings.png" width="32%" alt="Nightshade's settings list">
+  <img src="docs/images/launcher-home.png" width="32%" alt="Nightshade's home screen: the selected game over its art, with a row of covers under it">
+  <img src="docs/images/launcher-settings.png" width="32%" alt="Nightshade's settings: a column of categories beside the Video panel">
   <img src="docs/images/launcher-game-settings.png" width="32%" alt="One game's own settings, with its mods and cheats">
 </p>
 <p align="center"><sub>The Nightshade theme, drawn by the launcher's host preview with sample games.</sub></p>
