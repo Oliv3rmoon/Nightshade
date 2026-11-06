@@ -1941,6 +1941,72 @@ GraphicsPipeline* PipelineCache::CurrentGraphicsPipeline() {"""),
      '        EdenRecordAttributeless({key.unique_hashes[0], key.unique_hashes[1]}, programs[1].info);\n'
      '    }\n'
      '    std::array<const Shader::Info*, Maxwell::MaxShaderStage> infos{};\n'),
+    # Asynchronous shaders (BuiltPipeline): what a draw whose pipeline is still being built does.
+    # Eden 67bada77 skips it unless it has 6 indices or vertices or fewer. Two rules from Eden go
+    # before that one, and every decision is counted (headless/async_shaders.h, EDEN_ASYNC_SHADERS):
+    # - Eden PR #4639 (git.eden-emu.dev/eden-emu/eden/pulls/4639, by John, open on 2026-11-05; only
+    #   this rule of it, not its depth clamp change): a draw into a target under 640x360 waits.
+    #   Such targets often get something made once and used for a long time (lookup tables, noise
+    #   or fog textures); skipping the draw loses it for the session (Super Mario Odyssey's fog).
+    # - Upstream Eden (master 5df59912, vk_pipeline_cache.cpp:792-796): a draw with a depth buffer
+    #   (zeta_enable) is skipped even when small; a scene's geometry is drawn again next frame.
+    ('#include "video_core/renderer_vulkan/vk_pipeline_cache.h"\n',
+     '#include "video_core/renderer_vulkan/vk_pipeline_cache.h"\n#include "async_shaders.h"\n'),
+    ("""GraphicsPipeline* PipelineCache::BuiltPipeline(GraphicsPipeline* pipeline) const noexcept {
+    if (pipeline->IsBuilt()) {
+        return pipeline;
+    }
+    if (!use_asynchronous_shaders) {
+        return pipeline;
+    }
+    // If games are using a small index count, we can assume these are full screen quads.
+    // Usually these shaders are only used once for building textures so we can assume they
+    // can't be built async
+    const auto& draw_state = maxwell3d->draw_manager.draw_state;
+    if (draw_state.index_buffer.count <= 6 || draw_state.vertex_buffer.count <= 6) {
+        return pipeline;
+    }
+    return nullptr;
+}
+""", """GraphicsPipeline* PipelineCache::BuiltPipeline(GraphicsPipeline* pipeline) const noexcept {
+    namespace Async = ::Eden::AsyncShaders;
+    if (pipeline->IsBuilt()) {
+        return pipeline;
+    }
+    if (!use_asynchronous_shaders) {
+        Async::Note(Async::waited_sync);
+        return pipeline;
+    }
+    // Eden PR #4639: draws into small off-screen targets often build something used for a long
+    // time (lookup tables, noise or fog textures, generated once): skipping one loses it for the
+    // session (Super Mario Odyssey's fog, missing after a fresh shader cache). Wait for those; only
+    // skip draws into scene-sized targets, where a skipped draw costs one frame.
+    {
+        const auto& rt0 = maxwell3d->regs.rt[0];
+        const u64 area = u64{rt0.width} * u64{rt0.height};
+        if (rt0.width != 0 && area < u64{640} * 360) {
+            Async::Note(Async::waited_small_target);
+            return pipeline;
+        }
+    }
+    // Upstream Eden: if something is using depth, we can assume that games are not rendering
+    // anything which will be used one time.
+    if (maxwell3d->regs.zeta_enable) {
+        Async::Note(Async::skipped_depth);
+        return nullptr;
+    }
+    // If games are using a small index count, we can assume these are full screen quads.
+    // Usually these shaders are only used once for building textures so we can assume they
+    // can't be built async
+    const auto& draw_state = maxwell3d->draw_manager.draw_state;
+    if (draw_state.index_buffer.count <= 6 || draw_state.vertex_buffer.count <= 6) {
+        Async::Note(Async::waited_small_draw);
+        return pipeline;
+    }
+    Async::Note(Async::skipped);
+    return nullptr;
+}
+"""),
 ]
 # Time both graphics and compute preparation, without modifying the compiler or
 # reading guest state on another thread. These intervals overlap shader_prepare.

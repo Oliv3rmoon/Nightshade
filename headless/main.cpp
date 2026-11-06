@@ -38,6 +38,7 @@
 #include "amiibo.h"
 #include "memory_layout_guard.h"
 #include "title_defaults.h"
+#include "async_shaders.h"
 #include "diagnostics.h"
 #include "hud.h"
 #include "loading_art.h"
@@ -1369,6 +1370,9 @@ int main(int argc, char** argv) {
             // This runs before Core::System creates any of the new guest's threads.
             Eden::GuestClock::Reset(Eden::LoadAdaptiveClock(eden_game_title_id(guest)));
             Settings::values.use_asynchronous_shaders = speed.async_shaders;
+            // What the pipeline cache does with draws whose pipeline is not built yet, counted from
+            // here for this session (async_shaders.h, EDEN_ASYNC_SHADERS in stderr.log).
+            Eden::AsyncShaders::Reset(speed.async_shaders);
             // A game's saved pipelines are built while it plays (shader_start.h), unless the settings
             // file says otherwise: Vulkan only, the OpenGL renderer builds them before the game starts.
             Eden::ShaderStart::background = speed.background_shader_cache && backend == Eden::GraphicsBackend::Vulkan;
