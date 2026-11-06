@@ -44,6 +44,10 @@ test -f "$ffmpeg/lib/libavcodec.a" || { echo 'Run tools/build-headless-ffmpeg.sh
 # configure left in the cache.
 update_repository=(-U EDEN_UPDATE_REPOSITORY)
 [[ -n ${EDEN_UPDATE_REPOSITORY+set} ]] && update_repository=("-DEDEN_UPDATE_REPOSITORY=$EDEN_UPDATE_REPOSITORY")
+# The insider service's address (update_check/insider.h) the same way: EDEN_INSIDER_URL when it is set,
+# none otherwise (no insider builds).
+insider_url=(-U EDEN_INSIDER_URL)
+[[ -n ${EDEN_INSIDER_URL+set} ]] && insider_url=("-DEDEN_INSIDER_URL=$EDEN_INSIDER_URL")
 cmake -S "$scratch/source" -B "$scratch/native-local" -G Ninja \
     -DCMAKE_TOOLCHAIN_FILE="$root/headless/ps5.cmake" -DPS5_NATIVE=ON -DEDEN_DEVICE_FRONTEND="$devices" \
     -DCMAKE_BUILD_TYPE=Release -DENABLE_LTO=OFF \
@@ -55,7 +59,7 @@ cmake -S "$scratch/source" -B "$scratch/native-local" -G Ninja \
     -DEDEN_DEV_PROFILE="${EDEN_DEV_PROFILE:-OFF}" \
     -DEDEN_DEV_PROFILE_TITLE="${EDEN_DEV_PROFILE_TITLE:-$(cat "$root/.local/dev-profile-title" 2>/dev/null || true)}" \
     -DEDEN_DEV_WAIT_CALLERS="${EDEN_DEV_WAIT_CALLERS:-OFF}" \
-    "${update_repository[@]}" \
+    "${update_repository[@]}" "${insider_url[@]}" \
     -DCMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH=ON \
     -DCMAKE_PROJECT_yuzu_INCLUDE="$root/headless/inject.cmake" \
     -DEDEN_GPU_PROBE="$probe" -DENABLE_QT=OFF -DYUZU_CMD=OFF -DYUZU_ROOM=OFF -DYUZU_ROOM_STANDALONE=OFF \

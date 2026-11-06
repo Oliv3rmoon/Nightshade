@@ -3652,6 +3652,15 @@ set(EDEN_UPDATE_REPOSITORY "Oliv3rmoon/Nightshade" CACHE STRING
 include("${EDEN_PORT_DIR}/update_repository.cmake") # refuses what the update check would refuse
 write_derived("${PORT_BUILD_DIR}/version/update_repository.h"
     "// Generated from EDEN_UPDATE_REPOSITORY (headless/CMakeLists.txt).\n#pragma once\n#define EDEN_UPDATE_REPOSITORY \"${EDEN_UPDATE_REPOSITORY}\"\n")
+# Insider builds (update_check/insider.h): the insider service's address, which gives members of the
+# nightly Discord new test builds first (Settings > Diagnostics > Test builds, with an insider code).
+# Empty, the default: no insider builds at all, nothing asked and nothing in the settings. Read by
+# update_notice.cpp alone, as the repository is.
+set(EDEN_INSIDER_URL "" CACHE STRING
+    "The insider service's address (https://host[/path], no '/' at the end); empty: no insider builds")
+include("${EDEN_PORT_DIR}/insider_url.cmake") # refuses what the update check would refuse
+write_derived("${PORT_BUILD_DIR}/version/insider_url.h"
+    "// Generated from EDEN_INSIDER_URL (headless/CMakeLists.txt).\n#pragma once\n#define EDEN_INSIDER_URL \"${EDEN_INSIDER_URL}\"\n")
 target_include_directories(eden-headless PRIVATE "${PORT_BUILD_DIR}/version")
 target_link_libraries(eden-headless PRIVATE core eden-pad)
 # A game's text entry on the PS5's own on-screen keyboard (system_keyboard.h, keyboard_applet.h).

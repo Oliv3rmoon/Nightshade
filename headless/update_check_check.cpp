@@ -1929,6 +1929,11 @@ int main(int argc, char** argv) {
         std::printf("%d\n", github_release_repository_valid(argv[2]));
         return 0;
     }
+    // The same for the insider service's address (EDEN_INSIDER_URL, headless/insider_url.cmake).
+    if (argc == 3 && std::strcmp(argv[1], "--insider-url") == 0) {
+        std::printf("%d\n", insider_base_valid(argv[2]));
+        return 0;
+    }
     // The app's content version (sce_sys/param.json) is NN.NNN.NNN; a release's name is not one.
     unsigned parts[3];
     assert(update_check_version_parse("01.000.040", parts) == 1 && parts[0] == 1 && parts[1] == 0 && parts[2] == 40);

@@ -12,8 +12,10 @@ through a stand-in for the network, down to the requests it makes, and that a bu
 repository makes the catalog's requests as before.
 
 Then headless/update_repository.cmake, which refuses an EDEN_UPDATE_REPOSITORY when configuring
-(cmake -P), with names it must take and refuse: it takes and refuses what the C code does. CC, CXX
-and CMAKE name other programs; without cmake that part is skipped, saying so.
+(cmake -P), with names it must take and refuse: it takes and refuses what the C code does; and
+headless/insider_url.cmake the same for EDEN_INSIDER_URL, the insider service's address
+(update_check/insider.h). CC, CXX and CMAKE name other programs; without cmake that part is
+skipped, saying so.
 """
 from pathlib import Path
 import os, shutil, subprocess, sys, tempfile
@@ -26,6 +28,19 @@ REPOSITORIES = [
     ('x', False), ('/x', False), ('x/', False), ('x/y/z', False), ('a b/c', False), ('x\\y/z', False),
     ('x/y@z', False), ('x/y;z', False), ('x/y?z', False), ('x/y#z', False), ('\u00fcber/x', False),
     ('x_y/z', False), ('x.y/z', False),
+]
+
+# The insider service's address (EDEN_INSIDER_URL), and whether the update check takes it.
+INSIDER_URLS = [
+    ('https://nightly-insider.oliv3rmoon.workers.dev', True), ('https://insider.example.com/nightly', True),
+    ('https://a.b/c/d', True), ('https://localhost', True), ('https://x-1.y/v_2/a.b-c', True), ('https://x/...', True),
+    ('https://NIGHTLY.example', True), ('https://' + 'a' * 120, True), ('https://' + 'a' * 121, False),
+    ('http://x', False), ('https://', False), ('https://x/', False), ('https://x/a/', False), ('https://-x', False),
+    ('https://x-', False), ('https://x..y', False), ('https://.x', False), ('https://x.', False),
+    ('https://x:8443', False), ('https://user@x', False), ('https://x/a b', False), ('https://x/?q', False),
+    ('https://x/#f', False), ('https://x/.', False), ('https://x/..', False), ('https://x/./a', False),
+    ('https://x/../a', False), ('https://x//a', False), ('HTTPS://x', False), ('https://x_y', False),
+    ('https://x/a%20b', False), (' https://x', False), ('https://x/a\\b', False), ('ftp://x', False),
 ]
 
 root = Path(__file__).resolve().parents[1]
@@ -70,3 +85,20 @@ with tempfile.TemporaryDirectory() as tmp:
         sys.exit('EDEN_UPDATE_REPOSITORY in CMake and C differ:\n  ' + '\n  '.join(wrong))
     print(f'EDEN_UPDATE_REPOSITORY in CMake: takes and refuses what the update check does '
           f'({len(REPOSITORIES)} names and the empty one) PASS')
+
+    script = str(headless / 'insider_url.cmake')
+    for address, valid in INSIDER_URLS + [('', None)]:
+        taken = subprocess.run([cmake, '-DEDEN_INSIDER_URL=' + address, '-P', script], capture_output=True,
+                               text=True).returncode == 0
+        if valid is None:  # empty: no insider builds, which CMake takes and the C code is never asked
+            if not taken:
+                wrong.append('CMake refuses the empty address')
+            continue
+        c_takes = subprocess.run([str(exe), '--insider-url', address], capture_output=True, text=True,
+                                 check=True).stdout.strip() == '1'
+        if (taken, c_takes) != (valid, valid):
+            wrong.append(f'{address!r}: expected {valid}, CMake {taken}, C {c_takes}')
+    if wrong:
+        sys.exit('EDEN_INSIDER_URL in CMake and C differ:\n  ' + '\n  '.join(wrong))
+    print(f'EDEN_INSIDER_URL in CMake: takes and refuses what the update check does '
+          f'({len(INSIDER_URLS)} addresses and the empty one) PASS')
