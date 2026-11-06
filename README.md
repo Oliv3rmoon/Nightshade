@@ -9,11 +9,19 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Oliv3rmoon/Nightshade/releases/latest"><img src="https://img.shields.io/github/v/release/Oliv3rmoon/Nightshade?style=for-the-badge&label=download&color=e5484d&labelColor=0d0d0f" alt="Download the latest release"></a>
-  <a href="https://discord.gg/pSqgRU3YP9"><img src="https://img.shields.io/badge/discord-nightly-0d0d0f?style=for-the-badge&logo=discord&logoColor=e5484d" alt="Discord: nightly"></a>
-  <a href="https://github.com/Oliv3rmoon/Nightshade"><img src="https://img.shields.io/github/stars/Oliv3rmoon/Nightshade?style=for-the-badge&color=e5484d&labelColor=0d0d0f" alt="GitHub stars"></a>
-  <a href="https://buymeacoffee.com/oliv3rmoon"><img src="https://img.shields.io/badge/buy%20me%20a%20coffee-0d0d0f?style=for-the-badge&logo=buymeacoffee&logoColor=e5484d" alt="Buy me a coffee"></a>
+  <a href="https://github.com/Oliv3rmoon/Nightshade/releases"><img src="https://img.shields.io/github/v/release/Oliv3rmoon/Nightshade?include_prereleases" alt="Latest release"></a>
+  <a href="https://discord.gg/pSqgRU3YP9"><img src="https://img.shields.io/badge/discord-join%20nightly-5865F2?logo=discord&logoColor=white" alt="Discord: join nightly"></a>
+  <a href="https://github.com/Oliv3rmoon/Nightshade/stargazers"><img src="https://img.shields.io/github/stars/Oliv3rmoon/Nightshade?style=social" alt="GitHub stars"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue" alt="License: GPL-3.0-or-later"></a>
+  <a href="https://buymeacoffee.com/oliv3rmoon"><img src="https://img.shields.io/badge/buy%20me%20a%20coffee-e5484d?logo=buymeacoffee&logoColor=white" alt="Buy me a coffee"></a>
 </p>
+
+<p align="center">
+  <a href="https://github.com/Oliv3rmoon/Nightshade/releases/latest"><strong>Download the latest release</strong></a><br>
+  Test builds are on the <a href="https://github.com/Oliv3rmoon/Nightshade/releases">Releases page</a>, marked pre-release.
+</p>
+
+<p align="center">If Nightshade works for you, a ⭐ helps other PS5 owners find it.</p>
 
 Nightshade runs your own Switch games on a jailbroken PS5. It is made by **[Oliv3rmoon](https://github.com/Oliv3rmoon)**: big games start right away, long sessions last, the emulator gives memory back to the console, and the launcher has a look of its own in black and red. Every release lists exactly what is in it: see [Releases](https://github.com/Oliv3rmoon/Nightshade/releases) and the [changelog](docs/CHANGELOG.md).
 
@@ -177,6 +185,8 @@ Filesystem elevation uses [PS5-Lapy-JB-Daemon](https://github.com/ArkSama/PS5-La
 </details>
 
 ## Thanks
+
+Thanks to the testers in the nightly Discord who try every test build and send logs.
 
 Thank you to the people who test on their own consoles and report what they find, here and in the project Nightshade is built on:
 
