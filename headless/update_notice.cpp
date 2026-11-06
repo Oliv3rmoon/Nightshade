@@ -342,6 +342,7 @@ InsiderCode SetInsiderCode(const std::string& typed) {
     char normalised[INSIDER_CODE_LENGTH + 1];
     if (!insider_code_normalise(typed.c_str(), normalised)) return InsiderCode::invalid;
     // The code and a line end, written beside the file and moved over it.
+    (void)mkdir(ConfigDir().c_str(), 0777);
     const std::string temporary = file + ".tmp";
     FILE* out = std::fopen(temporary.c_str(), "wb");
     if (!out) return InsiderCode::failed;
