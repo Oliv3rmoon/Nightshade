@@ -58,3 +58,14 @@ before. And `self_update_ps5.c` sends any payload from the app's folder
 (`self_update_open_payload`), the launch payload as well as the helper, with a shorter wait for its
 answer when asked (`self_update_channel_timeout`), and `console_download` keeps the address it
 follows per call instead of in one static buffer, since downloads can now run at once.
+
+Insider builds (`insider.h`, `insider.c`) are ProsperoEden's own too: a build that names the
+nightly insider service (`EDEN_INSIDER_URL`) asks it first, with Test builds on and an insider
+code kept, through `insider_check_tests_from` (`self_update_check_self_insider` in
+`self_update_ps5.c`, whose `console_post` is the one POST the kit makes: HTTPS, no redirects, a
+5 s connect and 10 s overall limit, 16 KB of answer). Only an answer `"status": "update"` whose
+build passes every check fills the offer, a pre-release with its title; anything else asks
+GitHub's test builds exactly as before. `self_update.c` has `self_update_insider_url` and
+`self_update_allow_insider`: once the build names the service, `self_update_url_allowed` also
+takes `<service>/v1/download/<token>` (never as a redirect's target), and the download is
+checked against the SHA-256 and size the service gave, as any other.

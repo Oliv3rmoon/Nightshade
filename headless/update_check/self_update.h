@@ -148,8 +148,21 @@ extern "C"
     self_update_check_result self_update_check_self(self_update_offer *offer);
 
     /* 1 when a download may be made from url. redirected: 0 for the address the catalog lists
-     * (github.com only), 1 for where GitHub sends it (its release file host as well). */
+     * (github.com only), 1 for where GitHub sends it (its release file host as well).
+     * ProsperoEden: also, not redirected, an insider build's address once self_update_allow_insider
+     * has named the service. */
     int self_update_url_allowed(const char *url, int redirected);
+
+    /* ProsperoEden: insider builds (insider.h). The longest download address the service gives. */
+#define SELF_UPDATE_INSIDER_MAX_URL 400u
+    /* 1 when `url` is a download address of the insider service at `base` (https://...): exactly
+     * <base>/v1/download/ and a token, at most SELF_UPDATE_INSIDER_MAX_URL characters, only
+     * A-Z a-z 0-9 - _ . / : in it, no empty, "." or ".." segment after the prefix. */
+    int self_update_insider_url(const char *base, const char *url);
+    /* Lets self_update_url_allowed take the addresses self_update_insider_url takes for `base`
+     * (never as a redirect's target). NULL or "": none, as without insider builds. Call it before
+     * a download can start. 1: `base` is named (or none, for NULL or ""); 0: refused, none. */
+    int self_update_allow_insider(const char *base);
 
     /* ---- 2. The update itself --------------------------------------------------------------- */
 

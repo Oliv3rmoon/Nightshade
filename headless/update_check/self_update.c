@@ -117,6 +117,53 @@ static int starts_with(const char *text, const char *prefix)
     return strncmp(text, prefix, strlen(prefix)) == 0;
 }
 
+/* ProsperoEden: the insider service's address, once named (self_update_allow_insider). */
+static char self_update_insider_base[160];
+
+int self_update_insider_url(const char *base, const char *url)
+{
+    static const char path[] = "/v1/download/";
+    const char *token;
+    const char *segment;
+    size_t base_length;
+    size_t i;
+    if (base == NULL || url == NULL || !starts_with(base, "https://"))
+        return 0;
+    base_length = strlen(base);
+    if (base_length <= 8 || strlen(url) > SELF_UPDATE_INSIDER_MAX_URL || strncmp(url, base, base_length) != 0 ||
+        strncmp(url + base_length, path, sizeof(path) - 1) != 0)
+        return 0;
+    for (i = 0; url[i] != '\0'; ++i)
+    {
+        const char c = url[i];
+        if (!((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_' ||
+              c == '.' || c == '/' || c == ':'))
+            return 0;
+    }
+    /* The token: one segment or more, none of them empty, "." or "..". */
+    token = url + base_length + sizeof(path) - 1;
+    for (segment = token;;)
+    {
+        const size_t length = strcspn(segment, "/");
+        if (length == 0 || (length == 1 && segment[0] == '.') || (length == 2 && segment[0] == '.' && segment[1] == '.'))
+            return 0;
+        if (segment[length] == '\0')
+            return 1;
+        segment += length + 1;
+    }
+}
+
+int self_update_allow_insider(const char *base)
+{
+    self_update_insider_base[0] = '\0';
+    if (base == NULL || base[0] == '\0')
+        return 1;
+    if (!starts_with(base, "https://") || strlen(base) >= sizeof(self_update_insider_base))
+        return 0;
+    (void)snprintf(self_update_insider_base, sizeof(self_update_insider_base), "%s", base);
+    return 1;
+}
+
 int self_update_url_allowed(const char *url, int redirected)
 {
     size_t i;
@@ -132,6 +179,10 @@ int self_update_url_allowed(const char *url, int redirected)
             url[i] == '@')
             return 0;
     if (starts_with(url, "https://github.com/"))
+        return 1;
+    /* ProsperoEden: an insider build, from the service's own host; never a redirect's target. */
+    if (!redirected && self_update_insider_base[0] != '\0' &&
+        self_update_insider_url(self_update_insider_base, url))
         return 1;
     return redirected && starts_with(url, "https://release-assets.githubusercontent.com/");
 }

@@ -14,6 +14,7 @@
 
 #include "console_curl.h"
 #include "github_release.h"
+#include "insider.h"
 #include "update_check.h"
 #include "self_update_protocol.h"
 
@@ -126,6 +127,59 @@ static int console_fetch(void *user, const char *url, char *body, size_t capacit
     (void)curl_easy_getinfo(easy, CURLINFO_RESPONSE_CODE, &code);
     curl_easy_cleanup(easy);
     /* ProsperoEden: an answer too long is told from a failed transfer. */
+    if (sink.overflow)
+    {
+        *status = (int)code;
+        return SELF_UPDATE_FETCH_TOO_LARGE;
+    }
+    if (result != CURLE_OK)
+        return -(10000 + (int)result);
+    *status = (int)code;
+    *length = sink.used;
+    return 0;
+}
+
+/* ProsperoEden: insider builds (insider.h): a small JSON body POSTed, its answer read as
+ * console_fetch reads one. HTTPS only and no redirects (new_request), a shorter wait than the
+ * catalog's, the app's own User-Agent. */
+static int console_post(void *user, const char *url, const char *agent, const char *json, char *body,
+                        size_t capacity, size_t *length, int *status)
+{
+    static const char *const lines[] = {"Content-Type: application/json", "Accept: application/json", "Expect:"};
+    memory_sink sink = {body, capacity, 0, 0};
+    struct curl_slist *headers = NULL;
+    long code = 0;
+    size_t i;
+    CURLcode result;
+    CURL *easy = new_request(url);
+    (void)user;
+    *length = 0;
+    *status = 0;
+    if (easy == NULL)
+        return -(10000 + (int)CURLE_FAILED_INIT);
+    for (i = 0; i < sizeof(lines) / sizeof(lines[0]); ++i)
+    {
+        struct curl_slist *next = curl_slist_append(headers, lines[i]);
+        if (next == NULL)
+        {
+            curl_slist_free_all(headers);
+            curl_easy_cleanup(easy);
+            return -(10000 + (int)CURLE_OUT_OF_MEMORY);
+        }
+        headers = next;
+    }
+    (void)curl_easy_setopt(easy, CURLOPT_USERAGENT, agent);
+    (void)curl_easy_setopt(easy, CURLOPT_HTTPHEADER, headers);
+    (void)curl_easy_setopt(easy, CURLOPT_POSTFIELDS, json);
+    (void)curl_easy_setopt(easy, CURLOPT_POSTFIELDSIZE, (long)strlen(json));
+    (void)curl_easy_setopt(easy, CURLOPT_CONNECTTIMEOUT_MS, (long)INSIDER_CONNECT_MS);
+    (void)curl_easy_setopt(easy, CURLOPT_TIMEOUT_MS, (long)INSIDER_TIMEOUT_MS);
+    (void)curl_easy_setopt(easy, CURLOPT_WRITEFUNCTION, on_small);
+    (void)curl_easy_setopt(easy, CURLOPT_WRITEDATA, &sink);
+    result = curl_easy_perform(easy);
+    (void)curl_easy_getinfo(easy, CURLINFO_RESPONSE_CODE, &code);
+    curl_easy_cleanup(easy);
+    curl_slist_free_all(headers);
     if (sink.overflow)
     {
         *status = (int)code;
@@ -456,4 +510,34 @@ self_update_check_result self_update_check_self_tests(const char *repository, co
                    title);
     return self_update_check_tests_from(self_update_console(), repository, name, title, version, offer,
                                         report);
+}
+
+/* ProsperoEden: test builds with insider builds (insider.h): the insider service first, with the
+   kept code, then, when it offers nothing, self_update_check_self_tests above. */
+self_update_check_result self_update_check_self_insider(const char *base, const char *code, const char *app,
+                                                        const char *repository, const char *name,
+                                                        const char *running, self_update_offer *offer,
+                                                        insider_report *insider, github_release_report *github)
+{
+    char title[10];
+    char version[12];
+    if (insider != NULL)
+    {
+        memset(insider, 0, sizeof(*insider));
+        insider->status = INSIDER_NOT_ASKED;
+    }
+    if (github != NULL)
+        memset(github, 0, sizeof(*github));
+    if (offer == NULL || !update_check_read_param(SELF_UPDATE_PARAM_PATH, title, version))
+    {
+        if (offer != NULL)
+            memset(offer, 0, sizeof(*offer));
+        if (github != NULL)
+            github->reason = GITHUB_RELEASE_BAD_ARGUMENT;
+        return SELF_UPDATE_UNKNOWN;
+    }
+    (void)snprintf(self_update_agent, sizeof(self_update_agent), "homebrew-self-update/1 (%s)",
+                   title);
+    return insider_check_tests_from(self_update_console(), console_post, NULL, base, code, app, repository, name,
+                                    title, version, running, offer, insider, github);
 }

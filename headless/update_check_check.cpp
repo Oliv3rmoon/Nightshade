@@ -4,16 +4,25 @@
 // GitHub repository's releases instead (update_check/github_release.h), through a stand-in for
 // the network: the release's answer, its tag's version, SHA256SUMS, the notes, the decision, the
 // addresses a download may be made from, and that a build naming no repository asks the catalog
-// as before.
+// as before. Then insider builds (update_check/insider.h): the code, the request, the service's
+// answers, the fall back to GitHub's test builds, and a download whose SHA-256 differs refused.
 #include "update_check/github_release.h"
+#include "update_check/insider.h"
 #include "update_check/self_update.h"
+#include "update_check/self_update_protocol.h"
+#include "update_check/self_update_sha256.h"
 #include "update_check/update_check.h"
 #include <cassert>
+#include <chrono>
+#include <csignal>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <map>
 #include <string>
+#include <sys/socket.h>
+#include <thread>
+#include <unistd.h>
 #include <utility>
 #include <vector>
 
@@ -1257,6 +1266,660 @@ void TestBuildCheck() {
         for (const std::string& url : network.asked) assert(url.find("github.com") == std::string::npos);
     }
 }
+
+// ---- Insider builds (update_check/insider.h) --------------------------------------------------
+
+constexpr const char* kInsider = "https://nightly-insider.oliv3rmoon.workers.dev";
+constexpr const char* kInsiderUpdates = "https://nightly-insider.oliv3rmoon.workers.dev/v1/updates";
+constexpr const char* kInsiderDigest = "5d41402abc4b2a76b9719d911017c592aae4b6e1b2c3d4e5f60718293a4b5c6d";
+
+// A download address the service signs: its token names the build, the expiry and the member.
+std::string InsiderUrl(const std::string& tag) {
+    return std::string(kInsider) + "/v1/download/eyJrIjoiYnVpbGRzL25pZ2h0c2hhZGUvIiwidCI6IiIsInYiOiI" + tag +
+           "In0.Q2xhdWRmbGFyZS1zaWduZWQ_dG9rZW4-MQ";
+}
+
+// POST /v1/updates as the service answers "update" (nightly-insider's docs/API.md).
+std::string InsiderUpdate(const std::string& version, const std::string& digest = kInsiderDigest,
+                          std::uint64_t size = 81234567) {
+    const std::string tag = "v" + version;
+    return "{\n  \"status\": \"update\",\n  \"app\": \"nightshade\",\n  \"build\": {\n"
+           "    \"version\": \"" + version + "\",\n    \"tag\": \"" + tag + "\",\n"
+           "    \"title\": \"Nightshade " + tag + " (insider build)\",\n"
+           "    \"file\": \"Nightshade-" + tag + ".zip\",\n    \"size\": " + std::to_string(size) + ",\n"
+           "    \"sha256\": \"" + digest + "\",\n"
+           "    \"notes\": \"Insider build.\\n- The launcher's new settings.\",\n"
+           "    \"published_at\": \"2026-11-08T05:00:00Z\",\n    \"public_after\": \"2026-11-15T05:00:00Z\",\n"
+           "    \"url\": \"" + InsiderUrl(tag) + "\",\n    \"url_expires_at\": \"2026-11-08T06:00:00Z\"\n  }\n}";
+}
+
+std::string InsiderNothing(const char* status) {
+    return std::string("{\"status\":\"") + status +
+           "\",\"hint\":\"Insider builds: get a code in the nightly Discord, discord.gg/pSqgRU3YP9\"}";
+}
+
+insider_status Insider(const std::string& json, int http = 200, const char* installed = "01.010.012",
+                       const char* running = nullptr, insider_report* report = nullptr) {
+    static self_update_offer offer;
+    static insider_report scratch;
+    const insider_status status = insider_evaluate(json.data(), json.size(), http, kInsider, "nightshade", "Nightshade",
+                                                   "PPSA99008", installed, running, &offer, report ? report : &scratch);
+    if (status != INSIDER_UPDATE) assert(offer.artifact[0] == '\0' && offer.sha256[0] == '\0' && offer.size == 0);
+    return status;
+}
+
+const char* Refused(const std::string& json, const char* installed = "01.010.012", const char* running = nullptr) {
+    static insider_report report;
+    assert(Insider(json, 200, installed, running, &report) == INSIDER_REFUSED && report.why != nullptr);
+    return report.why;
+}
+
+// The service, stood in for: what it answers, and every request it was sent.
+struct InsiderService {
+    struct Request {
+        std::string url, agent, json;
+    };
+    std::vector<Request> asked;
+    int status = 200;
+    std::string body;
+    int result = 0; // the POST's own result: 0, a failure (negative) or SELF_UPDATE_FETCH_TOO_LARGE
+};
+InsiderService service;
+
+int Post(void* user, const char* url, const char* agent, const char* json, char* body, size_t capacity, size_t* length,
+         int* status) {
+    assert(user == &service);
+    service.asked.push_back({url, agent, json});
+    *length = 0;
+    *status = 0;
+    if (service.result != 0) {
+        if (service.result == SELF_UPDATE_FETCH_TOO_LARGE) *status = service.status;
+        return service.result;
+    }
+    if (service.body.size() > capacity) {
+        *status = service.status;
+        return SELF_UPDATE_FETCH_TOO_LARGE;
+    }
+    std::memcpy(body, service.body.data(), service.body.size());
+    *length = service.body.size();
+    *status = service.status;
+    return 0;
+}
+
+void Answer(int status, const std::string& body) {
+    service = InsiderService{};
+    service.status = status;
+    service.body = body;
+}
+
+void InsiderCodes() {
+    char code[INSIDER_CODE_LENGTH + 1];
+    // As the service takes them: any case, spaces and hyphens, the code as the page shows it.
+    for (const char* typed : {"ABCDEFGH", "abcdefgh", "ABCD-EFGH", "abcd efgh", " ab-cd ef-gh\n", "aBcD\tEfGh"}) {
+        assert(insider_code_normalise(typed, code) == 1 && std::strcmp(code, "ABCDEFGH") == 0);
+    }
+    assert(insider_code_normalise("2345-6789", code) == 1 && std::strcmp(code, "23456789") == 0);
+    assert(insider_code_normalise("wxyz-wxyz", code) == 1 && std::strcmp(code, "WXYZWXYZ") == 0);
+    // What is outside the alphabet goes (0 O 1 I L U too): what is left must be 8 characters.
+    for (const char* typed : {"", "ABCDEFG", "ABCDEFGHJ", "ABCD-EFG0", "ABCD-EFGO", "ABCD-EFG1", "ABCD-EFGI", "ABCD-EFGL",
+                              "ABCD-EFGU", "ABCD-EFGH-J", "\xc3\x84" "BCDEFGH", "--------", "OIL0U1OI"}) {
+        code[0] = 'x';
+        assert(insider_code_normalise(typed, code) == 0 && code[0] == '\0');
+    }
+    assert(insider_code_normalise("ABCDEFG\xc3\x84H", code) == 1 && std::strcmp(code, "ABCDEFGH") == 0);
+    assert(insider_code_normalise(nullptr, code) == 0 && code[0] == '\0');
+    assert(insider_code_normalise("ABCDEFGH", nullptr) == 0);
+
+    // A code as it is sent and kept: 8 characters of the alphabet, nothing else.
+    assert(insider_code_valid("ABCDEFGH") == 1 && insider_code_valid("23456789") == 1);
+    for (const char* bad : {"abcdefgh", "ABCDEFG", "ABCDEFGHJ", "ABCDEFG0", "ABCD-EFG", "ABCDEFGH\n", ""})
+        assert(insider_code_valid(bad) == 0);
+    assert(insider_code_valid(nullptr) == 0);
+    // The file in the config folder: the code and a line end.
+    assert(insider_code_read("ABCDEFGH\n", 9, code) == 1 && std::strcmp(code, "ABCDEFGH") == 0);
+    for (const std::string bad : {"ABCDEFGH", "ABCDEFGH\r\n", "abcdefgh\n", "ABCDEFG0\n", "ABCDEFGH\nJ", "ABCDEFGH\n\n",
+                                  " ABCDEFGH\n", "", "\n"}) {
+        code[0] = 'x';
+        assert(insider_code_read(bad.data(), bad.size(), code) == 0 && code[0] == '\0');
+    }
+    assert(insider_code_read(std::string("ABCD\0FGH\n", 9).data(), 9, code) == 0);
+
+    // The settings say where to get a code after these answers, not after silence or an offer.
+    for (const insider_status hints : {INSIDER_NOT_QUALIFIED, INSIDER_INVALID_CODE, INSIDER_EXPIRED_CODE})
+        assert(insider_status_hints(hints) == 1);
+    for (const insider_status quiet : {INSIDER_UPDATE, INSIDER_NONE, INSIDER_OTHER, INSIDER_NETWORK, INSIDER_TOO_LARGE,
+                                       INSIDER_BAD_RESPONSE, INSIDER_REFUSED, INSIDER_BAD_ARGUMENT, INSIDER_NOT_ASKED})
+        assert(insider_status_hints(quiet) == 0);
+    assert(std::strcmp(insider_status_text(INSIDER_EXPIRED_CODE), "expired_code") == 0 &&
+           std::strcmp(insider_status_text(INSIDER_NOT_ASKED), "not-asked") == 0 &&
+           std::strcmp(insider_status_text(static_cast<insider_status>(99)), "?") == 0);
+}
+
+void InsiderAddresses() {
+    // The service's address as a build names it (headless/insider_url.cmake takes the same).
+    for (const char* base : {kInsider, "https://insider.example.com/nightly", "https://a.b/c/d", "https://localhost",
+                             "https://x-1.y/v_2/a.b-c", "https://x/...", "https://NIGHTLY.example"})
+        assert(insider_base_valid(base) == 1);
+    for (const char* base : {"", "http://x", "https://", "https://x/", "https://x/a/", "https://-x", "https://x-",
+                             "https://x..y", "https://.x", "https://x.", "https://x:8443", "https://user@x",
+                             "https://x/a b", "https://x/?q", "https://x/#f", "https://x/.", "https://x/..",
+                             "https://x/./a", "https://x/../a", "https://x//a", "HTTPS://x", "https://x_y",
+                             "https://x/a%20b", " https://x", "https://x\n"})
+        assert(insider_base_valid(base) == 0);
+    assert(insider_base_valid(nullptr) == 0);
+    const std::string longest = "https://" + std::string(INSIDER_MAX_BASE - 8, 'a');
+    assert(insider_base_valid(longest.c_str()) == 1 && insider_base_valid((longest + "a").c_str()) == 0);
+
+    char url[256];
+    assert(insider_updates_url(url, sizeof(url), kInsider) != 0 && std::strcmp(url, kInsiderUpdates) == 0);
+    assert(insider_updates_url(url, sizeof(url), "https://x/") == 0 && url[0] == '\0');
+    assert(insider_updates_url(url, 20, kInsider) == 0 && url[0] == '\0');
+
+    // The app's id, and the versions the service writes, as content versions.
+    for (const char* app : {"nightshade", "dulcamara", "ab", "a-b", "x2", "a1234567890123456789012345678901"})
+        assert(insider_app_valid(app) == 1);
+    for (const char* app : {"", "a", "Nightshade", "1x", "-x", "a_b", "a b", "a12345678901234567890123456789012"})
+        assert(insider_app_valid(app) == 0);
+    char version[12];
+    for (const auto& [text, content] : std::vector<std::pair<const char*, const char*>>{
+             {"1.010.013", "01.010.013"}, {"v1.010.013", "01.010.013"}, {"01.010.013", "01.010.013"},
+             {"1.10.13", "01.010.013"}, {"0.2.12", "00.002.012"}, {"99.999.999", "99.999.999"}}) {
+        assert(insider_content_version(text, version) == 1 && std::strcmp(version, content) == 0);
+    }
+    for (const char* text : {"", "v", "1.010", "1.010.013.1", "1.1000.0", "100.0.0", "1.010.013-rc", "V1.010.013",
+                             " 1.010.013", "1..013", "1.010.", "vv1.010.013", "1.010.0000013"}) {
+        assert(insider_content_version(text, version) == 0 && version[0] == '\0');
+    }
+
+    // The request: the app, the version and the code, each a JSON string.
+    char json[INSIDER_MAX_REQUEST + 64];
+    assert(insider_request(json, sizeof(json), "nightshade", "01.010.012", "ABCDEFGH") != 0);
+    assert(std::strcmp(json, "{\"app\":\"nightshade\",\"installed_version\":\"01.010.012\",\"code\":\"ABCDEFGH\"}") == 0);
+    // Quotes, backslashes and control characters are escaped, whatever the text (the code sent is
+    // always a valid one, but nothing can step out of its string).
+    assert(insider_request(json, sizeof(json), "a\"b", "c\\d", "e\nf\x01g\x7f") != 0);
+    assert(std::strcmp(json, "{\"app\":\"a\\\"b\",\"installed_version\":\"c\\\\d\",\"code\":\"e\\u000af\\u0001g\\u007f\"}") ==
+           0);
+    assert(insider_request(json, sizeof(json), "nightshade", "01.010.012", "\xc3\xa9") != 0 &&
+           std::strstr(json, "\"code\":\"\xc3\xa9\"}") != nullptr);
+    // Too small for it, over the service's 1 KB, or an argument missing: nothing.
+    assert(insider_request(json, 40, "nightshade", "01.010.012", "ABCDEFGH") == 0 && json[0] == '\0');
+    const std::string long_code(INSIDER_MAX_REQUEST, 'A');
+    assert(insider_request(json, sizeof(json), "nightshade", "01.010.012", long_code.c_str()) == 0 && json[0] == '\0');
+    assert(insider_request(json, sizeof(json), nullptr, "01.010.012", "ABCDEFGH") == 0);
+
+    // The download's address: exactly <base>/v1/download/<token>, on the service's own host.
+    const std::string good = InsiderUrl("v1.010.013");
+    assert(self_update_insider_url(kInsider, good.c_str()) == 1);
+    assert(self_update_insider_url("https://h.example/n", "https://h.example/n/v1/download/t") == 1);
+    assert(self_update_insider_url("https://h.example/n", "https://h.example/v1/download/t") == 0);
+    std::string longest_url = std::string(kInsider) + "/v1/download/";
+    longest_url += std::string(SELF_UPDATE_INSIDER_MAX_URL - longest_url.size(), 'T');
+    assert(self_update_insider_url(kInsider, longest_url.c_str()) == 1);
+    for (const std::string& bad : std::vector<std::string>{
+             longest_url + "T", "https://nightly-insider.oliv3rmoon.workers.dev.evil.example/v1/download/t",
+             "https://evil.example/v1/download/t", "http://nightly-insider.oliv3rmoon.workers.dev/v1/download/t",
+             std::string(kInsider) + "/v1/download/", std::string(kInsider) + "/v1/downloads/t",
+             std::string(kInsider) + "/v1/updates", std::string(kInsider) + "/v1/download/t?x=1",
+             std::string(kInsider) + "/v1/download/t#x", std::string(kInsider) + "/v1/download/t%2F",
+             std::string(kInsider) + "/v1/download/a/../b", std::string(kInsider) + "/v1/download/..",
+             std::string(kInsider) + "/v1/download/.", std::string(kInsider) + "/v1/download/a//b",
+             std::string(kInsider) + "/v1/download/a/", std::string(kInsider) + "/v1/download/t\n",
+             std::string(kInsider) + "/v1/download/t u", std::string(kInsider) + "@evil/v1/download/t",
+             "https://github.com/Oliv3rmoon/Nightshade/releases/download/v1.010.013/Nightshade-v1.010.013.zip"})
+        assert(self_update_insider_url(kInsider, bad.c_str()) == 0);
+    assert(self_update_insider_url(nullptr, good.c_str()) == 0 && self_update_insider_url(kInsider, nullptr) == 0);
+    assert(self_update_insider_url("http://x", "http://x/v1/download/t") == 0);
+
+    // The kit downloads from there once the build names the service, and never as a redirect's
+    // target; GitHub stays as it was. Without the service it is refused.
+    assert(self_update_url_allowed(good.c_str(), 0) == 0);
+    assert(self_update_allow_insider(kInsider) == 1);
+    assert(self_update_url_allowed(good.c_str(), 0) == 1 && self_update_url_allowed(good.c_str(), 1) == 0);
+    assert(self_update_url_allowed("https://evil.example/v1/download/token", 0) == 0);
+    assert(self_update_url_allowed(kZip, 0) == 1 && self_update_url_allowed(kZip, 1) == 1);
+    assert(self_update_allow_insider("") == 1 && self_update_url_allowed(good.c_str(), 0) == 0);
+    assert(self_update_allow_insider("http://nightly-insider.oliv3rmoon.workers.dev") == 0 &&
+           self_update_url_allowed("http://nightly-insider.oliv3rmoon.workers.dev/v1/download/token", 0) == 0);
+    assert(self_update_allow_insider(nullptr) == 1 && self_update_url_allowed(good.c_str(), 0) == 0);
+    assert(self_update_url_allowed(kZip, 0) == 1);
+}
+
+void InsiderAnswers() {
+    static self_update_offer offer;
+    insider_report report{};
+    // "update": the build fills the offer as a GitHub test build's does; the log has its host and
+    // file, never the address's token.
+    const std::string update = InsiderUpdate("1.010.013");
+    assert(insider_evaluate(update.data(), update.size(), 200, kInsider, "nightshade", "Nightshade", "PPSA99008",
+                            "01.010.012", "01.010.012", &offer, &report) == INSIDER_UPDATE);
+    assert(std::strcmp(offer.title, "PPSA99008") == 0 && std::strcmp(offer.name, "Nightshade") == 0);
+    assert(std::strcmp(offer.installed, "01.010.012") == 0 && std::strcmp(offer.available, "01.010.013") == 0);
+    assert(std::strcmp(offer.version, "v1.010.013") == 0 && offer.artifact == InsiderUrl("v1.010.013"));
+    assert(std::strcmp(offer.sha256, kInsiderDigest) == 0 && offer.size == 81234567 && offer.beside[0] == '\0');
+    assert(offer.prerelease == 1 && std::strcmp(offer.release_title, "Nightshade v1.010.013 (insider build)") == 0);
+    assert(std::strcmp(offer.notes, "Insider build.\n- The launcher's new settings.") == 0 && !offer.notes_truncated);
+    assert(offer.page[0] == '\0');
+    assert(report.status == INSIDER_UPDATE && report.http_status == 200 && std::strcmp(report.answer, "update") == 0);
+    assert(std::strcmp(report.tag, "v1.010.013") == 0 && std::strcmp(report.host, "nightly-insider.oliv3rmoon.workers.dev") == 0);
+    assert(std::strcmp(report.file, "Nightshade-v1.010.013.zip") == 0 && report.why == nullptr);
+    assert(Insider(Compact(update)) == INSIDER_UPDATE);
+    // A title with a control character in it, none, and one too long; notes that are absent.
+    assert(Insider(With(update, "\"Nightshade v1.010.013 (insider build)\"", "\"a\\tb\"")) == INSIDER_UPDATE);
+    assert(insider_evaluate(update.data(), update.size(), 200, kInsider, "nightshade", "Nightshade", "PPSA99008",
+                            "01.010.012", nullptr, &offer, &report) == INSIDER_UPDATE);
+    {
+        const std::string tabbed = With(update, "\"Nightshade v1.010.013 (insider build)\"", "\"a\\tb\"");
+        assert(insider_evaluate(tabbed.data(), tabbed.size(), 200, kInsider, "nightshade", "Nightshade", "PPSA99008",
+                                "01.010.012", nullptr, &offer, nullptr) == INSIDER_UPDATE &&
+               std::strcmp(offer.release_title, "a b") == 0);
+        const std::string untitled = With(With(update, "\"title\": \"Nightshade v1.010.013 (insider build)\",\n", ""),
+                                          "\"notes\": \"Insider build.\\n- The launcher's new settings.\",\n", "");
+        assert(insider_evaluate(untitled.data(), untitled.size(), 200, kInsider, "nightshade", "Nightshade",
+                                "PPSA99008", "01.010.012", nullptr, &offer, nullptr) == INSIDER_UPDATE &&
+               offer.release_title[0] == '\0' && offer.notes[0] == '\0');
+        const std::string long_title =
+            With(update, "\"Nightshade v1.010.013 (insider build)\"", "\"" + std::string(128, 'x') + "\"");
+        assert(insider_evaluate(long_title.data(), long_title.size(), 200, kInsider, "nightshade", "Nightshade",
+                                "PPSA99008", "01.010.012", nullptr, &offer, nullptr) == INSIDER_UPDATE &&
+               offer.release_title[0] == '\0');
+    }
+
+    // Nothing for this member: the code is good with nothing newer, or it isn't (any more).
+    for (const auto& [text, status] : std::vector<std::pair<const char*, insider_status>>{
+             {"none", INSIDER_NONE}, {"not_qualified", INSIDER_NOT_QUALIFIED}, {"invalid_code", INSIDER_INVALID_CODE},
+             {"expired_code", INSIDER_EXPIRED_CODE}}) {
+        assert(Insider(InsiderNothing(text), 200, "01.010.012", nullptr, &report) == status);
+        assert(report.status == status && std::strcmp(report.answer, text) == 0 && report.why == nullptr);
+        assert(Insider(std::string("{\"status\":\"") + text + "\"}") == status);
+    }
+    // Another status or HTTP code: the service's errors, and "update" anywhere but in a 200.
+    for (const auto& [http, body] : std::vector<std::pair<int, std::string>>{
+             {400, "{\"status\":\"bad_request\"}"}, {404, "{\"status\":\"unknown_app\"}"}, {405, ""},
+             {429, "{\"status\":\"rate_limited\"}"}, {503, "{\"status\":\"unavailable\"}"}, {201, update},
+             {500, "<html>error</html>"}, {200, "{\"status\":\"rate_limited\"}"}, {200, "{\"status\":\"Update\"}"}}) {
+        assert(Insider(body, http, "01.010.012", nullptr, &report) == INSIDER_OTHER && report.http_status == http);
+    }
+    assert(Insider("{\"status\":\"rate_limited\"}", 429, "01.010.012", nullptr, &report) == INSIDER_OTHER &&
+           std::strcmp(report.answer, "rate_limited") == 0);
+    // JSON it can't read: not JSON, cut short, no status, a status that isn't a word, said twice.
+    for (const std::string& body : std::vector<std::string>{
+             "", "not json", "[]", "{}", "{\"status\":5}", "{\"status\":null}", "{\"status\":\"\"}",
+             "{\"status\":\"up date\"}", "{\"status\":\"none\",\"status\":\"update\"}", "{\"status\":\"none\"",
+             "{\"status\":\"none\"} x", update.substr(0, update.size() - 1), update.substr(0, update.size() / 2),
+             "{\"status\":\"" + std::string(40, 'a') + "\"}"}) {
+        assert(Insider(body, 200, "01.010.012", nullptr, &report) == INSIDER_BAD_RESPONSE && report.answer[0] == '\0');
+    }
+
+    // "update" with a build that fails a check is not offered: the download's address elsewhere...
+    const std::string url = InsiderUrl("v1.010.013");
+    for (const std::string& elsewhere : std::vector<std::string>{
+             "https://evil.example/v1/download/token", "http://nightly-insider.oliv3rmoon.workers.dev/v1/download/t",
+             std::string(kInsider) + ".evil.example/v1/download/t", std::string(kInsider) + "/v1/updates",
+             std::string(kInsider) + "/v1/download/t?sig=1", std::string(kInsider) + "/v1/download/a/../b",
+             std::string(kInsider) + "/v1/download/" + std::string(SELF_UPDATE_INSIDER_MAX_URL, 't'),
+             "https://github.com/Oliv3rmoon/Nightshade/releases/download/v1.010.013/Nightshade-v1.010.013.zip"}) {
+        assert(std::strcmp(Refused(With(update, url, elsewhere)), "url") == 0);
+    }
+    assert(std::strcmp(Refused(With(update, "\"url\": \"" + url + "\",\n", "")), "url") == 0);
+    // ... a SHA-256 that isn't 64 lowercase hexadecimal digits ...
+    for (const std::string& digest : std::vector<std::string>{
+             "5D41402ABC4B2A76B9719D911017C592AAE4B6E1B2C3D4E5F60718293A4B5C6D", std::string(63, 'a'),
+             std::string(65, 'a'), std::string(63, 'a') + "g", "", std::string(64, ' ')}) {
+        assert(std::strcmp(Refused(InsiderUpdate("1.010.013", digest)), "sha256") == 0);
+    }
+    assert(std::strcmp(Refused(With(update, "\"sha256\"", "\"sha512\"")), "sha256") == 0);
+    // ... a size of nothing, past the kit's limit, or not a whole number ...
+    assert(std::strcmp(Refused(InsiderUpdate("1.010.013", kInsiderDigest, 0)), "size") == 0);
+    assert(std::strcmp(Refused(InsiderUpdate("1.010.013", kInsiderDigest, SELF_UPDATE_MAX_ARCHIVE + 1)), "size") == 0);
+    assert(Insider(InsiderUpdate("1.010.013", kInsiderDigest, SELF_UPDATE_MAX_ARCHIVE)) == INSIDER_UPDATE);
+    for (const char* size : {"\"81234567\"", "-1", "8.1e7", "81234567.0", "081234567", "null", "99999999999999999999"})
+        assert(std::strcmp(Refused(With(update, "81234567", size)), "size") == 0);
+    // ... a version that isn't newer than the install or the program, or on another line ...
+    assert(std::strcmp(Refused(InsiderUpdate("1.010.012")), "not-newer") == 0);
+    assert(std::strcmp(Refused(InsiderUpdate("1.010.011")), "not-newer") == 0);
+    for (const char* other : {"1.011.000", "1.012.001", "2.010.013", "1.009.999"})
+        assert(std::strcmp(Refused(InsiderUpdate(other)), "another-line") == 0);
+    assert(std::strcmp(Refused(InsiderUpdate("1.010.012"), "01.010.010", "01.010.012"), "not-newer") == 0);
+    assert(std::strcmp(Refused(InsiderUpdate("1.011.001"), "01.011.000", "01.010.012"), "another-line") == 0);
+    assert(Insider(InsiderUpdate("1.010.013"), 200, "01.010.010", "01.010.012") == INSIDER_UPDATE);
+    // ... a version or a tag that can't be read, another app's answer, no build.
+    for (const char* version : {"\"1.010\"", "\"1.010.013-rc1\"", "10", "\"\""})
+        assert(std::strcmp(Refused(With(update, "\"1.010.013\"", version)), "version") == 0);
+    for (const char* tag : {"\"v1.010.013 x\"", "\"\"", "\"v1/010\"", "\"v1.010.013\\n\"", "13"})
+        assert(std::strcmp(Refused(With(update, "\"v1.010.013\"", tag)), "tag") == 0);
+    assert(std::strcmp(Refused(With(update, "\"v1.010.013\"", "\"" + std::string(40, 'v') + "\"")), "tag") == 0);
+    assert(std::strcmp(Refused(With(update, "\"app\": \"nightshade\"", "\"app\": \"dulcamara\"")), "app") == 0);
+    assert(std::strcmp(Refused(With(update, "\"app\": \"nightshade\"", "\"app\": 1")), "app") == 0);
+    assert(Insider(With(update, "\"app\": \"nightshade\",\n", "")) == INSIDER_UPDATE);
+    assert(std::strcmp(Refused("{\"status\":\"update\"}"), "build") == 0);
+    assert(std::strcmp(Refused("{\"status\":\"update\",\"build\":[]}"), "build") == 0);
+    assert(std::strcmp(Refused("{\"status\":\"update\",\"build\":null}"), "build") == 0);
+    // A field of the build said twice is not a build that can be read.
+    assert(std::strcmp(Refused(With(update, "\"size\": 81234567", "\"size\": 81234567, \"size\": 1")), "size") == 0);
+    assert(std::strcmp(Refused(With(update, "\"url\": ", "\"url\": \"" + url + "\", \"url\": ")), "url") == 0);
+    // Nothing to read with.
+    assert(insider_evaluate(update.data(), update.size(), 200, kInsider, "nightshade", "Nightshade", "PPSA99008",
+                            nullptr, nullptr, &offer, &report) == INSIDER_BAD_ARGUMENT);
+}
+
+void InsiderRequests() {
+    static self_update_offer offer;
+    insider_report report{};
+    // The request: POST /v1/updates with the app, the program's version and the code, the app's
+    // User-Agent; nothing else.
+    Answer(200, InsiderUpdate("1.010.013"));
+    assert(insider_check(Post, &service, kInsider, "ABCDEFGH", "nightshade", "Nightshade", "PPSA99008", "01.010.012",
+                         "01.010.012", &offer, &report) == SELF_UPDATE_AVAILABLE);
+    assert(service.asked.size() == 1 && service.asked[0].url == kInsiderUpdates);
+    assert(service.asked[0].agent == "Nightshade/01.010.012");
+    assert(service.asked[0].json == "{\"app\":\"nightshade\",\"installed_version\":\"01.010.012\",\"code\":\"ABCDEFGH\"}");
+    assert(report.status == INSIDER_UPDATE && std::strcmp(offer.available, "01.010.013") == 0);
+    // The program's version is what is sent; the install's (param.json) is what the offer says.
+    Answer(200, InsiderUpdate("1.010.013"));
+    assert(insider_check(Post, &service, kInsider, "ABCDEFGH", "nightshade", "Nightshade", "PPSA99008", "01.010.011",
+                         "01.010.012", &offer, &report) == SELF_UPDATE_AVAILABLE);
+    assert(service.asked[0].agent == "Nightshade/01.010.012" && service.asked[0].json.find("01.010.012") != std::string::npos);
+    assert(std::strcmp(offer.installed, "01.010.011") == 0);
+    Answer(200, InsiderUpdate("1.010.013"));
+    assert(insider_check(Post, &service, kInsider, "ABCDEFGH", "nightshade", "Nightshade", "PPSA99008", "01.010.011",
+                         nullptr, &offer, &report) == SELF_UPDATE_AVAILABLE);
+    assert(service.asked[0].agent == "Nightshade/01.010.011");
+
+    // Nothing is sent without a valid code, service, app or version.
+    for (const char* code : {"", "abcdefgh", "ABCD-EFGH", "ABCDEFG", static_cast<const char*>(nullptr)}) {
+        Answer(200, InsiderUpdate("1.010.013"));
+        assert(insider_check(Post, &service, kInsider, code, "nightshade", "Nightshade", "PPSA99008", "01.010.012",
+                             nullptr, &offer, &report) == SELF_UPDATE_UNKNOWN);
+        assert(service.asked.empty() && report.status == INSIDER_BAD_ARGUMENT && offer.artifact[0] == '\0');
+    }
+    for (const char* base : {"", "http://x", "https://x/", static_cast<const char*>(nullptr)}) {
+        Answer(200, InsiderUpdate("1.010.013"));
+        assert(insider_check(Post, &service, base, "ABCDEFGH", "nightshade", "Nightshade", "PPSA99008", "01.010.012",
+                             nullptr, &offer, &report) == SELF_UPDATE_UNKNOWN && service.asked.empty());
+    }
+    Answer(200, InsiderUpdate("1.010.013"));
+    assert(insider_check(Post, &service, kInsider, "ABCDEFGH", "Nightshade", "Nightshade", "PPSA99008", "01.010.012",
+                         nullptr, &offer, &report) == SELF_UPDATE_UNKNOWN && service.asked.empty());
+    assert(insider_check(Post, &service, kInsider, "ABCDEFGH", "nightshade", "Nightshade", "PPSA99008", "development",
+                         nullptr, &offer, &report) == SELF_UPDATE_UNKNOWN && service.asked.empty());
+    assert(insider_check(Post, &service, kInsider, "ABCDEFGH", "nightshade", "Nightshade", "PPSA99008", "01.010.012",
+                         "v1.010.012", &offer, &report) == SELF_UPDATE_UNKNOWN && service.asked.empty());
+    assert(insider_check(nullptr, &service, kInsider, "ABCDEFGH", "nightshade", "Nightshade", "PPSA99008",
+                         "01.010.012", nullptr, &offer, &report) == SELF_UPDATE_UNKNOWN);
+
+    // No answer, a timeout, an answer too large: silence, never an offer.
+    Answer(200, InsiderUpdate("1.010.013"));
+    service.result = -10028; // CURLE_OPERATION_TIMEDOUT
+    assert(insider_check(Post, &service, kInsider, "ABCDEFGH", "nightshade", "Nightshade", "PPSA99008", "01.010.012",
+                         nullptr, &offer, &report) == SELF_UPDATE_UNKNOWN);
+    assert(report.status == INSIDER_NETWORK && report.platform_error == -10028 && report.http_status == 0 &&
+           offer.artifact[0] == '\0' && service.asked.size() == 1);
+    Answer(200, InsiderUpdate("1.010.013") + std::string(INSIDER_MAX_ANSWER, ' '));
+    assert(insider_check(Post, &service, kInsider, "ABCDEFGH", "nightshade", "Nightshade", "PPSA99008", "01.010.012",
+                         nullptr, &offer, &report) == SELF_UPDATE_UNKNOWN);
+    assert(report.status == INSIDER_TOO_LARGE && report.http_status == 200 && offer.artifact[0] == '\0');
+    // An answer as long as the notes the service allows (4,000 characters, three bytes each) fits.
+    {
+        std::string notes;
+        for (int i = 0; i < 4000; ++i) notes += "\xe6\xbc\xa2";
+        Answer(200, With(InsiderUpdate("1.010.013"), "Insider build.\\n- The launcher's new settings.", notes));
+        assert(service.body.size() < INSIDER_MAX_ANSWER);
+        assert(insider_check(Post, &service, kInsider, "ABCDEFGH", "nightshade", "Nightshade", "PPSA99008",
+                             "01.010.012", nullptr, &offer, &report) == SELF_UPDATE_AVAILABLE &&
+               offer.notes == notes);
+    }
+    for (const char* status : {"none", "not_qualified", "invalid_code", "expired_code"}) {
+        Answer(200, InsiderNothing(status));
+        assert(insider_check(Post, &service, kInsider, "ABCDEFGH", "nightshade", "Nightshade", "PPSA99008",
+                             "01.010.012", nullptr, &offer, &report) == SELF_UPDATE_UNKNOWN);
+        assert(std::strcmp(insider_status_text(report.status), status) == 0 && offer.artifact[0] == '\0');
+    }
+}
+
+// Test builds with insider builds: the service first, GitHub's test builds whenever it offers nothing.
+self_update_check_result InsiderTestCheck(const char* code, self_update_offer* offer, insider_report* insider,
+                                          github_release_report* github, const char* base = kInsider) {
+    network.asked.clear();
+    return insider_check_tests_from(&kPlatform, Post, &service, base, code, "nightshade", kRepository, "Nightshade",
+                                    "PPSA99008", "01.010.007", "01.010.007", offer, insider, github);
+}
+
+void InsiderFallback() {
+    static self_update_offer offer;
+    insider_report insider{};
+    github_release_report github{};
+    const std::string list = ListOf(Repository());
+
+    // The insider build wins when the service offers one: GitHub is not asked.
+    ServeList(list);
+    Answer(200, InsiderUpdate("1.010.009"));
+    assert(InsiderTestCheck("ABCDEFGH", &offer, &insider, &github) == SELF_UPDATE_AVAILABLE);
+    assert(insider.status == INSIDER_UPDATE && service.asked.size() == 1 && network.asked.empty());
+    assert(std::strcmp(offer.available, "01.010.009") == 0 && offer.artifact == InsiderUrl("v1.010.009"));
+    assert(std::strcmp(offer.installed, "01.010.007") == 0 && offer.prerelease == 1);
+
+    // An expired code: the test build GitHub has is offered, exactly as without insider builds,
+    // and the settings will say where to get a new code.
+    static self_update_offer without;
+    github_release_report without_report{};
+    ServeList(list);
+    assert(TestCheck(kRepository, "01.010.007", &without, &without_report) == SELF_UPDATE_AVAILABLE);
+    const std::vector<std::string> github_requests = network.asked;
+    assert((github_requests == std::vector<std::string>{kList, SumsUrl("v1.010.008")}));
+    for (const char* status : {"expired_code", "invalid_code", "not_qualified", "none"}) {
+        ServeList(list);
+        Answer(200, InsiderNothing(status));
+        assert(InsiderTestCheck("ABCDEFGH", &offer, &insider, &github) == SELF_UPDATE_AVAILABLE);
+        assert(std::strcmp(insider_status_text(insider.status), status) == 0 && service.asked.size() == 1);
+        assert(network.asked == github_requests && github.reason == GITHUB_RELEASE_NEWER && github.prerelease == 1);
+        assert(std::strcmp(offer.version, "v1.010.008") == 0 && offer.artifact == ZipUrl("v1.010.008"));
+        assert(offer.sha256 == DigestOf("v1.010.008") && std::memcmp(&offer, &without, sizeof(offer)) == 0);
+        assert(insider_status_hints(insider.status) == (std::strcmp(status, "none") != 0));
+    }
+    // Offline (the request fails), a timeout, the service's errors, an answer it can't read, an
+    // update it refuses: the same.
+    for (int failure : {-10006, -10007, -10028, -10035}) {
+        ServeList(list);
+        Answer(200, InsiderUpdate("1.010.009"));
+        service.result = failure;
+        assert(InsiderTestCheck("ABCDEFGH", &offer, &insider, &github) == SELF_UPDATE_AVAILABLE);
+        assert(insider.status == INSIDER_NETWORK && insider.platform_error == failure && !insider_status_hints(insider.status));
+        assert(network.asked == github_requests && std::memcmp(&offer, &without, sizeof(offer)) == 0);
+    }
+    for (const auto& [http, body] : std::vector<std::pair<int, std::string>>{
+             {429, "{\"status\":\"rate_limited\"}"}, {503, "{\"status\":\"unavailable\"}"}, {200, "garbage"},
+             {200, InsiderUpdate("1.010.009").substr(0, 200)}, {200, InsiderUpdate("1.010.009", std::string(64, 'X'))},
+             {200, With(InsiderUpdate("1.010.009"), InsiderUrl("v1.010.009"), "https://evil.example/v1/download/x")},
+             {200, InsiderUpdate("1.011.000")}, {200, InsiderUpdate("1.010.007")}}) {
+        ServeList(list);
+        Answer(http, body);
+        assert(InsiderTestCheck("ABCDEFGH", &offer, &insider, &github) == SELF_UPDATE_AVAILABLE);
+        assert(insider.status != INSIDER_UPDATE && network.asked == github_requests);
+        assert(std::memcmp(&offer, &without, sizeof(offer)) == 0);
+    }
+    // No code kept, or no service named: nothing is sent, GitHub as always.
+    for (const char* none : {"", static_cast<const char*>(nullptr)}) {
+        ServeList(list);
+        Answer(200, InsiderUpdate("1.010.009"));
+        assert(InsiderTestCheck(none, &offer, &insider, &github) == SELF_UPDATE_AVAILABLE);
+        assert(insider.status == INSIDER_NOT_ASKED && service.asked.empty() && network.asked == github_requests);
+        ServeList(list);
+        assert(InsiderTestCheck("ABCDEFGH", &offer, &insider, &github, none) == SELF_UPDATE_AVAILABLE);
+        assert(insider.status == INSIDER_NOT_ASKED && service.asked.empty() && network.asked == github_requests);
+    }
+    // GitHub has nothing either: nothing at all, never an error.
+    ServeList("[]");
+    Answer(200, InsiderNothing("expired_code"));
+    assert(InsiderTestCheck("ABCDEFGH", &offer, &insider, &github) == SELF_UPDATE_UNKNOWN);
+    assert(insider.status == INSIDER_EXPIRED_CODE && github.reason == GITHUB_RELEASE_NONE && offer.artifact[0] == '\0');
+}
+
+// A helper stood in for (headless/self_update_helper): it takes the request, says it is ready,
+// counts what it is sent, and stages the release only when the app's last piece (the end mark)
+// arrives; then it waits for the go-ahead or a cancel.
+struct FakeHelper {
+    int fd = -1;
+    std::thread thread;
+    std::string request;
+    std::uint64_t received = 0;
+    bool ended = false;  // the end mark came: the release was handed over whole
+    std::string after;   // what the app said then ("cancel\n", "apply\n")
+};
+FakeHelper* helper = nullptr;
+
+bool ReadAll(int fd, void* data, std::size_t size) {
+    char* bytes = static_cast<char*>(data);
+    while (size != 0) {
+        const ssize_t count = ::read(fd, bytes, size);
+        if (count <= 0) return false;
+        bytes += count;
+        size -= static_cast<std::size_t>(count);
+    }
+    return true;
+}
+
+void RunHelper(FakeHelper* fake) {
+    for (int lines = 0; lines < 9;) {
+        char byte = 0;
+        if (!ReadAll(fake->fd, &byte, 1)) return;
+        fake->request += byte;
+        if (byte == '\n') ++lines;
+    }
+    if (::write(fake->fd, "ready\n", 6) != 6) return;
+    std::vector<char> piece;
+    for (;;) {
+        unsigned char header[4];
+        if (!ReadAll(fake->fd, header, sizeof(header))) return;
+        const std::size_t size = header[0] | (header[1] << 8) | (header[2] << 16) | (static_cast<std::size_t>(header[3]) << 24);
+        if (size == 0) break;
+        piece.resize(size);
+        if (!ReadAll(fake->fd, piece.data(), size)) return;
+        fake->received += size;
+    }
+    fake->ended = true;
+    if (::write(fake->fd, "staged\n", 7) != 7) return;
+    char byte = 0;
+    while (ReadAll(fake->fd, &byte, 1)) fake->after += byte;
+}
+
+long HelperSend(void* user, const void* data, std::size_t size) {
+    return static_cast<long>(::write(static_cast<int>(reinterpret_cast<std::intptr_t>(user)), data, size));
+}
+long HelperReceive(void* user, void* data, std::size_t size) {
+    return static_cast<long>(::read(static_cast<int>(reinterpret_cast<std::intptr_t>(user)), data, size));
+}
+void HelperClose(void* user) { ::close(static_cast<int>(reinterpret_cast<std::intptr_t>(user))); }
+
+int OpenFakeHelper(void*, self_update_channel* channel) {
+    int ends[2];
+    if (helper == nullptr || socketpair(AF_UNIX, SOCK_STREAM, 0, ends) != 0) return 0;
+    helper->fd = ends[1];
+    helper->thread = std::thread(RunHelper, helper);
+    channel->send = HelperSend;
+    channel->receive = HelperReceive;
+    channel->close = HelperClose;
+    channel->user = reinterpret_cast<void*>(static_cast<std::intptr_t>(ends[0]));
+    return 1;
+}
+
+std::uint64_t Clock(void*) {
+    return static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                          std::chrono::steady_clock::now().time_since_epoch())
+                                          .count());
+}
+
+// The kit's job for an offer, as the launcher follows it, until it is staged or has ended.
+self_update_status RunJob(const self_update_offer& offer, FakeHelper& fake, bool cancel_when_staged) {
+    static const self_update_platform platform = {Fetch, Download, Verify, OpenFakeHelper, LoadSequence,
+                                                  SaveSequence, Clock, nullptr};
+    static self_update_job job;
+    self_update_status status{};
+    std::memset(&job, 0, sizeof(job));
+    helper = &fake;
+    assert(self_update_start(&job, &platform, &offer) == 1);
+    for (int wait = 0; wait < 20000; ++wait) {
+        self_update_poll(&job, &status);
+        if (status.phase == SELF_UPDATE_READY || status.phase == SELF_UPDATE_FAILED ||
+            status.phase == SELF_UPDATE_CANCELLED)
+            break;
+        usleep(1000);
+    }
+    if (status.phase == SELF_UPDATE_READY && cancel_when_staged) self_update_cancel(&job);
+    self_update_finish(&job);
+    if (fake.thread.joinable()) fake.thread.join();
+    if (fake.fd >= 0) ::close(fake.fd);
+    helper = nullptr;
+    return status;
+}
+
+std::string Sha256Of(const std::string& bytes) {
+    self_update_sha256 hash;
+    unsigned char digest[32];
+    char text[65];
+    self_update_sha256_start(&hash);
+    self_update_sha256_add(&hash, bytes.data(), bytes.size());
+    self_update_sha256_finish(&hash, digest);
+    self_update_sha256_hex(digest, text);
+    return text;
+}
+
+void InsiderDownload() {
+    std::signal(SIGPIPE, SIG_IGN); // a write to a connection the other side closed fails instead
+    static self_update_offer offer;
+    std::string release(300000, '\0');
+    for (std::size_t i = 0; i < release.size(); ++i) release[i] = static_cast<char>((i * 31 + 7) & 0xff);
+    const std::string answer = InsiderUpdate("1.010.013", Sha256Of(release), release.size());
+    assert(insider_evaluate(answer.data(), answer.size(), 200, kInsider, "nightshade", "Nightshade", "PPSA99008",
+                            "01.010.012", "01.010.012", &offer, nullptr) == INSIDER_UPDATE);
+    assert(self_update_allow_insider(kInsider) == 1);
+
+    // The build as the service signed it: downloaded from its address, checked, handed over whole
+    // and staged; the helper is told what any update tells it. (Cancelled here, nothing applied.)
+    {
+        network = Network{};
+        network.files[offer.artifact] = release;
+        FakeHelper fake;
+        const self_update_status status = RunJob(offer, fake, true);
+        assert(status.phase == SELF_UPDATE_READY && fake.ended && fake.received == release.size());
+        assert(fake.request == std::string(SELF_UPDATE_MAGIC) + "\nupdate\nPPSA99008\n01.010.012\n01.010.013\n" +
+                                   std::to_string(release.size()) + "\n" + Sha256Of(release) +
+                                   "\nNightshade\nv1.010.013\n");
+        assert(fake.after == "cancel\n");
+        assert((network.asked == std::vector<std::string>{offer.artifact}));
+    }
+    // A tampered download (the same size, other bytes, so a SHA-256 that differs from the one the
+    // service gave): refused before the helper gets the end mark, so nothing is staged or installed.
+    {
+        std::string tampered = release;
+        tampered[tampered.size() / 2] ^= 0x01;
+        network = Network{};
+        network.files[offer.artifact] = tampered;
+        FakeHelper fake;
+        const self_update_status status = RunJob(offer, fake, false);
+        assert(status.phase == SELF_UPDATE_FAILED);
+        assert(std::strcmp(status.error, "The download doesn't match the catalog's listing") == 0);
+        assert(!fake.ended && fake.after.empty() && fake.received == tampered.size());
+    }
+    // One byte more or less than the build's size: refused as well.
+    for (const std::string& resized : {release.substr(0, release.size() - 1), release + "x"}) {
+        network = Network{};
+        network.files[offer.artifact] = resized;
+        FakeHelper fake;
+        const self_update_status status = RunJob(offer, fake, false);
+        assert(status.phase == SELF_UPDATE_FAILED && !fake.ended && fake.after.empty());
+    }
+    // A build without the service named: its address is not one the kit downloads from.
+    assert(self_update_allow_insider(nullptr) == 1);
+    {
+        network = Network{};
+        network.files[offer.artifact] = release;
+        FakeHelper fake;
+        const self_update_status status = RunJob(offer, fake, false);
+        assert(status.phase == SELF_UPDATE_FAILED && std::strcmp(status.error, "The download failed") == 0);
+        assert(!fake.ended && fake.received == 0);
+    }
+}
 } // namespace
 
 int main(int argc, char** argv) {
@@ -1319,6 +1982,12 @@ int main(int argc, char** argv) {
     Picking();
     Listed();
     TestBuildCheck();
+    InsiderCodes();
+    InsiderAddresses();
+    InsiderAnswers();
+    InsiderRequests();
+    InsiderFallback();
+    InsiderDownload();
     std::puts("update check: versions, request address, newer/same/older and silent answers PASS");
     std::puts("update check from GitHub: tag versions, addresses and redirects, SHA256SUMS lines, release notes, "
               "releases/latest answers, the ZIP SHA256SUMS lists, the check, its redirects and silent answers, no "
@@ -1326,5 +1995,10 @@ int main(int argc, char** argv) {
     std::puts("update check with test builds: version lines, the list's address and redirect, the release chosen "
               "(this line only, highest version, pre-release or not, drafts passed over), the list read whole, the "
               "test build's title, its SHA256SUMS and ZIP, without test builds releases/latest alone PASS");
+    std::puts("insider builds: the code normalised, checked and kept, the service's address, the request and its "
+              "escaping, update/none/not_qualified/invalid_code/expired_code, other statuses, answers cut short or "
+              "unreadable, builds refused (address, SHA-256, size, version, line, tag, app), GitHub's test builds "
+              "after any answer but an offer and offline, the insider build first when offered, a download whose "
+              "SHA-256 or size differs refused with nothing staged PASS");
     return 0;
 }

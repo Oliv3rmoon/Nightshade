@@ -30,7 +30,7 @@ REPOSITORIES = [
 
 root = Path(__file__).resolve().parents[1]
 headless = root / 'headless'
-kit = ['update_check.c', 'github_release.c', 'self_update.c', 'self_update_sha256.c']
+kit = ['update_check.c', 'github_release.c', 'insider.c', 'self_update.c', 'self_update_sha256.c']
 flags = ['-O1', '-g', '-fsanitize=address,undefined', '-fno-sanitize-recover=all', '-Wall', '-Wextra', '-Werror',
          '-DUPDATE_CHECK_NO_NETWORK=1', '-UNDEBUG']
 
