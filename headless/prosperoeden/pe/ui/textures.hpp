@@ -69,6 +69,16 @@ class Textures
     void load_wallpaper(const std::string &path);
     void clear_wallpaper();
 
+    // The selected game's art behind Nightshade's home screen and Library (Theme::showcase): its
+    // cover made small and blurred once, when it is asked for, not every frame. The one before it
+    // is kept while it fades out (game_art_age). The same path again does nothing.
+    void show_game_art(const std::string &cover_path);
+    std::uint32_t game_art() const { return game_art_[0].texture; }
+    std::uint32_t game_art_before() const { return game_art_[1].texture; }
+    // Seconds since the art shown now was made.
+    float game_art_age() const { return game_art_age_; }
+    const std::string &game_art_path() const { return game_art_[0].path; }
+
     void load_game_backdrop(const std::string &cover_path);
     void clear_game_backdrop();
     std::uint32_t brand() const
@@ -131,6 +141,13 @@ class Textures
     std::uint32_t game_backdrop_ = 0;
     std::uint32_t game_backdrop_blur_ = 0;
     std::string game_backdrop_path_;
+    struct GameArt
+    {
+        std::uint32_t texture = 0;
+        std::string path;
+    };
+    GameArt game_art_[2]; // the one shown, and the one fading out
+    float game_art_age_ = 0.0f;
     std::uint32_t brand_ = 0;
     std::uint32_t controller_ = 0;
     std::uint32_t splash_ = 0;
