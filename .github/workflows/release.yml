@@ -25,6 +25,11 @@ name: Release build
 # For a run that finds no ccache there is a second source: a snapshot kept as a file of the
 # `build-cache` release, which it downloads. A manual run on main with "snapshot" ticked keeps
 # its ccache as an artifact, which build-cache.yml publishes as the new snapshot.
+# Insider builds (opt-in: the repository variable INSIDER_UPLOAD is "true"): job "insider" also uploads a tag's ZIP
+# and SHA256SUMS to the nightly insider service's R2 bucket (tools/ci/insider-upload.py; Oliv3rmoon/nightly-insider),
+# whose members get it at once; and a tag with no release yet gets a draft instead of a published pre-release, so
+# the public release waits for the early-access window and the countdown publishes it. The R2 keys are secrets of
+# the "insider" environment, which only tags may use.
 # The actions are the Node 24 versions, pinned by commit.
 on:
   # A v* tag, to release: pushes to main build nothing.
@@ -176,8 +181,13 @@ jobs:
       - name: Build and package
         id: build
         timeout-minutes: 315
+        env:
+          # The nightly insider service's address (EDEN_INSIDER_URL, headless/CMakeLists.txt), when the repository
+          # variable INSIDER_URL names it; otherwise the build's own default (empty: no insider builds).
+          INSIDER_URL: ${{ vars.INSIDER_URL }}
         run: |
           ccache --zero-stats
+          if [[ -n $INSIDER_URL ]]; then export EDEN_INSIDER_URL=$INSIDER_URL; fi
           bash tools/ci/build-release.sh
 
       - name: Report disk, ccache and the linker
@@ -286,12 +296,19 @@ jobs:
       - name: Publish the pre-release
         env:
           GH_TOKEN: ${{ github.token }}
+          INSIDER_UPLOAD: ${{ vars.INSIDER_UPLOAD }}
         run: |
           set -euo pipefail
           # The names of the files of the tag's release, when there is one (a draft counts).
           if ! assets=$(gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' 2>/dev/null); then
-            # No release yet: this run makes it.
-            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --prerelease \
+            # No release yet: this run makes it. With insider builds on it is a draft: the build reaches the insiders
+            # first, and the countdown publishes the release once the early-access window is over.
+            draft=()
+            if [[ $INSIDER_UPLOAD == true ]]; then
+              draft=(--draft)
+              echo "::notice title=Draft release::Insider builds are on: $GITHUB_REF_NAME's release was made as a draft, to publish after the early-access window."
+            fi
+            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --prerelease "${draft[@]}" \
               --title "ProsperoEden $GITHUB_REF_NAME" --notes-file dist/release-notes.md \
               "dist/Nightshade-$GITHUB_REF_NAME.zip" dist/SHA256SUMS
           elif grep -qi '\.zip$' <<< "$assets"; then
@@ -305,3 +322,42 @@ jobs:
               "dist/Nightshade-$GITHUB_REF_NAME.zip" dist/SHA256SUMS
             echo "::notice title=Files added to the existing release::The release for $GITHUB_REF_NAME had no ZIP; this run's ZIP and SHA256SUMS were added. Its title and notes were not changed."
           fi
+
+  # The tag's ZIP for the nightly insider service (SETUP.md in Oliv3rmoon/nightly-insider): members with an insider
+  # code are offered it by the app's update check at once. Only with INSIDER_UPLOAD "true", and only for a tag; the
+  # R2 keys come from the "insider" environment. A build already uploaded with the same SHA-256 is left as it is, and
+  # one with another is refused: insider builds never change.
+  insider:
+    if: startsWith(github.ref, 'refs/tags/') && vars.INSIDER_UPLOAD == 'true'
+    needs: build
+    runs-on: ubuntu-24.04
+    environment: insider
+    permissions:
+      contents: read
+    concurrency:
+      group: insider-upload-nightshade
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: tools/ci/insider-upload.py
+          sparse-checkout-cone-mode: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: ProsperoEden
+          path: dist
+
+      - name: Upload the insider build
+        env:
+          R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
+          R2_BUCKET: ${{ vars.R2_BUCKET }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          INSIDER_WINDOW_DAYS: ${{ vars.INSIDER_WINDOW_DAYS }}
+        run: |
+          set -euo pipefail
+          cd dist && sha256sum -c SHA256SUMS && cd ..
+          python3 -I tools/ci/insider-upload.py --app nightshade --name Nightshade --tag "$GITHUB_REF_NAME" \
+            --zip "dist/Nightshade-$GITHUB_REF_NAME.zip" --sums dist/SHA256SUMS \
+            --notes-file dist/release-notes.md --same-line
