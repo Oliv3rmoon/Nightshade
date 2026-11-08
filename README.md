@@ -128,11 +128,11 @@ Join [nightly on Discord](https://discord.gg/pSqgRU3YP9), complete verification 
 
 ### What is coming
 
-The next Nightshade brings more of your library together: **Game Boy, Game Boy Color, Game Boy Advance, NES/FDS, SNES and Nintendo DS**, alongside Switch. Core settings open before a game launches, artwork reacts to actual gameplay, and the launcher is gaining a manual cover picker. The new **Belladonna** driver brings stronger submission handling, memory-failure recovery and useful diagnostics.
+The next Nightshade brings more of your library together: **Game Boy, Game Boy Color, Game Boy Advance, NES/FDS, SNES and Nintendo DS**, alongside Switch. Core settings open before a game launches, artwork reacts to actual gameplay, and the launcher includes a manual cover picker. The new **Belladonna** driver brings stronger submission handling, memory-failure recovery and useful diagnostics.
 
-A **three-day Nightshade test with the new Belladonna driver is planned for current eligible insiders from November 8 at 8 PM through November 11 at 8 PM, Los Angeles time (PST)**. The finished package and access checks are still being prepared; this notice is not a live download. At the end of the window, downloads and new game launches in that private test build close. A game already running is not force-closed, and saves and files are not deleted.
+**Nightshade 01.010.014 with the new Belladonna driver is scheduled for current eligible insiders from November 8, 2026 at 8 PM through November 11 at 8 PM, Los Angeles time (PST).** [View the three-day test and its live status](https://nightly-insider.nightly-ps5.workers.dev/testing/nightshade). Downloads open at the scheduled start. At the end of the window, downloads and new game launches in that private test build close. A game already running is not force-closed, and saves and files are not deleted.
 
-The upcoming delivery adds encrypted package storage, authenticated downloads, approved updates while idle and automatic app diagnostics after tester consent. Build checks are passing for the completed features; physical PS5 gameplay validation remains pending. Follow Discord for the verified build and its exact release notes.
+The verified package includes the matching complete source, **AES-256 encrypted hosted storage**, account-authenticated downloads, approved updates while idle and automatic app diagnostics after tester consent. The encrypted upload passed a full readback check, and the native installer verified all 82 extracted files. Physical PS5 gameplay and performance validation remain pending; this is a test build. Follow Discord for testing instructions and reports.
 
 ## Testing builds
 
