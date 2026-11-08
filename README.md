@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Oliv3rmoon/Nightshade/releases"><img src="https://img.shields.io/github/v/release/Oliv3rmoon/Nightshade?include_prereleases" alt="Latest release"></a>
+  <a href="https://github.com/Oliv3rmoon/Nightshade/releases"><img src="https://img.shields.io/github/v/release/Oliv3rmoon/Nightshade?include_prereleases" alt="Archived public release"></a>
   <a href="https://discord.gg/pSqgRU3YP9"><img src="https://img.shields.io/badge/discord-join%20nightly-5865F2?logo=discord&logoColor=white" alt="Discord: join nightly"></a>
   <a href="https://github.com/Oliv3rmoon/Nightshade/stargazers"><img src="https://img.shields.io/github/stars/Oliv3rmoon/Nightshade?style=social" alt="GitHub stars"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue" alt="License: GPL-3.0-or-later"></a>
@@ -17,9 +17,12 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Oliv3rmoon/Nightshade/releases/latest"><strong>Download the latest release</strong></a><br>
-  Test builds are on the <a href="https://github.com/Oliv3rmoon/Nightshade/releases">Releases page</a>, marked pre-release.
+  <a href="https://nightly-insider.nightly-ps5.workers.dev"><strong>New releases: nightly insider</strong></a><br>
+  <a href="https://github.com/Oliv3rmoon/Nightshade/releases">Browse the archived public releases</a>
 </p>
+
+> [!IMPORTANT]
+> **The next chapter is insider only.** New Nightshade releases will no longer be published here, including after a waiting period. Existing public releases and source stay available. Follow [nightly on Discord](https://discord.gg/pSqgRU3YP9) and [nightly insider](https://nightly-insider.nightly-ps5.workers.dev) for upcoming builds.
 
 <p align="center">If Nightshade works for you, a ⭐ helps other PS5 owners find it.</p>
 
@@ -101,6 +104,8 @@ Nightshade comes with apps of its own, in the same black and red, each with its 
 
 ## Install
 
+These instructions describe the archived public builds. New insider builds include their own installation, account and testing-window instructions.
+
 > [!TIP]
 > **Use [ShadowMountPlus 1.7beta4](https://github.com/drakmor/ShadowMountPlus/releases/tag/1.7beta4) or newer.** It mounts Nightshade from the folder or drive you copy it to, and it mounts `/data` and USB and extended storage drives into the app's sandbox, so Nightshade reaches its data and your game files with nothing else to load. With an older ShadowMountPlus, Nightshade falls back to its bundled [Lapy](https://github.com/ArkSama/PS5-Lapy-JB-Daemon) helper, which is sent through your ELF loader.
 
@@ -117,13 +122,21 @@ The released app (v1.010.x) installs as `PPSA99008` and keeps its data in `/data
 
 ## nightly insider
 
-New Nightshade builds after v1.010.012 go to **nightly insiders** first and are published here for everyone about two months later. Insiders update in the app with a free insider code, which you type in once the builds with the code check are out. Without a code the app runs the same and still tells you when a release is out; you update by hand from this page.
+**New releases are now nightly insider only.** There will be no new public releases and no delayed public drop. This repository keeps the previously published source and downloads available as an archive. Eligible insiders receive new builds through [nightly insider](https://nightly-insider.nightly-ps5.workers.dev), with the matching source, build instructions and license notices. Existing licenses and recipients' source rights remain unchanged.
 
-To become one, join [nightly on Discord](https://discord.gg/pSqgRU3YP9), verify, run `/rank Tester` in #bot-commands, then sign in with Discord at [nightly-insider.nightly-ps5.workers.dev](https://nightly-insider.nightly-ps5.workers.dev) to get your code.
+Join [nightly on Discord](https://discord.gg/pSqgRU3YP9), complete verification and the tester requirements, then sign in at [nightly insider](https://nightly-insider.nightly-ps5.workers.dev). Access depends on current eligibility and the release's testing window.
+
+### What is coming
+
+The next Nightshade brings more of your library together: **Game Boy, Game Boy Color, Game Boy Advance, NES/FDS, SNES and Nintendo DS**, alongside Switch. Core settings open before a game launches, artwork reacts to actual gameplay, and the launcher is gaining a manual cover picker. The new **Belladonna** driver brings stronger submission handling, memory-failure recovery and useful diagnostics.
+
+A **three-day Nightshade test with the new Belladonna driver is planned for current eligible insiders from November 8 at 8 PM through November 11 at 8 PM, Los Angeles time (PST)**. The finished package and access checks are still being prepared; this notice is not a live download. At the end of the window, downloads and new game launches in that private test build close. A game already running is not force-closed, and saves and files are not deleted.
+
+The upcoming delivery adds encrypted package storage, authenticated downloads, approved updates while idle and automatic app diagnostics after tester consent. Build checks are passing for the completed features; physical PS5 gameplay validation remains pending. Follow Discord for the verified build and its exact release notes.
 
 ## Testing builds
 
-Test releases are marked **Pre-release** on the [Releases page](https://github.com/Oliv3rmoon/Nightshade/releases). They are for trying what is next and sending logs back; keep the latest normal release for playing.
+The following are **archived public test releases**, marked **Pre-release** on the [Releases page](https://github.com/Oliv3rmoon/Nightshade/releases). New testing builds are delivered only through nightly insider; the older public builds remain available for reference and rollback.
 
 - **v1.011.x: Nightshade as its own app.** It runs under its own title ID, `PPSA64448`, with its own data folder, `/data/nightshade`, beside the official app instead of in its place. v1.011.002 has everything in v1.010.006. An earlier install moves over by itself: the old tile turns into a bridge that installs the new app, and the first start asks once whether to **Move** your data, **Copy** it or **Start fresh**. Nothing in `/data/prosperoeden` is ever deleted. See the notes of [v1.011.000](https://github.com/Oliv3rmoon/Nightshade/releases/tag/v1.011.000).
 - **v1.012.x: Switch 2 games, experimental.** These builds sit on Takoroka's [eden-nx2](https://git.eden-emu.dev/Takoroka/eden-nx2), the newer emulator core with experimental Switch 2 support. A Switch 2 game is a game folder with its ExeFS and RomFS, dumped from your own game. No Switch 2 game has been run on a PS5 yet, and Switch 1 games have not been played on the newer core on a console either. See the notes of [v1.012.000](https://github.com/Oliv3rmoon/Nightshade/releases/tag/v1.012.000).
@@ -235,7 +248,7 @@ Third-party components, authors and licenses are listed in
 
 ## License
 
-Copyright © 2026 BlackBearReloaded. Licensed under GPL-3.0-or-later; see [LICENSE](LICENSE). Third-party components keep their own licenses. Binary releases are built from the tagged source in this repository.
+Copyright © 2026 BlackBearReloaded. Licensed under GPL-3.0-or-later; see [LICENSE](LICENSE). Third-party components keep their own licenses. Archived public binaries correspond to the tagged source in this repository. New insider binaries are delivered with their matching complete Corresponding Source, build instructions and license notices.
 
 ## Disclaimer
 
