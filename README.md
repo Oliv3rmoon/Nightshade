@@ -45,9 +45,15 @@ Nightshade 2 is where the project is going next: every system on the roadmap in 
 
 <p align="center">
   <img src="docs/images/nightshade-2-launcher.jpg" width="49%" alt="The new Nightshade launcher: the home screen with the library grid behind it">
-  <img src="docs/images/nightshade-2-vision.jpg" width="49%" alt="The Nightshade 2 vision: a 21-system library, a new launcher, the Belladonna 1.0 driver, adaptive recovery, per-game profiles, search and favorites, protected saves and one controller flow">
+  <img src="docs/images/nightshade-2-vision.jpg" width="49%" alt="The Nightshade 2 vision: a 30+ system roadmap, a new launcher, the Belladonna 1.0 driver, adaptive recovery, per-game profiles, search and favorites, protected saves and one controller flow">
 </p>
 <p align="center"><sub>Concept art and a preview of the new launcher with sample games.</sub></p>
+
+<p align="center">
+  <img src="docs/images/nightshade-2-roadmap.jpg" width="100%" alt="The 30+ system roadmap: Switch runs on PS5 today; 12 systems are in development builds and not confirmed on a console yet; 18 are planned">
+</p>
+
+The roadmap covers 31 systems. Switch runs today. Twelve more (Switch 2, NES, Famicom Disk System, VS. System, SNES, Satellaview, Super Game Boy, Game Boy, Game Boy Color, Game Boy Advance, Nintendo DS and Nintendo 64) have an emulator core wired into development builds and tested on a PC, not on a console. The other eighteen are planned. Emulation comes from the open-source projects behind each system, with their licences and credits kept.
 
 ## Why Nightshade
 
