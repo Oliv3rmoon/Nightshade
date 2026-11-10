@@ -35,6 +35,20 @@ Nightshade runs your own Switch games on a jailbroken PS5. It is made by **[Oliv
 </p>
 <p align="center"><sub>The Nightshade theme, drawn by the launcher's host preview with sample games.</sub></p>
 
+## Nightshade 2: the vision
+
+<p align="center">
+  <img src="docs/images/nightshade-2-banner.jpg" width="100%" alt="Nightshade 2, in development: every system, one library">
+</p>
+
+Nightshade 2 is where the project is going next: every system on the roadmap in one library, a whole new launcher where your game's art takes over the home screen, and the Belladonna 1.0 driver underneath. It is in development and has no release date. Features and systems can change before release, and so far only the Switch side has run on a console.
+
+<p align="center">
+  <img src="docs/images/nightshade-2-launcher.jpg" width="49%" alt="The new Nightshade launcher: the home screen with the library grid behind it">
+  <img src="docs/images/nightshade-2-vision.jpg" width="49%" alt="The Nightshade 2 vision: a 21-system library, a new launcher, the Belladonna 1.0 driver, adaptive recovery, per-game profiles, search and favorites, protected saves and one controller flow">
+</p>
+<p align="center"><sub>Concept art and a preview of the new launcher with sample games.</sub></p>
+
 ## Why Nightshade
 
 - **A look of its own.** The Nightshade theme is the default: black and red, with accent presets (Red, Crimson, Rose, White, Violet, Ice), a red nightshade flower for the icon and home screen, and wallpapers of your own. Canopy and Slate are still there.
