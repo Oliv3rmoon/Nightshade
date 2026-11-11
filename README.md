@@ -55,6 +55,20 @@ Nightshade 2 is where the project is going next: every system on the roadmap in 
 
 The roadmap covers 31 systems. Switch runs today. Twelve more (Switch 2, NES, Famicom Disk System, VS. System, SNES, Satellaview, Super Game Boy, Game Boy, Game Boy Color, Game Boy Advance, Nintendo DS and Nintendo 64) have an emulator core wired into development builds and tested on a PC, not on a console. The other eighteen are planned. Emulation comes from the open-source projects behind each system, with their licences and credits kept.
 
+### Update: 11 November 2026
+
+<p align="center">
+  <img src="docs/images/nightshade-2-update.jpg" width="100%" alt="Nightshade 2, the update: Switch 2 in the same library, achievements, a compatibility list, exact navigation, a setup check, classic picture options, automatic cover art and no paid tier">
+</p>
+
+What has joined the plan since the vision above: Switch 2 games in the same library through a second runtime ([EglantinePS5](https://github.com/heydemoura/EglantinePS5) by Heyde Moura), achievements whose progress survives save states, a compatibility list that fills itself from reports you see before they are sent, a setup check that names the exact file each system needs, CRT and LCD looks and HD packs for the classics, and automatic cover art that stays off until you turn it on. There is no paid tier: [nightly insider](https://nightly-insider.nightly-ps5.workers.dev) builds are free to join.
+
+<p align="center">
+  <img src="docs/images/nightshade-2-complete-list.jpg" width="100%" alt="Nightshade 2, the complete list. Built: exact stick navigation, menu sounds that keep up, per-game core options, pause menu on classic systems, launcher packs (experimental), Game Boy start-up fix, Nintendo 64 build fix, builds that check themselves, untranslated lines stop a release. In progress: Switch 2 through a second runtime, Nintendo 64 engine. Planned: smoother motion, automatic cover art, game cases in 3D, collections, controls shown on the controller, setup check for every system, folders and defaults per system, pause menu on Switch with remapping, core option defaults per system, achievements, CRT and LCD looks, NES HD packs, GameCube, Wii, Wii U and 3DS, self-filling compatibility list, a status on every system, every screen in your language. Investigating: system icons, alternative front end download">
+</p>
+
+The complete list, by where each piece stands. "Built" means it is in the code and tested on a computer. Apart from launcher packs, which are already in releases as an experimental feature, nothing on the list has run on a PS5 yet, and nothing is called working until it has.
+
 ## Why Nightshade
 
 - **A look of its own.** The Nightshade theme is the default: black and red, with accent presets (Red, Crimson, Rose, White, Violet, Ice), a red nightshade flower for the icon and home screen, and wallpapers of your own. Canopy and Slate are still there.
