@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/nightshade-logo.svg" width="160" alt="Nightshade logo">
+  <img src="docs/images/herbarium-header.jpg" width="100%" alt="Specimen N° 01, Nightshade (Solanum nigrum): Switch games on a jailbroken PS5">
 </p>
 
 <h1 align="center">Nightshade</h1>
