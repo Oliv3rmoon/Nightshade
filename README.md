@@ -77,6 +77,17 @@ The complete list, by where each piece stands. "Built" means it is in the code a
 
 The roadmap grows to 33 systems: PlayStation 2 and PlayStation 3 join it. PS2 games, GameCube and Wii games and Switch 2 games are each to be run by a separate engine that Nightshade starts from the same library and returns from, built on open-source PS5 ports with their licences and source kept in every build. PlayStation and PSP are planned as classic cores. PlayStation 3 is the heaviest system on the list and is being researched before anything is promised. Only Switch runs today; everything else on this card is planned or in progress, and none of it has run on a PS5 in Nightshade yet.
 
+### For the record
+
+The facts below are from Playtendoh's own repository as it stood on 12 November 2026 (commit [`1fcd686`](https://github.com/premohq/PlayTendoh/commit/1fcd6862c70c39ee7c22af223ef5017d8a88b0a7)). Each one links to its source.
+
+- Its README says of its next version: "None of 6.0 has run on a console yet." ([README, line 86](https://github.com/premohq/PlayTendoh/blob/1fcd6862c70c39ee7c22af223ef5017d8a88b0a7/README.md#L86))
+- Its latest release is PS5-ECAM 5.1.0, from 28 October 2026. ([releases](https://github.com/premohq/PlayTendoh/releases))
+- The Switch side of it follows Nightshade's port and carries three patches written or co-written by Oliv3rmoon: [`patches/eden`](https://github.com/premohq/PlayTendoh/blob/1fcd6862c70c39ee7c22af223ef5017d8a88b0a7/patches/eden) 0011, 0021 and 0022. Its credits name Nightshade. ([README, line 278](https://github.com/premohq/PlayTendoh/blob/1fcd6862c70c39ee7c22af223ef5017d8a88b0a7/README.md#L278))
+- We were told we were no longer a collaborator. The code stayed.
+
+So we closed the circle ourselves. That is what Full Circle means.
+
 ## Why Nightshade
 
 - **A look of its own.** The Nightshade theme is the default: black and red, with accent presets (Red, Crimson, Rose, White, Violet, Ice), a red nightshade flower for the icon and home screen, and wallpapers of your own. Canopy and Slate are still there.
