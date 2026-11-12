@@ -40,6 +40,8 @@ Nothing on this page counts as working until a tester has run it on a console. N
 - **Nintendo 64** - a build fault that would have left the engine's memory unallocated on a PS5 is fixed, and the build now stops if it ever comes back. *Built.* The engine runs on a computer only so far. *In progress.*
 - **Switch 2** - Switch 2 games to be started from the same library through a second runtime, [EglantinePS5](https://github.com/heydemoura/EglantinePS5) by Heyde Moura, with Nightshade's own loading screen and performance overlay. Off by default and labelled in development. A game that fails returns to the library and is never restarted on its own, and no game is listed as running until a console has run it. *In progress.*
 - **GameCube, Wii, Wii U and 3DS** - each as its own program that Nightshade starts and returns from, one system at a time. *Planned.*
+- **PlayStation 2** - PS2 games in the same library, run by a separate PS2 engine that Nightshade starts and returns from. Games are found and listed first; starting one waits for the engine. *Planned.*
+- **PlayStation 3** - the heaviest system on the list. Whether it can run well enough on a PS5 is being researched before anything is promised. *Investigating.*
 
 ### Trust
 

@@ -69,6 +69,14 @@ What has joined the plan since the vision above: Switch 2 games in the same libr
 
 The complete list, by where each piece stands. "Built" means it is in the code and tested on a computer. Apart from launcher packs, which are already in releases as an experimental feature, nothing on the list has run on a PS5 yet, and nothing is called working until it has.
 
+### Checkpoint: Full Circle (12 November 2026)
+
+<p align="center">
+  <img src="docs/images/nightshade-2-full-circle.jpg" width="100%" alt="Nightshade 2, checkpoint Full Circle: the scene's engines, one library. 33 systems on the roadmap. PlayStation 2, planned. GameCube and Wii, planned. Switch 2, in progress. PlayStation and PSP, planned. PlayStation 3, investigating. Switch runs on PS5 today">
+</p>
+
+The roadmap grows to 33 systems: PlayStation 2 and PlayStation 3 join it. PS2 games, GameCube and Wii games and Switch 2 games are each to be run by a separate engine that Nightshade starts from the same library and returns from, built on open-source PS5 ports with their licences and source kept in every build. PlayStation and PSP are planned as classic cores. PlayStation 3 is the heaviest system on the list and is being researched before anything is promised. Only Switch runs today; everything else on this card is planned or in progress, and none of it has run on a PS5 in Nightshade yet.
+
 ## Why Nightshade
 
 - **A look of its own.** The Nightshade theme is the default: black and red, with accent presets (Red, Crimson, Rose, White, Violet, Ice), a red nightshade flower for the icon and home screen, and wallpapers of your own. Canopy and Slate are still there.
