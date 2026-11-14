@@ -88,6 +88,14 @@ The facts below are from Playtendoh's own repository as it stood on 12 November 
 
 So we closed the circle ourselves. That is what Full Circle means.
 
+### Lights Out (13 November 2026)
+
+<p align="center">
+  <img src="docs/images/nightshade-lights-out.jpg" width="100%" alt="Nightshade, Lights Out, the last promo: no more trailers, next up a build that runs. Proof first: nothing ships until it has run on a PS5. Testers wanted: a jailbroken PS5 and thirty minutes. No paid tier: insider builds are free to join. The next thing Nightshade shows you will be running on a console">
+</p>
+
+This is the last promo. No more trailers: the next thing Nightshade shows you will be a build running on a console, and nothing ships until it has run on a PS5. Testers are wanted: a jailbroken PS5 and thirty minutes are enough to help, through [nightly on Discord](https://discord.gg/pSqgRU3YP9). There is no paid tier; insider builds are free to join.
+
 ## Why Nightshade
 
 - **A look of its own.** The Nightshade theme is the default: black and red, with accent presets (Red, Crimson, Rose, White, Violet, Ice), a red nightshade flower for the icon and home screen, and wallpapers of your own. Canopy and Slate are still there.
