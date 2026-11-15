@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Oliv3rmoon/Nightshade/releases"><img src="https://img.shields.io/github/v/release/Oliv3rmoon/Nightshade?include_prereleases" alt="Archived public release"></a>
+  <a href="https://github.com/Oliv3rmoon/Nightshade/releases"><img src="https://img.shields.io/github/v/release/Oliv3rmoon/Nightshade?include_prereleases" alt="Newest public build"></a>
   <a href="https://discord.gg/pSqgRU3YP9"><img src="https://img.shields.io/badge/discord-join%20nightly-5865F2?logo=discord&logoColor=white" alt="Discord: join nightly"></a>
   <a href="https://github.com/Oliv3rmoon/Nightshade/stargazers"><img src="https://img.shields.io/github/stars/Oliv3rmoon/Nightshade?style=social" alt="GitHub stars"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue" alt="License: GPL-3.0-or-later"></a>
@@ -18,11 +18,11 @@
 
 <p align="center">
   <a href="https://nightly-insider.nightly-ps5.workers.dev"><strong>New releases: nightly insider</strong></a><br>
-  <a href="https://github.com/Oliv3rmoon/Nightshade/releases">Browse the archived public releases</a>
+  <a href="https://github.com/Oliv3rmoon/Nightshade/releases">Public test builds and earlier releases</a>
 </p>
 
 > [!IMPORTANT]
-> **The next chapter is insider only.** New Nightshade releases will no longer be published here, including after a waiting period. Existing public releases and source stay available. Follow [nightly on Discord](https://discord.gg/pSqgRU3YP9) and [nightly insider](https://nightly-insider.nightly-ps5.workers.dev) for upcoming builds.
+> **Test builds are public again.** [v1.010.012](https://github.com/Oliv3rmoon/Nightshade/releases/tag/v1.010.012) is out as a pre-release for anyone to try and report on; nothing in it is confirmed on a console yet. Full releases stay insider only, with no delayed public drop. Existing public releases and source stay available. Follow [nightly on Discord](https://discord.gg/pSqgRU3YP9) and [nightly insider](https://nightly-insider.nightly-ps5.workers.dev) for upcoming builds.
 
 <p align="center">If Nightshade works for you, a ⭐ helps other PS5 owners find it.</p>
 
@@ -183,7 +183,7 @@ The released app (v1.010.x) installs as `PPSA99008` and keeps its data in `/data
 
 ## nightly insider
 
-**New releases are now nightly insider only.** There will be no new public releases and no delayed public drop. This repository keeps the previously published source and downloads available as an archive. Eligible insiders receive new builds through [nightly insider](https://nightly-insider.nightly-ps5.workers.dev), with the matching source, build instructions and license notices. Existing licenses and recipients' source rights remain unchanged.
+**Full releases are nightly insider only,** with no delayed public drop. Test builds are published here as pre-releases, starting again with v1.010.012 on 14 November 2026. This repository keeps the previously published source and downloads available. Eligible insiders receive new builds through [nightly insider](https://nightly-insider.nightly-ps5.workers.dev), with the matching source, build instructions and license notices. Existing licenses and recipients' source rights remain unchanged.
 
 Join [nightly on Discord](https://discord.gg/pSqgRU3YP9), complete verification and the tester requirements, then sign in at [nightly insider](https://nightly-insider.nightly-ps5.workers.dev). Access depends on current eligibility and the release's testing window.
 
@@ -197,7 +197,11 @@ The verified package includes the matching complete source, **AES-256 encrypted 
 
 ## Testing builds
 
-The following are **archived public test releases**, marked **Pre-release** on the [Releases page](https://github.com/Oliv3rmoon/Nightshade/releases). New testing builds are delivered only through nightly insider; the older public builds remain available for reference and rollback.
+<p align="center">
+  <a href="https://github.com/Oliv3rmoon/Nightshade/releases/tag/v1.010.012"><img src="docs/images/nightshade-v1.010.012-test.jpg" width="100%" alt="Nightshade test build v1.010.012: a glowing crimson nightshade flower with two berries beside a lake under a starry night sky. Not confirmed on a console yet"></a>
+</p>
+
+Test builds are marked **Pre-release** on the [Releases page](https://github.com/Oliv3rmoon/Nightshade/releases). The newest is **[v1.010.012](https://github.com/Oliv3rmoon/Nightshade/releases/tag/v1.010.012)** (14 November 2026): the redrawn launcher and background shaders in Tears of the Kingdom, with the freeze watchdog from the earlier test builds. Nothing in it is confirmed on a console yet; if you run it, send `/data/prosperoeden/logs`. The earlier test lines remain available for reference and rollback:
 
 - **v1.011.x: Nightshade as its own app.** It runs under its own title ID, `PPSA64448`, with its own data folder, `/data/nightshade`, beside the official app instead of in its place. v1.011.002 has everything in v1.010.006. An earlier install moves over by itself: the old tile turns into a bridge that installs the new app, and the first start asks once whether to **Move** your data, **Copy** it or **Start fresh**. Nothing in `/data/prosperoeden` is ever deleted. See the notes of [v1.011.000](https://github.com/Oliv3rmoon/Nightshade/releases/tag/v1.011.000).
 - **v1.012.x: Switch 2 games, experimental.** These builds sit on Takoroka's [eden-nx2](https://git.eden-emu.dev/Takoroka/eden-nx2), the newer emulator core with experimental Switch 2 support. A Switch 2 game is a game folder with its ExeFS and RomFS, dumped from your own game. No Switch 2 game has been run on a PS5 yet, and Switch 1 games have not been played on the newer core on a console either. See the notes of [v1.012.000](https://github.com/Oliv3rmoon/Nightshade/releases/tag/v1.012.000).
