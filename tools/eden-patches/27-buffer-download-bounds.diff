@@ -1,0 +1,29 @@
+--- a/src/video_core/buffer_cache/buffer_cache.h
++++ b/src/video_core/buffer_cache/buffer_cache.h
+@@ -1957,6 +1957,26 @@
+ 
+ template <class P>
+ void BufferCache<P>::DownloadBufferMemory(Buffer& buffer, DAddr device_addr, u64 size) {
++    // A CPU flush may span several independent cache allocations. Clip before
++    // asking the page tracker to clear dirty bits or computing buffer offsets.
++    // Otherwise the first buffer consumes the other buffers' downloads too.
++    const DAddr buffer_begin = buffer.CpuAddr();
++    const DAddr buffer_end = buffer_begin + buffer.SizeBytes();
++    if (device_addr >= buffer_end) {
++        return;
++    }
++    if (device_addr < buffer_begin) {
++        const u64 skipped = buffer_begin - device_addr;
++        if (size <= skipped) {
++            return;
++        }
++        device_addr = buffer_begin;
++        size -= skipped;
++    }
++    size = (std::min)(size, buffer_end - device_addr);
++    if (size == 0) {
++        return;
++    }
+     boost::container::small_vector<BufferCopy, 1> copies;
+     u64 total_size_bytes = 0;
+     u64 largest_copy = 0;

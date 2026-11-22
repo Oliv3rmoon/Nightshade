@@ -1,0 +1,13 @@
+--- a/src/video_core/texture_cache/texture_cache.h
++++ b/src/video_core/texture_cache/texture_cache.h
+@@ -228,6 +228,10 @@
+             if (blacklist) {
+                 if (view.blacklist && view.id != NULL_IMAGE_VIEW_ID) {
+                     const ImageViewBase& image_view = slot_image_views[view.id];
++                    // Buffer views have no parent image and cannot be resolution-scaled.
++                    if (image_view.image_id == NULL_IMAGE_ID) {
++                        continue;
++                    }
+                     auto& image = slot_images[image_view.image_id];
+                     has_blacklisted |= ScaleDown(image);
+                     image.scale_rating = 0;

@@ -1,0 +1,145 @@
+--- a/src/shader_recompiler/host_translate_info.h
++++ b/src/shader_recompiler/host_translate_info.h
+@@ -28,6 +28,8 @@
+     u32 max_descriptor_set_sampled_images{};
+     u32 max_descriptor_set_storage_images{};
+     u32 max_descriptor_set_input_attachements{};
++    // Opt-in: a Vulkan texel buffer uses the scalar type of its integer format.
++    bool support_integer_texture_buffers{};
+     bool support_float64{};      ///< True when the device supports 64-bit floats
+     bool support_float16{};      ///< True when the device supports 16-bit floats
+     bool support_int64{};        ///< True when the device supports 64-bit integers
+--- a/src/shader_recompiler/shader_info.h
++++ b/src/shader_recompiler/shader_info.h
+@@ -187,6 +187,8 @@
+     u32 count;
+     u32 size_shift;
+ 
++    bool is_integer = false;
++
+     auto operator<=>(const TextureBufferDescriptor&) const = default;
+ };
+ using TextureBufferDescriptors = boost::container::small_vector<TextureBufferDescriptor, 6>;
+--- a/src/shader_recompiler/ir_opt/texture_pass.cpp
++++ b/src/shader_recompiler/ir_opt/texture_pass.cpp
+@@ -580,7 +580,7 @@
+           texture_descriptors{texture_descriptors_}, image_descriptors{image_descriptors_} {}
+ 
+     u32 Add(const TextureBufferDescriptor& desc) {
+-        return Add(texture_buffer_descriptors, desc, [&desc](const auto& existing) {
++        const u32 index{Add(texture_buffer_descriptors, desc, [&desc](const auto& existing) {
+             return desc.cbuf_index == existing.cbuf_index &&
+                    desc.cbuf_offset == existing.cbuf_offset &&
+                    desc.shift_left == existing.shift_left &&
+@@ -589,7 +589,9 @@
+                    desc.secondary_shift_left == existing.secondary_shift_left &&
+                    desc.count == existing.count && desc.size_shift == existing.size_shift &&
+                    desc.has_secondary == existing.has_secondary;
+-        });
++        })};
++        texture_buffer_descriptors[index].is_integer |= desc.is_integer;
++        return index;
+     }
+ 
+     u32 Add(const ImageBufferDescriptor& desc) {
+@@ -866,6 +868,8 @@
+                     .secondary_shift_left = cbuf.secondary_shift_left,
+                     .count = count,
+                     .size_shift = size_shift,
++                    .is_integer = host_info.support_integer_texture_buffers &&
++                                  is_texture_pixel_format_integer(cbuf),
+                 });
+             } else {
+                 count = std::min(count, sampled_dynamic_cap);
+--- a/src/shader_recompiler/backend/spirv/spirv_emit_context.h
++++ b/src/shader_recompiler/backend/spirv/spirv_emit_context.h
+@@ -48,6 +48,9 @@
+ struct TextureBufferDefinition {
+     Id id;
+     u32 count;
++    Id image_type;
++    Id pointer_type;
++    bool is_integer;
+ };
+ 
+ struct ImageBufferDefinition {
+--- a/src/shader_recompiler/backend/spirv/spirv_emit_context.cpp
++++ b/src/shader_recompiler/backend/spirv/spirv_emit_context.cpp
+@@ -1352,14 +1352,15 @@
+         return;
+     }
+     const spv::ImageFormat format{spv::ImageFormat::Unknown};
+-    image_buffer_type = TypeImage(F32[1], spv::Dim::Buffer, 0U, false, false, 1, format);
+-
+-    const Id type{TypePointer(spv::StorageClass::UniformConstant, image_buffer_type)};
+     texture_buffers.reserve(info.texture_buffer_descriptors.size());
+     for (const TextureBufferDescriptor& desc : info.texture_buffer_descriptors) {
+         if (desc.count != 1) {
+             throw NotImplementedException("Array of texture buffers");
+         }
++        // Integer counter/argument buffers must remain integer through the fetch.
++        const Id image_type{TypeImage(desc.is_integer ? U32[1] : F32[1],
++                                      spv::Dim::Buffer, 0U, false, false, 1, format)};
++        const Id type{TypePointer(spv::StorageClass::UniformConstant, image_type)};
+         const Id id{AddGlobalVariable(type, spv::StorageClass::UniformConstant)};
+         Decorate(id, spv::Decoration::Binding, binding);
+         Decorate(id, spv::Decoration::DescriptorSet, 0U);
+@@ -1367,6 +1368,9 @@
+         texture_buffers.push_back({
+             .id = id,
+             .count = desc.count,
++            .image_type = image_type,
++            .pointer_type = type,
++            .is_integer = desc.is_integer,
+         });
+         if (profile.supported_spirv >= 0x00010400) {
+             interfaces.push_back(id);
+--- a/src/shader_recompiler/backend/spirv/emit_spirv_image.cpp
++++ b/src/shader_recompiler/backend/spirv/emit_spirv_image.cpp
+@@ -263,15 +263,15 @@
+             const Id idx{index.IsImmediate() ? ctx.Const(index.U32()) : ctx.Def(index)};
+             const bool non_uniform{
+                 MarkNonUniform(ctx, idx, index, NonUniformKind::UniformTexelBuffer)};
+-            const Id ptr{ctx.OpAccessChain(ctx.image_buffer_type, def.id, idx)};
+-            const Id object{ctx.OpLoad(ctx.image_buffer_type, ptr)};
++            const Id ptr{ctx.OpAccessChain(def.pointer_type, def.id, idx)};
++            const Id object{ctx.OpLoad(def.image_type, ptr)};
+             if (non_uniform) {
+                 DecorateNonUniform(ctx, ptr);
+                 DecorateNonUniform(ctx, object);
+             }
+             return object;
+         }
+-        return ctx.OpLoad(ctx.image_buffer_type, def.id);
++        return ctx.OpLoad(def.image_type, def.id);
+     } else {
+         const TextureDefinition& def{ctx.textures.at(info.descriptor_index)};
+         if (def.count > 1) {
+@@ -339,7 +339,7 @@
+ 
+ bool IsTextureInteger(EmitContext& ctx, const IR::TextureInstInfo& info) {
+     if (info.type == TextureType::Buffer) {
+-        return false;
++        return ctx.texture_buffers.at(info.descriptor_index).is_integer;
+     }
+     return ctx.textures.at(info.descriptor_index).is_integer;
+ }
+--- a/src/video_core/renderer_vulkan/vk_pipeline_cache.cpp
++++ b/src/video_core/renderer_vulkan/vk_pipeline_cache.cpp
+@@ -63,7 +63,7 @@
+ using VideoCommon::GenericEnvironment;
+ using VideoCommon::GraphicsEnvironment;
+ 
+-constexpr u32 CACHE_VERSION = 18;
++constexpr u32 CACHE_VERSION = 19;
+ constexpr size_t VULKAN_CACHE_FLUSH_PIPELINES = 128;
+ constexpr size_t VULKAN_CACHE_FLUSH_MIN_SECONDS = 30;
+ constexpr std::array<char, 8> VULKAN_CACHE_MAGIC_NUMBER{'y', 'u', 'z', 'u', 'v', 'k', 'c', 'h'};
+@@ -470,6 +470,7 @@
+         .max_descriptor_set_sampled_images = device.GetMaxDescriptorSetSampledImages(),
+         .max_descriptor_set_storage_images = device.GetMaxDescriptorSetStorageImages(),
+         .max_descriptor_set_input_attachements = device.GetMaxDescriptorSetInputAttachments(),
++        .support_integer_texture_buffers = true,
+         .support_float64 = device.IsFloat64Supported(),
+         .support_float16 = device.IsFloat16Supported(),
+         .support_int64 = device.IsShaderInt64Supported(),

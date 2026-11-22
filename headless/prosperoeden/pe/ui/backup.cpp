@@ -37,8 +37,8 @@ constexpr float kPollSeconds = 0.25f;
 constexpr float kMessageSeconds = 8.0f;
 // Where a backup goes on the drive (headless/backup.h, kFolder).
 constexpr const char *kBackupFolder = "/nightshade-backup";
-// The Diagnostics row that opens this dialog (settings.cpp, diagnostics_backup).
-constexpr int kDiagnosticsRow = 3;
+// The Diagnostics row that opens this dialog (settings.cpp, diagnostics_backup), under Test builds.
+constexpr int kDiagnosticsRow = 4;
 
 // A size as the other dialogs write it: MB, or GB from one on.
 std::string size_text(std::uint64_t bytes)

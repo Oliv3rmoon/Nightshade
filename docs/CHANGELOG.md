@@ -2,6 +2,189 @@
 
 What changed in each release of ProsperoEden, newest first. A release's notes on GitHub are its section here.
 
+## v1.500.000
+
+**Nightshade 1.5 — The Stability Leap.** A full public release combining **Belladonna 1.0** (`871f66e`), the redesigned Nightshade launcher and Tears of the Kingdom freeze/stutter fixes from `v1.010.008–v1.010.015`, and **24 adapted GPU, NVDRV/SMMU, Vulkan, shader-cache, and guest-fault stability fixes** adapted from [bf39l/ProsperoEden](https://github.com/bf39l/ProsperoEden) ([issue #6](https://github.com/Oliv3rmoon/Nightshade/issues/6)). Every change passed host ASan/UBSan regression suites, SPIR-V validation, and native PS5 package/SELF checks; **physical PS5 console installation and gameplay results are still pending community testing.**
+
+### Core Stability & Memory Fixes (24 adapted fixes + Nightshade hardening)
+
+- **GPU buffer cache, DMA, and draw safety.** Fixed buffer usage bitmask tracking across partial range transitions, read ownership and asynchronous readback lifetimes, buffer download bounds clamping, storage binding virtual spans, buffer allocation retirement recovery, resolution-scaled buffer view blacklisting, unbound DMA channel handling, and an indirect-draw instance ceiling to stop runaway GPU commands.
+- **NVDRV / SMMU memory reclaim and sparse mappings.** Reclaimed stale SMMU mappings and fixed mapping failure returns, fixed-mapping pin replacement, GPU mapping index cleanup, GPU mapping buffer bounds, sparse remap backing bounds and pin ownership, low-alias allocation failures, and backing-rejection diagnostics.
+- **Vulkan shaders, integer texel buffers, and disk shader cache.** Added Vulkan integer texel buffer view support, bounded shader environment reads and `env_ptrs` sizing (`MaxShaderProgram`), improved Vulkan shader error reporting, rejected corrupt shader instructions on load, validated shader-cache environment bounds and payload lengths before deserialization, rejected malformed compute cache entries, and bounded shader-cache reads to each entry's declared span.
+- **Texture garbage collection prefetch & eviction accounting.** Accounted for clean and oversized texture evictions during GC prefetch with saturating usage subtraction and current-pass refill batching.
+- **Guest fatal panic handling & scoped detailed logs.** Fatal guest panics previously parked the thread and froze the game; they now record safe bounded memory evidence (with address-space wraparound guards) and cleanly end the session without retrying, while bounded early-boot retries remain reserved for transient prefetch aborts. When **Detailed logging** is enabled, debug output is scoped to `Render`, `Render.Vulkan`, `HW.GPU`, `Shader`, and `Core.ARM` (`*:Info`) so noisy service, filesystem, and NVDRV polling does not flood the 100 MiB log file.
+
+### Also Included Since the Previous Full Release (v1.010.007)
+
+- **Belladonna 1.0 Vulkan driver (`871f66e`).** Replaces the October 29 driver with fixed GPU completion counting, OOM safety on command recording and shader builds, damaged pipeline-cache validation, 10-second GPU stall containment (`radv/ps5 stall:`), Vulkan swapchain loss recovery, and a silent startup crystal animation (fade with Reduce motion). First launch of each game rebuilds compiled Vulkan pipelines once under the new driver key.
+- **Redesigned Nightshade launcher & icon.** Full-bleed selected game art on Home, 6-column Library grid with system-keyboard search and All / Recently played / Favorites filters, side-by-side Settings, larger couch-readable type, background Library scanning without UI stalls, and the crimson Nightshade flower icon.
+- **Tears of the Kingdom stability & async shaders.** Asynchronous shaders enabled by default for TOTK (overridable per game) with Eden's small-target and depth draw rules, bounded runaway copy loop guard at `main+0x6E1404`, and the enhanced freeze watchdog (`EDEN_STUCK_GUEST` / `EDEN_STUCK_THREAD`) with module-relative offsets.
+- **Graphics, shader discovery, and audio fixes from `v1.010.015`.** Declared indexed Vulkan storage image arrays and non-uniform image atomics, stopped empty Maxwell instruction discovery with per-block scratch, block-row ASTC recompression, locked small-page GPU memory layout updates, non-mutating PCM volume/channel downmix, and smooth 1 ms audio underrun fade-to-silence.
+- **Full native package.** Built as a standard installable release with `lapy.elf` filesystem elevation, `self-updater.elf` for in-app **Update now**, `app-launch.elf` for **Settings > Apps**, and MihawkGen weights (`mihawkgen/network.fgw`).
+
+### Credits & Community Testers
+
+Built on upstream **[Eden](https://github.com/eden-emulator/mirror)**, **ProsperoEden** by BlackBearReloaded, and **Mihawk**'s PS5 Mesa / PS5 Vulkan / MihawkGen stack (see [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md) for complete credits and licenses).
+
+Special thanks to **[bf39l](https://github.com/bf39l)** for the upstream stability findings and patches in [bf39l/ProsperoEden](https://github.com/bf39l/ProsperoEden) ([issue #6](https://github.com/Oliv3rmoon/Nightshade/issues/6)), and to community testers and contributors **bluegaterune**, **renhexforge**, **GameNostalgic0**, **bobrass**, and **Tiang-88** whose logs, reports, and bug fixes shaped this release.
+
+### Console Testing Status & What to Send
+
+Physical PS5 installation, launch, and gameplay testing are still pending. Back up `/data/prosperoeden` before updating. If you hit a freeze, crash, audio glitch, or visual regression, please open an issue or post in Discord with `/data/prosperoeden/logs` (`stderr.log`, `stderr.prev.log`, `heap.log`, and any crash report) plus `/data/prosperoeden/user/log/eden_log.txt`, your PS5 model/firmware, game and version, and renderer.
+
+### Install
+
+- **From `v1.005.102` through `v1.010.008`:** Open Nightshade and choose **Update now**.
+- **From `v1.010.009–v1.010.015`:** If **Settings > Diagnostics > Test builds** is enabled, turn **Test builds** **off** and reopen Nightshade so **Update now** checks full releases — or install manually below.
+- **Manual install (including `v1.005.101` and earlier or fresh installs):** Download `Nightshade-v1.500.000.zip`, verify its SHA-256 against `SHA256SUMS`, extract `PPSA99008/`, and copy it over your homebrew folder (e.g. `/data/homebrew/PPSA99008/`).
+
+## v1.010.015
+
+**Test build with Belladonna 1.0 and Nightshade graphics fixes.** Belladonna 1.0 replaces the October 29 driver. It corrects GPU completion and allocation handling and changes how the driver responds when the GPU stops answering. The game fixes below have host regression coverage and still need matched tests on a PS5.
+
+### Changed
+
+- **Belladonna launch animation.** A silent crystal animation appears once when Nightshade opens with Belladonna. Reduce motion uses a fade.
+- **Launcher startup and Library.** The built-in launcher starts one background scan. You can open Library and keep using the menu while the list loads. If you press Options on Home before game settings are available, the launcher shows that it is still reading the list. Native shader cache maintenance runs when a game is selected. If the startup report file cannot open, its rows go to the session log and the launcher continues.
+- **Vulkan storage images.** Eden declares the arrays it indexes in SPIR-V, including storage texel buffers. Image atomics select the correct descriptor in an array on devices that support non-uniform indexing. The array declaration fix addresses a shader-generation defect relevant to Fighting Force Collection's Vulkan startup crash. Its OpenGL freeze after choosing a game still needs investigation.
+- **Shader discovery.** The parser stops when an executable Maxwell instruction is empty. Discovery only allocates scratch for the blocks it reads and switches to control-flow scanning at an empty block. A live shader can be retried when its code is available, and a cached pipeline with an empty instruction is skipped. The Fighting Force Collection selector still needs a console retest.
+- **Texture cleanup and conversion.** Dirty texture downloads can now share one GPU wait even when the collector skips images it needs to keep. Large ASTC textures on a light frame can convert in the background when their input, output and scratch data fit the available allowance. Decoders keep their context until outstanding work has finished. These changes address specific stalls and lifetime defects. Tears of the Kingdom still needs a frame-time comparison on the same route, and the cause of Top Racer Collection's audio distortion remains open.
+- **ASTC texture recompression.** Workers decode and compress matching block rows together for BC1 and BC3 textures. Each conversion uses one layer of scratch memory.
+- **GPU memory layout.** Small-page mappings now use the same lock as readers. This corrects a race in the path implicated in a Final Fantasy Resonance GPU-thread crash. The game's separate post-boss transition failure still needs a retest.
+- **GPU stall logs.** `stderr.log` records when the emulator finishes suspending the game and when the GPU fence completes. These markers help locate where a freeze stops making progress.
+- **Vulkan display recovery.** When VideoOut loses the swapchain after a frame has been submitted, Nightshade keeps that frame's completion fence and rebuilds the swapchain before the next copy. If acquisition fails before submission, the pending frame can still be retried.
+- **Belladonna queue submission.** Small submissions use stack storage for their command plan. Larger submissions can still grow the plan on the heap before claiming GPU command memory.
+- **Vulkan driver cache saves.** Nightshade skips writes when the saved cache is byte-for-byte identical. If the driver cache grows during a save, Nightshade retries the snapshot and keeps the saved file if it cannot read a complete copy.
+- **Audio buffer reuse.** Volume adjustment and surround downmix now work on a copy of the game's PCM. A game can submit the same buffer twice without replaying samples that Nightshade already changed.
+- **Audio underrun handling.** Missing audio fades to silence over one millisecond when the queue runs dry. Each `EDEN_AUDIO_PORT_CLOSED` line in `eden_log.txt` identifies the stream, its guest channel count, and the padded frame and block counts. Pauses and shutdown silence are excluded. The counts help diagnose Top Racer Collection's distortion.
+- **Finished GPU work is counted right.** A submission that finished while the driver was counting could make it take work for done that was not, free command memory the GPU was still reading, or report a frame finished early. That is fixed. A wait for the GPU also sleeps until its time is up instead of spinning, and a frame whose GPU work failed is no longer put on the screen.
+- **Running out of memory is reported instead of written past.** While a frame's commands were recorded, a shader was built or work was handed to the GPU, a failed allocation could write past a buffer, free memory twice or crash. On the paths its tests cover, the driver now stops and reports the failure instead. That is not every way of running out of memory, and a game may still not survive one.
+- **Damaged Vulkan cache entries.** Belladonna checks shader layouts and pipeline record sizes before using cached data. Entries that fail these checks are rebuilt on demand.
+- **Sizes that could wrap around are refused:** very large uploads, query pools, geometry shader output and buffer placements are checked before they are used.
+- **Every game's shaders are compiled again, once.** Belladonna 1.0 files each compiled graphics pipeline under a new key, so it cannot use what the earlier driver compiled. The first start of each game with this build compiles all of its saved shaders from nothing: minutes for a large game where the cache is built before the game plays, or, where it is built while you play (the default), more stutter than usual until it is done. While that build runs, the overlay's `SHD` percentage shows how far it is; it is gone once the build ends. Later starts are as before. Each game's own list of shaders is kept, and nothing needs deleting.
+
+The driver's own notes (`ps5/RELEASE_1.0.0.md`) are included in the accompanying `Belladonna-1.0-871f66e-source.tar.zst` archive and in `tools/driver-sources/belladonna-1.0-871f66e.bundle`.
+
+### What a sudden close may mean
+
+One rule in this driver is stricter than before. It has not run on a console, so a tester may be the first to meet it:
+
+- **A GPU that makes no progress for 10 seconds is given up for good.** More kinds of waiting notice it than before, and once one has, nothing more goes to the GPU in that session: Nightshade closes and leaves a crash report that names `VK_ERROR_DEVICE_LOST`, and `stderr.log` has the stall report (`radv/ps5 stall:`). The driver cannot tell one very long piece of GPU work from a hang, so a close after a freeze of 10 seconds may be this rule and not a GPU that really stopped.
+
+A session that ends like this is worth more than one that went well: send its logs and say what was on screen.
+
+### What a picture that stops may mean
+
+The driver is also stricter about the display. This closes nothing and leaves no crash report:
+
+- **A failed call to the display now ends that picture, and Nightshade sets the picture up again.** There are three such calls: reading which frame the display last showed, waiting for the display's next refresh, and handing the display a frame. The earlier driver carried on after any of them failed. Belladonna 1.0 marks the swapchain lost instead. Nightshade then tries the frame up to three times, with a new swapchain for the second and third, and leaves the frame out if that does not help. So one failure should be a short hitch, and a failure that keeps coming back should be a picture that stands still while the game goes on behind it, with the sound still playing. `stderr.log` gets a line only when the display refuses a frame (`wsi/videoout: sceVideoOutSubmitFlip`); a failed read or wait leaves none. Not seen on a console yet.
+
+If the picture freezes while the sound goes on, say so, with what was on screen and how long it lasted, and send the logs.
+
+### What to send
+
+Send `/data/prosperoeden/logs` (`stderr.log`, `stderr.prev.log`, `heap.log`, and any crash report) after each session, along with `/data/prosperoeden/user/log/eden_log.txt` if it is present. Say how long the first start took and whether anything froze, closed or looked wrong that was fine on v1.010.012. To compare gameplay performance, run the same save, route and settings again once the shader-cache rebuild finishes.
+
+### Install
+
+With **Settings > Diagnostics > Test builds** on in v1.010.009 or later, **Update now** offers it. Otherwise download `Nightshade-v1.010.015.zip` below and copy its `PPSA99008` folder over yours. To go back, install v1.010.012 the same way.
+
+## v1.010.012
+
+**The launcher, redrawn, and asynchronous shaders on in Tears of the Kingdom for the frame drops when new areas load.** In two testers' sessions on v1.010.011 the drops (after loading a save, in the desert, on the volcano) came with bursts of new graphics pipelines: 800 and 1,961 built while playing, after the shader cache, up to 96 in 30 seconds. Both had **Asynchronous shaders** off, so each new pipeline held the frame until the driver had built it. Not confirmed on a console yet.
+
+### Changed
+
+- **Asynchronous shaders are on for Tears of the Kingdom** unless its own Performance settings (Library > Game settings > Performance) have the switch: that switch, on or off, still decides. A safe start still turns them off, and the game's video profiles keep them on. Something new can be missing for a frame or two where it first appears; say where if you see it.
+- **Two rules for a draw whose pipeline is not built yet,** with asynchronous shaders on, in every game: a draw into a target smaller than 640x360 waits for it, since what a game draws there once (lookup tables, fog or noise textures) would otherwise be missing for the rest of the session (the rule of [Eden PR #4639](https://git.eden-emu.dev/eden-emu/eden/pulls/4639), by John); and a draw that uses depth is left out even when it is small, as upstream Eden does, since the scene draws it again next frame.
+
+### New
+
+- **The launcher, redrawn.** The Nightshade theme has a layout of its own: a top bar with the flower, the tabs Home, Library, Multiplayer and Settings, and the clock; a home screen over the selected game's art with its name, a crimson Play and a row of covers (the games played last first); a Library of six covers to a row with a search on the system keyboard and the filters All, Recently played and Favorites (a game becomes a favorite in its Quick settings); and Settings as a column beside a panel of the category, where its options open. The type is larger, to read from a couch. About is the last row of Settings. Behind it all, nightshade flowers frame the screen, and what is chosen has a crimson ring and glow. Canopy and Slate are as they were.
+- **A new icon:** Nightshade's flower, crimson with a white star and two berries.
+- **`stderr.log` says what happened to those draws:** every 5 seconds, when it changed, an `EDEN_ASYNC_SHADERS` line with how many were left out (`skipped`, `skipped_depth`) and how many waited (`waited_small_target`, `waited_small_draw`, and `waited_sync` with the switch off). The launch report says `Asynchronous shaders on: this game's own default` when the default decided.
+- **Each `EDEN_PIPELINE` line ends with `spv=`,** a hash of each shader stage as the GPU gets it. A new pipeline whose stages were all seen before differs only in state outside its shaders: `tools/analyze-pipeline-reuse.py stderr.log` counts those, which says how much graphics pipeline libraries could save.
+- **A timing run in every build:** an empty `cost-run.txt` in the app's folder makes `heap.log` get `EDEN_VULKAN_COST` lines every 5 seconds: the driver's pipeline builds, the shader translation, the draws that waited for a pipeline and the rest ([A timing run](SETTINGS.md#a-timing-run)). It costs a little speed; take the file out afterwards.
+
+### What to send
+
+Play as usual, go where the drops were, and send `/data/prosperoeden/logs` (`stderr.log` and `stderr.prev.log`) after each session. With a timing run, `heap.log` and `heap.prev.log` too. Say whether the drops changed and whether anything was missing for a moment.
+
+### Install
+
+With **Settings > Diagnostics > Test builds** on in v1.010.009 or later, **Update now** offers it. Otherwise download `Nightshade-v1.010.012.zip` below and copy its `PPSA99008` folder over yours.
+
+## v1.010.011
+
+**Tears of the Kingdom: the crash after a long freeze should be gone.** v1.010.010's freeze watchdog caught it twice on a tester's console, on the way up Death Mountain and later in the same game. The game's main thread spent about 90 seconds in one loop of its own code (`main+0x6E1404`) that copies 4 numbers but was handed a count near a billion. It wrote over a large part of the game's memory, and then jumped through one of the pointers it had overwritten: "guest thread MainThread jumped to an unmapped address". Not confirmed on a console yet.
+
+### Fixed
+
+- **That loop stops at 4 in Tears of the Kingdom** (this build of the game only, and only when its code is exactly what the logs showed). With a sane count it does just what it did before. With a wrong one it copies its 4 numbers and goes on, and `stderr.log` gets an `EDEN_TOTK_LOOP_BOUNDED` line with the count, where it was read, and whether that memory had last been written by the graphics side (`page=`). What writes the wrong count is still unknown, and those lines should say.
+- **The freeze watchdog names modules:** `EDEN_STUCK_GUEST` and its other lines now say `main+0x...` instead of a raw address.
+
+The frame drops in big areas are not from running out of memory: the logs show plenty free while the frame rate dips. They are still being looked into.
+
+Everything else is v1.010.010.
+
+### What to send
+
+Play as usual and send `/data/prosperoeden/logs` (`stderr.log` and `stderr.prev.log`) after each session, even one that doesn't crash. For the frame drops, say where they start (desert, volcano and so on) and about how long they last.
+
+### Install
+
+With **Settings > Diagnostics > Test builds** on in v1.010.009 or later, **Update now** offers it. Otherwise download `Nightshade-v1.010.011.zip` below and copy its `PPSA99008` folder over yours.
+
+## v1.010.010
+
+**The freeze watchdog says where a frozen game is.** A tester's Tears of the Kingdom froze 110 minutes in, in the Mucktorch fight, on v1.010.009. Its `stderr.log` ended with `EDEN_STUCK core=0 state=guest`: one of the game's own threads kept running on the first core for 10 seconds without asking the system for anything. Nothing else was held: no request in progress, no graphics stall, no memory fault. The log couldn't say where that thread was. Now it can. Nothing a game does changes, and this isn't confirmed on a console yet.
+
+### New
+
+- **A core stuck in the game's code is looked at.** At 10, 60 and 300 seconds, `stderr.log` gets `EDEN_STUCK_GUEST`: the thread's name and priority, where it is in the game's code, its call chain, the code around it and the memory its registers point at. Four `EDEN_STUCK_PC` lines a second apart then show whether it loops. The core goes on running the same thread afterwards.
+- **What every other thread is doing.** With the first two reports, `EDEN_STUCK_THREAD` lines list each of the game's threads: its state, what it waits for and who holds it.
+- **A core that doesn't answer** gets `EDEN_STUCK_NO_ANSWER`: the emulator itself is held under the game's code there, not the game looping.
+- **A stuck memory fault** also names its address and what it waits for.
+
+Everything else is v1.010.009.
+
+### What to send
+
+When a game freezes, leave it frozen for about a minute before closing it, then send `/data/prosperoeden/logs` (`stderr.log` and `stderr.prev.log`) and `/data/prosperoeden/user/log/eden_log.txt`.
+
+### Install
+
+With **Settings > Diagnostics > Test builds** on in v1.010.009, **Update now** offers it. Otherwise download `Nightshade-v1.010.010.zip` below and copy its `PPSA99008` folder over yours.
+
+## v1.010.009
+
+**Test builds through Update now.** A tester asked for each new test build to come through **Update now** instead of being copied over by hand. **Settings > Diagnostics > Test builds** (off by default) does it. Not confirmed on a console yet.
+
+### New
+
+- **Test builds in Update now.** Switched on, the check at the start offers the newest release of the version line you have, a test build or not: the releases with the same first two numbers and a higher third (1.010.010 for 1.010.009). Another line is never offered, however new: not 1.011 (another title ID and folder), and not 1.012 (the Switch 2 test line). The update dialog says **Test build available** with the release's title, and the download is checked against that release's own `SHA256SUMS` and installed as any update is. It applies the next time Nightshade opens. See [Test builds](https://github.com/Oliv3rmoon/Nightshade/blob/v1.010.009/docs/SETTINGS.md#test-builds).
+
+Everything else is v1.010.008, its freeze diagnostics too.
+
+### Install
+
+This is a test release, and the versions before it don't have the switch, so **Update now** doesn't offer it. Download `Nightshade-v1.010.009.zip` below and copy its `PPSA99008` folder over yours. Then switch on **Test builds**, and the next test builds come through **Update now**.
+
+## v1.010.008
+
+**A test build for Tears of the Kingdom's freeze.** On v1.010.007 a tester's TOTK froze about 70 minutes in, on a loading screen: the picture and the sound kept going and memory was fine, but the load never finished. This build doesn't fix that yet. It makes a frozen game say what it is waiting on. Not confirmed on a console yet: play TOTK until it freezes (or as long as you can), then send `/data/prosperoeden/logs` and `/data/prosperoeden/user/log`.
+
+### New
+
+- **A frozen game says why.** While a game plays, Nightshade watches each of its cores and every request it makes of the console's system. When one stays put for 10 seconds, a minute and five minutes, `stderr.log` gets an `EDEN_STUCK` line naming it (the core, the request and its system service, and once the game's last 64 requests), and every 30 seconds an `EDEN_PROGRESS` line sums up what is running.
+- **GPU waits in the log.** When the GPU stops answering for a while, `stderr.log` says when the wait began and ended (`EDEN_GPU_STALL`).
+
+Everything else is v1.010.007.
+
+### Install
+
+This is a test release, so **Update now** doesn't offer it. Download `Nightshade-v1.010.008.zip` below and copy its `PPSA99008` folder over yours. The next full release installs over it as usual.
+
 ## v1.010.007
 
 **Memory in long sessions, video profiles, Safe Launch and Quick settings, and homebrew in the Library.** Tears of the Kingdom ended after about an hour on v1.010.006 and slowed down after its item menu: Nightshade kept 2 GB more of the console's memory than it used and never gave any back, and the game's largest texture needed one 176 MiB block that a long session no longer had. Nightshade now gives its memory back, uploads large textures in pieces, and its graphics caches no longer evict at their hardest for the rest of a session. Choose Minimum, Recommended, High or Ultra for every game or for one, start a game once in safe mode when it won't start, and change a game's video from a quick panel. Homebrew NROs are listed beside your games with their own names and icons, and newer games' ZBIC-compressed code must decode whole. Not confirmed on a console yet: play TOTK as long as you can, open its item menu often, and send `/data/prosperoeden/logs`.

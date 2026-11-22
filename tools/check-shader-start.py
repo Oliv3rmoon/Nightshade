@@ -106,6 +106,7 @@ with tempfile.TemporaryDirectory(prefix='eden-shader-start-') as work:
         texture_util = (port / 'texture_util.cpp').read_text()
         assert 'decode_scratch.resize_destructive(level_size / (std::max)(layers, 1u));' in texture_util
         assert 'decode_scratch.resize_destructive(level_size);' not in texture_util
+        assert 'Tegra::Texture::BCN::TranscodeASTCLayer(' in texture_util
         cmake = (root / 'headless/CMakeLists.txt').read_text()
         assert 'if(NOT "${PORT_BUILD_DIR}/texture_util.cpp" IN_LIST video_sources)' in cmake
         print('Shader cache load in the Vulkan port: stopped first when the cache goes, the GPU thread takes from '

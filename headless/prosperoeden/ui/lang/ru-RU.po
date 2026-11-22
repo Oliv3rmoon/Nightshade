@@ -2155,6 +2155,16 @@ msgstr "Убрано из списка. Сохранения остались н
 msgid "Tears of the Kingdom: 4 GiB and compressed ASTC in every tier, what it needs to play for hours."
 msgstr "Tears of the Kingdom: 4 GiB и сжатые ASTC на каждом уровне, что нужно для многочасовой игры."
 
+#. Update dialog and notification title: the newer release of this app on offer is a test build (made for testing, before a regular release).
+#: pe/ui/launcher.cpp, pe/ui/update.cpp
+msgid "Test build available"
+msgstr "Доступна тестовая версия"
+
+#. Settings switch (Diagnostics, under Update notices): whether the app's update offer also includes test builds, releases of this app made for testing before a regular release (not games).
+#: pe/ui/settings.cpp
+msgid "Test builds"
+msgstr "Тестовые версии"
+
 #: settings_store.h
 msgid "Thai"
 msgstr "Тайский"
@@ -2441,6 +2451,11 @@ msgstr "Уведомления об обновлениях"
 #: pe/ui/update.cpp
 msgid "Update now"
 msgstr "Обновить"
+
+#. About the Test builds switch. A version line is the releases sharing the version's first two numbers (1.010.007, 1.010.008...); test builds of other lines are never offered.
+#: pe/ui/settings.cpp
+msgid "Update offers include test builds of this version line. They can have new bugs."
+msgstr "В обновления входят и тестовые версии этой линейки. В них могут быть новые ошибки."
 
 #: pe/ui/update.cpp
 msgid "Update ready"
@@ -2802,3 +2817,35 @@ msgstr "{0}: {1}. Генерация кадров и постобработка 
 #: pe/ui/settings.cpp
 msgid "Crash reports (FTP): {0}\nAttach crash-*.txt and its matching logs to your issue."
 msgstr "Отчёты о сбоях (FTP): {0}\nПриложите crash-*.txt и соответствующие журналы к сообщению о проблеме."
+
+#: pe/ui/showcase.cpp
+msgid "All"
+msgstr "Все"
+
+#: pe/ui/showcase.cpp
+msgid "Recently played"
+msgstr "Недавние"
+
+#: pe/ui/showcase.cpp
+msgid "Favorites"
+msgstr "Избранное"
+
+#: pe/ui/showcase.cpp
+msgid "Search games"
+msgstr "Поиск игр"
+
+#: pe/ui/quick.cpp
+msgid "Favorite"
+msgstr "В избранном"
+
+#: pe/ui/showcase.cpp
+msgid "No games match your search."
+msgstr "Нет игр по вашему запросу."
+
+#: pe/ui/showcase.cpp
+msgid "No favorites yet. Add one from Quick settings."
+msgstr "Избранного пока нет. Добавьте игру в быстрых настройках."
+
+#: pe/ui/quick.cpp
+msgid "Shows the game under Favorites in the Library."
+msgstr "Показывает игру в разделе «Избранное» библиотеки."

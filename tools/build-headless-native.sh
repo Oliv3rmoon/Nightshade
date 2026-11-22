@@ -47,6 +47,7 @@ update_repository=(-U EDEN_UPDATE_REPOSITORY)
 cmake -S "$scratch/source" -B "$scratch/native-local" -G Ninja \
     -DCMAKE_TOOLCHAIN_FILE="$root/headless/ps5.cmake" -DPS5_NATIVE=ON -DEDEN_DEVICE_FRONTEND="$devices" \
     -DCMAKE_BUILD_TYPE=Release -DENABLE_LTO=OFF \
+    -DEDEN_MOUNTED_STORAGE_ONLY="${EDEN_MOUNTED_STORAGE_ONLY:-OFF}" \
     -DEDEN_PS5_VULKAN="${EDEN_PS5_VULKAN:-OFF}" \
     -DEDEN_VULKAN_DRIVER="${EDEN_VULKAN_DRIVER:-CUSTOM}" \
     -DEDEN_DEV_VULKAN="${EDEN_DEV_VULKAN:-OFF}" \
@@ -73,6 +74,7 @@ python3 -B "$root/headless/check_slab_lifetime.py" \
     "$scratch/source/src/core/hle/kernel/slab_helpers.h"
 echo "Building Eden with $jobs parallel jobs"
 cmake --build "$scratch/native-local" --target eden-headless core -j "$jobs"
+python3 -B "$root/tools/check-native-weak-imports.py" "$scratch/native-local/bin/eden-headless"
 python3 -B "$root/tools/check-timing-stop.py" "$scratch/native-local"
 python3 -B "$root/tools/check-post-processing-paths.py" "$scratch/native-local"
 # In every build: an object that saw Eden's own table header would write a table the rest keeps sparse.
@@ -81,8 +83,13 @@ python3 -B "$root/tools/check-multiplayer-headers.py" "$scratch/native-local"
 # Source checks of the release configuration (development builds opt out: EDEN_SKIP_SOURCE_CHECKS=1).
 [[ ${EDEN_SKIP_SOURCE_CHECKS:-0} == 1 ]] && exit 0
 python3 -B "$root/headless/check_audio_shutdown.py" "$scratch/native-local/headless/core.cpp" "$scratch/source/src/core/core.cpp"
+python3 -B "$root/tools/check-shader-discovery-scan.py" "$scratch/native-local/headless/shader_environment.cpp"
 python3 -B "$root/tools/check-audio-queue.py" "$scratch/native-local/headless/sink_stream.cpp" "$scratch/source/src"
 python3 -B "$root/tools/check-load-failure.py"
+python3 -B "$root/tools/check-guest-fault.py"
+python3 -B "$root/tools/check-buffer-and-draw-safety.py" "$scratch/source"
+python3 -B "$root/tools/check-nvmap-sparse-pins.py" "$scratch/source"
+python3 -B "$root/tools/check-shader-and-cache-safety.py" "$scratch/source"
 python3 -B "$root/tools/check-recent-games.py"
 python3 -B "$root/tools/check-update-versions.py" "$scratch/native-local/headless/ncz-registered_cache.cpp"
 python3 -B "$root/tools/check-game-folder-mods.py"
@@ -131,10 +138,16 @@ if [[ "$graphics" == ON ]]; then
     python3 -B "$root/tools/check-integer-buffer-clear.py"
     python3 -B "$root/tools/check-game-capture-shutdown.py"
     if [[ ${EDEN_PS5_VULKAN:-OFF} == ON ]]; then
+        python3 -B "$root/tools/check-astc-policy.py" "$scratch/source"
+        python3 -B "$root/tools/check-async-lifetimes.py" "$scratch/source"
         python3 -B "$root/tools/check-staging-buffers.py" "$scratch/source/src" \
             "$scratch/native-local/headless/vulkan_staging_buffer_pool.cpp"
         python3 -B "$root/tools/check-texture-evictions.py" "$scratch/source/src" \
             "$scratch/native-local/headless/vulkan-cache/video_core/texture_cache/texture_cache.h"
+        python3 -B "$root/tools/check-gc-downloads.py" "$scratch/source"
+        python3 -B "$root/tools/check-gpu-kind-map.py" "$scratch/source"
+        EDEN_SHADER_BUILD="$scratch/native-local" python3 -B "$root/tools/check-storage-image-spirv.py"
+        python3 -B "$root/tools/check-vulkan-cache-save.py" "$scratch/native-local/headless"
         python3 -B "$root/tools/check-shader-start.py" "$scratch/native-local/headless"
     fi
 fi

@@ -1,0 +1,12 @@
+--- a/src/shader_recompiler/frontend/maxwell/decode.cpp
++++ b/src/shader_recompiler/frontend/maxwell/decode.cpp
+@@ -46,6 +46,9 @@
+         return Opcode::name;
+ #include "maxwell.inc"
+ #undef INST
++    if (insn == 0 || insn == ~u64{0}) {
++        throw LogicError("Invalid Maxwell instruction {:#016x}", insn);
++    }
+     ASSERT_MSG(false, "Invalid insn {:#016x}", insn);
+     return Opcode::NOP;
+ }

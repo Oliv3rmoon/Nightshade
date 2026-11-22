@@ -663,6 +663,44 @@ std::optional<std::int64_t> EdenServices::ask_seed(std::int64_t current, const s
     return Eden::RngSeedFromText(Common::UTF16ToUTF8(answer.text));
 }
 
+std::optional<std::string> EdenServices::ask_search(const std::string& current, const std::atomic<bool>& stop) {
+    Eden::TextRequest request;
+    request.title = u"Search games";
+    request.initial = Common::UTF8ToUTF16(current);
+    request.max_length = 64;
+    const auto answer = Eden::AskSystemKeyboard(request, stop);
+    if (answer.outcome == Eden::TextOutcome::unavailable)
+        throw std::runtime_error("The system keyboard is unavailable");
+    if (answer.outcome != Eden::TextOutcome::accepted) return std::nullopt;
+    return Common::UTF16ToUTF8(answer.text);
+}
+
+// The Library's favorites (Nightshade's layout): {"games": [file, ...]} in the config folder.
+static std::string FavoritesFile() { return Eden::ConfigFile("favorites.json"); }
+
+std::vector<std::string> EdenServices::favorites() {
+    std::vector<std::string> files;
+    std::string text;
+    if (!Eden::Settings::ReadFile(FavoritesFile(), text)) return files;
+    const auto document = Eden::Settings::Json::parse(text, nullptr, false);
+    if (!document.is_object() || !document.contains("games") || !document.at("games").is_array()) return files;
+    for (const auto& entry : document.at("games"))
+        if (entry.is_string() && !entry.get<std::string>().empty()) files.push_back(entry.get<std::string>());
+    return files;
+}
+
+bool EdenServices::set_favorite(const std::string& file, bool favorite) {
+    std::vector<std::string> files = favorites();
+    const auto at = std::find(files.begin(), files.end(), file);
+    if (favorite == (at != files.end())) return true;
+    if (favorite) files.push_back(file);
+    else files.erase(at);
+    Eden::Settings::Json document = Eden::Settings::Json::object();
+    document["games"] = files;
+    return Eden::Settings::WriteFile(FavoritesFile(),
+        document.dump(2, ' ', false, Eden::Settings::Json::error_handler_t::replace) + "\n");
+}
+
 EdenServices::EdenServices(std::string launch_error, Eden::Multiplayer::RoomClient& rooms)
     : rooms_(rooms), launch_error_(std::move(launch_error)) {
     (void)mkdir(Eden::ConfigDir().c_str(), 0777);
@@ -960,6 +998,8 @@ bool EdenServices::take_update(pe::ui::UpdateOffer* offer) {
     offer->installable = found.installable;
     offer->notes = found.notes;
     offer->notes_truncated = found.notes_truncated;
+    offer->test_build = found.test_build;
+    offer->title = found.title;
     return true;
 }
 
@@ -1214,6 +1254,7 @@ pe::ui::Preferences EdenServices::preferences() {
     result.wallpaper = saved.wallpaper;
     result.update_notices = saved.update_notices;
     result.community_seen = saved.community_seen;
+    result.test_builds = saved.test_builds;
     // Settings > Performance: the general values (settings_store.h).
     const Eden::PerformanceSettings speed = Eden::LoadPerformance(0);
     result.block_list = speed.block_list;
@@ -1265,6 +1306,7 @@ bool EdenServices::set_preferences(const pe::ui::Preferences& preferences) {
     value.wallpaper = preferences.wallpaper;
     value.update_notices = preferences.update_notices;
     value.community_seen = preferences.community_seen;
+    value.test_builds = preferences.test_builds;
     value.mapping = preferences.mapping;
     value.menu_bind = preferences.menu_bind;
     Eden::PerformanceSettings speed = Eden::LoadPerformance(0);

@@ -1,0 +1,18 @@
+--- a/src/core/hle/service/nvdrv/devices/nvhost_as_gpu.cpp
++++ b/src/core/hle/service/nvdrv/devices/nvhost_as_gpu.cpp
+@@ -373,7 +373,14 @@
+         const bool use_big_pages = alloc->second.big_pages && big_page;
+         gmmu->Map(params.offset, device_address, size, static_cast<Tegra::PTEKind>(params.kind), use_big_pages);
+ 
+-        alloc->second.mappings.push_back(params.offset);
++        // A fixed map can replace the record at the same GPU address. The
++        // new pin now belongs to that record; release its previous pin once.
++        // Keep only one allocation-list entry so FreeSpace does not free twice.
++        if (const auto previous = mapping_map.find(params.offset); previous != mapping_map.end()) {
++            nvmap.UnpinHandle(previous->second.handle);
++        } else {
++            alloc->second.mappings.push_back(params.offset);
++        }
+         mapping_map.insert_or_assign(params.offset, Mapping(params.handle, device_address, params.offset, size, true, use_big_pages, alloc->second.sparse));
+     } else {
+         auto& allocator{big_page ? *vm.big_page_allocator : *vm.small_page_allocator};

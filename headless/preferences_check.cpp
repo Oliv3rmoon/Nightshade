@@ -98,6 +98,16 @@ int main() {
     saved.community_seen = true;
     assert(Eden::SavePreferences(saved, file) && Eden::LoadPreferences(file).community_seen);
     assert(Read(file).find("\"community_seen\": true") != std::string::npos);
+    // Test builds (Settings > Diagnostics): off in a new install and in a file an earlier version
+    // wrote, kept under "system" beside Update notices once switched on, and off again.
+    assert(!saved.test_builds && !Eden::LoadPreferences(earlier).test_builds);
+    saved.test_builds = true;
+    assert(Eden::SavePreferences(saved, file) && Eden::LoadPreferences(file).test_builds);
+    assert(Read(file).find("\"test_builds\": true") != std::string::npos);
+    assert(Eden::LoadPreferences(file).update_notices && Eden::LoadPreferences(file).community_seen);
+    saved.test_builds = false;
+    assert(Eden::SavePreferences(saved, file) && !Eden::LoadPreferences(file).test_builds);
+    assert(Read(file).find("\"test_builds\": false") != std::string::npos);
     assert(!Eden::SavePreferences({true, 101, false, false}, file));
     assert(Eden::LoadPreferences(file).volume == 40);
     assert(Read(file).find("\"renderer\": \"opengl\"") != std::string::npos);

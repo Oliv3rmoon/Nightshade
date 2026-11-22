@@ -180,9 +180,12 @@ void LoadPipelines(
             std::vector<FileEnvironment> envs(num_envs);
             for (FileEnvironment& env : envs) {
                 CheckEnvironment(file, end);
-                env.Deserialize(file);
+                env.Deserialize(file, std::streampos{end});
             }
             if (envs.front().ShaderStage() == Shader::Stage::Compute) {
+                if (num_envs != 1) {
+                    throw DamagedCache{};
+                }
                 load_compute(file, std::move(envs.front()));
             } else {
                 load_graphics(file, std::move(envs));

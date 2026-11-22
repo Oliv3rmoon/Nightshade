@@ -6,6 +6,7 @@
 #include "pe/ui/launch_commit.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 
 namespace pe::ui
@@ -129,6 +130,7 @@ Launcher::Launcher(Services &services, Textures &textures, const Fonts &fonts, b
     sources_ = services_.sources();
     sources_generation_ = sources_.generation; // the list read below has the sources' games
     downloads_ = services_.downloads();
+    favorites_ = services_.favorites();
     apply_look();
     read_profiles();
     read_home();
@@ -137,9 +139,9 @@ Launcher::Launcher(Services &services, Textures &textures, const Fonts &fonts, b
     home_springs_[0].snap(1.0f);
     rail_active_[0].snap(1.0f);
     settings_.wrap = false;
-    settings_.visible = th().list_settings ? 10 : 14;
-    settings_.pitch = th().list_settings ? 84.0f : 88.0f;
-    settings_.reset(14, 0);
+    settings_.visible = th().showcase ? 9 : th().list_settings ? 10 : 14;
+    settings_.pitch = th().showcase ? 88.0f : th().list_settings ? 84.0f : 88.0f;
+    settings_.reset(settings_rows(), 0);
     section_.snap(1.0f);
     detail_.snap(1.0f);
     cue(home_.launch_failed ? Cue::notify : first_start ? Cue::welcome : Cue::resume);
@@ -155,6 +157,8 @@ Launcher::~Launcher()
     if (room_edit_.valid()) room_edit_.wait();
     seed_edit_stop_ = true;
     if (seed_edit_.valid()) seed_edit_.wait();
+    search_edit_stop_ = true;
+    if (search_edit_.valid()) search_edit_.wait();
     if (app_open_.valid()) app_open_.wait();
     // The game list may still be reading; it uses the services this launcher was given.
     if (scan_.valid())
@@ -229,7 +233,7 @@ std::array<bool, 8> Launcher::switch_states(Modal modal) const
     case Modal::wallpaper:
         return {}; // no switches: the dialog only lists the folder's images
     default:
-        return {prefs_.detailed_logging, prefs_.immediate_logs, prefs_.update_notices};
+        return {prefs_.detailed_logging, prefs_.immediate_logs, prefs_.update_notices, prefs_.test_builds};
     }
 }
 
@@ -375,18 +379,29 @@ void Launcher::press(Key key)
         return press_rail(key);
     if ((key == Key::l1 || key == Key::r1) && at_section())
     {
-        int next = (section() + (key == Key::r1 ? 1 : kSections - 1)) % kSections;
-        if (th().top_nav && next == 1)
+        // Nightshade's tabs are the first four sections; About is a row of Settings there.
+        const int sections = th().showcase ? 4 : kSections;
+        int next = (section() + (key == Key::r1 ? 1 : sections - 1)) % sections;
+        if (th().top_nav && !th().showcase && next == 1)
             next = key == Key::r1 ? 2 : 0;
         go_section(next);
         return;
+    }
+    if (screen_ == Screen::home && key == Key::options && !games_loaded_ && scan_.valid())
+    {
+        finish_scan();
+        if (scan_.valid())
+        {
+            say(tr("Reading..."));
+            return;
+        }
     }
     switch (screen_)
     {
     case Screen::home:
         return press_home(key);
     case Screen::library:
-        return press_library(key);
+        return th().showcase ? press_showcase_library(key) : press_library(key);
     case Screen::multiplayer:
         return press_multiplayer(key);
     case Screen::settings:
@@ -397,7 +412,7 @@ void Launcher::press(Key key)
         return press_language(key);
     case Screen::about:
         if (key == Key::circle)
-            go_section(0);
+            go_section(th().showcase ? 3 : 0); // Nightshade's About is a page of Settings
         else if (key == Key::left)
             focus_rail();
         return;
@@ -442,8 +457,30 @@ void Launcher::update(float dt)
         else
             textures_.clear_game_backdrop();
     }
+    // Nightshade's home screen shows the selected game's art: made once the selection rests on a
+    // game (at once when there is none yet), never every frame.
+    if (th().showcase)
+    {
+        std::string wanted = textures_.game_art_path();
+        if (screen_ == Screen::home)
+        {
+            if (library_.selected >= 0 && library_.selected < static_cast<int>(games_.size()))
+                wanted = games_[static_cast<std::size_t>(library_.selected)].cover;
+            else if (screen_ == Screen::home)
+                wanted = home_.last_cover;
+        }
+        if (wanted != art_wanted_)
+        {
+            art_wanted_ = wanted;
+            art_wait_ = 0.0f;
+        }
+        art_wait_ += dt;
+        if (wanted != textures_.game_art_path() && (art_wait_ >= 0.15f || textures_.game_art() == 0))
+            textures_.show_game_art(wanted);
+    }
     textures_.pump(dt);
-    finish_scan(false);
+    finish_scan();
+    poll_search();
     poll_sources(dt);
     poll_apps(dt);
     poll_backup(dt);
@@ -488,6 +525,9 @@ void Launcher::update(float dt)
     }
     library_.update(dt);
     grid_rows_.update(dt);
+    shelf_.update(dt);
+    if (th().showcase)
+        keep_showcase_selection();
     grid_x_.update(dt, t.cursor_spring);
     grid_y_.update(dt, t.cursor_spring);
     pane_.target = modal_ == Modal::game_options || modal_ == Modal::mods || modal_ == Modal::cheats ||
@@ -587,6 +627,7 @@ void Launcher::update_offer(float dt)
             // "v1.000.050" and "1.000.050" both read as the number.
             const std::string &newer = offer.version;
             update_version_ = newer.size() > 1 && (newer[0] == 'v' || newer[0] == 'V') ? newer.substr(1) : newer;
+            update_test_build_ = offer.test_build;
             // Update notices off (Settings > Diagnostics): neither the dialog nor the notification.
             // The version stays known, and About names it.
             if (!prefs_.update_notices)
@@ -625,6 +666,42 @@ void Launcher::update_offer(float dt)
 void Launcher::draw_screen(Canvas &c, Screen screen)
 {
     drawing_shown_ = screen == screen_;
+    if (th().showcase)
+    {
+        switch (screen)
+        {
+        case Screen::home:
+            return draw_home(c);
+        case Screen::library:
+            return draw_showcase_library(c);
+        case Screen::settings:
+            return draw_settings(c);
+        default:
+            break;
+        }
+        // The other pages keep their own layout, a little smaller under the top bar; About is a page
+        // of Settings (its column at the left), Multiplayer says where it stands at the left.
+        if (screen == Screen::about)
+            draw_settings(c);
+        if (screen == Screen::multiplayer)
+            draw_showcase_intro(c);
+        c.list.push_transform(0.92f, 960.0f, 960.0f, 0.0f, 0.0f);
+        defer_footer_ = true;
+        footer_pending_ = false;
+        if (screen == Screen::multiplayer)
+            draw_multiplayer(c);
+        else if (screen == Screen::files)
+            draw_files(c);
+        else if (screen == Screen::language)
+            draw_language(c);
+        else
+            draw_about(c);
+        defer_footer_ = false;
+        c.list.pop_transform();
+        if (footer_pending_)
+            draw_showcase_footer(c, footer_hints_.data(), static_cast<int>(footer_hints_.size()), footer_status_);
+        return;
+    }
     if (th().top_nav)
     {
         draw_home(c);
@@ -706,8 +783,9 @@ void Launcher::draw_update_notice(Canvas &c)
     list.line(cx + 8.0f, cy - 2.0f, cx, cy - 10.0f, 2.8f, t.on_accent);
     {
         const Heavy heavy(c, 0.6f);
-        text_shrink(c, tr("Update available"), card.x + 88.0f, baseline(card.y + 18.0f, 34.0f, t.size_text),
-                    t.size_text, t.title, card.w - 112.0f);
+        // A test build (Settings > Diagnostics > Test builds) says so.
+        text_shrink(c, update_test_build_ ? tr("Test build available") : tr("Update available"), card.x + 88.0f,
+                    baseline(card.y + 18.0f, 34.0f, t.size_text), t.size_text, t.title, card.w - 112.0f);
     }
     text_shrink(c, update_text(fill(tr("Version {0} is on homebrew.page"), {update_version_})), card.x + 88.0f,
                 baseline(card.y + 54.0f, 30.0f, t.size_small), t.size_small, t.copy, card.w - 112.0f);
@@ -820,19 +898,25 @@ void Launcher::draw_opening(Canvas &c)
     const float settle = tween::back_out(tween::clamp01((opening_ - 0.12f) / 0.55f));
     const float fly = tween::cubic_in_out((opening_ - reveal) / (handover * 0.68f));
     const float stay = 1.0f - fly;
-    const float side = tween::lerp(232.0f * (0.84f + 0.16f * settle), 64.0f, fly);
-    const float cx = tween::lerp(960.0f, (layout::kRail - 64.0f) * 0.5f + 32.0f, fly);
-    const float cy = tween::lerp(500.0f, 72.0f, fly);
+    // Its place: the rail's top, or Nightshade's top bar.
+    const bool bar = t.showcase;
+    const float side = tween::lerp(232.0f * (0.84f + 0.16f * settle), bar ? kShowcaseMark.w : 64.0f, fly);
+    const float cx = tween::lerp(960.0f, bar ? kShowcaseMark.x + kShowcaseMark.w * 0.5f :
+                                               (layout::kRail - 64.0f) * 0.5f + 32.0f, fly);
+    const float cy = tween::lerp(500.0f, bar ? kShowcaseMark.y + kShowcaseMark.h * 0.5f : 72.0f, fly);
     const Rect mark{cx - side * 0.5f, cy - side * 0.5f, side, side};
     const float corner = tween::lerp(54.0f, 18.0f, fly);
     // A pool of dusk around it, so the mark and its name read on any picture.
     list.shadow({cx - 380.0f, cy - 270.0f, 760.0f, 680.0f}, 330.0f, 420.0f, t.base.with_alpha(0.46f * shown * stay));
     list.shadow({mark.x - 14.0f, mark.y - 14.0f, mark.w + 28.0f, mark.h + 28.0f}, corner + 14.0f, 80.0f,
                 t.highlight.with_alpha(0.34f * shown * stay));
-    list.shadow({mark.x + 4.0f, mark.y + side * 0.10f, mark.w - 8.0f, mark.h - 4.0f}, corner, side * 0.20f,
-                Color{0.0f, 0.0f, 0.0f, 0.55f * shown});
+    // (Nightshade's mark is the flower alone: no square of its own to shade or edge.)
+    if (!bar)
+        list.shadow({mark.x + 4.0f, mark.y + side * 0.10f, mark.w - 8.0f, mark.h - 4.0f}, corner, side * 0.20f,
+                    Color{0.0f, 0.0f, 0.0f, 0.55f * shown});
     list.rounded_image(textures_.brand(), mark, {0.0f, 0.0f, 1.0f, 1.0f}, corner, white.with_alpha(shown));
-    list.bordered_rect(mark, corner, white.with_alpha(0.0f), 1.5f, white.with_alpha(0.16f * shown * stay));
+    if (!bar)
+        list.bordered_rect(mark, corner, white.with_alpha(0.0f), 1.5f, white.with_alpha(0.16f * shown * stay));
     // Two rings of light leave it, one after the other.
     for (const float begun : {0.40f, 0.62f})
     {
@@ -852,7 +936,10 @@ void Launcher::draw_opening(Canvas &c)
     list.push_transform(1.0f, 0.0f, 0.0f, 0.0f, (1.0f - named) * 16.0f - gone * 10.0f);
     {
         const Heavy heavy(c);
-        text(c, "PROSPEROEDEN", 960.0f, 706.0f, 40.0f, t.title, Align::center, 12.0f);
+        std::string name = bar ? kBuildLabel : "PROSPEROEDEN";
+        for (char &ch : name)
+            ch = static_cast<char>(std::toupper(static_cast<unsigned char>(ch)));
+        text(c, name, 960.0f, 706.0f, 40.0f, t.title, Align::center, 12.0f);
     }
     list.pop_transform();
     list.pop_opacity();
@@ -904,11 +991,16 @@ void Launcher::draw(gfx::DrawList &list)
     if (!page || opened < 0.99f)
         draw_rail(c);
     draw_clock(c);
-    if (th().top_nav && (screen_ == Screen::home || screen_ == Screen::library))
+    if (th().top_nav && !th().showcase && (screen_ == Screen::home || screen_ == Screen::library))
         draw_home_status(c);
     if (modal_shown_ != Modal::none && (!page || mapping_of_game || quick_on_page))
     {
-        list.rounded_rect(kScreen, 0.0f, th().scrim.with_alpha(0.72f * opened));
+        // A dialog opened from Nightshade's Settings is drawn in its panel, beside the categories.
+        const bool docked = dialog_docked(modal_shown_);
+        if (docked)
+            list.push_transform(kDockScale, 960.0f, 540.0f, kDockX, kDockY);
+        else
+            list.rounded_rect(kScreen, 0.0f, th().scrim.with_alpha(0.72f * opened));
         if (modal_shown_ == Modal::mapping)
             draw_mapping(c, opened);
         else if (modal_shown_ == Modal::menu_mapping)
@@ -941,6 +1033,8 @@ void Launcher::draw(gfx::DrawList &list)
             draw_community(c, opened);
         else
             draw_dialog(c, modal_shown_, opened);
+        if (docked)
+            list.pop_transform();
     }
     list.pop_transform();
     draw_update_notice(c);

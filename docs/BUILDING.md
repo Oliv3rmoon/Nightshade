@@ -51,6 +51,25 @@ already exists: the dependencies, this checkout's build cache in
 
 `JOBS=<n>` sets the number of parallel compile jobs (default: all cores).
 
+For Belladonna, the dependency manifest pins the public base, a checked Git
+bundle with the corresponding driver source changes, and the exact commit to
+build. A fresh dependency fetch combines those inputs and verifies the checked
+out revision. The queue submission change uses the existing shader cache ID.
+
+Set `EDEN_MOUNTED_STORAGE_ONLY=ON` for the native app validation build when its
+data directory is already exposed to the app. After preparing the native build
+dependencies, run `tools/build-headless-native.sh --graphics` with that setting.
+The application checks write access to its own data directory and records the
+result in the boot trace. The output is a native validation ELF.
+
+The native link resolves optional, unimplemented Mesa entrypoints to zero while keeping
+required SDK module imports. With LLD 21 or newer, `tools/link-headless-native.sh` selects
+`-z nodynamic-undefined-weak`: those versions otherwise retain optional imports when SDK
+shared-library stubs are inputs. LLD 18 uses the existing `--no-dynamic-linker` behavior.
+`tools/check-native-weak-imports.py` checks the actual linked executable before packaging;
+the native converter then validates the remaining required imports against SDK stubs.
+The linker option is documented in the [LLD ELF manual](https://github.com/llvm/llvm-project/blob/llvmorg-21.1.8/lld/docs/ld.lld.1).
+
 `EDEN_UPDATE_REPOSITORY=<owner>/<name>` makes the app's update check ([Updating](INSTALL.md#updating))
 ask that GitHub repository's releases instead of the homebrew.page catalog;
 `EDEN_UPDATE_REPOSITORY=` (empty) asks the catalog. Left unset, the default in
@@ -131,9 +150,12 @@ Next to this repository (`../`), as git checkouts:
   again from the new commit (only what changed compiles).
 
 RADV's shader cache on disk is keyed by the driver's build id, `shader_cache_id` in
-`tools/deps.json`. It is Mihawk's `1ba9874`, the revision the caches players have were made
-with, and changes only when a Belladonna commit changes how shaders compile: a driver update that
-compiles shaders as before keeps every game's cache.
+`tools/deps.json`. It is the Belladonna commit that last changed how shaders compile, and changes
+only when a Belladonna commit does that again: a driver update that compiles shaders as before
+keeps every game's cache. It was Mihawk's `1ba9874` up to v1.010.012. Belladonna 1.0 (v1.010.015)
+moved it to Belladonna's `9bebc54`, the commit that gives every final graphics pipeline a new
+cache key: the driver could not find those pipelines in an older cache whatever the id said, so
+each game's shaders are compiled again once, and the new id keeps the older entries out.
 
 The `libSceAgcDriver` import facade both drivers link against is built from
 `tools/stubs/libSceAgcDriver.c`. Small contracts from our research repositories are in

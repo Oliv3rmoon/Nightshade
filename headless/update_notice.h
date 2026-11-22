@@ -10,7 +10,10 @@
 // README.md). The catalog's check fetches the catalog's signed manifest and the app's own entry
 // and verifies the Ed25519 signature and the hashes; GitHub's reads the release and its
 // SHA256SUMS over HTTPS, with no signature: the trust of a player who downloads the release by
-// hand. Either compares the content version with this build's (sce_sys/param.json). The update
+// hand. Either compares the content version with this build's (sce_sys/param.json). With Test
+// builds on (Settings > Diagnostics), a build that asks GitHub asks the repository's releases list
+// instead and offers the newest release of this version's own line (01.010: never 01.011 or
+// 01.012), a pre-release or not; it is downloaded and installed as any other release. The update
 // downloads the release ZIP from GitHub over HTTPS, checks its SHA-256 and streams it to the
 // self-update helper (self-updater.elf in the app's folder), which the app sends to the console's
 // payload loader: the helper checks and unpacks the release beside the app (it must be this
@@ -23,7 +26,8 @@
 
 namespace Eden::UpdateNotice {
 // Starts the check on a thread of its own; only the first call of a launch does anything.
-void Start();
+// test_builds: Settings > Diagnostics > Test builds, as the settings say when the app opens.
+void Start(bool test_builds);
 
 // Where the check asks, as the launcher's update texts name it: "homebrew.page", or "GitHub" for a
 // build that names a repository.
@@ -36,6 +40,8 @@ struct Offer {
     std::uint64_t size = 0;    // the ZIP's size in bytes; 0 when the catalog doesn't know
     std::string notes;         // the release notes, plain text; empty when there are none
     bool notes_truncated = false;
+    bool test_build = false;   // a test build: a GitHub pre-release (Test builds on)
+    std::string title;         // a test build's title on GitHub ("Nightshade v1.010.008 (test release)")
 };
 // A newer release than this one, once, when the check's answer has come: false when there is
 // nothing (yet) to tell.

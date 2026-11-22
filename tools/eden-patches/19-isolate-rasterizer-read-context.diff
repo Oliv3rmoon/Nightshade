@@ -1,0 +1,30 @@
+--- a/src/core/memory.cpp
++++ b/src/core/memory.cpp
+@@ -692,10 +692,16 @@
+         const auto* p = GetPointerImpl(
+             v_address, []() {}, []() {});
+-        if (!gpu_device_memory) [[unlikely]] {
+-            gpu_device_memory = &system.Host1x().MemoryManager();
+-        }
++        auto& device_memory = system.Host1x().MemoryManager();
+         const size_t core = system.GetCurrentHostThreadID();
++        // Host workers have no guest-core slot and cannot reuse a guest core's last download.
++        if (core >= rasterizer_read_areas.size()) [[unlikely]] {
++            Common::ScratchBuffer<u32> scratch;
++            device_memory.ApplyOpOnPointer(p, scratch, [&](DAddr address) {
++                (void)system.GPU().OnCPURead(address, size);
++            });
++            return;
++        }
+         auto& current_area = rasterizer_read_areas[core];
+-        gpu_device_memory->ApplyOpOnPointer(p, scratch_buffers[core], [&](DAddr address) {
++        device_memory.ApplyOpOnPointer(p, rasterizer_read_scratch[core], [&](DAddr address) {
+             const DAddr end_address = address + size;
+             if (current_area.start_address <= address && end_address <= current_area.end_address)
+@@ -777,4 +783,6 @@
+     std::array<VideoCore::RasterizerDownloadArea, Core::Hardware::NUM_CPU_CORES> rasterizer_read_areas{};
+     std::array<GPUDirtyState, Core::Hardware::NUM_CPU_CORES> rasterizer_write_areas{};
++    // GPU reads can wait for the GPU thread while write-side address lookups continue.
++    std::array<Common::ScratchBuffer<u32>, Core::Hardware::NUM_CPU_CORES> rasterizer_read_scratch{};
+     std::array<Common::ScratchBuffer<u32>, Core::Hardware::NUM_CPU_CORES> scratch_buffers{};
+     std::span<Core::GPUDirtyMemoryManager> gpu_dirty_managers;

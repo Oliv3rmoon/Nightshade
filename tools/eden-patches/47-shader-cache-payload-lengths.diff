@@ -1,0 +1,70 @@
+--- a/src/video_core/shader_environment.h
++++ b/src/video_core/shader_environment.h
+@@ -172,7 +172,7 @@
+     FileEnvironment& operator=(const FileEnvironment&) = delete;
+     FileEnvironment(const FileEnvironment&) = delete;
+ 
+-    void Deserialize(std::ifstream& file);
++    void Deserialize(std::ifstream& file, std::streampos cache_end);
+ 
+     [[nodiscard]] u64 ReadInstruction(u32 address) override;
+ 
+--- a/src/video_core/shader_environment.cpp
++++ b/src/video_core/shader_environment.cpp
+@@ -487,7 +487,7 @@
+     return viewport_transform_state;
+ }
+ 
+-void FileEnvironment::Deserialize(std::ifstream& file) {
++void FileEnvironment::Deserialize(std::ifstream& file, std::streampos cache_end) {
+     u64 code_size{};
+     u64 num_texture_types{};
+     u64 num_texture_pixel_formats{};
+@@ -507,7 +507,37 @@
+         .read(reinterpret_cast<char*>(&read_highest), sizeof(read_highest))
+         .read(reinterpret_cast<char*>(&viewport_transform_state), sizeof(viewport_transform_state))
+         .read(reinterpret_cast<char*>(&stage), sizeof(stage));
+-    code.resize(Common::DivCeil(code_size, sizeof(u64)));
++    // Validate against the writer's range and remaining file bytes before any
++    // payload allocation. The caller already knows the file end; no extra seek.
++    if (stage > Shader::Stage::VertexA || code_size == 0 || code_size % sizeof(u64) != 0 ||
++        read_highest < read_lowest ||
++        code_size != static_cast<u64>(read_highest) - read_lowest + sizeof(u64)) {
++        throw std::ios_base::failure("Invalid shader cache code range or stage");
++    }
++    const auto position = file.tellg();
++    if (position < std::streampos{0} || cache_end < position) {
++        throw std::ios_base::failure("Invalid shader cache file position");
++    }
++    u64 remaining = static_cast<u64>(cache_end - position);
++    const auto RequireBytes = [&](u64 count, u64 width) {
++        // Divide before multiplying so damaged counts cannot wrap the check.
++        if (count > remaining / width) {
++            throw std::ios_base::failure("Shader cache payload exceeds remaining file bytes");
++        }
++        remaining -= count * width;
++    };
++    RequireBytes(code_size, 1);
++    RequireBytes(num_texture_types, sizeof(u32) + sizeof(Shader::TextureType));
++    RequireBytes(num_texture_pixel_formats, sizeof(u32) + sizeof(Shader::TexturePixelFormat));
++    RequireBytes(num_cbuf_values, sizeof(u64) + sizeof(u32));
++    RequireBytes(num_cbuf_replacement_values, sizeof(u64) + sizeof(Shader::ReplaceConstant));
++    if (stage == Shader::Stage::Compute) {
++        RequireBytes(sizeof(workgroup_size) + sizeof(shared_memory_size), 1);
++    } else {
++        RequireBytes(sizeof(sph), 1);
++        if (stage == Shader::Stage::Geometry) RequireBytes(sizeof(gp_passthrough_mask), 1);
++    }
++    code.resize(code_size / sizeof(u64));
+     file.read(reinterpret_cast<char*>(code.data()), code_size);
+     for (size_t i = 0; i < num_texture_types; ++i) {
+         u32 key;
+@@ -700,7 +730,7 @@
+         }
+         std::vector<FileEnvironment> envs(num_envs);
+         for (FileEnvironment& env : envs) {
+-            env.Deserialize(file);
++            env.Deserialize(file, end);
+         }
+         if (envs.front().ShaderStage() == Shader::Stage::Compute) {
+             if (num_envs != 1) {

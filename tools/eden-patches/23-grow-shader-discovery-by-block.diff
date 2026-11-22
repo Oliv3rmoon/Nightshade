@@ -1,0 +1,55 @@
+--- a/src/video_core/shader_environment.cpp
++++ b/src/video_core/shader_environment.cpp
+@@ -162,6 +162,8 @@
+     }
+     cached_lowest = start_address;
+     cached_highest = start_address + static_cast<u32>(*size);
++    // Retain the extra word used by the cache record, including at a block boundary.
++    code.resize(CachedSizeWords());
+     return Common::CityHash64(reinterpret_cast<const char*>(code.data()), *size);
+ }
+
+@@ -261,22 +263,22 @@
+     static constexpr u64 EXIT_VALUE = 0xE30000000007000FULL;
+
+     const u32 first_instruction{Shader::Maxwell::Location{CodeStartAddress()}.Offset()};
+-    code.resize(MAXIMUM_SIZE / INST_SIZE);
+-
+-    GPUVAddr guest_addr{program_base + start_address};
+-    size_t offset{0};
+-    size_t size{BLOCK_SIZE};
+-    while (size <= MAXIMUM_SIZE) {
++    code.clear();
++    const GPUVAddr guest_addr{program_base + start_address};
++    for (size_t offset = 0; offset < MAXIMUM_SIZE; offset += BLOCK_SIZE) {
++        code.resize((offset + BLOCK_SIZE) / INST_SIZE);
+         u64* const data = code.data() + offset / INST_SIZE;
+-        gpu_memory->ReadBlock(guest_addr, data, BLOCK_SIZE);
++        gpu_memory->ReadBlock(guest_addr + offset, data, BLOCK_SIZE);
+         // The first block starts with the program header and scheduling data.
+         const size_t first_byte = offset == 0 ? first_instruction - start_address : 0;
+         if (offset == 0 && data[first_byte / INST_SIZE] == 0) {
+             throw Shader::InvalidArgument("Empty Maxwell instruction at {:#x}",
+                                           first_instruction);
+         }
++        bool empty_block = true;
+         for (size_t index = first_byte; index < BLOCK_SIZE; index += INST_SIZE) {
+             const u64 inst = data[index / INST_SIZE];
++            empty_block &= inst == 0;
+             if (inst == SELF_BRANCH_A || inst == SELF_BRANCH_B) {
+                 return offset + index;
+             }
+@@ -284,9 +286,10 @@
+                 return offset + index + INST_SIZE;
+             }
+         }
+-        guest_addr += BLOCK_SIZE;
+-        size += BLOCK_SIZE;
+-        offset += BLOCK_SIZE;
++        // Leave a gap to control-flow discovery, which follows branches to code beyond it.
++        if (empty_block) {
++            return std::nullopt;
++        }
+     }
+     return std::nullopt;
+ }

@@ -1,0 +1,26 @@
+--- a/src/shader_recompiler/backend/spirv/spirv_emit_context.cpp
++++ b/src/shader_recompiler/backend/spirv/spirv_emit_context.cpp
+@@ -1356,7 +1356,10 @@
+         const Id image_type{
+             TypeImage(sampled_type, spv::Dim::Buffer, false, false, false, 2, format)};
+         const Id pointer_type{TypePointer(spv::StorageClass::UniformConstant, image_type)};
+-        const Id id{AddGlobalVariable(pointer_type, spv::StorageClass::UniformConstant)};
++        // Image() indexes descriptors with count > 1; the global must point to an array,
++        // while each OpAccessChain result remains a pointer to one image.
++        const Id desc_type{DescType(*this, image_type, pointer_type, desc.count)};
++        const Id id{AddGlobalVariable(desc_type, spv::StorageClass::UniformConstant)};
+         Decorate(id, spv::Decoration::Binding, binding);
+         Decorate(id, spv::Decoration::DescriptorSet, 0U);
+         Name(id, NameOf(stage, desc, "imgbuf"));
+@@ -1410,7 +1413,10 @@
+         const Id sampled_type{desc.is_integer ? U32[1] : F32[1]};
+         const Id image_type{ImageType(*this, desc, sampled_type)};
+         const Id pointer_type{TypePointer(spv::StorageClass::UniformConstant, image_type)};
+-        const Id id{AddGlobalVariable(pointer_type, spv::StorageClass::UniformConstant)};
++        // As with sampled textures, distinguish the descriptor array's pointer from the
++        // element pointer Image() uses to load an individual image.
++        const Id desc_type{DescType(*this, image_type, pointer_type, desc.count)};
++        const Id id{AddGlobalVariable(desc_type, spv::StorageClass::UniformConstant)};
+         Decorate(id, spv::Decoration::Binding, binding);
+         Decorate(id, spv::Decoration::DescriptorSet, 0U);
+         Name(id, NameOf(stage, desc, "img"));

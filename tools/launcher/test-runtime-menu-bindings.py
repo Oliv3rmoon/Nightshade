@@ -98,9 +98,12 @@ end}
         key('triangle')
         need('STATE active=builtin' in command('status'), 'native picker honors remapped Select')
         command('tick 180')
+        key('up')  # Dismiss the first-run community card without activating anything on Home.
+        command('tick 45')  # Section shortcuts resume after the card fades.
         # Reset through the real built-in Controls > Menu keybinds page.
-        key('r1', 3)
-        key('down')
+        need(preferences()['theme'] == 'nightly', 'test uses the default Nightshade settings list')
+        key('l1')  # Settings is one tab to the left of Home in Nightshade.
+        key('down', 4)  # Profiles, Video, Performance, Audio, Controls.
         key('triangle')
         key('down', 3)
         key('triangle')

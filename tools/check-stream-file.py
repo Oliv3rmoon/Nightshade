@@ -164,12 +164,14 @@ int main() {
         owned->fail_next = 1000;
         std::vector<std::string> said;
         std::mutex said_lock;
-        StreamFile file(std::move(owned), SourceGame{}, name, 40, [&](const std::string& line) {
-            const std::lock_guard lock(said_lock);
-            said.push_back(line);
-        });
-        std::vector<std::uint8_t> got(1000);
-        assert(file.Read(got.data(), got.size(), 0) == 0 && file.Failed() == "connection reset");
+        {
+            StreamFile file(std::move(owned), SourceGame{}, name, 40, [&](const std::string& line) {
+                const std::lock_guard lock(said_lock);
+                said.push_back(line);
+            });
+            std::vector<std::uint8_t> got(1000);
+            assert(file.Read(got.data(), got.size(), 0) == 0 && file.Failed() == "connection reset");
+        } // The terminal log is emitted after the failure wakes the read; join before checking it.
         const std::lock_guard lock(said_lock);
         assert(said.size() == 5 && said[0].find("asking again in 500 ms (1 of 5)") != std::string::npos &&
                said[4] == "Gave up after 5 transfers in a row brought nothing: connection reset");
@@ -286,12 +288,16 @@ int main() {
     {
         // While memory is short, only the reading ahead stays kept.
         auto owned = std::make_unique<FakeSource>(kSize);
-        StreamFile file(std::move(owned), SourceGame{}, name, 90);
         std::atomic<bool> short_of_memory{false};
+        StreamFile file(std::move(owned), SourceGame{}, name, 90);
         file.KeepLessWhen([&] { return short_of_memory.load(); });
         for (std::uint64_t at = 0; at < 50 * StreamFile::kBlock; at += 512 * 1024) Check(file, at, 512 * 1024);
         assert(file.GetStats().kept > StreamFile::kAhead + 2);
         short_of_memory = true;
+        // Pressure is sampled as a new block comes; a prefetched read may need none.
+        const auto waits_before_pressure = file.GetStats().waits;
+        Check(file, 90 * StreamFile::kBlock, 512 * 1024);
+        assert(file.GetStats().waits > waits_before_pressure);
         for (std::uint64_t at = 50 * StreamFile::kBlock; at < 60 * StreamFile::kBlock; at += 512 * 1024) Check(file, at, 512 * 1024);
         assert(file.GetStats().kept <= StreamFile::kAhead + 2);
         Check(file, 55 * StreamFile::kBlock, 1000);

@@ -46,6 +46,7 @@ bool Textures::load_art(const std::string &directory)
         *texture = create(image);
         return *texture != 0;
     };
+    art_directory_ = directory;
     // The theme names its artwork (theme.hpp).
     const std::string art = "art/";
     const bool backdrop = load(art + th().backdrop, &backdrop_);
@@ -54,6 +55,20 @@ bool Textures::load_art(const std::string &directory)
     // Only the home screen's controller display needs this one.
     (void)load("art/controller.tga", &controller_);
     return backdrop && blur && brand;
+}
+
+void Textures::reload_brand()
+{
+    if (art_directory_.empty())
+        return;
+    gfx::Image image;
+    if (!gfx::load_tga(art_directory_ + "/art/" + th().brand, &image))
+    {
+        sys::log("art %s could not be read", th().brand);
+        return;
+    }
+    batch_.delete_texture(brand_);
+    brand_ = create(image);
 }
 
 bool Textures::load_splash(const std::string &path)
@@ -98,6 +113,24 @@ void Textures::load_game_backdrop(const std::string &cover_path)
     game_backdrop_ = create(image);
     gfx::Image blurred = gfx::halve(image);
     game_backdrop_blur_ = create(blurred);
+}
+
+void Textures::show_game_art(const std::string &cover_path)
+{
+    if (cover_path == game_art_[0].path)
+        return;
+    batch_.delete_texture(game_art_[1].texture);
+    game_art_[1] = std::move(game_art_[0]);
+    game_art_[0] = {0, cover_path};
+    game_art_age_ = 0.0f;
+    gfx::Image image;
+    if (cover_path.empty() || !services_.load_image(cover_path, &image) || image.empty())
+        return; // no art: the theme's backdrop shows
+    // It fills the screen softly: a small copy, blurred, is all it needs (and all it costs).
+    while (image.width > 256 || image.height > 256)
+        image = gfx::halve(image);
+    gfx::blur(image, std::max(2, image.width / 40));
+    game_art_[0].texture = create(image);
 }
 
 void Textures::clear_game_backdrop()
@@ -177,6 +210,11 @@ void Textures::release()
     drop_splash();
     clear_game_backdrop();
     clear_wallpaper();
+    for (GameArt &art : game_art_)
+    {
+        batch_.delete_texture(art.texture);
+        art = {};
+    }
     for (std::uint32_t *texture : {&backdrop_, &backdrop_blur_, &brand_, &controller_})
     {
         batch_.delete_texture(*texture);
@@ -213,6 +251,7 @@ Cover Textures::cover(const std::string &path, float size)
 void Textures::pump(float dt, int budget)
 {
     ++frame_;
+    game_art_age_ += dt;
     for (auto &[key, entry] : covers_)
         if (entry.loaded)
             entry.age += dt;

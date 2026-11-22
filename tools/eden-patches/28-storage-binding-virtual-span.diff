@@ -1,0 +1,126 @@
+--- a/src/video_core/buffer_cache/buffer_cache.h
++++ b/src/video_core/buffer_cache/buffer_cache.h
+@@ -22,6 +22,22 @@
+ namespace VideoCommon {
+ 
+ using Core::DEVICE_PAGESIZE;
++
++// Large requests are rare; record existing operands without reads or GPU waits.
++// Separate huge requests so smaller legitimate bindings cannot hide them.
++inline void LogLargeBufferBinding(const char* kind, GPUVAddr gpu, u64 bytes,
++                                  u64 operand0 = 0, u64 operand1 = 0,
++                                  u64 operand2 = 0, u64 operand3 = 0) {
++    if (bytes < (u64{256} << 20)) return;
++    static std::atomic<u64> large{0}, huge{0};
++    auto& counter = bytes >= (u64{2} << 30) ? huge : large;
++    const u64 sample = counter.fetch_add(1, std::memory_order_relaxed) + 1;
++    if (sample > 8 && (sample & (sample - 1)) != 0) return;
++    LOG_WARNING(HW_GPU,
++                "Large buffer binding: kind={}, gpu={:#x}, bytes={}, operand0={:#x}, operand1={:#x}, operand2={:#x}, operand3={:#x}",
++                kind, gpu, bytes, operand0, operand1, operand2, operand3);
++}
++
+ 
+ template <class P>
+ BufferCache<P>::BufferCache(Tegra::MaxwellDeviceMemoryManager& device_memory_, Runtime& runtime_)
+@@ -1421,6 +1437,8 @@
+     const u32 address_size = static_cast<u32>(gpu_addr_end - gpu_addr_begin);
+     const u32 draw_size = (index_buffer_ref.count + index_buffer_ref.first) * u32(index_buffer_ref.FormatSizeInBytes());
+     const u32 size = (std::min)(address_size, draw_size);
++    LogLargeBufferBinding("index", gpu_addr_begin, size, gpu_addr_end, index_buffer_ref.first,
++                          index_buffer_ref.count, index_buffer_ref.FormatSizeInBytes());
+     if (size == 0 || !device_addr) {
+         channel_state->index_buffer = NULL_BINDING;
+         return;
+@@ -1465,6 +1483,7 @@
+     if (!gpu_memory->IsWithinGPUAddressRange(gpu_addr_end) || size >= 64_MiB) {
+         size = static_cast<u32>(gpu_memory->MaxContinuousRange(gpu_addr_begin, size));
+     }
++    LogLargeBufferBinding("vertex", gpu_addr_begin, size, index, gpu_addr_end);
+     const BufferId buffer_id = FindBuffer(*device_addr, size, false);
+     const Binding binding{
+         .device_addr = *device_addr,
+@@ -1478,6 +1497,7 @@
+ template <class P>
+ void BufferCache<P>::UpdateDrawIndirect() {
+     const auto update = [this](GPUVAddr gpu_addr, size_t size, Binding& binding) {
++        LogLargeBufferBinding("indirect", gpu_addr, size);
+         const std::optional<DAddr> device_addr = gpu_memory->GpuToCpuAddress(gpu_addr);
+         if (!device_addr) {
+             binding = NULL_BINDING;
+@@ -1549,6 +1569,7 @@
+     const auto& binding = maxwell3d->regs.transform_feedback.buffers[index];
+     const GPUVAddr gpu_addr = binding.Address() + binding.start_offset;
+     const u32 size = binding.size;
++    LogLargeBufferBinding("transform-feedback", gpu_addr, size, index, binding.start_offset);
+     const std::optional<DAddr> device_addr = gpu_memory->GpuToCpuAddress(gpu_addr);
+     if (binding.enable == 0 || size == 0 || !device_addr) {
+         channel_state->transform_feedback_buffers[index] = NULL_BINDING;
+@@ -1618,6 +1639,7 @@
+     if (device_addr == 0) {
+         return NULL_BUFFER_ID;
+     }
++    LogLargeBufferBinding("cache-range", 0, size, device_addr);
+     const u64 page = device_addr >> CACHING_PAGEBITS;
+     const BufferId buffer_id = page_table[page];
+     if (buffer_id) {
+@@ -2129,7 +2151,7 @@
+     // Alignment only applies to the offset of the buffer
+     const u32 alignment = runtime.GetStorageBufferAlignment();
+     const GPUVAddr aligned_gpu_addr = Common::AlignDown(gpu_addr, alignment);
+-    const u32 aligned_size = static_cast<u32>(gpu_addr - aligned_gpu_addr) + size;
++    const u64 aligned_size = gpu_addr - aligned_gpu_addr + size;
+ 
+     const std::optional<DAddr> aligned_device_addr = gpu_memory->GpuToCpuAddress(aligned_gpu_addr);
+     if (!aligned_device_addr || size == 0) {
+@@ -2137,15 +2159,33 @@
+         return NULL_BINDING;
+     }
+     const std::optional<DAddr> device_addr = gpu_memory->GpuToCpuAddress(gpu_addr);
+-    ASSERT_MSG(device_addr, "Unaligned storage buffer address not found for cbuf index {}",
+-               cbuf_index);
+-    // The end address used for size calculation does not need to be aligned
+-    const DAddr cpu_end = Common::AlignUp(*device_addr + size, Core::DEVICE_PAGESIZE);
+-
+-    u32 binding_size = static_cast<u32>(cpu_end - *aligned_device_addr);
+-    if (is_written) {
+-        binding_size = aligned_size;
+-    }
++    if (!device_addr) {
++        LOG_WARNING(HW_GPU, "Storage binding mapping changed before translation: gpu={:#x}", gpu_addr);
++        return NULL_BINDING;
++    }
++    // A binding length belongs to GPU virtual space. Independently translated
++    // physical addresses may differ after a remap and must never be subtracted.
++    const GPUVAddr gpu_end = gpu_addr + size;
++    const GPUVAddr rounded_end = Common::AlignUp(gpu_end, Core::DEVICE_PAGESIZE);
++    const u64 virtual_size = is_written ? aligned_size : rounded_end - aligned_gpu_addr;
++    if (gpu_end < gpu_addr || rounded_end < gpu_end || virtual_size > u64{0xffffffff}) {
++        LOG_WARNING(HW_GPU, "Unrepresentable storage buffer span: gpu={:#x}, payload={}, span={}",
++                    gpu_addr, size, virtual_size);
++        return NULL_BINDING;
++    }
++    if (*device_addr < *aligned_device_addr ||
++        *device_addr - *aligned_device_addr != gpu_addr - aligned_gpu_addr) {
++        static std::atomic<u64> changed_mappings{0};
++        const u64 sample = changed_mappings.fetch_add(1, std::memory_order_relaxed) + 1;
++        if (sample <= 8 || (sample & (sample - 1)) == 0) {
++            LOG_WARNING(HW_GPU,
++                        "Storage translation discontinuity: descriptor={:#x}, gpu={:#x}, aligned_gpu={:#x}, cpu={:#x}, aligned_cpu={:#x}, payload={}, span={}",
++                        ssbo_addr, gpu_addr, aligned_gpu_addr, *device_addr, *aligned_device_addr, size, virtual_size);
++        }
++    }
++    const u32 binding_size = static_cast<u32>(virtual_size);
++    LogLargeBufferBinding(is_written ? "storage-write" : "storage-read", gpu_addr, binding_size,
++                          ssbo_addr, aligned_gpu_addr, size, *aligned_device_addr);
+     const Binding binding{
+         .device_addr = *aligned_device_addr,
+         .gpu_addr = aligned_gpu_addr,
+@@ -2158,6 +2198,7 @@
+ template <class P>
+ TextureBufferBinding BufferCache<P>::GetTextureBufferBinding(GPUVAddr gpu_addr, u32 size,
+                                                              PixelFormat format) {
++    LogLargeBufferBinding("texture", gpu_addr, size, static_cast<u32>(format));
+     const std::optional<DAddr> device_addr = gpu_memory->GpuToCpuAddress(gpu_addr);
+     TextureBufferBinding binding;
+     if (!device_addr || size == 0) {

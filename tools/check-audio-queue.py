@@ -9,7 +9,8 @@ The first argument is the sink_stream.cpp the build writes (headless/CMakeLists.
 ring"), the second Eden's src folder. This checks that the build makes room with
 headless/audio_queue.h and no longer throws, then compiles that header with Eden's own ring and
 queue and feeds it more PCM than is played: the ring never overflows, the buffers left are the
-newest, and each buffer's samples are still its own.
+newest, and each buffer's samples are still its own. It also checks the generated output
+callback's underrun counts and the native output fade applied to padded frames.
 """
 from pathlib import Path
 import os, subprocess, sys, tempfile
@@ -23,12 +24,25 @@ assert 'Audio PCM queue capacity exceeded' not in built, 'the build still stops 
 assert 'Eden::AudioQueue::DropOldest(samples_buffer, 0x10000, queue, playing_buffer, queued_buffers' in append
 assert append.index('DropOldest(') < append.index('samples_buffer.Push('), 'room must be made before the push'
 assert '#include "audio_queue.h"' in built
+render_begin = built.index(' SinkStream::ProcessAudioOutAndRender(')
+render_begin = built.rindex('\n', 0, render_begin) + 1
+render_end = built.index('\n}\n', render_begin) + len('\n}')
+render = built[render_begin:render_end]
+native = (root / 'headless/audio.cpp').read_text()
+assert (native.index('ProcessAudioOutAndRender(block, kAudioOutGrain)') <
+        native.index('underrun_fade.Apply(block, padded_frames)') <
+        native.index('sceAudioOutOutput(handle, block.data())'))
+assert 'wake.wait(lock, [this] { return !in_flight; });\n    underrun_fade.Reset();' in native
 
 code = r'''
 #include "audio_queue.h"
+#include <array>
 #include <cassert>
+#include <condition_variable>
 #include <cstdio>
+#include <cstring>
 #include <deque>
+#include <mutex>
 #include <vector>
 #include "common/bounded_threadsafe_queue.h"
 #include "common/common_types.h"
@@ -85,7 +99,67 @@ struct Stream {
         assert(queued.load() <= ring.Size() / kChannels);
     }
 };
+
+struct SinkStream {
+    struct System {
+        bool paused = false;
+        bool shutting_down = false;
+        bool IsPaused() const { return paused; }
+        bool IsShuttingDown() const { return shutting_down; }
+        const System& CoreTiming() const { return *this; }
+        u64 GetGlobalTimeNs() const { return 0; }
+    } system;
+    std::mutex release_mutex, sample_count_lock;
+    std::condition_variable release_cv;
+    Common::RingBuffer<s16, kCapacity> samples_buffer;
+    Common::SPSCQueue<SinkBuffer, 0x10000> queue;
+    SinkBuffer playing_buffer{};
+    std::atomic<u32> queued_buffers{};
+    std::array<s16, kChannels> last_frame{};
+    u64 last_sample_count_update_time = 0;
+    u64 min_played_sample_count = 0;
+    u64 max_played_sample_count = 0;
+
+    std::size_t GetDeviceChannels() const { return kChannels; }
+    std::size_t ProcessAudioOutAndRender(std::span<s16>, std::size_t);
+
+    void QueueFrame(s16 left, s16 right) {
+        std::array<s16, kChannels> pcm{left, right};
+        assert(samples_buffer.Push(pcm) == pcm.size());
+        queue.EmplaceWait(SinkBuffer{1, 0, 0, false});
+        ++queued_buffers;
+    }
+};
+
+// OUTPUT_CALLBACK
+
 int main() {
+    // Underrun counts are frames. The sink reports intentional silence separately
+    // and supplies its held frame for the native output fade.
+    {
+        auto stream = std::make_unique<SinkStream>();
+        constexpr std::size_t frames = 2;
+        std::array<s16, frames * kChannels> pcm{};
+        stream->QueueFrame(11, 12);
+        stream->QueueFrame(21, 22);
+        assert(stream->ProcessAudioOutAndRender(pcm, frames) == 0);
+        assert((pcm == std::array<s16, 4>{11, 12, 21, 22}));
+        assert(stream->ProcessAudioOutAndRender(pcm, frames) == frames);
+        assert((pcm == std::array<s16, 4>{21, 22, 21, 22}));
+        stream->QueueFrame(31, 32);
+        assert(stream->ProcessAudioOutAndRender(pcm, frames) == 1);
+        assert((pcm == std::array<s16, 4>{31, 32, 31, 32}));
+        assert(stream->max_played_sample_count == 3);
+        stream->system.paused = true;
+        assert(stream->ProcessAudioOutAndRender(pcm, frames) == 0);
+        assert((pcm == std::array<s16, 4>{}));
+        stream->system.paused = false;
+        stream->system.shutting_down = true;
+        pcm.fill(99);
+        assert(stream->ProcessAudioOutAndRender(pcm, frames) == 0);
+        assert((pcm == std::array<s16, 4>{}));
+        assert(stream->max_played_sample_count == 3);
+    }
     // A renderer stream given PCM faster than it is played: 240-frame buffers, three appended for
     // every two played, for about a minute of audio.
     {
@@ -147,13 +221,51 @@ int main() {
         for (u64 tag = 1; tag <= 10; ++tag) stream->Append(240, tag);
         assert(stream->dropped == 0 && stream->queued == 10);
     }
-    std::puts("audio queue: PASS");
+    {
+        auto stream = std::make_unique<SinkStream>();
+        Eden::AudioQueue::UnderrunFade fade;
+        std::array<s16, 128> empty_block{};
+        empty_block.fill(99);
+        fade.Apply(empty_block, 64);
+        assert((empty_block == std::array<s16, 128>{}));
+
+        stream->QueueFrame(-12000, 24000);
+        stream->QueueFrame(24000, -12000);
+        std::array<s16, 6> first{};
+        const auto padded = stream->ProcessAudioOutAndRender(first, 3);
+        assert(padded == 1);
+        fade.Apply(first, padded);
+        assert((first == std::array<s16, 6>{-12000, 24000, 24000, -12000, 23500, -11750}));
+
+        const auto empty = stream->ProcessAudioOutAndRender(empty_block, 64);
+        assert(empty == 64);
+        fade.Apply(empty_block, empty);
+        for (unsigned frame = 0; frame < 64; ++frame) {
+            const int gain = frame < 46 ? 46 - static_cast<int>(frame) : 0;
+            assert(empty_block[2 * frame] == 500 * gain);
+            assert(empty_block[2 * frame + 1] == -250 * gain);
+        }
+        assert(stream->max_played_sample_count == 2);
+
+        stream->QueueFrame(17000, -25000);
+        std::array<s16, 2> resumed{};
+        const auto resumed_padding = stream->ProcessAudioOutAndRender(resumed, 1);
+        assert(resumed_padding == 0);
+        fade.Apply(resumed, resumed_padding);
+        assert((resumed == std::array<s16, 2>{17000, -25000}));
+
+        fade.Reset();
+        assert(stream->ProcessAudioOutAndRender(empty_block, 64) == 64);
+        fade.Apply(empty_block, 64);
+        assert((empty_block == std::array<s16, 128>{}));
+    }
+    std::puts("audio underrun counts and stereo fade across hardware blocks: PASS");
 }
 '''
 with tempfile.TemporaryDirectory() as tmp:
     exe = Path(tmp) / 'audio-queue'
     subprocess.run([os.environ.get('CXX', 'c++'), '-std=c++20', '-Wall', '-Wextra', '-Werror', '-O1',
                     '-I' + str(root / 'headless'), '-I' + str(src), '-x', 'c++', '-', '-o', str(exe)],
-                   input=code, text=True, check=True)
+                   input=code.replace('// OUTPUT_CALLBACK', render), text=True, check=True)
     subprocess.run([str(exe)], check=True)
 print('Audio queue: PASS a full PCM ring drops its oldest audio, in step with its buffers, and plays on')

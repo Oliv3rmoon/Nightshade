@@ -3,8 +3,7 @@
 
 1. The policy: in place on light screens, in the background from the first busy frame and back;
    on a light frame, a texture larger than a screen picture goes to the background too (a light
-   game in play: Top Racer Collection, Oliv3rmoon/Nightshade#3), unless it is larger than
-   kLightBackgroundTexels, which stays in place.
+   game in play: Top Racer Collection, Oliv3rmoon/Nightshade#3), subject to an actual input/output/layer-scratch reservation.
 2. With Eden's source as the argument, the Vulkan texture cache as tools/prepare-vulkan-port.py
    writes it: the code it puts in RefreshContents, compiled as written with stand-ins for the
    texture cache, sends each size where the policy says and logs EDEN_ASTC_BACKGROUND for a light
@@ -16,17 +15,46 @@ import subprocess, sys, tempfile
 root = Path(__file__).resolve().parents[1]
 code = r"""
 #include "astc_policy.h"
+#include "astc_decode_budget.h"
 #include <cassert>
 using namespace Eden::AstcPolicy;
 static void Play(unsigned draws) { for (unsigned i = 0; i < draws; ++i) Draw(); }
 int main() {
+    const auto observed = DecodePayload(42295792, 42295792, 512, 512);
+    assert(observed && *observed == 85640160);
+    assert(!DecodePayload(0, 1, 1, 1) && !DecodePayload(1, 1, 0, 1));
+    const auto max = (std::numeric_limits<std::uint64_t>::max)();
+    assert(!DecodePayload(1, 1, max, 2) && !DecodePayload(1, 1, max / 2, 1));
+    assert(!DecodePayload(max, 1, 1, 1) && !DecodePayload(max - 4, 1, 1, 1));
+    DecodeBudget budget, independent;
+    {
+        auto job = budget.Reserve(*observed, false);
+        assert(job && budget.Held() == *observed && independent.Held() == 0);
+        assert(!budget.Reserve(*observed, false)); // Existing jobs prevent an over-budget admission.
+        auto moved = std::move(*job);
+        assert(job->Bytes() == 0 && moved.Bytes() == *observed);
+        auto busy = budget.Reserve(169173488, true); // Preserve existing busy override, track it.
+        assert(busy && budget.Held() > Eden::Performance::kLightBackgroundBytes);
+        assert(!budget.Reserve(1, false)); // A busy backlog blocks subsequent light work.
+    }
+    assert(budget.Held() == 0); // Completion, discarded context or failed setup releases once.
+    assert(!budget.Reserve(169173488, false)); // Observed larger array output alone cannot fit.
+    {
+        auto exact = budget.Reserve(Eden::Performance::kLightBackgroundBytes, false);
+        assert(exact && !budget.Reserve(1, false));
+    }
+    {
+        auto full = budget.Reserve(max, true);
+        assert(full && !budget.Reserve(1, true)); // Overflow also rejects under busy override.
+    }
+    assert(budget.Held() == 0);
     constexpr unsigned picture = 1920 * 1080, mipmapped = picture + picture / 3, atlas = 4096 * 4096;
     constexpr unsigned array = 121 * (1024 * 1024 + (1024 * 1024) / 3);  // a large game's texture array
     // Nothing drawn yet, and a loading screen: a picture in place, a larger texture in the background.
     assert(!Busy() && !InBackground(picture) && !InBackground(mipmapped) && !InBackground(kInPlaceTexels));
-    assert(InBackground(kInPlaceTexels + 1) && InBackground(atlas) && InBackground(kLightBackgroundTexels));
-    // Above kLightBackgroundTexels a light frame converts in place, a layer at a time.
-    assert(!InBackground(kLightBackgroundTexels + 1) && !InBackground(array));
+    assert(InBackground(kInPlaceTexels + 1) && InBackground(atlas) && InBackground(32u << 20));
+    // Eligibility has no stale32MiB ceiling; actual payload admission is checked below.
+    assert(InBackground((32u << 20) + 1) && InBackground(array) && InBackground(42295792));
     Play(400); assert(!InBackground(picture) && InBackground(atlas));
     Frame(); assert(!InBackground(picture));
     Play(700); Frame(); assert(!InBackground(picture) && Draws() == 700);
@@ -58,6 +86,8 @@ cache_code = r"""
 #include <cstdio>
 #include "astc_policy.h"
 #include "memory_budget.h"
+#include "astc_decode_budget.h"
+#include <vector>
 #include "common/scope_exit.h"
 namespace Eden::Performance {
 long long now = 1;
@@ -71,11 +101,15 @@ constexpr bool True(ImageFlagBits f) { return static_cast<unsigned>(f) != 0; }
 struct Extent { unsigned width, height; };
 struct Resources { int levels, layers; };
 struct Info { Extent size; Resources resources; };
-struct Image { ImageFlagBits flags; Info info; unsigned texels; };
+struct Image { ImageFlagBits flags; Info info; unsigned texels; unsigned unswizzled_size_bytes; };
 using ImageId = int;
 unsigned MapSizeBytes(const Image& image) { return image.texels; }
 int queued = 0, in_place = 0;
-void QueueAsyncDecode(Image&, ImageId) { ++queued; }
+Eden::AstcPolicy::DecodeBudget astc_decode_budget;
+std::vector<Eden::AstcPolicy::DecodeBudget::Reservation> retained;
+void QueueAsyncDecode(Image&, ImageId, Eden::AstcPolicy::DecodeBudget::Reservation payload) {
+    retained.push_back(std::move(payload)); ++queued;
+}
 void RefreshContents(Image& image, ImageId image_id, long long conversion_ns) {
 @SNIPPET@
     Eden::Performance::now += conversion_ns;  // UploadImageContents
@@ -84,10 +118,10 @@ void RefreshContents(Image& image, ImageId image_id, long long conversion_ns) {
 int main() {
     using namespace Eden::AstcPolicy;
     const auto astc = [](unsigned width, unsigned height, int layers, int levels) {
-        return Image{ImageFlagBits::AsynchronousDecode, {{width, height}, {levels, layers}}, width * height * unsigned(layers)};
+        return Image{ImageFlagBits::AsynchronousDecode, {{width, height}, {levels, layers}}, width * height * unsigned(layers), width * height * unsigned(layers)};
     };
     Image picture = astc(1920, 1080, 1, 1), atlas = astc(4096, 4096, 1, 1), array = astc(1024, 1024, 64, 1);
-    Image other{ImageFlagBits::None, {{4096, 4096}, {1, 1}}, 4096u * 4096u};
+    Image other{ImageFlagBits::None, {{4096, 4096}, {1, 1}}, 4096u * 4096u, 4096u * 4096u};
     for (int i = 0; i < 200; ++i) Draw();  // a light game in play
     RefreshContents(picture, 1, 20'000'000);  // in place, 20 ms: logged
     assert(in_place == 1 && queued == 0);
@@ -106,9 +140,20 @@ int main() {
     // (memory_budget.h LightBackgroundRoom), unlogged at 0 ms.
     Frame();
     Frame();
-    Eden::Performance::astc_background_bytes = 120ull << 20;
+    auto busy_backlog = astc_decode_budget.Reserve(120ull << 20, true);
     RefreshContents(atlas, 2, 0);
     assert(in_place == 5 && queued == 3);
+    retained.clear();
+    busy_backlog.reset();
+    assert(astc_decode_budget.Held() == 0);
+    auto observed = astc(512, 512, 121, 10);
+    observed.texels = observed.unswizzled_size_bytes = 42295792;
+    RefreshContents(observed, 5, 0);
+    assert(in_place == 5 && queued == 4 && astc_decode_budget.Held() == 85640160);
+    RefreshContents(observed, 6, 0);
+    assert(in_place == 6 && queued == 4 && astc_decode_budget.Held() == 85640160);
+    retained.clear();
+    assert(astc_decode_budget.Held() == 0);
     return 0;
 }
 """
@@ -117,8 +162,8 @@ with tempfile.TemporaryDirectory() as tmp:
     subprocess.run(['c++', '-std=c++20', '-Wall', '-Wextra', '-Werror', '-fsanitize=address,undefined',
                     '-I' + str(root / 'headless'), '-x', 'c++', '-', '-o', str(exe)], input=code, text=True, check=True)
     subprocess.run([str(exe)], check=True)
-    print('ASTC conversion: PASS in place on light screens up to a picture, larger ones in the background unless '
-          'over 32 Mi texels, everything in the background from the first busy frame, and back')
+    print('ASTC conversion: PASS in place on light screens up to a picture, larger ones eligible when '
+          'the actual payload fits; reservation release, overflow and busy backlog checked')
     if len(sys.argv) > 1:
         source = Path(sys.argv[1])
         port = Path(tmp) / 'port'
@@ -128,13 +173,12 @@ with tempfile.TemporaryDirectory() as tmp:
         cache = (port / 'vulkan-cache/video_core/texture_cache/texture_cache.h').read_text()
         refresh = cache.split('void TextureCache<P>::RefreshContents(Image& image, ImageId image_id) {', 1)[1]
         refresh = refresh.split('\ntemplate <class P>', 1)[0]
-        begin = refresh.index('    if (True(image.flags & ImageFlagBits::AsynchronousDecode) && '
-                              '::Eden::AstcPolicy::InBackground(MapSizeBytes(image))')
+        begin = refresh.index('    if (True(image.flags & ImageFlagBits::AsynchronousDecode) &&\n')
         end = refresh.index('    };\n', begin) + len('    };\n')
         snippet = refresh[begin:end]
         # The conversion in place it times is the upload that follows it.
         assert refresh.index('UploadImageContents(image, staging);', end) > end
-        assert 'QueueAsyncDecode(image, image_id);' not in refresh[:begin]
+        assert 'QueueAsyncDecode(image, image_id,' not in refresh[:begin]
         exe = Path(tmp) / 'cache'
         subprocess.run(['c++', '-std=c++20', '-Wall', '-Wextra', '-Werror', '-fsanitize=address,undefined',
                         '-I' + str(root / 'headless'), '-I' + str(source / 'src'), '-x', 'c++', '-', '-o', str(exe)],
@@ -142,8 +186,12 @@ with tempfile.TemporaryDirectory() as tmp:
         lines = subprocess.run([str(exe)], check=True, capture_output=True, text=True).stdout.splitlines()
         expected = [
             'EDEN_ASTC_IN_PLACE ms=20.0 texels=2073600 size=1920x1080 layers=1 levels=1 draws=200 slow=1 slow_ms=20',
-            'EDEN_ASTC_BACKGROUND texels=16777216 size=4096x4096 layers=1 levels=1 draws=200 count=1',
+            'EDEN_ASTC_BACKGROUND texels=16777216 size=4096x4096 layers=1 levels=1 draws=200 count=1 admitted=1 input=16777216 output=16777216 payload=100663296 pending=100663296',
+            'EDEN_ASTC_BACKGROUND texels=67108864 size=1024x1024 layers=64 levels=1 draws=200 count=2 admitted=0 input=67108864 output=67108864 payload=138412032 pending=100663296',
             'EDEN_ASTC_IN_PLACE ms=700.0 texels=67108864 size=1024x1024 layers=64 levels=1 draws=200 slow=2 slow_ms=720',
+            'EDEN_ASTC_BACKGROUND texels=16777216 size=4096x4096 layers=1 levels=1 draws=0 count=3 admitted=0 input=16777216 output=16777216 payload=100663296 pending=377346048',
+            'EDEN_ASTC_BACKGROUND texels=42295792 size=512x512 layers=121 levels=10 draws=0 count=4 admitted=1 input=42295792 output=42295792 payload=85640160 pending=85640160',
+            'EDEN_ASTC_BACKGROUND texels=42295792 size=512x512 layers=121 levels=10 draws=0 count=5 admitted=0 input=42295792 output=42295792 payload=85640160 pending=85640160',
         ]
         assert lines == expected, lines
         print('ASTC conversion: PASS the Vulkan texture cache\'s code as written sends each size where the policy '

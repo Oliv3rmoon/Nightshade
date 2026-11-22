@@ -20,8 +20,7 @@ inline constexpr const char* kDataDir = "/data/prosperoeden";
 inline constexpr const char* kDefaultAssetsDir = "/data/prosperoeden";
 inline constexpr const char* kInstallDir = "/data/homebrew/PPSA99008";
 
-// Filesystem access requested at startup: -1 not requested, 0 granted, otherwise the
-// elevation::Status that refused it.
+// Startup storage check: -1 pending, 0 usable, otherwise the startup access error.
 inline int& FilesystemAccessStatus() {
     static int status = -1;
     return status;

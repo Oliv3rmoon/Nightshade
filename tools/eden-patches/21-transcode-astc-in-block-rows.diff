@@ -1,0 +1,167 @@
+--- a/src/video_core/textures/workers.h
++++ b/src/video_core/textures/workers.h
+@@ -17,8 +17,9 @@
+ // The GPU and background texture decoder share workers. A conversion can use its
+ // output as soon as its own rows are ready, even if another caller has queued work.
+ template <typename ProcessRow>
+-void TranscodeRows(std::uint32_t rows, std::uint32_t blocks_per_row, const ProcessRow& process_row) {
+-    if (rows <= 1 || std::uint64_t{rows} * blocks_per_row <= 16) {
++void TranscodeRows(std::uint32_t rows, std::uint32_t blocks_per_row, const ProcessRow& process_row,
++                   bool parallel = true) {
++    if (!parallel || rows <= 1 || std::uint64_t{rows} * blocks_per_row <= 16) {
+         for (std::uint32_t row = 0; row < rows; ++row) {
+             process_row(row);
+         }
+--- a/src/video_core/textures/astc.h
++++ b/src/video_core/textures/astc.h
+@@ -3,9 +3,13 @@
+
+ #pragma once
+
++#include <cstdint>
++#include <span>
++
+ namespace Tegra::Texture::ASTC {
+
+ void Decompress(std::span<const uint8_t> data, uint32_t width, uint32_t height, uint32_t depth,
+-                uint32_t block_width, uint32_t block_height, std::span<uint8_t> output);
++                uint32_t block_width, uint32_t block_height, std::span<uint8_t> output,
++                bool parallel = true);
+
+ } // namespace Tegra::Texture::ASTC
+--- a/src/video_core/textures/astc.cpp
++++ b/src/video_core/textures/astc.cpp
+@@ -2000,13 +2000,14 @@
+ }
+
+ void Decompress(std::span<const uint8_t> data, uint32_t width, uint32_t height, uint32_t depth,
+-                uint32_t block_width, uint32_t block_height, std::span<uint8_t> output) {
++                uint32_t block_width, uint32_t block_height, std::span<uint8_t> output,
++                bool parallel) {
+     const u32 rows = Common::DivideUp(height, block_height);
+     const u32 cols = Common::DivideUp(width, block_width);
+
+     for (u32 z = 0; z < depth; ++z) {
+         const u32 depth_offset = z * height * width * 4;
+-        TranscodeRows(rows, cols, [&](u32 y_index) {
++        const auto decode_row = [&](u32 y_index) {
+             const u32 y = y_index * block_height;
+             for (u32 x_index = 0; x_index < cols; ++x_index) {
+                 const u32 block_index = (z * rows * cols) + (y_index * cols) + x_index;
+@@ -2027,7 +2028,8 @@
+                                 uncompData.data() + h * block_width, decompWidth * 4);
+                 }
+             }
+-        });
++        };
++        TranscodeRows(rows, cols, decode_row, parallel);
+     }
+ }
+
+--- a/src/video_core/textures/bcn.h
++++ b/src/video_core/textures/bcn.h
+@@ -13,4 +13,8 @@
+
+ void CompressBC3(std::span<const u8> data, u32 width, u32 height, u32 depth, std::span<u8> output);
+
++// Recompress one ASTC layer with a tightly packed RGBA scratch layer.
++void TranscodeASTCLayer(std::span<const u8> data, u32 width, u32 height, u32 astc_width, u32 astc_height,
++                        bool bc1, std::span<u8> scratch, std::span<u8> output);
++
+ } // namespace Tegra::Texture::BCN
+--- a/src/video_core/textures/bcn.cpp
++++ b/src/video_core/textures/bcn.cpp
+@@ -2,8 +2,10 @@
+ // SPDX-License-Identifier: GPL-2.0-or-later
+
+ #include <stb_dxt.h>
++#include <numeric>
+ #include <string.h>
+ #include "common/alignment.h"
++#include "video_core/textures/astc.h"
+ #include "video_core/textures/bcn.h"
+ #include "video_core/textures/workers.h"
+
+@@ -13,7 +15,7 @@
+
+ template <u32 BytesPerBlock, bool ThresholdAlpha = false>
+ void CompressBCN(std::span<const uint8_t> data, uint32_t width, uint32_t height, uint32_t depth,
+-                 std::span<uint8_t> output, BCNCompressor f) {
++                 std::span<uint8_t> output, BCNCompressor f, bool parallel = true) {
+     constexpr u8 alpha_threshold = 128;
+     constexpr u32 bytes_per_px = 4;
+     const u32 plane_dim = width * height;
+@@ -23,7 +25,7 @@
+     const u32 bytes_per_row = BytesPerBlock * blocks_per_row;
+     const u32 bytes_per_plane = bytes_per_row * block_rows;
+     for (u32 z = 0; z < depth; z++) {
+-        TranscodeRows(block_rows, blocks_per_row, [&](u32 row) {
++        const auto compress_row = [&](u32 row) {
+             const u32 y = row * 4;
+             for (u32 x = 0; x < width; x += 4) {
+                 // Gather 4x4 block of RGBA texels
+@@ -59,25 +61,50 @@
+                       (x / 4) * BytesPerBlock,
+                   reinterpret_cast<u8*>(input_colors), any_alpha);
+             }
+-        });
++        };
++        TranscodeRows(block_rows, blocks_per_row, compress_row, parallel);
+     }
+ }
+
+-void CompressBC1(std::span<const uint8_t> data, uint32_t width, uint32_t height, uint32_t depth,
+-                 std::span<uint8_t> output) {
+-    CompressBCN<8, true>(data, width, height, depth, output,
+-                         [](u8* block_output, const u8* block_input, bool any_alpha) {
+-                             stb_compress_bc1_block(block_output, block_input, any_alpha,
+-                                                    STB_DXT_NORMAL);
+-                         });
++static void CompressBC1Block(u8* output, const u8* input, bool any_alpha) {
++    stb_compress_bc1_block(output, input, any_alpha, STB_DXT_NORMAL);
+ }
+
+-void CompressBC3(std::span<const uint8_t> data, uint32_t width, uint32_t height, uint32_t depth,
+-                 std::span<uint8_t> output) {
+-    CompressBCN<16, false>(data, width, height, depth, output,
+-                           [](u8* block_output, const u8* block_input, bool any_alpha) {
+-                               stb_compress_bc3_block(block_output, block_input, STB_DXT_NORMAL);
+-                           });
++static void CompressBC3Block(u8* output, const u8* input, bool) {
++    stb_compress_bc3_block(output, input, STB_DXT_NORMAL);
++}
++
++void CompressBC1(std::span<const u8> data, u32 width, u32 height, u32 depth, std::span<u8> output) {
++    CompressBCN<8, true>(data, width, height, depth, output, CompressBC1Block);
++}
++
++void CompressBC3(std::span<const u8> data, u32 width, u32 height, u32 depth, std::span<u8> output) {
++    CompressBCN<16>(data, width, height, depth, output, CompressBC3Block);
++}
++
++void TranscodeASTCLayer(std::span<const u8> data, u32 width, u32 height, u32 astc_width, u32 astc_height,
++                        bool bc1, std::span<u8> scratch, std::span<u8> output) {
++    // A band starts on both source ASTC and destination BCn block boundaries; only the final
++    // band can have clipped block rows. Each job owns its texels and blocks in both planes.
++    const u32 band_height = std::lcm(astc_height, 4u);
++    const u32 bands = Common::DivideUp(height, band_height);
++    const u32 blocks_per_row = Common::DivideUp(width, 4u);
++    const size_t astc_row_bytes = size_t{Common::DivideUp(width, astc_width)} * 16;
++    const size_t bcn_row_bytes = size_t{blocks_per_row} * (bc1 ? 8 : 16);
++    const size_t rgba_row_bytes = size_t{width} * 4;
++    TranscodeRows(bands, blocks_per_row, [&](u32 band) {
++        const u32 y = band * band_height;
++        const u32 rows = (std::min)(band_height, height - y);
++        auto rgba = scratch.subspan(y * rgba_row_bytes, rows * rgba_row_bytes);
++        ASTC::Decompress(data.subspan((y / astc_height) * astc_row_bytes),
++                         width, rows, 1, astc_width, astc_height, rgba, false);
++        auto bc = output.subspan((y / 4) * bcn_row_bytes);
++        if (bc1) {
++            CompressBCN<8, true>(rgba, width, rows, 1, bc, CompressBC1Block, false);
++        } else {
++            CompressBCN<16>(rgba, width, rows, 1, bc, CompressBC3Block, false);
++        }
++    });
+ }
+
+ } // namespace Tegra::Texture::BCN

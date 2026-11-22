@@ -688,7 +688,7 @@ bool CreateTexture(Texture& texture) {
     texture.resident = true;
     ++created;
     const bool background = !light_frame || (fixed_mode && texture.size > 3 * MiB && texture.size <= 32 * MiB &&
-                                             (Eden::Performance::astc_background_bytes = decoded_now, Eden::Performance::LightBackgroundRoom(texture.size)));
+                                             Eden::Performance::LightBackgroundRoom(decoded_now, texture.size));
     // At most the backlog the logs show (up to 94 conversions waiting, about 256 MiB of this
     // catalogue's textures) is in flight; beyond it they are taken as converted and uploaded.
     if (texture.costly && background && decoded_now + texture.size <= 256 * MiB) {

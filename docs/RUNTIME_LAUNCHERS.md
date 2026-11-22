@@ -83,6 +83,12 @@ notices** (true by default): when it is false, a pack should not offer the relea
 it opens, only name it where it shows the running version. The built-in launcher that a
 pack falls back to follows it.
 
+`status.update.test_build` is true when that release is a test build (a GitHub pre-release,
+offered only with **Settings > Diagnostics > Test builds** on), and `status.update.title`
+is then its title on GitHub (it may be empty); a pack should say it is a test build where it
+offers it, as the built-in launcher does. `preferences.test_builds` is that switch (false by
+default); a change applies the next time the app opens.
+
 `choices.speed_limit` lists the speed-limit steps as percentages, `0` meaning no limit.
 `preferences.speed_limit` and a game setting's `speed_limit` are indexes into that list;
 the game setting is `-1` while the game follows Settings.

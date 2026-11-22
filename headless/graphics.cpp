@@ -17,6 +17,7 @@
 #include <time.h>
 #include "hud.h"
 #include "shader_start.h"
+#include "async_shaders.h"
 #include "start_wait.h"
 #include "loading_art.h"
 #include "network/network.h"
@@ -821,6 +822,8 @@ void GraphicsWindow::OnFrameDisplayed() {
 #endif
                 Eden::Performance::ReportVulkan();
                 Eden::Performance::ReportMemory();
+                // Draws that found their pipeline unbuilt since the last line (async_shaders.h).
+                Eden::AsyncShaders::Report(stderr);
 #ifdef EDEN_DEV_PROFILE
                 // Composite runs on the GPU thread, so its owner CPU clock is valid here.
                 Eden::Performance::ReportGpuThread(frame_total);

@@ -1,0 +1,36 @@
+--- a/src/video_core/dma_pusher.cpp
++++ b/src/video_core/dma_pusher.cpp
+@@ -4,6 +4,9 @@
+ // SPDX-FileCopyrightText: Copyright 2021 yuzu Emulator Project
+ // SPDX-License-Identifier: GPL-2.0-or-later
+ 
++#include <stdexcept>
++
++#include "common/logging.h"
+ #include "common/settings.h"
+ #include "core/core.h"
+ #include "video_core/dma_pusher.h"
+@@ -182,6 +185,11 @@
+         });
+     } else {
+         auto subchannel = subchannels[dma_state.subchannel];
++        if (subchannel == nullptr) {
++            LOG_ERROR(HW_GPU, "EDEN_INVALID_GPU_COMMAND unbound subchannel={} method={:#x} dma_get={:#x}",
++                      dma_state.subchannel, dma_state.method, dma_state.dma_get);
++            throw std::runtime_error("GPU command references an unbound engine channel");
++        }
+         if (!subchannel->execution_mask[dma_state.method]) {
+             subchannel->method_sink.emplace_back(dma_state.method, argument);
+         } else {
+@@ -197,6 +205,11 @@
+         puller.CallMultiMethod(*this, dma_state.method, dma_state.subchannel, base_start, num_methods, dma_state.method_count);
+     } else {
+         auto subchannel = subchannels[dma_state.subchannel];
++        if (subchannel == nullptr) {
++            LOG_ERROR(HW_GPU, "EDEN_INVALID_GPU_COMMAND unbound subchannel={} method={:#x} dma_get={:#x}",
++                      dma_state.subchannel, dma_state.method, dma_state.dma_get);
++            throw std::runtime_error("GPU command references an unbound engine channel");
++        }
+         subchannel->ConsumeSink(system);
+         subchannel->current_dma_segment = dma_state.dma_get + dma_state.dma_word_offset;
+         subchannel->CallMultiMethod(system, dma_state.method, base_start, num_methods, dma_state.method_count);

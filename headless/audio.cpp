@@ -52,7 +52,8 @@ AudioStream::AudioStream(Core::System& system, u32 channels, const std::string& 
             std::unique_lock lock(mutex);
             while (!stop.stop_requested()) {
                 if (!wake.wait(lock, stop, [this] { return !IsPaused(); })) break;
-                ProcessAudioOutAndRender(block, kAudioOutGrain);
+                const auto padded_frames = ProcessAudioOutAndRender(block, kAudioOutGrain);
+                underrun_fade.Apply(block, padded_frames);
                 // AudioOut paces complete 256-frame, 48 kHz stereo blocks.
                 in_flight = true;
                 lock.unlock();
@@ -67,6 +68,8 @@ AudioStream::AudioStream(Core::System& system, u32 channels, const std::string& 
                     break;
                 }
                 output_frames += kAudioOutGrain;
+                underrun_frames += padded_frames;
+                underrun_blocks += padded_frames != 0;
                 for (std::size_t frame = 0; frame < kAudioOutGrain; ++frame)
                     nonzero_frames += block[frame * 2] != 0 || block[frame * 2 + 1] != 0;
             }
@@ -86,6 +89,7 @@ void AudioStream::Stop() {
     SignalPause();
     std::unique_lock lock(mutex);
     wake.wait(lock, [this] { return !in_flight; });
+    underrun_fade.Reset();
 }
 void AudioStream::Finalize() {
     worker.request_stop();
@@ -96,8 +100,10 @@ void AudioStream::Finalize() {
     if (handle >= 0) {
         const int drain = sceAudioOutOutput(handle, nullptr);
         const int close = sceAudioOutClose(handle);
-        LOG_INFO(Audio_Sink, "EDEN_AUDIO_PORT_CLOSED frames={} nonzero={} failed={} drain={} close={}",
-                 output_frames, nonzero_frames, failed.load(), drain, close);
+        LOG_INFO(Audio_Sink, "EDEN_AUDIO_PORT_CLOSED frames={} nonzero={} failed={} drain={} close={} "
+                            "underrun_frames={} underrun_blocks={} stream={} guest_channels={}",
+                 output_frames, nonzero_frames, failed.load(), drain, close, underrun_frames,
+                 underrun_blocks, name, system_channels);
         handle = -1;
     }
 }

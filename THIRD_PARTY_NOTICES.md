@@ -11,6 +11,12 @@ builds on the following projects, each under its own license.
   simpleini, sirit, SPIRV-Headers, Vulkan-Headers, Vulkan-Utility-Libraries,
   Vulkan Memory Allocator, ENet, frozen, cpp-httplib, nlohmann/json, and the time
   zone data. Each keeps its upstream license.
+- **[bf39l/ProsperoEden](https://github.com/bf39l/ProsperoEden)**,
+  GPL-3.0-or-later (`Oliv3rmoon/Nightshade#6`). Stability fixes adapted into
+  Nightshade's Eden patch series (`tools/eden-patches/24..47-*.diff`), texture
+  GC download prefetch accounting (`headless/vulkan_gc_downloads.inc`), shader
+  cache validation (`headless/shader_cache_reader.inc`), and guest panic
+  recovery/diagnostics (`headless/guest_fault.h`).
 - **[zbic](https://github.com/kinnay/zbic)** by Yannik Marchand (kinnay), one of the packages
   Eden's build fetches at the commit Eden pins: Atmosphère's ZBIC variant of zstd 1.5.7
   (`src/zstd.c`, `zstd.h`, `zstd_errors.h`). The binary interpolative coding of its entropy tables
@@ -42,6 +48,12 @@ builds on the following projects, each under its own license.
 
 ## Graphics
 
+- **[Belladonna](https://github.com/Oliv3rmoon/Belladonna)** (`871f66e94cf3b6ca3787115784d833f08b04fba1`) by
+  Oliv3rmoon. Nightshade's fork of Mihawk's PS5 Mesa (RADV, mainly MIT) and its
+  PS5 platform layer (GPL-3.0-or-later). Pinned in `tools/deps.json`, carried as
+  `tools/driver-sources/belladonna-1.0-871f66e.bundle` on top of public commit
+  `bd34ec1aff7e26f88010bb359b1fcec46577e9fd`, and delivered alongside releases as
+  `Belladonna-1.0-871f66e-source.tar.zst`.
 - **[PS5 Mesa](https://github.com/mihawk-99/PS5_Mesa)** and
   **[PS5 Vulkan](https://github.com/mihawk-99/PS5_Vulkan)** by Mihawk. The
   RADV Vulkan driver (Mesa, mainly MIT) and its PS5 link recipe and platform

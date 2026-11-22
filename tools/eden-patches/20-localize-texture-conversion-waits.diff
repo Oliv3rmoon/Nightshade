@@ -1,0 +1,208 @@
+--- a/src/video_core/textures/workers.h
++++ b/src/video_core/textures/workers.h
+@@ -4,4 +4,9 @@
+ #pragma once
+
++#include <algorithm>
++#include <condition_variable>
++#include <cstdint>
++#include <mutex>
++
+ #include "common/thread_worker.h"
+
+@@ -10,3 +15,54 @@
+ Common::ThreadWorker& GetThreadWorkers();
+
++// The GPU and background texture decoder share workers. A conversion can use its
++// output as soon as its own rows are ready, even if another caller has queued work.
++template <typename ProcessRow>
++void TranscodeRows(std::uint32_t rows, std::uint32_t blocks_per_row, const ProcessRow& process_row) {
++    if (rows <= 1 || std::uint64_t{rows} * blocks_per_row <= 16) {
++        for (std::uint32_t row = 0; row < rows; ++row) {
++            process_row(row);
++        }
++        return;
++    }
++
++    const auto rows_per_job = std::clamp(rows / 32, 1u, 8u);
++    const auto num_jobs = 1 + (rows - 1) / rows_per_job;
++    auto remaining = num_jobs;
++    std::mutex mutex;
++    std::condition_variable complete;
++    const auto finish = [&](std::uint32_t jobs) {
++        std::lock_guard lock{mutex};
++        remaining -= jobs;
++        if (remaining == 0) {
++            complete.notify_one();
++        }
++    };
++    const auto wait = [&] {
++        std::unique_lock lock{mutex};
++        complete.wait(lock, [&] { return remaining == 0; });
++    };
++
++    auto& workers = GetThreadWorkers();
++    std::uint32_t submitted = 0;
++    try {
++        for (; submitted < num_jobs; ++submitted) {
++            const auto first = submitted * rows_per_job;
++            const auto past = first + (std::min)(rows_per_job, rows - first);
++            workers.QueueWork([&, first, past] {
++                for (auto row = first; row < past; ++row) {
++                    process_row(row);
++                }
++                finish(1);
++            });
++        }
++    } catch (...) {
++        // Keep the caller's input, output and completion state alive until
++        // any jobs accepted before the failed enqueue have finished.
++        finish(num_jobs - submitted);
++        wait();
++        throw;
++    }
++    wait();
+ }
++
++}
+--- a/src/video_core/textures/astc.cpp
++++ b/src/video_core/textures/astc.cpp
+@@ -2004,36 +2004,29 @@
+     const u32 rows = Common::DivideUp(height, block_height);
+     const u32 cols = Common::DivideUp(width, block_width);
+-
+-    Common::ThreadWorker& workers{GetThreadWorkers()};
+
+     for (u32 z = 0; z < depth; ++z) {
+         const u32 depth_offset = z * height * width * 4;
+-        for (u32 y_index = 0; y_index < rows; ++y_index) {
+-            auto decompress_stride = [data, width, height, block_width, block_height, output, rows,
+-                                      cols, z, depth_offset, y_index] {
+-                const u32 y = y_index * block_height;
+-                for (u32 x_index = 0; x_index < cols; ++x_index) {
+-                    const u32 block_index = (z * rows * cols) + (y_index * cols) + x_index;
+-                    const u32 x = x_index * block_width;
+-
+-                    const std::span<const u8, 16> blockPtr{data.subspan(block_index * 16, 16)};
++        TranscodeRows(rows, cols, [&](u32 y_index) {
++            const u32 y = y_index * block_height;
++            for (u32 x_index = 0; x_index < cols; ++x_index) {
++                const u32 block_index = (z * rows * cols) + (y_index * cols) + x_index;
++                const u32 x = x_index * block_width;
+
+-                    // Blocks can be at most 12x12
+-                    std::array<u32, 12 * 12> uncompData;
+-                    DecompressBlock(blockPtr, block_width, block_height, uncompData);
++                const std::span<const u8, 16> blockPtr{data.subspan(block_index * 16, 16)};
+
+-                    u32 decompWidth = (std::min)(block_width, width - x);
+-                    u32 decompHeight = (std::min)(block_height, height - y);
++                // Blocks can be at most 12x12
++                std::array<u32, 12 * 12> uncompData;
++                DecompressBlock(blockPtr, block_width, block_height, uncompData);
+
+-                    const std::span<u8> outRow = output.subspan(depth_offset + (y * width + x) * 4);
+-                    for (u32 h = 0; h < decompHeight; ++h) {
+-                        std::memcpy(outRow.data() + h * width * 4,
+-                                    uncompData.data() + h * block_width, decompWidth * 4);
+-                    }
++                u32 decompWidth = (std::min)(block_width, width - x);
++                u32 decompHeight = (std::min)(block_height, height - y);
++
++                const std::span<u8> outRow = output.subspan(depth_offset + (y * width + x) * 4);
++                for (u32 h = 0; h < decompHeight; ++h) {
++                    std::memcpy(outRow.data() + h * width * 4,
++                                uncompData.data() + h * block_width, decompWidth * 4);
+                 }
+-            };
+-            workers.QueueWork(std::move(decompress_stride));
+-        }
+-        workers.WaitForRequests();
++            }
++        });
+     }
+ }
+--- a/src/video_core/textures/bcn.cpp
++++ b/src/video_core/textures/bcn.cpp
+@@ -19,49 +19,46 @@
+     const u32 plane_dim = width * height;
+
+-    Common::ThreadWorker& workers{GetThreadWorkers()};
+-
++    const u32 blocks_per_row = Common::DivideUp(width, 4U);
++    const u32 block_rows = Common::DivideUp(height, 4U);
++    const u32 bytes_per_row = BytesPerBlock * blocks_per_row;
++    const u32 bytes_per_plane = bytes_per_row * block_rows;
+     for (u32 z = 0; z < depth; z++) {
+-        for (u32 y = 0; y < height; y += 4) {
+-            auto compress_row = [z, y, width, height, plane_dim, f, data, output]() {
+-                for (u32 x = 0; x < width; x += 4) {
+-                    // Gather 4x4 block of RGBA texels
+-                    u8 input_colors[4][4][4];
+-                    bool any_alpha = false;
++        TranscodeRows(block_rows, blocks_per_row, [&](u32 row) {
++            const u32 y = row * 4;
++            for (u32 x = 0; x < width; x += 4) {
++                // Gather 4x4 block of RGBA texels
++                u8 input_colors[4][4][4];
++                bool any_alpha = false;
+
+-                    for (u32 j = 0; j < 4; j++) {
+-                        for (u32 i = 0; i < 4; i++) {
+-                            const size_t coord =
+-                                (z * plane_dim + (y + j) * width + (x + i)) * bytes_per_px;
++                for (u32 j = 0; j < 4; j++) {
++                    for (u32 i = 0; i < 4; i++) {
++                        const size_t coord =
++                            (z * plane_dim + (y + j) * width + (x + i)) * bytes_per_px;
+
+-                            if ((x + i < width) && (y + j < height)) {
+-                                if constexpr (ThresholdAlpha) {
+-                                    if (data[coord + 3] >= alpha_threshold) {
+-                                        input_colors[j][i][0] = data[coord + 0];
+-                                        input_colors[j][i][1] = data[coord + 1];
+-                                        input_colors[j][i][2] = data[coord + 2];
+-                                        input_colors[j][i][3] = 255;
+-                                    } else {
+-                                        any_alpha = true;
+-                                        memset(input_colors[j][i], 0, bytes_per_px);
+-                                    }
++                        if ((x + i < width) && (y + j < height)) {
++                            if constexpr (ThresholdAlpha) {
++                                if (data[coord + 3] >= alpha_threshold) {
++                                    input_colors[j][i][0] = data[coord + 0];
++                                    input_colors[j][i][1] = data[coord + 1];
++                                    input_colors[j][i][2] = data[coord + 2];
++                                    input_colors[j][i][3] = 255;
+                                 } else {
+-                                    memcpy(input_colors[j][i], &data[coord], bytes_per_px);
++                                    any_alpha = true;
++                                    memset(input_colors[j][i], 0, bytes_per_px);
+                                 }
+                             } else {
+-                                memset(input_colors[j][i], 0, bytes_per_px);
++                                memcpy(input_colors[j][i], &data[coord], bytes_per_px);
+                             }
++                        } else {
++                            memset(input_colors[j][i], 0, bytes_per_px);
+                         }
+                     }
+-
+-                    const u32 bytes_per_row = BytesPerBlock * Common::DivideUp(width, 4U);
+-                    const u32 bytes_per_plane = bytes_per_row * Common::DivideUp(height, 4U);
+-                    f(output.data() + z * bytes_per_plane + (y / 4) * bytes_per_row +
+-                          (x / 4) * BytesPerBlock,
+-                      reinterpret_cast<u8*>(input_colors), any_alpha);
+                 }
+-            };
+-            workers.QueueWork(std::move(compress_row));
+-        }
+-        workers.WaitForRequests();
++
++                f(output.data() + z * bytes_per_plane + row * bytes_per_row +
++                      (x / 4) * BytesPerBlock,
++                  reinterpret_cast<u8*>(input_colors), any_alpha);
++            }
++        });
+     }
+ }

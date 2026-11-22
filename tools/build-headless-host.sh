@@ -33,6 +33,20 @@ PY
 fi
 printf '%s\n' '67bada77f8a43a90da2e94e89b8e7da73c256989' > "$eden/GIT-COMMIT"
 printf '%s\n' 'ps5-headless' > "$eden/GIT-REFSPEC"
+# As in prepare-build.sh, compile the current patch set in the host emulator too. Restore
+# every touched file before applying a changed set: later patches can modify earlier ones.
+command -v patch >/dev/null || { echo "patch is required (apt install patch)" >&2; exit 1; }
+eden_patches=(tools/eden-patches/*.diff)
+eden_patch_set=$(cat "${eden_patches[@]}" | sha256sum | cut -d' ' -f1)
+if [[ $(cat "$eden/.eden-patches" 2>/dev/null) != "$eden_patch_set" ]]; then
+    rm -f "$eden/.eden-patches"
+    sed -n 's|^+++ b/||p' "${eden_patches[@]}" | sort -u | sed 's|^|*/|' |
+        xargs tar -xzf .deps/eden-67bada77.tar.gz --wildcards --strip-components=1 -C "$eden"
+    for eden_patch in "${eden_patches[@]}"; do
+        patch -d "$eden" -p1 -N -s < "$eden_patch" || { echo "$eden_patch does not apply to Eden's source" >&2; exit 1; }
+    done
+    printf '%s\n' "$eden_patch_set" > "$eden/.eden-patches"
+fi
 # FFmpeg links configure probes through the compiler driver, not raw ld.
 # Keep the derivative in our cache and regenerate its Makefile when it changes.
 python3 - "$eden" "$scratch/build" <<'PY'
@@ -86,6 +100,10 @@ python3 -B "$root/tools/check-staging-chunks.py" "$scratch/source"
 python3 -B "$root/tools/check-memory-soak.py"
 # The shader cache built while a game plays: its shared state, and the Vulkan port that uses it.
 python3 -B "$root/tools/check-shader-start.py" "$scratch/source"
+python3 -B "$root/tools/check-shader-discovery-scan.py" "$scratch/build/headless/shader_environment.cpp"
+# Tears of the Kingdom's asynchronous shaders, the port's rules for a draw whose pipeline is not
+# built (Eden PR #4639's small targets, upstream Eden's depth), their counts and SPIR-V hashes.
+python3 -B "$root/tools/check-totk-async-shaders.py" "$scratch/source"
 python3 -B "$root/tools/check-crash-report.py"
 python3 -B "$root/tools/check-stop-limit.py"
 python3 -B "$root/tools/check-image-pages.py"
@@ -93,12 +111,23 @@ python3 -B "$root/tools/check-guest-headroom.py"
 python3 -B "$root/tools/check-guest-span.py" "$scratch/source/src/core/memory.cpp"
 # With the source: the Vulkan texture cache's ASTC code as the port writes it (issue 3).
 python3 -B "$root/tools/check-astc-policy.py" "$scratch/source"
+python3 -B "$root/tools/check-async-lifetimes.py" "$scratch/source"
 # An indexed storage image array within what the pipelines bind (Eden patch 12, issue 4).
 python3 -B "$root/tools/check-indexed-storage-images.py"
+# Storage images must declare the array that the SPIR-V consumer indexes (Eden patch 14).
+EDEN_SHADER_BUILD="$scratch/build" python3 -B "$root/tools/check-storage-image-spirv.py"
 python3 -B "$root/tools/check-guest-clock.py"
 python3 -B "$root/tools/check-guest-idle.py" "$scratch/source/src/core/hle/kernel/physical_core.cpp"
+# The freeze watchdog (headless/guest_progress.h): its marks at their sites in the pinned source,
+# and a frozen load with its frames still coming named three ways.
+python3 -B "$root/tools/check-guest-progress.py" "$scratch/source"
+# Tears of the Kingdom's loop at main+0x6E1404 bounded to the 4 floats it copies, its words checked
+# with an assembler (and run on AArch64 hosts), and addresses named by module.
+python3 -B "$root/tools/check-totk-guard.py" "$scratch/source"
 python3 -B "$root/tools/check-ncz.py"
 python3 -B "$root/tools/check-gc-scan.py"
+python3 -B "$root/tools/check-gc-downloads.py" "$scratch/source"
+python3 -B "$root/tools/check-gpu-kind-map.py" "$scratch/source"
 "$scratch/build/bin/eden-scalar-check"
 "$scratch/build/bin/eden-memory-check"
 python3 -B "$root/tools/check-decoder-startup.py"

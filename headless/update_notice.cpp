@@ -41,6 +41,7 @@ constexpr const char* kAppName = kRepository[0] != '\0' ? "Nightshade" : "Prospe
 
 std::mutex lock;
 bool started = false;
+bool test_builds = false;  // Settings > Diagnostics > Test builds, as the app opened
 bool found = false;  // an offer nobody has been told about yet
 self_update_check_result answer = SELF_UPDATE_UNKNOWN;
 self_update_offer offer{};
@@ -85,15 +86,30 @@ bool DevelopmentOffer(self_update_offer& out) {
 void* Check(void*) {
     self_update_offer result{};
     github_release_report github{};
+    // Test builds ask the repository's releases list, pre-releases with it; a build that asks the
+    // catalog has none to offer, and asks as it always does.
+    const bool tests = test_builds && kRepository[0] != '\0';
     // With no repository named, this is self_update_check_self(): the catalog, as before.
-    self_update_check_result state = self_update_check_self_from(kRepository, kAppName, &result, &github);
-    if (kRepository[0] != '\0') {
+    self_update_check_result state = tests ? self_update_check_self_tests(kRepository, kAppName, &result, &github)
+                                           : self_update_check_self_from(kRepository, kAppName, &result, &github);
+    if (tests) {
+        char line[640];
+        std::snprintf(line, sizeof(line),
+                      "GitHub %s releases (test builds): reason=%s http=%d redirects=%d error=%d releases=%d tag=%s "
+                      "prerelease=%d zip=%s",
+                      kRepository, github_release_reason_text(github.reason), github.http_status, github.redirects,
+                      github.platform_error, github.listed, github.tag[0] ? github.tag : "-", github.prerelease,
+                      github.zip[0] ? github.zip : "-");
+        Report("update check", line);
+    } else if (kRepository[0] != '\0') {
         char line[640];
         std::snprintf(line, sizeof(line),
                       "GitHub %s releases/latest: reason=%s http=%d redirects=%d error=%d tag=%s zip=%s", kRepository,
                       github_release_reason_text(github.reason), github.http_status, github.redirects,
                       github.platform_error, github.tag[0] ? github.tag : "-", github.zip[0] ? github.zip : "-");
         Report("update check", line);
+    } else if (test_builds) {
+        Report("update check", "Test builds: this build asks homebrew.page, which has none; asking it as usual");
     }
 #ifdef EDEN_DEV_PROFILE
     if (DevelopmentOffer(result)) {
@@ -101,6 +117,15 @@ void* Check(void*) {
         state = SELF_UPDATE_AVAILABLE;
     }
 #endif
+    // A test build is of the program's own line as well as of sce_sys/param.json's: an install of
+    // 01.010 is never offered 01.011 (another title ID and folder) or 01.012 (the Switch 2 test line).
+    if (tests && (state == SELF_UPDATE_AVAILABLE || state == SELF_UPDATE_NOT_INSTALLABLE) &&
+        !github_release_same_line(result.available, kAppVersion)) {
+        Report("update check", (std::string{"Test builds: "} + result.available + " is not of the program's line (" +
+                                kAppVersion + "): not offered")
+                                   .c_str());
+        state = SELF_UPDATE_UNKNOWN;
+    }
     // The program's own version counts too (issue 230): an install that replaced the program but
     // kept an older sce_sys/param.json read as that older version, and the version the console
     // already ran was offered at every start.
@@ -113,10 +138,10 @@ void* Check(void*) {
         state = SELF_UPDATE_UP_TO_DATE;
     }
     char line[300];
-    std::snprintf(line, sizeof(line), "result=%s installed=%s available=%s version=%s size=%llu",
+    std::snprintf(line, sizeof(line), "result=%s installed=%s available=%s version=%s size=%llu%s",
                   ResultName(state), result.installed[0] ? result.installed : "-",
                   result.available[0] ? result.available : "-", result.version[0] ? result.version : "-",
-                  static_cast<unsigned long long>(result.size));
+                  static_cast<unsigned long long>(result.size), result.prerelease ? " test-build" : "");
     Report("update check", line);
     if (state == SELF_UPDATE_AVAILABLE || state == SELF_UPDATE_NOT_INSTALLABLE) {
         const std::lock_guard guard(lock);
@@ -143,11 +168,12 @@ Phase FromKit(self_update_phase phase) {
 
 const char* Source() { return kRepository[0] != '\0' ? "GitHub" : "homebrew.page"; }
 
-void Start() {
+void Start(bool tests) {
     {
         const std::lock_guard guard(lock);
         if (started) return;
         started = true;
+        test_builds = tests;
     }
     pthread_attr_t attributes;
     if (pthread_attr_init(&attributes) != 0) return;
@@ -170,6 +196,8 @@ bool Take(Offer* out) {
         out->size = offer.size;
         out->notes = offer.notes;
         out->notes_truncated = offer.notes_truncated != 0;
+        out->test_build = offer.prerelease != 0;
+        out->title = offer.release_title;
     }
     return true;
 }
@@ -179,7 +207,8 @@ bool Begin() {
     if (answer != SELF_UPDATE_AVAILABLE) return false;
     if (begun) self_update_finish(&job);
     begun = self_update_start(&job, self_update_console(), &offer) == 1;
-    Report("update", begun ? ("Updating to " + std::string(offer.available)).c_str() : "The update could not begin");
+    Report("update", begun ? ("Updating to " + std::string(offer.available) + (offer.prerelease ? " (a test build)" : "")).c_str()
+                           : "The update could not begin");
     return begun;
 }
 

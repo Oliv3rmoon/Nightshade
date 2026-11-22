@@ -1,0 +1,80 @@
+--- a/src/video_core/buffer_cache/usage_tracker.h
++++ b/src/video_core/buffer_cache/usage_tracker.h
+@@ -5,6 +5,10 @@
+ // SPDX-License-Identifier: GPL-3.0-or-later
+ 
+ #pragma once
++
++#include <algorithm>
++#include <limits>
++#include <vector>
+ 
+ #include "common/alignment.h"
+ #include "common/common_types.h"
+@@ -27,6 +31,10 @@
+     }
+ 
+     void Track(u64 offset, u64 size) noexcept {
++        if (size == 0) return;
++        if (size > (std::numeric_limits<u64>::max)() - offset) {
++            return;
++        }
+         const size_t page = offset >> BUFFER_PAGE_SHIFT;
+         const size_t page_end = (offset + size) >> BUFFER_PAGE_SHIFT;
+         if (page_end < page || page_end >= pages.size()) {
+@@ -45,14 +53,19 @@
+     }
+ 
+     [[nodiscard]] bool IsUsed(u64 offset, u64 size) const noexcept {
++        if (size == 0) return false;
++        if (size > (std::numeric_limits<u64>::max)() - offset) {
++            return true;
++        }
+         const size_t page = offset >> BUFFER_PAGE_SHIFT;
+         const size_t page_end = (offset + size) >> BUFFER_PAGE_SHIFT;
+         if (page_end < page || page_end >= pages.size()) {
+-            return false;
++            return true; // Invalid ranges must not authorize reordered uploads.
+         }
+         if (IsPageUsed(page, offset, size)) {
+             return true;
+         }
++        if (page == page_end) return false;
+         for (size_t i = page + 1; i < page_end; i++) {
+             if (pages[i] != 0) {
+                 return true;
+@@ -64,21 +77,23 @@
+     }
+ 
+ private:
++    static u64 PageMask(u64 offset, u64 size) noexcept {
++        const size_t offset_in_page = offset % BUFFER_PAGE_BYTES;
++        const size_t bytes = std::min<u64>(size, BUFFER_PAGE_BYTES - offset_in_page);
++        if (bytes == 0) return 0;
++        const size_t first_bit = offset_in_page >> BUFFER_BYTES_PER_BITSHIFT;
++        const size_t last_bit = (offset_in_page + bytes - 1) >> BUFFER_BYTES_PER_BITSHIFT;
++        // Include every touched 64-byte unit, including short/unaligned tails.
++        // Both shifts stay in [0, 63], including a whole 4096-byte page.
++        return (~u64{0} << first_bit) & (~u64{0} >> (63 - last_bit));
++    }
++
+     void TrackPage(u64 page, u64 offset, u64 size) noexcept {
+-        const size_t offset_in_page = offset % BUFFER_PAGE_BYTES;
+-        const size_t first_bit = offset_in_page >> BUFFER_BYTES_PER_BITSHIFT;
+-        const size_t num_bits = std::min<size_t>(size, BUFFER_PAGE_BYTES) >> BUFFER_BYTES_PER_BITSHIFT;
+-        const size_t mask = ~u64{0} >> (64 - num_bits);
+-        pages[page] |= (~u64{0} & mask) << first_bit;
++        pages[page] |= PageMask(offset, size);
+     }
+ 
+     bool IsPageUsed(u64 page, u64 offset, u64 size) const noexcept {
+-        const size_t offset_in_page = offset % BUFFER_PAGE_BYTES;
+-        const size_t first_bit = offset_in_page >> BUFFER_BYTES_PER_BITSHIFT;
+-        const size_t num_bits = std::min<size_t>(size, BUFFER_PAGE_BYTES) >> BUFFER_BYTES_PER_BITSHIFT;
+-        const size_t mask = ~u64{0} >> (64 - num_bits);
+-        const size_t mask2 = (~u64{0} & mask) << first_bit;
+-        return (pages[page] & mask2) != 0;
++        return (pages[page] & PageMask(offset, size)) != 0;
+     }
+ 
+ private:

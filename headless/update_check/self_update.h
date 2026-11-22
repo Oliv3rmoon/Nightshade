@@ -131,6 +131,12 @@ extern "C"
            is "none" when the app isn't installed, available "any" when the release names no
            version. Empty: the app's own update, the kit's conversation unchanged. */
         char beside[10];
+        /* ProsperoEden: test builds (github_release_test_check): the release is a GitHub
+           pre-release, and its title there ("Nightshade v1.010.008 (test release)"; may be
+           empty). For the dialog only: the helper is told nothing of it, and installs it as any
+           other release. */
+        int prerelease;
+        char release_title[128];
     } self_update_offer;
 
     /* Blocking; call it from a worker thread, once per launch. */

@@ -101,19 +101,14 @@ if [[ -f $radv_release/lib/libvulkan_radeon.ps5.a ]]; then
     if [[ $built != "$mesa_pin" ]]; then
         step "RADV: built from ${built:0:12}, pinned Belladonna ${mesa_pin:0:12}"
         bash tools/build-radv-dependencies.sh
-        rm -f build/radv-isolated/libvulkan_radeon.ps5.a
     elif [[ $built_id != "$build_id" ]]; then
         step "RADV: built with build id ${built_id:0:12}, pinned ${build_id:0:12}"
         bash tools/build-radv-dependencies.sh
-        rm -f build/radv-isolated/libvulkan_radeon.ps5.a
     fi
+else
+    step "RADV (Mesa) for the PS5 - this takes a while"
+    bash tools/build-radv-dependencies.sh
 fi
-if [[ ! -f build/radv-isolated/libvulkan_radeon.ps5.a ]]; then
-    if [[ ! -f $radv_release/lib/libvulkan_radeon.ps5.a ]]; then
-        step "RADV (Mesa) for the PS5 - this takes a while"
-        bash tools/build-radv-dependencies.sh
-    fi
-    step "Isolating RADV beside the OpenGL Mesa"
-    python3 -B tools/isolate-radv.py
-fi
+step "Isolating RADV beside the OpenGL Mesa"
+python3 -B tools/isolate-radv.py
 step "Prepared: $scratch"

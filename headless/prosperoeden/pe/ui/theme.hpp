@@ -81,6 +81,7 @@ struct Theme
     float border = 1.0f;        // hairlines
     float focus_width = 2.0f;   // the focus ring's stroke
     float focus_glow = 30.0f;   // how far its light reaches
+    float glow = 1.0f;          // how strong that light is (1: the launcher's own)
     bool glass_panels = true;   // panels show the blurred artwork behind them
     float shadow_blur = 48.0f;
     float shadow_offset = 20.0f;
@@ -112,6 +113,12 @@ struct Theme
     bool top_nav = false;        // horizontal section tabs at the top instead of the sidebar rail
     float scrim_opacity = 0.0f;  // >0: flat scrim at this alpha; 0: directional gradient scrim
     float game_page_offset = 0.0f; // px to push the game settings columns below their base position
+    // Nightshade's own layout (docs/THEMES.md): a top bar with the mark, the wordmark and four
+    // tabs (Home, Library, Multiplayer, Settings); the home screen is the selected game's art with
+    // a row of covers under its title; the Library a grid of covers with a search and filters; and
+    // Settings a column of categories beside a panel of the chosen one. About is a row of Settings.
+    // It takes top_nav's place: a theme that sets it needs no other layout variant.
+    bool showcase = false;
 
     // ---- sound: a folder of ui/sounds with its own cues ("": the launcher's) ----
     const char *sounds = "";

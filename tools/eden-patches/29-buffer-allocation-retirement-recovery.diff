@@ -1,0 +1,88 @@
+--- a/src/video_core/delayed_destruction_ring.h
++++ b/src/video_core/delayed_destruction_ring.h
+@@ -22,6 +22,16 @@
+         elements[index].clear();
+     }
+ 
++    // The caller must first wait for every GPU use of the retired objects.
++    size_t ClearAfterSynchronization() {
++        size_t count = 0;
++        for (auto& bucket : elements) {
++            count += bucket.size();
++            bucket.clear();
++        }
++        return count;
++    }
++
+     void Push(T&& object) {
+         elements[index].push_back(std::move(object));
+     }
+--- a/src/video_core/renderer_vulkan/vk_buffer_cache.h
++++ b/src/video_core/renderer_vulkan/vk_buffer_cache.h
+@@ -107,6 +107,18 @@
+                                 GuestDescriptorQueue& guest_descriptor_queue,
+                                 ComputePassDescriptorQueue& compute_pass_descriptor_queue,
+                                 DescriptorPool& descriptor_pool);
++
++#ifdef PS5_NATIVE
++    bool IsOutOfDeviceMemory(std::exception_ptr error) const noexcept {
++        try {
++            if (error) std::rethrow_exception(error);
++        } catch (const vk::Exception& failure) {
++            return failure.GetResult() == VK_ERROR_OUT_OF_DEVICE_MEMORY;
++        } catch (...) {
++        }
++        return false;
++    }
++#endif
+ 
+     void TickFrame(Common::SlotVector<Buffer>& slot_buffers) noexcept;
+ 
+--- a/src/video_core/buffer_cache/buffer_cache.h
++++ b/src/video_core/buffer_cache/buffer_cache.h
+@@ -10,6 +10,7 @@
+ #include <atomic>
+ #include <limits>
+ #include <cstdio>
++#include <exception>
+ #include <memory>
+ #include <numeric>
+ 
+@@ -1783,8 +1784,35 @@
+     wanted_size = static_cast<u32>(device_addr_end - device_addr);
+     const OverlapResult overlap = ResolveOverlaps(device_addr, wanted_size);
+     const u32 size = static_cast<u32>(overlap.end - overlap.begin);
+-    const BufferId new_buffer_id =
+-        slot_buffers.insert(runtime, overlap.begin, size, sparse_compatible);
++    const BufferId new_buffer_id = [&] {
++#ifdef PS5_NATIVE
++        if constexpr (requires { runtime.IsOutOfDeviceMemory(std::exception_ptr{}); }) {
++            try {
++                return slot_buffers.insert(runtime, overlap.begin, size, sparse_compatible);
++            } catch (const std::exception&) {
++                if (!runtime.IsOutOfDeviceMemory(std::current_exception())) {
++                    throw;
++                }
++                // A cache merge needs the old and new buffers simultaneously.
++                // Older, already retired buffers need not occupy memory as well.
++                // Finish submits and waits before their Vulkan handles are freed.
++                runtime.Finish();
++                const size_t retired = delayed_destruction_ring.ClearAfterSynchronization();
++                LOG_WARNING(Render_Vulkan,
++                            "Buffer allocation recovery: requested={}, merged={}, overlaps={}, retired={}",
++                            wanted_size, size, overlap.ids.size(), retired);
++                if (retired == 0) {
++                    throw;
++                }
++                // One retry only. Live overlaps and GPU-written data stay intact.
++                return slot_buffers.insert(runtime, overlap.begin, size, sparse_compatible);
++            }
++        } else
++#endif
++        {
++            return slot_buffers.insert(runtime, overlap.begin, size, sparse_compatible);
++        }
++    }();
+     auto& new_buffer = slot_buffers[new_buffer_id];
+     const size_t size_bytes = new_buffer.SizeBytes();
+     runtime.ClearBuffer(new_buffer, 0, size_bytes, 0);

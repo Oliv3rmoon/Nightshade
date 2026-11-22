@@ -1,0 +1,77 @@
+--- a/src/video_core/renderer_vulkan/vk_rasterizer.cpp
++++ b/src/video_core/renderer_vulkan/vk_rasterizer.cpp
+@@ -601,9 +601,13 @@
+     if (indirect_address) {
+         // DispatchIndirect
+         static constexpr auto sync_info = VideoCommon::ObtainBufferSynchronize::FullSynchronize;
+-        const auto post_op = VideoCommon::ObtainBufferOperation::DiscardWrite;
++        // Dispatch arguments are read, not overwritten. Keep GPU ownership so later
++        // CPU reads and partial-page uploads cannot resurrect stale guest memory.
++        const auto post_op = VideoCommon::ObtainBufferOperation::DoNothing;
+         const auto [buffer, offset] =
+             buffer_cache.ObtainBuffer(*indirect_address, 12, sync_info, post_op);
++        // An upload recorded later must not move ahead of this argument read.
++        buffer->MarkUsage(offset, 12);
+         scheduler.RequestOutsideRenderPassOperationContext();
+         scheduler.Record([pipeline, indirect_buffer = buffer->Handle(),
+                           indirect_offset = offset](vk::CommandBuffer cmdbuf) {
+--- a/src/video_core/renderer_opengl/gl_rasterizer.cpp
++++ b/src/video_core/renderer_opengl/gl_rasterizer.cpp
+@@ -410,7 +410,9 @@
+     if (indirect_address) {
+         // DispatchIndirect
+         static constexpr auto sync_info = VideoCommon::ObtainBufferSynchronize::FullSynchronize;
+-        const auto post_op = VideoCommon::ObtainBufferOperation::DiscardWrite;
++        // Dispatch arguments are read, not overwritten. Keep GPU ownership so later
++        // CPU reads and partial-page uploads cannot resurrect stale guest memory.
++        const auto post_op = VideoCommon::ObtainBufferOperation::DoNothing;
+         const auto [buffer, offset] =
+             buffer_cache.ObtainBuffer(*indirect_address, 12, sync_info, post_op);
+         glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, buffer->Handle());
+--- a/src/video_core/buffer_cache/buffer_cache.h
++++ b/src/video_core/buffer_cache/buffer_cache.h
+@@ -861,6 +861,9 @@
+             Buffer& buffer = slot_buffers[binding.buffer_id];
+             TouchBuffer(buffer, binding.buffer_id);
+             SynchronizeBuffer(buffer, binding.device_addr, binding.size);
++            // Usage is per submission, even when the Vulkan binding is unchanged.
++            // TickFrame can retire the previous submission's usage independently.
++            buffer.MarkUsage(buffer.Offset(binding.device_addr), binding.size);
+             if (!flags[Dirty::VertexBuffer0 + index]) {
+                 flush_bindings();
+                 continue;
+@@ -868,7 +871,6 @@
+             flags[Dirty::VertexBuffer0 + index] = false;
+             const u32 stride = maxwell3d->regs.vertex_streams[index].stride;
+             const u32 offset = buffer.Offset(binding.device_addr);
+-            buffer.MarkUsage(offset, binding.size);
+             if (!bindings.buffers.empty() && index != last_index + 1) {
+                 flush_bindings();
+             }
+@@ -891,6 +893,9 @@
+             Buffer& buffer = slot_buffers[binding.buffer_id];
+             TouchBuffer(buffer, binding.buffer_id);
+             SynchronizeBuffer(buffer, binding.device_addr, binding.size);
++            // Usage is per submission, even when the Vulkan binding is unchanged.
++            // TickFrame can retire the previous submission's usage independently.
++            buffer.MarkUsage(buffer.Offset(binding.device_addr), binding.size);
+             if (!flags[Dirty::VertexBuffer0 + index]) {
+                 continue;
+             }
+@@ -911,7 +916,6 @@
+ 
+                 const u32 stride = maxwell3d->regs.vertex_streams[index].stride;
+                 const u32 offset = buffer.Offset(binding.device_addr);
+-                buffer.MarkUsage(offset, binding.size);
+ 
+                 host_bindings.buffers.push_back(&buffer);
+                 host_bindings.offsets.push_back(offset);
+@@ -929,6 +933,8 @@
+         Buffer& buffer = slot_buffers[binding.buffer_id];
+         TouchBuffer(buffer, binding.buffer_id);
+         SynchronizeBuffer(buffer, binding.device_addr, binding.size);
++        // Both the command and optional count buffers are GPU reads.
++        buffer.MarkUsage(buffer.Offset(binding.device_addr), binding.size);
+     };
+     if (current_draw_indirect->include_count) {
+         bind_buffer(channel_state->count_buffer_binding);

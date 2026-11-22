@@ -36,6 +36,9 @@ class Textures
 
     // The background art, its blurred copy (frosted panels) and the app icon.
     bool load_art(const std::string &directory);
+    // The theme's mark again, after a change of theme (themes name their own: Nightshade's is its
+    // flower). The backdrops stay until the launcher opens again.
+    void reload_brand();
     // The picture the console shows while the app starts (sce_sys/pic0.dds), for the opening:
     // the launcher's first frame is that picture, so the app appears without a cut.
     bool load_splash(const std::string &path);
@@ -69,11 +72,26 @@ class Textures
     void load_wallpaper(const std::string &path);
     void clear_wallpaper();
 
+    // The selected game's art behind Nightshade's home screen and Library (Theme::showcase): its
+    // cover made small and blurred once, when it is asked for, not every frame. The one before it
+    // is kept while it fades out (game_art_age). The same path again does nothing.
+    void show_game_art(const std::string &cover_path);
+    std::uint32_t game_art() const { return game_art_[0].texture; }
+    std::uint32_t game_art_before() const { return game_art_[1].texture; }
+    // Seconds since the art shown now was made.
+    float game_art_age() const { return game_art_age_; }
+    const std::string &game_art_path() const { return game_art_[0].path; }
+
     void load_game_backdrop(const std::string &cover_path);
     void clear_game_backdrop();
     std::uint32_t brand() const
     {
         return brand_;
+    }
+    // The theme's own backdrop, whatever shows over it (Nightshade lays its frame over a game's art).
+    std::uint32_t theme_backdrop() const
+    {
+        return backdrop_;
     }
     // 0 when the launch picture was not loaded.
     std::uint32_t splash() const
@@ -131,7 +149,15 @@ class Textures
     std::uint32_t game_backdrop_ = 0;
     std::uint32_t game_backdrop_blur_ = 0;
     std::string game_backdrop_path_;
+    struct GameArt
+    {
+        std::uint32_t texture = 0;
+        std::string path;
+    };
+    GameArt game_art_[2]; // the one shown, and the one fading out
+    float game_art_age_ = 0.0f;
     std::uint32_t brand_ = 0;
+    std::string art_directory_; // where load_art read the art
     std::uint32_t controller_ = 0;
     std::uint32_t splash_ = 0;
     std::unordered_map<std::string, Entry> covers_;

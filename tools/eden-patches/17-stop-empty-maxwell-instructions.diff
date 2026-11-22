@@ -1,0 +1,134 @@
+--- a/src/shader_recompiler/frontend/maxwell/control_flow.cpp
++++ b/src/shader_recompiler/frontend/maxwell/control_flow.cpp
+@@ -274,6 +274,9 @@
+
+ CFG::AnalysisState CFG::AnalyzeInst(Block* block, FunctionId function_id, Location pc) {
+     const Instruction inst{env.ReadInstruction(pc.Offset())};
++    if (inst.raw == 0) {
++        throw InvalidArgument("Empty Maxwell instruction at {:#x}", pc.Offset());
++    }
+     const Opcode opcode{Decode(inst.raw)};
+     switch (opcode) {
+     case Opcode::BRA:
+--- a/src/video_core/shader_environment.h
++++ b/src/video_core/shader_environment.h
+@@ -46,6 +46,10 @@
+     [[nodiscard]] std::array<u32, 3> WorkgroupSize() const final;
+
+     [[nodiscard]] u64 ReadInstruction(u32 address) final;
++
++    [[nodiscard]] u32 CodeStartAddress() const noexcept {
++        return start_address + initial_offset;
++    }
+
+     [[nodiscard]] std::optional<u64> Analyze();
+
+--- a/src/video_core/shader_environment.cpp
++++ b/src/video_core/shader_environment.cpp
+@@ -21,6 +21,8 @@
+ #include "common/settings.h"
+ #include <ranges>
+ #include "shader_recompiler/environment.h"
++#include "shader_recompiler/exception.h"
++#include "shader_recompiler/frontend/maxwell/location.h"
+ #include "video_core/engines/kepler_compute.h"
+ #include "video_core/memory_manager.h"
+ #include "video_core/shader_environment.h"
+@@ -179,7 +181,7 @@
+ }
+
+ size_t GenericEnvironment::ReadSizeBytes() const noexcept {
+-    return read_highest - read_lowest + INST_SIZE;
++    return static_cast<size_t>(read_highest) - start_address + INST_SIZE;
+ }
+
+ bool GenericEnvironment::CanBeSerialized() const noexcept {
+@@ -187,9 +189,10 @@
+ }
+
+ u64 GenericEnvironment::CalculateHash() const {
+-    const size_t size{ReadSizeBytes()};
++    const u32 first{(std::min)(start_address, read_lowest)};
++    const size_t size{static_cast<size_t>(read_highest) - first + INST_SIZE};
+     const auto data{std::make_unique<char[]>(size)};
+-    gpu_memory->ReadBlock(program_base + read_lowest, data.get(), size);
++    gpu_memory->ReadBlock(program_base + first, data.get(), size);
+     return Common::CityHash64(data.get(), size);
+ }
+
+@@ -257,6 +260,7 @@
+
+     static constexpr u64 EXIT_VALUE = 0xE30000000007000FULL;
+
++    const u32 first_instruction{Shader::Maxwell::Location{CodeStartAddress()}.Offset()};
+     code.resize(MAXIMUM_SIZE / INST_SIZE);
+
+     GPUVAddr guest_addr{program_base + start_address};
+@@ -265,7 +269,13 @@
+     while (size <= MAXIMUM_SIZE) {
+         u64* const data = code.data() + offset / INST_SIZE;
+         gpu_memory->ReadBlock(guest_addr, data, BLOCK_SIZE);
+-        for (size_t index = 0; index < BLOCK_SIZE; index += INST_SIZE) {
++        // The first block starts with the program header and scheduling data.
++        const size_t first_byte = offset == 0 ? first_instruction - start_address : 0;
++        if (offset == 0 && data[first_byte / INST_SIZE] == 0) {
++            throw Shader::InvalidArgument("Empty Maxwell instruction at {:#x}",
++                                          first_instruction);
++        }
++        for (size_t index = first_byte; index < BLOCK_SIZE; index += INST_SIZE) {
+             const u64 inst = data[index / INST_SIZE];
+             if (inst == SELF_BRANCH_A || inst == SELF_BRANCH_B) {
+                 return offset + index;
+--- a/src/video_core/shader_cache.cpp
++++ b/src/video_core/shader_cache.cpp
+@@ -10,6 +10,7 @@
+ #include <boost/container/small_vector.hpp>
+
+ #include "common/assert.h"
++#include "shader_recompiler/exception.h"
+ #include "shader_recompiler/frontend/maxwell/control_flow.h"
+ #include "shader_recompiler/object_pool.h"
+ #include "video_core/control/channel_state.h"
+@@ -75,6 +76,12 @@
+             const u32 start_address{shader_config.offset};
+             GraphicsEnvironment env{*maxwell3d, *gpu_memory, program, base_addr, start_address};
+             shader_info = MakeShaderInfo(env, *cpu_shader_addr);
++            if (!shader_info) {
++                // The guest can finish writing this program without changing its registers.
++                dirty[VideoCommon::Dirty::Shaders] = true;
++                last_shaders_valid = false;
++                return false;
++            }
+         }
+         shader_infos[index] = shader_info;
+         unique_hashes[index] = shader_info->unique_hash;
+@@ -228,16 +235,15 @@
+     return entry_pointer;
+ }
+
+-const ShaderInfo* ShaderCache::MakeShaderInfo(GenericEnvironment& env, VAddr cpu_addr) {
++const ShaderInfo* ShaderCache::MakeShaderInfo(GenericEnvironment& env, VAddr cpu_addr) try {
+     auto info = std::make_unique<ShaderInfo>();
+     if (const std::optional<u64> cached_hash{env.Analyze()}) {
+         info->unique_hash = *cached_hash;
+         info->size_bytes = env.CachedSizeBytes();
+     } else {
+-        // Slow path, not really hit on commercial games
+-        // Build a control flow graph to get the real shader size
++        // Analyze the executable code after the graphics program header.
+         Shader::ObjectPool<Shader::Maxwell::Flow::Block> flow_block;
+-        Shader::Maxwell::Flow::CFG cfg{env, flow_block, env.StartAddress()};
++        Shader::Maxwell::Flow::CFG cfg{env, flow_block, env.CodeStartAddress()};
+         info->unique_hash = env.CalculateHash();
+         info->size_bytes = env.ReadSizeBytes();
+     }
+@@ -245,6 +251,9 @@
+     const ShaderInfo* const result{info.get()};
+     Register(std::move(info), cpu_addr, size_bytes);
+     return result;
++} catch (const Shader::Exception& error) {
++    LOG_DEBUG(HW_GPU, "Skipping shader discovery at {:#x}: {}", cpu_addr, error.what());
++    return nullptr;
+ }
+
+ } // namespace VideoCommon

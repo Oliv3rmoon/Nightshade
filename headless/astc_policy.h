@@ -19,10 +19,10 @@
 // decode" in its log), and the race froze for 0.6 to 0.8 s at a time with its sound. So on a light
 // frame only a texture about the size of a screen picture is converted in place (kInPlaceTexels,
 // a 1080p picture and its mipmaps: tens of milliseconds); a larger one goes to the background as
-// in play, and a light screen keeps moving while it is converted. Above kLightBackgroundTexels
-// (a texture array of a large game's loading screen) it stays in place: the background copies
-// the whole texture twice at once, where the conversion in place goes a layer at a time.
-// The size is MapSizeBytes, which kept as BC3 is a byte per texel, so the work it takes.
+// in play, and a light screen keeps moving while it is converted. Admission also requires room
+// for actual input, output and one layer's decode scratch (astc_decode_budget.h). Both paths
+// convert a layer at a time. A 32 MiB output cutoff previously forced a 40.3 MiB array through
+// an observed 8.18-second in-place conversion despite its payload fitting an empty allowance.
 #pragma once
 
 namespace Eden::AstcPolicy {
@@ -31,10 +31,9 @@ inline unsigned draws_now = 0, draws_before = 0;
 // From this many draws a frame is the game in play (a large open-world game: 2,000 to 4,500
 // in play, 300 to 750 on its loading screen).
 inline constexpr unsigned kBusyFrame = 1000;
-// On a light frame: converted in place up to this many texels, in the background above it, and in
-// place again above kLightBackgroundTexels.
+// On a light frame: converted in place up to this output size, otherwise eligible for a bounded
+// background reservation. Eligibility alone does not guarantee admission when the budget is full.
 inline constexpr unsigned kInPlaceTexels = 3u << 20;
-inline constexpr unsigned kLightBackgroundTexels = 32u << 20;
 
 inline void Draw() noexcept { ++draws_now; }
 inline void Frame() noexcept {
@@ -45,7 +44,7 @@ inline unsigned Draws() noexcept { return draws_now > draws_before ? draws_now :
 inline bool Busy() noexcept { return Draws() >= kBusyFrame; }
 // `texels`: MapSizeBytes of the texture to convert.
 inline bool InBackground(unsigned texels) noexcept {
-    return Busy() || (texels > kInPlaceTexels && texels <= kLightBackgroundTexels);
+    return Busy() || texels > kInPlaceTexels;
 }
 
 // For the log (tools/prepare-vulkan-port.py): conversions in place that held the frame for at least

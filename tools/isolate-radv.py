@@ -14,7 +14,8 @@ import subprocess
 root = Path(__file__).resolve().parents[1]
 source = root.parent/'mihawk-vulkan-review/.deps/native/radv-release/lib/libvulkan_radeon.ps5.a'
 output = root/'build/radv-isolated'
-output.mkdir(parents=True, exist_ok=True)
+target = output/source.name
+manifest_path = output/'manifest.json'
 
 def symbols(path, defined=False):
     cmd = ['nm', '-g', '--format=posix']
@@ -27,6 +28,21 @@ def symbols(path, defined=False):
 def digest(path):
     with path.open('rb') as f:
         return hashlib.file_digest(f, 'sha256').hexdigest()
+
+before = digest(source)
+recipe_hash = digest(Path(__file__))
+try:
+    manifest = json.loads(manifest_path.read_text())
+    if (isinstance(manifest, dict) and manifest.get('source_sha256') == before and
+            manifest.get('recipe_sha256') == recipe_hash and
+            manifest.get('isolated_sha256') == digest(target)):
+        print(f'RADV isolation already matches {source}')
+        raise SystemExit(0)
+except (OSError, ValueError):
+    pass
+if output.is_symlink():
+    output.unlink()
+output.mkdir(parents=True, exist_ok=True)
 
 defined = sorted(symbols(source, True))
 demangled = subprocess.run(['c++filt'], input='\n'.join(defined)+'\n',
@@ -47,16 +63,15 @@ for name, readable in zip(defined, demangled):
         private.append(name)
 mapping = output/'symbols.map'
 mapping.write_text(''.join(f'{s} eden_radv_private_{s}\n' for s in private))
-before = digest(source)
-target = output/source.name
 subprocess.run(['objcopy', '--redefine-syms='+str(mapping), str(source), str(target)], check=True)
 subprocess.run(['ranlib', str(target)], check=True)
 assert digest(source) == before, 'Input RADV archive changed'
 after_symbols = symbols(target)
 assert not set(private).intersection(after_symbols), 'Unrenamed implementation symbol'
 assert public.intersection(defined) <= symbols(target, True), 'Lost public entrypoint'
-(output/'manifest.json').write_text(json.dumps({
+manifest_path.write_text(json.dumps({
     'source': str(source), 'source_sha256': before,
+    'recipe_sha256': recipe_hash,
     'isolated_sha256': digest(target), 'renamed_symbols': len(private),
     'public_symbols': sorted(public.intersection(defined)),
     'note': 'Archive namespace verification only; final native link and runtime validation still required.'

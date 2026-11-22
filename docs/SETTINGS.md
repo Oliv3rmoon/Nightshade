@@ -9,7 +9,7 @@ The settings that take more than a line to explain: the Performance switches and
 | Setting | In the file | Default | What it does |
 |---|---|---|---|
 | Compile ahead | `block_list` | off | The code a 64-bit game compiled in earlier sessions is compiled again on a spare CPU as it starts, so the game stutters less when it reaches that code. In the one large game it was measured in, the game loaded sooner and its first seconds of play held their frame rate, while the emulated processor worked about a tenth harder afterwards. It has run in one game on the console so far; switch it off if a game misbehaves. |
-| Asynchronous shaders | `async_shaders` | off | A new effect is drawn once its shader is ready instead of pausing the game for it. Things can be missing for a moment. With the Vulkan renderer only: the OpenGL renderer ignores it. |
+| Asynchronous shaders | `async_shaders` | off (on for Tears of the Kingdom) | A new effect is drawn once its shader is ready instead of pausing the game for it. Things can be missing for a moment. With the Vulkan renderer only: the OpenGL renderer ignores it. See [Asynchronous shaders](#asynchronous-shaders). |
 | Faster GPU emulation | `fast_gpu` | off | The emulator's lowest GPU accuracy. Faster in demanding games; graphics can be wrong. |
 | Faster CPU emulation | `unsafe_cpu` | off | Less exact floating-point math. A few games misbehave. |
 | Faster DMA | `unsafe_dma` | off | Less exact memory transfers to the GPU. A few games show wrong graphics. |
@@ -27,6 +27,38 @@ A game can have its own values: in its settings, **Performance** (see [Settings 
   "games": { "0100000000010000": { "performance": { "fast_gpu": true } } }
 }
 ```
+
+### Asynchronous shaders
+
+With **Asynchronous shaders** off, a draw whose pipeline is not built yet waits for it, and so does the frame. With them on, the draw is left out until the pipeline is ready, except where leaving it out would show for longer than a frame. Such a draw waits:
+
+- when it draws into a target smaller than 640x360 (lookup tables, noise or fog textures a game makes once and keeps: left out, they would be missing for the rest of the session; the rule of [Eden PR #4639](https://git.eden-emu.dev/eden-emu/eden/pulls/4639));
+- when it has 6 indices or vertices or fewer and does not use depth (a full-screen pass).
+
+A draw that uses depth is left out even when it is small (upstream Eden's rule): the scene draws it again next frame.
+
+**Tears of the Kingdom has them on** unless its own Performance settings (Library > Game settings > Performance) have the switch: there it builds hundreds of new pipelines for minutes after a save loads and wherever new scenery streams in, and with the switch off each one holds the frame. Its own switch, on or off, always decides; **Settings > Performance** does not, because saving that page writes the switch for every game. A safe start ([Safe Launch](#safe-launch)) turns them off. The launch report says `Asynchronous shaders on: this game's own default` when the default decided, and the `Performance:` line says `async shaders on` or `off`.
+
+Every 5 s while a game plays, `stderr.log` gets a line with what the session did so far with draws that found their pipeline unbuilt, when that changed: each draw counts every time it is drawn before its pipeline is ready. For example:
+
+```
+EDEN_ASYNC_SHADERS on=1 skipped=812 skipped_depth=2304 waited_small_target=96 waited_small_draw=40 waited_sync=0
+```
+
+`skipped` and `skipped_depth` were left out, `waited_small_target` and `waited_small_draw` waited for the rules above, and `waited_sync` waited because the switch was off.
+
+### A timing run
+
+With an empty file named `cost-run.txt` in the app's folder (where it is installed, usually `/data/homebrew/PPSA99008`), the Vulkan renderer times where its work goes, in any build. The launch report says `Timing run: cost-run.txt is in the app's folder`, and every 5 s `heap.log` (beside `stderr.log` in `/data/prosperoeden/logs`) gets one `EDEN_VULKAN_COST api=<name> calls=<n> ns=<n>` line for each of the renderer's timers, with the session's totals so far: the time between two lines is the difference. The ones about new pipelines:
+
+| `api=` | What it times |
+|---|---|
+| `graphics_pipeline` | the driver building a pipeline, on the builder threads (the shader cache's at the start too) |
+| `shader_prepare` | the GPU thread making a new pipeline: Eden's translation of the game's shaders and the rest |
+| `shader_ir`, `shader_spirv` | that translation's two parts |
+| `pipeline_ready_wait` | draws waiting for a pipeline still being built (asynchronous shaders off, or a rule above) |
+
+The timers cost a little on every draw: take the file out after the test. Send `heap.log` and `stderr.log` with the session's `.prev.log` copies.
 
 ### The shader cache while the game plays
 
@@ -240,7 +272,7 @@ The menu opens with the profile that the PS5 user in front chose last. If you us
 
 The output resolution, the menu's sounds and the accessibility settings are the same for every game.
 
-**Quick settings.** Options on a game (in the Library, on the home screen, or on its settings page) opens a panel with **Play**, **Start in safe mode** ([Safe Launch](#safe-launch)), and the settings players change most: the video profile, resolution, upscaling filter, renderer, FPS overlay and frame generation. Each change is saved for that game at once, as on its settings page; Triangle opens that page for everything else.
+**Quick settings.** Options on a game (in the Library, on the home screen, or on its settings page) opens a panel with **Play**, **Start in safe mode** ([Safe Launch](#safe-launch)), and the settings players change most: the video profile, resolution, upscaling filter, renderer, FPS overlay and frame generation. Each change is saved for that game at once, as on its settings page; Triangle opens that page for everything else. With the Nightshade theme its **Favorite** row puts the game under **Favorites** in the Library; the favorites are kept in `config/favorites.json` (`{"games": [the games' file names]}`).
 
 One more is in the settings file only, for a game whose graphics break with it: `"vertex_input_dynamic": false` in the game's entry under `"games"` makes the Vulkan renderer build each pipeline's vertex input into the pipeline instead of setting it while drawing (`VK_EXT_vertex_input_dynamic_state` off). On desktop RADV, Pokémon Legends: Z-A draws flashing colour after the train station with it on, and players fixed it this way ([#59](https://github.com/Swordpdf/ProsperoEden/issues/59), [#112](https://github.com/Swordpdf/ProsperoEden/issues/112)). A game with it off builds more pipelines, so it can stutter more the first time it draws something. The launch report says `dynamic vertex input on` or `off`. Changing the game's settings in the Library keeps it; take it out of the file to switch it back on.
 
@@ -263,7 +295,7 @@ Every profile also turns frame generation and post-processing off. Recommended i
 
 A profile is not saved as such: choosing one writes those settings, and the menu reads back which profile they match. Change one of them by hand (or turn frame generation on) and the profile shows **Custom**; choose a profile again to set them all back. Settings saved before profiles existed are not changed: they show as the profile they match, or Custom. In a game's own settings, **Default** keeps Settings' values (and shows Settings' profile), and choosing a profile gives the game those values of its own; going back to **Default** takes back only what a profile sets.
 
-Some games have profiles of their own. **Tears of the Kingdom** keeps the console's 4 GiB and compressed ASTC textures in every one (see [Console memory](#console-memory)): its profiles set the game's own memory to 4 GiB, so with a mod that needs more, set its **Memory** by hand afterwards (the profile then shows Custom).
+Some games have profiles of their own. **Tears of the Kingdom** keeps the console's 4 GiB, compressed ASTC textures and asynchronous shaders in every one (see [Console memory](#console-memory) and [Asynchronous shaders](#asynchronous-shaders)): its profiles set the game's own memory to 4 GiB, so with a mod that needs more, set its **Memory** by hand afterwards (the profile then shows Custom).
 
 ## Safe Launch
 
@@ -328,3 +360,7 @@ The launcher follows the language the PS5 is set to: Arabic, Chinese (simplified
 ## Update notices
 
 **Settings > Diagnostics > Update notices** (on by default) is the offer at the start when [homebrew.page](https://homebrew.page/ps5) lists a newer release of ProsperoEden (or, in a build that asks a GitHub repository's releases instead, when that repository has one; [Updating](INSTALL.md#updating)): the update dialog, or the **Update available** notification when the app cannot install it itself (see [Updating](INSTALL.md#updating)). **Skip** answers one start; switched off, the app opens without the offer every time. It still asks homebrew.page, and the About screen names the newer version beside the one running. In the settings file it is `"system": { "update_notices": false }`, and it applies the next time ProsperoEden opens.
+
+## Test builds
+
+**Settings > Diagnostics > Test builds** (off by default) lets **Update now** offer test builds too, in a build that asks a GitHub repository's releases (Nightshade's builds do): the repository's pre-releases, as well as its regular releases. Switched on, the check at the start asks the repository's list of releases instead of its newest one and offers the newest release of the version line you have, a test build or not: the releases with the same first two numbers as the running version and a higher third (1.010.008 and 1.010.009 for 1.010.007). Another line is never offered, however new: 1.011 (another title ID and folder) and 1.012 (the Switch 2 test line) not to an install of 1.010. The update dialog then says **Test build available** with the release's title, and the update is downloaded, checked against that release's own `SHA256SUMS` and installed as any other ([Updating](INSTALL.md#updating)). A test build can have new bugs; the version it replaced is kept ([Going back to the previous version](INSTALL.md#going-back-to-the-previous-version)). In the settings file it is `"system": { "test_builds": true }`, and it applies the next time Nightshade opens. A build that asks homebrew.page has no test builds, and asks it as usual.

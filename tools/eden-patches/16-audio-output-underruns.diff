@@ -1,0 +1,42 @@
+--- a/src/audio_core/sink/sink_stream.h
++++ b/src/audio_core/sink/sink_stream.h
+@@ -201,8 +201,9 @@
+      *
+      * @param output_buffer - Output buffer to be filled with samples.
+      * @param num_frames - Number of frames to be filled.
+-     */
+-    void ProcessAudioOutAndRender(std::span<s16> output_buffer, std::size_t num_frames);
++     * @return Frames padded because the queue ran out. Intentional silence returns zero.
++     */
++    std::size_t ProcessAudioOutAndRender(std::span<s16> output_buffer, std::size_t num_frames);
+
+     /**
+      * Get the total number of samples expected to have been played by this stream.
+--- a/src/audio_core/sink/sink_stream.cpp
++++ b/src/audio_core/sink/sink_stream.cpp
+@@ -164,7 +164,7 @@
+     }
+ }
+
+-void SinkStream::ProcessAudioOutAndRender(std::span<s16> output_buffer, std::size_t num_frames) {
++std::size_t SinkStream::ProcessAudioOutAndRender(std::span<s16> output_buffer, std::size_t num_frames) {
+     const std::size_t num_channels = GetDeviceChannels();
+     const std::size_t frame_size = num_channels;
+     const std::size_t frame_size_bytes = frame_size * sizeof(s16);
+@@ -179,7 +179,7 @@
+         }
+         for (size_t i = 0; i < num_frames; i++)
+             std::memset(&output_buffer[i * frame_size], 0, frame_size_bytes);
+-        return;
++        return 0;
+     }
+
+     while (frames_written < num_frames) {
+@@ -219,6 +219,7 @@
+         min_played_sample_count = max_played_sample_count;
+         max_played_sample_count += actual_frames_written;
+     }
++    return num_frames - actual_frames_written;
+ }
+
+ u64 SinkStream::GetExpectedPlayedSampleCount() {

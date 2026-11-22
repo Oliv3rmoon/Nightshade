@@ -1,0 +1,64 @@
+--- a/src/core/hle/service/nvdrv/devices/nvhost_as_gpu.cpp
++++ b/src/core/hle/service/nvdrv/devices/nvhost_as_gpu.cpp
+@@ -12,6 +12,7 @@
+ #include "common/assert.h"
+ #include "common/common_types.h"
+ #include "common/logging.h"
++#include "common/scope_exit.h"
+ #include "core/core.h"
+ #include "core/hle/service/nvdrv/core/container.h"
+ #include "core/hle/service/nvdrv/core/nvmap.h"
+@@ -286,6 +287,9 @@
+             }
+ 
+             DAddr base = nvmap.PinHandle(entry.handle, false);
++            if (base == 0) {
++                return NvResult::InsufficientMemory;
++            }
+             DAddr device_address{static_cast<DAddr>(
+                 base + (static_cast<u64>(entry.handle_offset_big_pages) << vm.big_page_size_bits))};
+ 
+@@ -333,7 +337,17 @@
+         return NvResult::BadValue;
+     }
+ 
+-    DAddr device_address = DAddr(nvmap.PinHandle(params.handle, false) + params.buffer_offset);
++    const DAddr pinned_address = nvmap.PinHandle(params.handle, false);
++    if (pinned_address == 0) {
++        return NvResult::InsufficientMemory;
++    }
++    bool keep_pin = false;
++    SCOPE_EXIT {
++        if (!keep_pin) {
++            nvmap.UnpinHandle(params.handle);
++        }
++    };
++    DAddr device_address = pinned_address + params.buffer_offset;
+     u64 size{params.mapping_size ? params.mapping_size : handle->orig_size};
+ 
+     bool big_page{[&]() {
+@@ -376,6 +390,7 @@
+     }
+ 
+     map_buffer_offsets.insert(params.offset);
++    keep_pin = true;
+ 
+     return NvResult::Success;
+ }
+--- a/src/core/hle/service/nvdrv/devices/nvhost_nvdec_common.cpp
++++ b/src/core/hle/service/nvdrv/devices/nvhost_nvdec_common.cpp
+@@ -145,6 +145,14 @@
+     const size_t num_entries = (std::min)(params.num_entries, static_cast<u32>(entries.size()));
+     for (size_t i = 0; i < num_entries; i++) {
+         DAddr pin_address = nvmap.PinHandle(entries[i].map_handle, true);
++        if (pin_address == 0) {
++            // Do not report success with address zero. Undo this batch's pins.
++            for (size_t j = 0; j < i; ++j) {
++                nvmap.UnpinHandle(entries[j].map_handle);
++                entries[j].map_address = 0;
++            }
++            return NvResult::InsufficientMemory;
++        }
+         entries[i].map_address = static_cast<u32>(pin_address);
+     }
+ 

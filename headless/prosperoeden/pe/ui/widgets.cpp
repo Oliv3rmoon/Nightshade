@@ -406,7 +406,7 @@ void plate_focus(Canvas &c, const Plate &style, const Rect &r, float amount)
         return;
     }
     // The highlight's light, breathing slowly.
-    const float glow = 0.20f + 0.12f * breath(c);
+    const float glow = std::min(1.0f, (0.20f + 0.12f * breath(c)) * t.glow);
     c.list.shadow({r.x - 2.0f, r.y + 2.0f, r.w + 4.0f, r.h + 2.0f}, style.radius + 2.0f, t.focus_glow,
                   t.accent.with_alpha(glow * amount));
     if (style.focus_base.a > 0.0f)
@@ -433,7 +433,7 @@ void focus_ring(Canvas &c, const Rect &r, float radius, float amount)
                              t.title.with_alpha(amount));
         return;
     }
-    const float glow = 0.26f + 0.16f * breath(c);
+    const float glow = std::min(1.0f, (0.26f + 0.16f * breath(c)) * t.glow);
     c.list.shadow({r.x - 4.0f, r.y, r.w + 8.0f, r.h + 6.0f}, radius + 4.0f, t.focus_glow + 8.0f,
                   t.accent.with_alpha(glow * amount));
     const float w = t.focus_width;

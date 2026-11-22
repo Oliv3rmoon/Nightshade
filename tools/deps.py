@@ -10,7 +10,7 @@
 Nothing that already exists is modified: an existing checkout stays at whatever revision it
 has (status reports it), an existing file or folder is not downloaded again. Downloads are
 cached in $PROSPEROEDEN_DEPS_CACHE (default ~/.cache/prosperoeden-deps) and verified against
-their pinned SHA-256/SHA-512 before use; git inputs are fetched at their pinned commit.
+their pinned SHA-256/SHA-512 before use. Git inputs are checked out at their pinned commit.
 """
 import hashlib
 import json
@@ -197,12 +197,23 @@ def seed(item, path):
 def fetch_git(item):
     path = location(item)
     if not path.exists():
-        print(f'deps: fetching {item["url"]} at {item["commit"][:12]} into {path}', flush=True)
+        bundle = item.get('git_bundle')
+        if bundle:
+            bundle_path = ROOT / bundle['path']
+            algorithm, expected = pinned_hash(bundle)
+            if not bundle_path.is_file() or digest(bundle_path, algorithm) != expected:
+                fail(f'{item["name"]}: {bundle["path"]} failed its pinned {algorithm} check')
+            base = bundle['base']
+        else:
+            base = item['commit']
+        print(f'deps: fetching {item["url"]} at {base[:12]} into {path}', flush=True)
         staging = path.with_name(path.name + f'.partial-{os.getpid()}')
         shutil.rmtree(staging, ignore_errors=True)
         git('init', '-q', str(staging))
         git('remote', 'add', 'origin', item['url'], cwd=staging)
-        git('fetch', '-q', '--depth', '1', 'origin', item['commit'], cwd=staging)
+        git('fetch', '-q', '--depth', '1', 'origin', base, cwd=staging)
+        if bundle:
+            git('fetch', '-q', '--no-tags', str(bundle_path), 'HEAD', cwd=staging)
         git('-c', 'advice.detachedHead=false', 'checkout', '-q', '--detach', 'FETCH_HEAD', cwd=staging)
         head = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=staging, text=True).strip()
         if head != item['commit']:

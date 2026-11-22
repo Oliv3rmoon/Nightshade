@@ -80,13 +80,16 @@ int main() {
     one.filter = 2;
     assert(game_profile_of(one, prefs, other) == 2);
 
-    // Tears of the Kingdom: its own tiers keep the console's 4 GiB in every one.
+    // Tears of the Kingdom: its own tiers keep the console's 4 GiB in every one, and asynchronous
+    // shaders on, the game's own default (headless/title_defaults.h).
     const TitleProfiles *own = title_profiles(totk);
     assert(own != nullptr && title_profiles(other) == nullptr && title_profiles(0) == nullptr);
-    for (const VideoProfile &tier : own->tiers) assert(tier.memory_layout == 0 && tier.astc == 0);
+    for (const VideoProfile &tier : own->tiers)
+        assert(tier.memory_layout == 0 && tier.astc == 0 && tier.async_shaders);
     GameSettings zelda;
     const GameSettings recommended = with_profile(zelda, totk, kRecommendedProfile);
     assert(recommended.memory_layout == 0 && recommended.resolution == 2 && recommended.astc == 0);
+    assert(recommended.performance[kAsyncShadersSwitch] == 1);
     assert(game_profile_of(recommended, prefs, totk) == kRecommendedProfile);
     // Its memory changed by hand (a mod that needs 8 GiB): Custom.
     GameSettings modded = recommended;

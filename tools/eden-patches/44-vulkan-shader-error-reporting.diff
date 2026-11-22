@@ -1,0 +1,30 @@
+--- a/src/video_core/renderer_vulkan/vk_pipeline_cache.cpp
++++ b/src/video_core/renderer_vulkan/vk_pipeline_cache.cpp
+@@ -896,6 +896,7 @@
+         render_pass_cache, key, std::move(modules), infos);
+ 
+ } catch (const Shader::Exception& exception) {
++    LOG_ERROR(Render_Vulkan, "{}", exception.what());
+     auto hash = key.Hash();
+     size_t env_index{0};
+     for (size_t index = 0; index < Maxwell::MaxShaderProgram; ++index) {
+@@ -905,11 +906,14 @@
+         Shader::Environment& env{*envs[env_index]};
+         ++env_index;
+ 
+-        const u32 cfg_offset{static_cast<u32>(env.StartAddress() + sizeof(Shader::ProgramHeader))};
+-        Shader::Maxwell::Flow::CFG cfg(env, pools.flow_block, cfg_offset, index == 0);
+-        env.Dump(hash, key.unique_hashes[index]);
+-    }
+-    LOG_ERROR(Render_Vulkan, "{}", exception.what());
++        // Dump the captured bytes directly. Rebuilding a CFG here can throw
++        // again while handling the original shader failure and hide its cause.
++        try {
++            env.Dump(hash, key.unique_hashes[index]);
++        } catch (const std::exception& dump_error) {
++            LOG_ERROR(Render_Vulkan, "Shader dump failed: {}", dump_error.what());
++        }
++    }
+     return nullptr;
+ }
+ 

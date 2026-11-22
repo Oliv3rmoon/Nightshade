@@ -19,7 +19,8 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     "${EDEN_PORT_DIR}/vulkan_download_batch.inc"
     "${EDEN_PORT_DIR}/vulkan_gc_downloads.inc"
-    "${EDEN_PORT_DIR}/texture_rows.inc" "${EDEN_PORT_DIR}/texture_partial_refresh.inc")
+    "${EDEN_PORT_DIR}/texture_rows.inc" "${EDEN_PORT_DIR}/texture_partial_refresh.inc"
+    "${EDEN_PORT_DIR}/astc_refresh.inc")
 list(REMOVE_ITEM video_sources vulkan_common/vulkan_device.cpp renderer_vulkan/vk_scheduler.cpp texture_cache/util.cpp)
 list(APPEND video_sources "${PORT_BUILD_DIR}/vulkan_device.cpp" "${PORT_BUILD_DIR}/vulkan_scheduler.cpp"
     "${PORT_BUILD_DIR}/texture_util.cpp")
@@ -53,6 +54,10 @@ endforeach()
 target_include_directories(video_core BEFORE PUBLIC "${PORT_BUILD_DIR}/include")
 target_include_directories(video_core BEFORE PUBLIC "${PORT_BUILD_DIR}/vulkan-cache")
 target_include_directories(video_core PRIVATE "${PORT_BUILD_DIR}" "${EDEN_PORT_DIR}")
+# Existing depfiles name Eden's original cache base. Its new override adds context reservations
+# and changes member teardown order, so rebuild consumers when introducing that override too.
+set_property(SOURCE ${video_sources} TARGET_DIRECTORY video_core APPEND PROPERTY OBJECT_DEPENDS
+    "${PORT_BUILD_DIR}/vulkan-cache/video_core/texture_cache/texture_cache_base.h")
 # The descriptor-buffer writer override (null descriptors): rebuild its callers once,
 # since existing depfiles still name the upstream header.
 set_property(SOURCE

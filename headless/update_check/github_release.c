@@ -128,10 +128,10 @@ size_t github_release_file_url(char *out, size_t size, const char *repository, c
     return (size_t)length;
 }
 
-int github_release_api_url_allowed(const char *url)
+/* 1 when `url` is https://api.github.com/repositories/<a number><end>, exactly. */
+static int moved_url(const char *url, const char *end)
 {
     static const char start[] = GITHUB_RELEASE_HOST "repositories/";
-    static const char end[] = "/releases/latest";
     size_t digits = 0;
     if (url == NULL || strncmp(url, start, sizeof(start) - 1) != 0)
         return 0;
@@ -142,6 +142,45 @@ int github_release_api_url_allowed(const char *url)
     if (digits == 0 || digits > 19 || url[0] == '0')
         return 0;
     return strcmp(url + digits, end) == 0;
+}
+
+int github_release_api_url_allowed(const char *url)
+{
+    return moved_url(url, "/releases/latest");
+}
+
+/* The list's path after the repository: one page, the largest GitHub gives. */
+#define LIST_PATH_TEXT(page) "/releases?per_page=" #page
+#define LIST_PATH(page) LIST_PATH_TEXT(page)
+
+int github_release_same_line(const char *version, const char *installed)
+{
+    unsigned a[3];
+    unsigned b[3];
+    return update_check_version_parse(version, a) && update_check_version_parse(installed, b) && a[0] == b[0] &&
+           a[1] == b[1];
+}
+
+size_t github_release_list_url(char *out, size_t size, const char *repository)
+{
+    int length;
+    if (out == NULL || size == 0)
+        return 0;
+    out[0] = '\0';
+    if (!github_release_repository_valid(repository))
+        return 0;
+    length = snprintf(out, size, "%s%s%s", GITHUB_RELEASE_API, repository, LIST_PATH(GITHUB_RELEASE_LIST_PAGE));
+    if (length <= 0 || (size_t)length >= size)
+    {
+        out[0] = '\0';
+        return 0;
+    }
+    return (size_t)length;
+}
+
+int github_release_list_url_allowed(const char *url)
+{
+    return moved_url(url, LIST_PATH(GITHUB_RELEASE_LIST_PAGE));
 }
 
 /* ---- The release --------------------------------------------------------------------------- */
@@ -174,8 +213,18 @@ static github_release_reason published(const char *json, size_t length, const ch
     return is_literal(value, size, "true") ? GITHUB_RELEASE_NOT_PUBLISHED : GITHUB_RELEASE_BAD_RESPONSE;
 }
 
-github_release_reason github_release_evaluate(const char *json, size_t length,
-                                              const char *installed, github_release *release)
+/* A release's title for the dialog: control characters (a line end, a tab) as spaces. */
+static void plain_title(char *title)
+{
+    for (; *title != '\0'; ++title)
+        if ((unsigned char)*title < 0x20 || *title == 0x7f)
+            *title = ' ';
+}
+
+/* github_release_evaluate; `listed` (test builds, github_release_evaluate_listed): a pre-release
+ * is offered too, and the release's title is kept. */
+static github_release_reason evaluate(const char *json, size_t length, const char *installed, int listed,
+                                      github_release *release)
 {
     const char *assets = NULL;
     const char *value = NULL;
@@ -197,10 +246,26 @@ github_release_reason github_release_evaluate(const char *json, size_t length,
     if (json == NULL || update_check_json_value(json, length, "assets", &assets, &assets_length) != 1)
         return GITHUB_RELEASE_BAD_RESPONSE;
     /* releases/latest never gives a draft or a pre-release; a release that says it is one is not
-     * offered all the same. */
-    if ((state = published(json, length, "draft")) != GITHUB_RELEASE_NEWER ||
-        (state = published(json, length, "prerelease")) != GITHUB_RELEASE_NEWER)
+     * offered all the same. The list (test builds) gives pre-releases, and they are offered;
+     * a draft never is. */
+    if ((state = published(json, length, "draft")) != GITHUB_RELEASE_NEWER)
         return state;
+    if ((state = published(json, length, "prerelease")) == GITHUB_RELEASE_NOT_PUBLISHED && listed)
+    {
+        release->prerelease = 1;
+        state = GITHUB_RELEASE_NEWER;
+    }
+    if (state != GITHUB_RELEASE_NEWER)
+        return state;
+    if (listed)
+    {
+        /* Its title, for the dialog; none (null, or longer than the dialog takes) is no title. */
+        if ((found = string_member(json, length, "name", release->title, sizeof(release->title))) == -2)
+            return GITHUB_RELEASE_BAD_RESPONSE;
+        if (found != 1)
+            release->title[0] = '\0';
+        plain_title(release->title);
+    }
     if ((found = string_member(json, length, "tag_name", release->tag, sizeof(release->tag))) != 1)
     {
         release->tag[0] = '\0';
@@ -283,6 +348,96 @@ github_release_reason github_release_evaluate(const char *json, size_t length,
                                        GITHUB_RELEASE_NOTES_CHARACTERS, &release->notes_truncated);
         free(body);
     }
+    return GITHUB_RELEASE_NEWER;
+}
+
+github_release_reason github_release_evaluate(const char *json, size_t length,
+                                              const char *installed, github_release *release)
+{
+    return evaluate(json, length, installed, 0, release);
+}
+
+github_release_reason github_release_evaluate_listed(const char *json, size_t length,
+                                                     const char *installed, github_release *release)
+{
+    return evaluate(json, length, installed, 1, release);
+}
+
+github_release_reason github_release_pick(const char *json, size_t length, const char *installed,
+                                          const char **release, size_t *release_length, int *listed)
+{
+    char best[12] = {0};
+    const char *best_item = NULL;
+    size_t best_length = 0;
+    size_t cursor = 0;
+    int count = 0;
+    int twice = 0;
+    int found;
+    if (listed != NULL)
+        *listed = 0;
+    if (release == NULL || release_length == NULL)
+        return GITHUB_RELEASE_BAD_ARGUMENT;
+    *release = NULL;
+    *release_length = 0;
+    if (!update_check_version_parse(installed, NULL))
+        return GITHUB_RELEASE_BAD_ARGUMENT;
+    if (json == NULL)
+        return GITHUB_RELEASE_BAD_RESPONSE;
+    /* Every release, from first to last; an answer cut short in transit is refused whole, as
+     * releases/latest's is (the last element, or the array's end, does not read). */
+    for (;;)
+    {
+        const char *item = NULL;
+        size_t item_length = 0;
+        char tag[40] = {0};
+        char version[12] = {0};
+        github_release_reason state;
+        int comparable = 0;
+        found = update_check_json_array_next(json, length, &cursor, &item, &item_length);
+        if (found == 0)
+            break;
+        if (found != 1)
+            return GITHUB_RELEASE_BAD_RESPONSE;
+        ++count;
+        if (listed != NULL)
+            *listed = count;
+        /* A release is an object whose draft and prerelease are true or false (published() reads
+         * them as releases/latest's are read; an element that isn't an object reads as neither). */
+        state = published(item, item_length, "draft");
+        if (state == GITHUB_RELEASE_BAD_RESPONSE || published(item, item_length, "prerelease") == GITHUB_RELEASE_BAD_RESPONSE)
+            return GITHUB_RELEASE_BAD_RESPONSE;
+        if (state == GITHUB_RELEASE_NOT_PUBLISHED)
+            continue; /* a draft: never offered */
+        /* A tag that is no content version (an earlier test build's "oliv3rmoon-build-3", one too
+         * long to be one) is not a release of any line. */
+        if ((found = string_member(item, item_length, "tag_name", tag, sizeof(tag))) == -2)
+            return GITHUB_RELEASE_BAD_RESPONSE;
+        if (found != 1 || !github_release_tag_version(tag, version))
+            continue;
+        /* This install's line only, and newer than it. */
+        if (!github_release_same_line(version, installed) ||
+            update_check_version_compare(version, installed, &comparable) <= 0 || !comparable)
+            continue;
+        found = best[0] == '\0' ? 1 : update_check_version_compare(version, best, &comparable);
+        if (found > 0)
+        {
+            memcpy(best, version, sizeof(best));
+            best_item = item;
+            best_length = item_length;
+            twice = 0;
+        }
+        else if (found == 0)
+        {
+            twice = 1; /* two releases of that version: which one is meant? */
+        }
+    }
+    if (twice)
+        return GITHUB_RELEASE_BAD_RESPONSE;
+    if (best_item == NULL)
+        return count == 0 ? GITHUB_RELEASE_NONE : GITHUB_RELEASE_NOT_NEWER;
+    /* Given only once the whole list has been read. */
+    *release = best_item;
+    *release_length = best_length;
     return GITHUB_RELEASE_NEWER;
 }
 
@@ -849,16 +1004,18 @@ static self_update_check_result no_offer(self_update_offer *offer, github_releas
     return reason == GITHUB_RELEASE_NOT_NEWER ? SELF_UPDATE_UP_TO_DATE : SELF_UPDATE_UNKNOWN;
 }
 
-/* releases/latest of `repository` into `answer`, following a renamed repository's redirect.
- * GITHUB_RELEASE_NEWER: a 200 answer of *length bytes is there; otherwise why there is none. */
-static github_release_reason fetch_latest(const self_update_platform *platform, const char *repository,
-                                          char *answer, size_t capacity, size_t *length,
-                                          github_release_report *report)
+/* releases/latest of `repository` (with `list`, its releases list: test builds) into `answer`,
+ * following a renamed repository's redirect. GITHUB_RELEASE_NEWER: a 200 answer of *length bytes
+ * is there; otherwise why there is none. */
+static github_release_reason fetch_release(const self_update_platform *platform, const char *repository,
+                                           int list, char *answer, size_t capacity, size_t *length,
+                                           github_release_report *report)
 {
     char url[256];
     int status = 0;
     int hop;
-    if (github_release_url(url, sizeof(url), repository) == 0)
+    if ((list ? github_release_list_url(url, sizeof(url), repository)
+              : github_release_url(url, sizeof(url), repository)) == 0)
         return GITHUB_RELEASE_BAD_ARGUMENT;
     for (hop = 0;; ++hop)
     {
@@ -876,9 +1033,9 @@ static github_release_reason fetch_latest(const self_update_platform *platform, 
             break;
         /* A renamed repository: GitHub's redirect names its new address in its body as well as in
          * its Location header, and the kit's fetch gives the body. Followed to that address alone
-         * (github_release_api_url_allowed). */
+         * (github_release_api_url_allowed, or github_release_list_url_allowed for the list). */
         if (hop >= GITHUB_RELEASE_REDIRECTS || string_member(answer, *length, "url", next, sizeof(next)) != 1 ||
-            !github_release_api_url_allowed(next))
+            !(list ? github_release_list_url_allowed(next) : github_release_api_url_allowed(next)))
             return GITHUB_RELEASE_REDIRECT_REFUSED;
         memcpy(url, next, sizeof(url));
         report->redirects = hop + 1;
@@ -893,6 +1050,59 @@ static github_release_reason fetch_latest(const self_update_platform *platform, 
     return GITHUB_RELEASE_NEWER;
 }
 
+static github_release_reason fetch_latest(const self_update_platform *platform, const char *repository,
+                                          char *answer, size_t capacity, size_t *length,
+                                          github_release_report *report)
+{
+    return fetch_release(platform, repository, 0, answer, capacity, length, report);
+}
+
+/* The offer of a release found newer (github_release_evaluate, or _listed): its SHA256SUMS chooses
+ * the ZIP and gives its SHA-256, and the offer is filled. */
+static self_update_check_result offer_release(const self_update_platform *platform, const char *repository,
+                                              const char *name, const char *title_id, const char *installed,
+                                              github_release *release, self_update_offer *offer,
+                                              github_release_report *report)
+{
+    char sums_url[512];
+    char sums[GITHUB_RELEASE_MAX_SUMS];
+    sums_sink sink;
+    /* SHA256SUMS comes the way the ZIP will: from github.com, by way of its file host. The
+     * addresses are made from the repository and the tag, not taken from the answer, and are ones
+     * a download may be made from (self_update_url_allowed); github.com sends a renamed
+     * repository's on to its new name. */
+    memset(offer, 0, sizeof(*offer));
+    if (github_release_file_url(sums_url, sizeof(sums_url), repository, release->tag, "SHA256SUMS") == 0 ||
+        !self_update_url_allowed(sums_url, 0))
+        return no_offer(offer, report, GITHUB_RELEASE_BAD_ARGUMENT);
+    sink.body = sums;
+    sink.capacity = sizeof(sums);
+    sink.used = 0;
+    if (platform->download(platform->user, sums_url, sizeof(sums), on_sums, &sink) != 0)
+        return no_offer(offer, report, GITHUB_RELEASE_SUMS_UNREADABLE);
+    report->reason = github_release_choose(release, sums, sink.used, offer->sha256);
+    if (report->reason != GITHUB_RELEASE_NEWER)
+        return no_offer(offer, report, report->reason);
+    log_text(report->zip, sizeof(report->zip), release->zip);
+    if (github_release_file_url(offer->artifact, sizeof(offer->artifact), repository, release->tag,
+                                release->zip) == 0 ||
+        !self_update_url_allowed(offer->artifact, 0))
+        return no_offer(offer, report, GITHUB_RELEASE_BAD_ARGUMENT);
+
+    (void)snprintf(offer->title, sizeof(offer->title), "%s", title_id);
+    (void)snprintf(offer->name, sizeof(offer->name), "%s", name);
+    (void)snprintf(offer->installed, sizeof(offer->installed), "%s", installed);
+    (void)snprintf(offer->available, sizeof(offer->available), "%s", release->available);
+    (void)snprintf(offer->version, sizeof(offer->version), "%s", release->tag);
+    (void)snprintf(offer->page, sizeof(offer->page), "https://github.com/%s/releases/tag/%s", repository,
+                   release->tag);
+    offer->size = release->zip_size;
+    (void)snprintf(offer->notes, sizeof(offer->notes), "%s", release->notes);
+    offer->notes_truncated = release->notes_truncated;
+    report->reason = GITHUB_RELEASE_NEWER;
+    return SELF_UPDATE_AVAILABLE;
+}
+
 self_update_check_result github_release_check(const self_update_platform *platform,
                                               const char *repository, const char *name,
                                               const char *title_id, const char *installed,
@@ -904,9 +1114,6 @@ self_update_check_result github_release_check(const self_update_platform *platfo
     static github_release release;
     github_release_report unused;
     char url[256];
-    char sums_url[512];
-    char sums[GITHUB_RELEASE_MAX_SUMS];
-    sums_sink sink;
     size_t length = 0;
     github_release_reason fetched;
     if (report == NULL)
@@ -928,41 +1135,80 @@ self_update_check_result github_release_check(const self_update_platform *platfo
         log_text(report->zip, sizeof(report->zip), release.zips[0]);
     if (report->reason != GITHUB_RELEASE_NEWER)
         return no_offer(offer, report, report->reason);
+    return offer_release(platform, repository, name, title_id, installed, &release, offer, report);
+}
 
-    /* SHA256SUMS comes the way the ZIP will: from github.com, by way of its file host. The
-     * addresses are made from the repository and the tag, not taken from the answer, and are ones
-     * a download may be made from (self_update_url_allowed); github.com sends a renamed
-     * repository's on to its new name. */
-    memset(offer, 0, sizeof(*offer));
-    if (github_release_file_url(sums_url, sizeof(sums_url), repository, release.tag, "SHA256SUMS") == 0 ||
-        !self_update_url_allowed(sums_url, 0))
+self_update_check_result github_release_test_check(const self_update_platform *platform,
+                                                   const char *repository, const char *name,
+                                                   const char *title_id, const char *installed,
+                                                   self_update_offer *offer,
+                                                   github_release_report *report)
+{
+    /* One check at a time, as github_release_check (whose buffers these are not). The list's
+     * answer is the larger, and only held while it is read. */
+    static github_release release;
+    github_release_report unused;
+    char url[256];
+    char *answer;
+    const char *chosen = NULL;
+    size_t chosen_length = 0;
+    size_t length = 0;
+    github_release_reason reason;
+    self_update_check_result result;
+    if (report == NULL)
+        report = &unused;
+    memset(report, 0, sizeof(*report));
+    if (offer == NULL)
+        return SELF_UPDATE_UNKNOWN;
+    memset(&release, 0, sizeof(release));
+    /* update_check_url also refuses anything that isn't a title ID. */
+    if (platform == NULL || !is_file_name(name, 40) || update_check_url(url, sizeof(url), title_id) == 0 ||
+        !update_check_version_parse(installed, NULL) || github_release_list_url(url, sizeof(url), repository) == 0)
         return no_offer(offer, report, GITHUB_RELEASE_BAD_ARGUMENT);
-    sink.body = sums;
-    sink.capacity = sizeof(sums);
-    sink.used = 0;
-    if (platform->download(platform->user, sums_url, sizeof(sums), on_sums, &sink) != 0)
-        return no_offer(offer, report, GITHUB_RELEASE_SUMS_UNREADABLE);
-    report->reason = github_release_choose(&release, sums, sink.used, offer->sha256);
-    if (report->reason != GITHUB_RELEASE_NEWER)
-        return no_offer(offer, report, report->reason);
-    log_text(report->zip, sizeof(report->zip), release.zip);
-    if (github_release_file_url(offer->artifact, sizeof(offer->artifact), repository, release.tag,
-                                release.zip) == 0 ||
-        !self_update_url_allowed(offer->artifact, 0))
-        return no_offer(offer, report, GITHUB_RELEASE_BAD_ARGUMENT);
+    answer = (char *)malloc(GITHUB_RELEASE_MAX_LIST_ANSWER);
+    if (answer == NULL)
+        return no_offer(offer, report, GITHUB_RELEASE_NETWORK);
 
-    (void)snprintf(offer->title, sizeof(offer->title), "%s", title_id);
-    (void)snprintf(offer->name, sizeof(offer->name), "%s", name);
-    (void)snprintf(offer->installed, sizeof(offer->installed), "%s", installed);
-    (void)snprintf(offer->available, sizeof(offer->available), "%s", release.available);
-    (void)snprintf(offer->version, sizeof(offer->version), "%s", release.tag);
-    (void)snprintf(offer->page, sizeof(offer->page), "https://github.com/%s/releases/tag/%s", repository,
-                   release.tag);
-    offer->size = release.zip_size;
-    (void)snprintf(offer->notes, sizeof(offer->notes), "%s", release.notes);
-    offer->notes_truncated = release.notes_truncated;
-    report->reason = GITHUB_RELEASE_NEWER;
-    return SELF_UPDATE_AVAILABLE;
+    reason = fetch_release(platform, repository, 1, answer, GITHUB_RELEASE_MAX_LIST_ANSWER, &length, report);
+    if (reason == GITHUB_RELEASE_NEWER)
+        reason = github_release_pick(answer, length, installed, &chosen, &chosen_length, &report->listed);
+    if (reason == GITHUB_RELEASE_NEWER)
+    {
+        /* The release is read as releases/latest's is, a pre-release offered too (pick took only
+         * this line's newer ones). */
+        reason = github_release_evaluate_listed(chosen, chosen_length, installed, &release);
+        log_text(report->tag, sizeof(report->tag), release.tag);
+        if (release.zip_count == 1)
+            log_text(report->zip, sizeof(report->zip), release.zips[0]);
+        report->prerelease = release.prerelease;
+    }
+    free(answer);
+    /* The line once more, from the release itself: never another line's, whatever was read. */
+    if (reason == GITHUB_RELEASE_NEWER && !github_release_same_line(release.available, installed))
+        reason = GITHUB_RELEASE_NOT_NEWER;
+    if (reason != GITHUB_RELEASE_NEWER)
+        return no_offer(offer, report, reason);
+    result = offer_release(platform, repository, name, title_id, installed, &release, offer, report);
+    if (result == SELF_UPDATE_AVAILABLE)
+    {
+        offer->prerelease = release.prerelease;
+        if (release.prerelease)
+            (void)snprintf(offer->release_title, sizeof(offer->release_title), "%s", release.title);
+    }
+    return result;
+}
+
+self_update_check_result self_update_check_tests_from(const self_update_platform *platform,
+                                                      const char *repository, const char *name,
+                                                      const char *title_id, const char *installed,
+                                                      self_update_offer *offer,
+                                                      github_release_report *report)
+{
+    if (report != NULL)
+        memset(report, 0, sizeof(*report));
+    if (repository == NULL || repository[0] == '\0')
+        return self_update_check(platform, title_id, installed, offer);
+    return github_release_test_check(platform, repository, name, title_id, installed, offer, report);
 }
 
 self_update_check_result self_update_check_from(const self_update_platform *platform,

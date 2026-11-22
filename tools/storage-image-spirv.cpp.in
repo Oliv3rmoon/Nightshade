@@ -1,0 +1,181 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Test context for the real declaration methods; Sirit produces every binary instruction.
+#include <array>
+#include <cassert>
+#include <compare>
+#include <cstdint>
+#include <fstream>
+#include <string>
+#include <string_view>
+#include <stdexcept>
+#include <unordered_set>
+#include <vector>
+#include <fmt/format.h>
+#include <sirit/sirit.h>
+using u32 = std::uint32_t;
+using Sirit::Id;
+// DESCRIPTOR_TYPES
+struct InvalidArgument : std::runtime_error {
+    template <typename... Args> explicit InvalidArgument(const char* message, Args&&...)
+        : std::runtime_error(message) {}
+};
+using NotImplementedException = InvalidArgument;
+namespace IR {
+struct Value {
+    u32 immediate{};
+    Id dynamic{};
+    bool IsImmediate() const { return dynamic.value == 0; }
+    u32 U32() const { return immediate; }
+};
+struct TextureInstInfo {
+    TextureType type;
+    u32 descriptor_index{};
+};
+struct Inst {
+    TextureInstInfo info;
+    template <typename T> T Flags() const { return info; }
+};
+}
+struct Profile {
+    u32 supported_spirv{};
+    bool support_sampled_image_array_nonuniform_indexing{};
+    bool support_storage_image_array_nonuniform_indexing{};
+    bool support_uniform_texel_buffer_array_nonuniform_indexing{};
+    bool support_storage_texel_buffer_array_nonuniform_indexing{};
+};
+struct Info {
+    std::vector<ImageDescriptor> image_descriptors;
+    std::vector<ImageBufferDescriptor> image_buffer_descriptors;
+};
+class EmitContext : public Sirit::Module {
+public:
+    explicit EmitContext(u32 version) : Sirit::Module(version), profile{version} {
+        U32[1] = TypeInt(32, false);
+        F32[1] = TypeFloat(32);
+        u32_zero_value = Const(0);
+    }
+    Id Const(u32 value) { return Constant(U32[1], value); }
+    Id Def(const IR::Value& value) { return value.dynamic; }
+    void DefineImageBuffers(const Info& info, u32& binding);
+    void DefineImages(const Info& info, u32& binding, u32& scaling_index);
+    std::array<Id, 2> U32{}, F32{};
+    Stage stage{Stage::Compute};
+    Profile profile;
+    Id image_u32{}, u32_zero_value{};
+    std::unordered_set<u32> non_uniform_ids;
+    bool uses_nonuniform_sampled_image{}, uses_nonuniform_storage_image{};
+    bool uses_nonuniform_uniform_texel_buffer{}, uses_nonuniform_storage_texel_buffer{};
+    std::vector<Id> interfaces;
+    std::vector<ImageDefinition> images;
+    std::vector<ImageBufferDefinition> image_buffers;
+};
+// PRODUCTION_FUNCTIONS
+enum class Access { ReadWrite, Atomic, NonUniformAtomic };
+
+void Generate(const char* directory, u32 version, bool buffer, bool integer, u32 count, Access access) {
+    EmitContext ctx{version};
+    const bool atomic = access != Access::ReadWrite;
+    const bool non_uniform = access == Access::NonUniformAtomic;
+    ctx.profile.support_storage_image_array_nonuniform_indexing = non_uniform;
+    ctx.profile.support_storage_texel_buffer_array_nonuniform_indexing = non_uniform;
+    ctx.AddCapability(spv::Capability::Shader);
+    if (buffer) {
+        ctx.AddCapability(spv::Capability::ImageBuffer);
+    }
+    if (access == Access::ReadWrite && count > 1) {
+        if (buffer && version < 0x00010500) {
+            ctx.AddExtension("SPV_EXT_descriptor_indexing");
+        }
+        ctx.AddCapability(buffer ? spv::Capability::StorageTexelBufferArrayDynamicIndexing
+                                 : spv::Capability::StorageImageArrayDynamicIndexing);
+    }
+    if (!integer) {
+        ctx.AddCapability(spv::Capability::StorageImageReadWithoutFormat);
+        ctx.AddCapability(spv::Capability::StorageImageWriteWithoutFormat);
+    }
+    ctx.SetMemoryModel(spv::AddressingModel::Logical, spv::MemoryModel::GLSL450);
+    const auto type = buffer ? TextureType::Buffer : TextureType::Color2D;
+    const auto format = integer ? ImageFormat::R32_UINT : ImageFormat::Typeless;
+    Info info;
+    if (buffer) {
+        info.image_buffer_descriptors.push_back({
+            .format = format, .is_written = true, .is_read = true, .is_integer = integer,
+            .cbuf_index = 0, .cbuf_offset = 0x14a0, .count = count, .size_shift = 3});
+    } else {
+        info.image_descriptors.push_back({
+            .type = type, .format = format, .is_written = true, .is_read = true, .is_integer = integer,
+            .cbuf_index = 0, .cbuf_offset = 0x14a0, .count = count, .size_shift = 3});
+    }
+    u32 binding = 0, scaling = 0;
+    ctx.DefineImageBuffers(info, binding);
+    ctx.DefineImages(info, binding, scaling);
+    assert(binding == 1 && scaling == (buffer ? 0U : 1U));
+
+    const Id void_type = ctx.TypeVoid();
+    const Id input_vector = ctx.TypeVector(ctx.U32[1], 3);
+    const Id invocation = ctx.AddGlobalVariable(
+        ctx.TypePointer(spv::StorageClass::Input, input_vector), spv::StorageClass::Input);
+    ctx.Decorate(invocation, spv::Decoration::BuiltIn,
+                 non_uniform ? spv::BuiltIn::LocalInvocationId : spv::BuiltIn::WorkgroupId);
+    const Id main = ctx.OpFunction(void_type, spv::FunctionControlMask::MaskNone,
+                                  ctx.TypeFunction(void_type));
+    ctx.AddLabel();
+
+    IR::Value index{.immediate = count - 1};
+    if (count > 1 && (non_uniform || !atomic)) {
+        index.dynamic = ctx.OpBitwiseAnd(ctx.U32[1],
+            ctx.OpCompositeExtract(ctx.U32[1], ctx.OpLoad(input_vector, invocation), 0),
+            ctx.Const(count - 1));
+    }
+    const Id coords = buffer ? ctx.Const(0) : ctx.ConstantComposite(
+        ctx.TypeVector(ctx.U32[1], 2), ctx.Const(0), ctx.Const(0));
+    if (atomic) {
+        ctx.image_u32 = ctx.TypePointer(spv::StorageClass::Image, ctx.U32[1]);
+        IR::Inst inst{{type, 0}};
+        EmitImageAtomicIAdd32(ctx, &inst, index, coords, ctx.Const(1));
+        assert(ctx.non_uniform_ids.size() == (non_uniform ? 3U : 0U));
+        assert(ctx.uses_nonuniform_storage_image == (non_uniform && !buffer));
+        assert(ctx.uses_nonuniform_storage_texel_buffer == (non_uniform && buffer));
+        if (non_uniform) {
+            ctx.AddExtension("SPV_EXT_descriptor_indexing");
+            ctx.AddCapability(spv::Capability::ShaderNonUniform);
+            ctx.AddCapability(buffer ? spv::Capability::StorageTexelBufferArrayNonUniformIndexing
+                                     : spv::Capability::StorageImageArrayNonUniformIndexing);
+        }
+    } else {
+        const auto [image, is_integer] = Image(ctx, index, {type, 0});
+        assert(is_integer == integer);
+        const Id color = ctx.OpImageRead(ctx.TypeVector(integer ? ctx.U32[1] : ctx.F32[1], 4),
+                                         image, coords);
+        ctx.OpImageWrite(image, coords, color);
+    }
+
+    ctx.OpReturn();
+    ctx.OpFunctionEnd();
+    ctx.interfaces.push_back(invocation);
+    ctx.AddEntryPoint(spv::ExecutionModel::GLCompute, main, "main", std::span<const Id>{ctx.interfaces});
+    ctx.AddExecutionMode(main, spv::ExecutionMode::LocalSize, non_uniform ? 8U : 1U, 1U, 1U);
+    const auto code = ctx.Assemble();
+    const std::string name = std::string(directory) + "/" + std::to_string(version) + "-" +
+        (buffer ? "buffer" : "image") + (integer ? "-uint-" : "-float-") +
+        std::to_string(count) + (non_uniform ? "-nonuniform-atomic" : atomic ? "-atomic" : "") + ".spv";
+    std::ofstream out(name, std::ios::binary);
+    out.write(reinterpret_cast<const char*>(code.data()), code.size() * sizeof(u32));
+    assert(out.good());
+}
+
+int main(int argc, char** argv) {
+    assert(argc == 2);
+    for (u32 version : {0x00010000U, 0x00010300U, 0x00010400U}) {
+        for (bool buffer : {false, true}) {
+            for (bool integer : {false, true}) {
+                for (u32 count : {1U, 2U, 8U, 1024U}) {
+                    Generate(argv[1], version, buffer, integer, count, Access::ReadWrite);
+                }
+            }
+            Generate(argv[1], version, buffer, true, 1, Access::Atomic);
+            Generate(argv[1], version, buffer, true, 8, Access::Atomic);
+            Generate(argv[1], version, buffer, true, 8, Access::NonUniformAtomic);
+        }
+    }
+}

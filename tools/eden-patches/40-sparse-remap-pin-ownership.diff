@@ -1,0 +1,216 @@
+--- a/src/core/hle/service/nvdrv/devices/nvhost_as_gpu.h
++++ b/src/core/hle/service/nvdrv/devices/nvhost_as_gpu.h
+@@ -8,9 +8,13 @@
+ #pragma once
+ 
+ #include <bit>
++#include <iterator>
++#include <limits>
+ #include <list>
+ #include <map>
+ #include <memory>
++#include <stdexcept>
++#include <utility>
+ #include <mutex>
+ #include <optional>
+ #include "common/container/unordered_set.h"
+@@ -33,6 +37,55 @@
+ }
+ 
+ namespace Service::Nvidia::NvCore {
++
++// One owner represents one successful nvmap pin. Split ranges share that pin
++// until their last surviving fragment is replaced or the address space closes.
++class SparseMappingOwnership {
++public:
++    template <class Apply>
++    void Replace(u64 begin, u64 size, std::shared_ptr<void> owner, Apply&& apply) {
++        if (size == 0) {
++            std::forward<Apply>(apply)();
++            return;
++        }
++        if (size > (std::numeric_limits<u64>::max)() - begin) {
++            throw std::invalid_argument("Sparse mapping range overflow");
++        }
++        const u64 end = begin + size;
++        auto first = ranges.upper_bound(begin);
++        if (first != ranges.begin()) {
++            const auto previous = std::prev(first);
++            if (previous->second.end > begin) first = previous;
++        }
++        const auto last = ranges.lower_bound(end);
++
++        // Allocate at most three replacement nodes before changing GPU mappings.
++        // No owning range is removed if preparation or the GPU update throws.
++        std::map<u64, Range> replacement;
++        if (first != last) {
++            if (first->first < begin) {
++                replacement.emplace(first->first, Range{begin, first->second.owner});
++            }
++            const auto previous = std::prev(last);
++            if (previous->second.end > end) {
++                replacement.emplace(end, Range{previous->second.end, previous->second.owner});
++            }
++        }
++        if (owner) replacement.emplace(begin, Range{end, std::move(owner)});
++
++        std::forward<Apply>(apply)();
++        ranges.erase(first, last);
++        ranges.merge(replacement); // Transfers prepared nodes without allocating.
++    }
++
++private:
++    struct Range {
++        u64 end;
++        std::shared_ptr<void> owner;
++    };
++    std::map<u64, Range> ranges;
++};
++
+ class Container;
+ class NvMap;
+ } // namespace Service::Nvidia::NvCore
+@@ -157,7 +210,7 @@
+     NvResult GetVARegions1(IoctlGetVaRegions& params);
+     NvResult GetVARegions3(IoctlGetVaRegions& params, std::span<VaRegion> regions);
+ 
+-    [[nodiscard]] bool FreeMappingLocked(u64 offset) noexcept;
++    [[nodiscard]] bool FreeMappingLocked(u64 offset);
+ 
+     Module& module;
+ 
+@@ -194,6 +247,14 @@
+     //!< Holds allocations created by AllocSpace from
+     //!< which fixed buffers can be mapped into
+     std::map<u64, Allocation> allocation_map;
++    struct SparsePin {
++        NvCore::NvMap& nvmap;
++        NvCore::NvMap::Handle::Id handle;
++        SparsePin(NvCore::NvMap& map, NvCore::NvMap::Handle::Id id) : nvmap{map}, handle{id} {}
++        ~SparsePin() { nvmap.UnpinHandle(handle); }
++    };
++    // Declared before gmmu: GPU page tables are destroyed before these pins.
++    NvCore::SparseMappingOwnership sparse_mapping_pins;
+     std::mutex mutex; //!< Locks all AS operations
+ 
+     struct VM {
+--- a/src/core/hle/service/nvdrv/devices/nvhost_as_gpu.cpp
++++ b/src/core/hle/service/nvdrv/devices/nvhost_as_gpu.cpp
+@@ -199,7 +199,7 @@
+     return NvResult::Success;
+ }
+ 
+-bool nvhost_as_gpu::FreeMappingLocked(u64 offset) noexcept {
++bool nvhost_as_gpu::FreeMappingLocked(u64 offset) {
+     if (auto const it = mapping_map.find(offset); it != mapping_map.end()) {
+         auto const mapping = it->second;
+         if (!mapping.fixed) {
+@@ -209,14 +209,16 @@
+             u64 aligned_size{Common::AlignUp(mapping.size, page_size)};
+             allocator.Free(u32(mapping.offset >> page_size_bits), u32(aligned_size >> page_size_bits));
+         }
+-        nvmap.UnpinHandle(mapping.handle);
+         // Sparse mappings shouldn't be fully unmapped, just returned to their sparse state
+         // Only FreeSpace can unmap them fully
+         if (mapping.sparse_alloc) {
+-            gmmu->MapSparse(offset, mapping.size, mapping.big_page);
++            sparse_mapping_pins.Replace(offset, mapping.size, {}, [&] {
++                gmmu->MapSparse(offset, mapping.size, mapping.big_page);
++            });
+         } else {
+             gmmu->Unmap(offset, mapping.size);
+         }
++        nvmap.UnpinHandle(mapping.handle);
+         // Keep all ownership indexes in step with the mapping record. A later
+         // FreeSpace must not revisit an explicitly unmapped fixed mapping.
+         if (mapping.fixed) {
+@@ -249,8 +251,11 @@
+                 return NvResult::BadValue;
+ 
+         // Unset sparse flag if required
+-        if (allocation.sparse)
+-            gmmu->Unmap(params.offset, allocation.size);
++        if (allocation.sparse) {
++            sparse_mapping_pins.Replace(params.offset, allocation.size, {}, [&] {
++                gmmu->Unmap(params.offset, allocation.size);
++            });
++        }
+ 
+         auto& allocator{params.page_size == VM::YUZU_PAGESIZE ? *vm.small_page_allocator : *vm.big_page_allocator};
+         u32 page_size_bits{params.page_size == VM::YUZU_PAGESIZE ? VM::PAGE_SIZE_BITS : vm.big_page_size_bits};
+@@ -275,6 +280,7 @@
+         GPUVAddr virtual_address{static_cast<u64>(entry.as_offset_big_pages)
+                                  << vm.big_page_size_bits};
+         u64 size{static_cast<u64>(entry.big_pages) << vm.big_page_size_bits};
++        if (size == 0) continue;
+ 
+         auto alloc{allocation_map.upper_bound(virtual_address)};
+ 
+@@ -295,7 +301,9 @@
+ 
+         const bool use_big_pages = alloc->second.big_pages;
+         if (!entry.handle) {
+-            gmmu->MapSparse(virtual_address, size, use_big_pages);
++            sparse_mapping_pins.Replace(virtual_address, size, {}, [&] {
++                gmmu->MapSparse(virtual_address, size, use_big_pages);
++            });
+         } else {
+             auto handle{nvmap.GetHandle(entry.handle)};
+             if (!handle) {
+@@ -314,11 +322,17 @@
+             if (base == 0) {
+                 return NvResult::InsufficientMemory;
+             }
+-            DAddr device_address{static_cast<DAddr>(
+-                base + (static_cast<u64>(entry.handle_offset_big_pages) << vm.big_page_size_bits))};
+-
+-            gmmu->Map(virtual_address, device_address, size,
+-                      static_cast<Tegra::PTEKind>(entry.kind), use_big_pages);
++            bool keep_sparse_pin = false;
++            SCOPE_EXIT {
++                if (!keep_sparse_pin) nvmap.UnpinHandle(entry.handle);
++            };
++            auto owner = std::make_shared<SparsePin>(nvmap, entry.handle);
++            keep_sparse_pin = true;
++            DAddr device_address{static_cast<DAddr>(base + backing_offset)};
++            sparse_mapping_pins.Replace(virtual_address, size, std::move(owner), [&] {
++                gmmu->Map(virtual_address, device_address, size,
++                          static_cast<Tegra::PTEKind>(entry.kind), use_big_pages);
++            });
+         }
+     }
+ 
+@@ -349,7 +363,15 @@
+             }
+             u64 gpu_address = u64(params.offset + params.buffer_offset);
+             VAddr device_address{mapping.ptr + params.buffer_offset};
+-            gmmu->Map(gpu_address, device_address, params.mapping_size, Tegra::PTEKind(params.kind), mapping.big_page);
++            const auto apply = [&] {
++                gmmu->Map(gpu_address, device_address, params.mapping_size,
++                          Tegra::PTEKind(params.kind), mapping.big_page);
++            };
++            if (mapping.sparse_alloc) {
++                sparse_mapping_pins.Replace(gpu_address, params.mapping_size, {}, apply);
++            } else {
++                apply();
++            }
+             return NvResult::Success;
+         } else {
+             LOG_WARNING(Service_NVDRV, "Cannot remap an unmapped GPU address space region: {:#x}", params.offset);
+@@ -412,7 +434,15 @@
+         }
+ 
+         const bool use_big_pages = alloc->second.big_pages && big_page;
+-        gmmu->Map(params.offset, device_address, size, static_cast<Tegra::PTEKind>(params.kind), use_big_pages);
++        const auto apply = [&] {
++            gmmu->Map(params.offset, device_address, size,
++                      static_cast<Tegra::PTEKind>(params.kind), use_big_pages);
++        };
++        if (alloc->second.sparse) {
++            sparse_mapping_pins.Replace(params.offset, size, {}, apply);
++        } else {
++            apply();
++        }
+ 
+         // A fixed map can replace the record at the same GPU address. The
+         // new pin now belongs to that record; release its previous pin once.

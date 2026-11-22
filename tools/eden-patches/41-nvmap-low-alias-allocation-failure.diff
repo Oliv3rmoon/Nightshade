@@ -1,0 +1,101 @@
+--- a/src/core/hle/service/nvdrv/core/nvmap.cpp
++++ b/src/core/hle/service/nvdrv/core/nvmap.cpp
+@@ -6,10 +6,12 @@
+ // SPDX-License-Identifier: GPL-3.0-or-later
+ 
+ #include <functional>
++#include <limits>
+ 
+ #include "common/alignment.h"
+ #include "common/assert.h"
+ #include "common/logging.h"
++#include "common/scope_exit.h"
+ #include "core/hle/service/nvdrv/core/container.h"
+ #include "core/hle/service/nvdrv/core/heap_mapper.h"
+ #include "core/hle/service/nvdrv/core/nvmap.h"
+@@ -167,12 +169,39 @@
+     }
+ 
+     std::scoped_lock lock(handle_description->mutex);
+-    const auto map_low_area = [&] {
+-        if (handle_description->pin_virt_address == 0) {
+-            u32 address = host1x.Allocator().Allocate(u32(handle_description->aligned_size));
+-            host1x.gmmu_manager.Map(GPUVAddr(address), handle_description->d_address, handle_description->aligned_size);
+-            handle_description->pin_virt_address = address;
+-        }
++    bool mapped_for_pin = false;
++    bool pin_committed = false;
++    SCOPE_EXIT {
++        // A new backing map must not be stranded when its low alias fails.
++        // Existing live or queued mappings retain their original ownership.
++        if (mapped_for_pin && !pin_committed) {
++            std::scoped_lock queueLock(unmap_queue_lock);
++            UnmapHandle(*handle_description);
++        }
++    };
++    const auto map_low_area = [&]() -> bool {
++        if (handle_description->pin_virt_address != 0) return true;
++        if (handle_description->aligned_size > std::numeric_limits<u32>::max()) {
++            LOG_ERROR(Service_NVDRV, "Low GPU mapping is too large: {}", handle_description->aligned_size);
++            return false;
++        }
++        const u32 size = static_cast<u32>(handle_description->aligned_size);
++        const u32 address = host1x.Allocator().Allocate(size);
++        if (address == 0) {
++            LOG_ERROR(Service_NVDRV, "Low GPU address allocation failed: size={}", size);
++            return false;
++        }
++        bool alias_committed = false;
++        SCOPE_EXIT {
++            if (!alias_committed) {
++                host1x.gmmu_manager.Unmap(GPUVAddr(address), size);
++                host1x.Allocator().Free(address, size);
++            }
++        };
++        host1x.gmmu_manager.Map(GPUVAddr(address), handle_description->d_address, size);
++        handle_description->pin_virt_address = address;
++        alias_committed = true;
++        return true;
+     };
+     if (!handle_description->pins) {
+         // If we're in the unmap queue we can just remove ourselves and return since we're already
+@@ -182,17 +211,12 @@
+             // following check and erase
+             std::scoped_lock queueLock(unmap_queue_lock);
+             if (handle_description->unmap_queue_entry) {
++                if (low_area_pin && !map_low_area()) return 0;
+                 unmap_queue.erase(*handle_description->unmap_queue_entry);
+                 handle_description->unmap_queue_entry.reset();
+-
+-                if (low_area_pin) {
+-                    map_low_area();
+-                    handle_description->pins++;
+-                    return static_cast<DAddr>(handle_description->pin_virt_address);
+-                }
+-
+                 handle_description->pins++;
+-                return handle_description->d_address;
++                return low_area_pin ? static_cast<DAddr>(handle_description->pin_virt_address)
++                                    : handle_description->d_address;
+             }
+         }
+ 
+@@ -241,13 +265,13 @@
+             smmu.Map(address, vaddress, map_size, session->asid, true);
+             handle_description->in_heap = false;
+         }
+-    }
+-
+-    if (low_area_pin) {
+-        map_low_area();
+-    }
++        mapped_for_pin = true;
++    }
++
++    if (low_area_pin && !map_low_area()) return 0;
+ 
+     handle_description->pins++;
++    pin_committed = true;
+     if (low_area_pin) {
+         return static_cast<DAddr>(handle_description->pin_virt_address);
+     }

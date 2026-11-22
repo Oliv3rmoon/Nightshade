@@ -13,8 +13,11 @@ rules (headless/staging_chunks.h, headless/memory_budget.h). Then it runs:
 - a synthetic three hours of Tears of the Kingdom: 18,881 cached pipelines built while the game
   starts, open-world streaming, the item menu's texture array of 121 layers every ten minutes,
   bursts of the game's own writes;
-- the EDEN_MEMORY lines of four TOTK sessions that ended (tools/memory-soak/traces: v1.010.004's
-  out-of-memory crash 83 minutes in, v1.010.006's staging refusal and both of issue #2's logs).
+- the EDEN_MEMORY lines of five TOTK sessions that ended (tools/memory-soak/traces: v1.010.004's
+  out-of-memory crash 83 minutes in, v1.010.006's staging refusal, both of issue #2's logs, and
+  v1.010.007's session that froze on a loading screen 71 minutes in and was closed ten minutes
+  later, its heap at 3.5 GB with all 256 arenas made: the pool kept 1.8 GB free and no request
+  waited, so its freeze was not one of memory, and the simulation must hold it too).
 
 In each, no allocation may fail and the pool's largest free block must stay above the largest
 request (the menu's array, 161 MiB, which has memory of its own). The synthetic session runs with
@@ -153,6 +156,6 @@ with tempfile.TemporaryDirectory(prefix='eden-soak-') as tmp:
         failed.append('v1.010.006 failed in no more seeds than this tree: the simulation does not tell them apart')
 if failed:
     sys.exit('memory soak failed:\n  ' + '\n  '.join(failed))
-print(f'Memory soak: PASS four TOTK sessions that ended and three hours of TOTK with {len(SEEDS)} seeds, with no '
+print(f'Memory soak: PASS five TOTK sessions that ended and three hours of TOTK with {len(SEEDS)} seeds, with no '
       f'allocation refused and the largest free block above the largest request in {len(SEEDS) - fixed_failed} of '
       f'them ({len(SEEDS) - control_failed} with v1.010.006\'s rules); the heap starts near v1.010.004')

@@ -1,0 +1,14 @@
+--- a/src/video_core/macro.cpp
++++ b/src/video_core/macro.cpp
+@@ -72,6 +72,11 @@
+ // or a counter whose reset was lost. They are read once more through the caches, and the draw is
+ // dropped if they still say so.
+ bool IsDrawImplausible(u32 count, u32 instance_count) {
++    // Small meshes with tens of millions of instances can hang the host GPU
++    // before the total-vertex ceiling rejects them. Keep zero-count draws as no-ops.
++    if (count != 0 && instance_count > (u32{1} << 20)) {
++        return true;
++    }
+     return u64(count) * u64(instance_count) > (u64(1) << 28);
+ }
+ 

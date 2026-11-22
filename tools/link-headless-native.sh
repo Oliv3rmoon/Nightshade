@@ -32,20 +32,25 @@ fi
 # Mesa's Vulkan entrypoint tables reference optional driver entrypoints as weak
 # symbols (vk_entrypoints_gen --weak). An unimplemented one must resolve to 0,
 # not become a dynamic import the native packager has no SDK stub for.
-# lld 21+ no longer exports undefined weak symbols from executables by default
-# (-z dynamic-undefined-weak opts back in); lld 18 still does, and its only switch
-# for that is --no-dynamic-linker, which otherwise affects just PT_INTERP, absent
-# from the PS5 link script anyway. Every one of these weak imports is a Mesa
-# entrypoint-table reference that resolves to 0 either way.
+# lld 21+ makes those symbols dynamic when an input shared library is present,
+# including our SDK stubs. Explicitly keep them local with its new -z option.
+# lld 18 resolves them locally with --no-dynamic-linker and has no such -z option.
+# Required strong SDK imports still undergo the native converter's validation.
 # The SDK's dlfcn wrappers explicitly return unavailable when these optional
 # weak hooks are null. This static frontend supplies no dynamic-loader hooks.
-"$template/.deps/native/ps5-payload-sdk/bin/prospero-lld" \
+native_linker="$template/.deps/native/ps5-payload-sdk/bin/prospero-lld"
+weak_import_flags=(--no-dynamic-linker)
+native_linker_version=$("$native_linker" --version)
+if [[ $native_linker_version =~ LLD[[:space:]]+([0-9]+) ]] && (( BASH_REMATCH[1] >= 21 )); then
+    weak_import_flags+=(-z nodynamic-undefined-weak)
+fi
+"$native_linker" \
     "${tls_flags[@]}" "${radv_link_flags[@]}" -L "$sdk/target/lib" \
     --defsym=__dlopen=0 --defsym=__dlsym=0 --defsym=__dladdr=0 \
     --defsym=__dlclose=0 --defsym=__dlerror=0 \
     -T "$template/tooling/native/ps5-pie.ld" -T "$root/tools/unwind.ld" \
     --eh-frame-hdr --gc-sections --version-script "$root/tools/app-symbols.map" -e _start \
-    --no-dynamic-linker \
+    "${weak_import_flags[@]}" \
     --error-limit=0 -Map="$output.map" \
     --wrap=aligned_alloc --wrap=malloc --wrap=calloc --wrap=realloc --wrap=free \
     --wrap=posix_memalign --wrap=malloc_usable_size \

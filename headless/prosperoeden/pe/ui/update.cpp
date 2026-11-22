@@ -628,9 +628,14 @@ void Launcher::draw_update(Canvas &c, float open)
         list.line(kCenterX + 18.0f, ay - 2.0f, kCenterX, ay + 16.0f, 6.0f, accent);
         list.line(kCenterX - 30.0f, kRingY + 38.0f, kCenterX + 30.0f, kRingY + 38.0f, 6.0f, accent.with_alpha(0.85f));
 
-        centred(tr("Update available"), 506.0f, 60.0f, th().size_display, th().title);
-        centred(fill_text(tr("Version {0} is ready to install."), update_version_), 570.0f, 34.0f, th().size_text,
-                th().value);
+        // A test build (Settings > Diagnostics > Test builds) says so, with its title on GitHub
+        // ("Nightshade v1.010.008 (test release)") in place of the version's line when it has one.
+        centred(update_.test_build ? tr("Test build available") : tr("Update available"), 506.0f, 60.0f,
+                th().size_display, th().title);
+        centred(update_.test_build && !update_.title.empty() ?
+                    update_.title :
+                    fill_text(tr("Version {0} is ready to install."), update_version_),
+                570.0f, 34.0f, th().size_text, th().value);
         if (update_.size > 0)
             centred(fill_text(tr("Download size: {0}"), megabytes(update_.size)), 606.0f, 30.0f, th().size_small,
                     th().accent_pale);

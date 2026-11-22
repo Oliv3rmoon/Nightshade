@@ -56,7 +56,9 @@ if git('-C', str(checkout), 'rev-parse', '--git-dir', check=False).returncode !=
 else:
     assert git('-C', str(checkout), 'cat-file', '-e', mesa['commit'] + '^{commit}', check=False).returncode == 0, \
         f'{checkout} does not have the pinned commit {mesa["commit"]}'
-    if git('-C', str(checkout), 'rev-parse', '--is-shallow-repository').stdout.strip() == 'true':
+    shallow = git('-C', str(checkout), 'rev-parse', '--is-shallow-repository').stdout.strip() == 'true'
+    cache_commit = mesa['shader_cache_id'] + '^{commit}'
+    if shallow and git('-C', str(checkout), 'cat-file', '-e', cache_commit, check=False).returncode != 0:
         notes.append(f'{checkout} is a shallow checkout: did not check where shader_cache_id is in its history')
     else:
         assert git('-C', str(checkout), 'merge-base', '--is-ancestor', mesa['shader_cache_id'], mesa['commit'],
@@ -186,7 +188,7 @@ for target in args[at + 2:]:
 # 3. prepare-build.sh's decision, with a cached driver and a stub builder.
 prepare = (root / 'tools/prepare-build.sh').read_text()
 start = prepare.index('radv_release=../mihawk-vulkan-review/.deps/native/radv-release')
-end = prepare.index('\nif [[ ! -f build/radv-isolated/', start)
+end = prepare.index('\nstep "Isolating RADV beside the OpenGL Mesa"', start)
 with tempfile.TemporaryDirectory() as folder:
     work = Path(folder) / 'nightshade'
     (work / 'tools').mkdir(parents=True)
@@ -209,6 +211,8 @@ with tempfile.TemporaryDirectory() as folder:
         'a driver from another commit must be built again'
     assert rebuilt(built, f'radv build id: {mesa["commit"]}'), 'a driver with another build id must be built again'
     assert rebuilt(built), 'a driver with no build id recorded must be built again'
+    (release / 'lib/libvulkan_radeon.ps5.a').unlink()
+    assert rebuilt(built, f'radv build id: {mesa["shader_cache_id"]}'), 'the source archive is required'
 
 for note in notes:
     print(f'note: {note}')

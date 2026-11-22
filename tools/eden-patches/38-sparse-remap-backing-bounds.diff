@@ -1,0 +1,61 @@
+--- a/src/core/hle/service/nvdrv/devices/nvhost_as_gpu.cpp
++++ b/src/core/hle/service/nvdrv/devices/nvhost_as_gpu.cpp
+@@ -278,8 +278,12 @@
+ 
+         auto alloc{allocation_map.upper_bound(virtual_address)};
+ 
+-        if (alloc-- == allocation_map.begin() ||
+-            (virtual_address - alloc->first) + size > alloc->second.size) {
++        if (alloc == allocation_map.begin()) {
++            return NvResult::BadValue;
++        }
++        --alloc;
++        if ((virtual_address - alloc->first) > alloc->second.size ||
++            size > alloc->second.size - (virtual_address - alloc->first)) {
+             LOG_WARNING(Service_NVDRV, "Cannot remap into an unallocated region!");
+             return NvResult::BadValue;
+         }
+@@ -295,6 +299,12 @@
+         } else {
+             auto handle{nvmap.GetHandle(entry.handle)};
+             if (!handle) {
++                return NvResult::BadValue;
++            }
++
++            const u64 backing_offset = static_cast<u64>(entry.handle_offset_big_pages)
++                                       << vm.big_page_size_bits;
++            if (backing_offset > handle->aligned_size || size > handle->aligned_size - backing_offset) {
+                 return NvResult::BadValue;
+             }
+ 
+@@ -387,8 +397,12 @@
+     if ((params.flags & MappingFlags::Fixed) != MappingFlags::None) {
+         auto alloc{allocation_map.upper_bound(params.offset)};
+ 
+-        if (alloc-- == allocation_map.begin() ||
+-            (params.offset - alloc->first) + size > alloc->second.size) {
++        if (alloc == allocation_map.begin()) {
++            return NvResult::BadValue;
++        }
++        --alloc;
++        if ((params.offset - alloc->first) > alloc->second.size ||
++            size > alloc->second.size - (params.offset - alloc->first)) {
+             ASSERT_MSG(false, "Cannot perform a fixed mapping into an unallocated region!");
+             return NvResult::BadValue;
+         }
+--- a/src/core/hle/service/nvdrv/core/heap_mapper.h
++++ b/src/core/hle/service/nvdrv/core/heap_mapper.h
+@@ -21,8 +21,11 @@
+     ~HeapMapper();
+ 
+     bool IsInBounds(VAddr start, size_t size) const {
+-        VAddr end = start + size;
+-        return start >= m_vaddress && end <= (m_vaddress + m_size);
++        if (start < m_vaddress) {
++            return false;
++        }
++        const VAddr offset = start - m_vaddress;
++        return offset <= m_size && size <= m_size - offset;
+     }
+ 
+     DAddr Map(VAddr start, size_t size);

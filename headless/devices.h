@@ -12,6 +12,7 @@
 #include "audio_core/sink/sink.h"
 #include "input_common/drivers/virtual_gamepad.h"
 #include "input_common/input_engine.h"
+#include "audio_queue.h"
 #include "button_mapping.h"
 #include "pad_haptics.h"
 #include "ps5_pad.hpp"
@@ -160,6 +161,9 @@ private:
     bool in_flight = false;
     u64 output_frames = 0;
     u64 nonzero_frames = 0;
+    u64 underrun_frames = 0;
+    u64 underrun_blocks = 0;
+    AudioQueue::UnderrunFade underrun_fade;
     std::mutex mutex;
     std::condition_variable_any wake;
     std::jthread worker;

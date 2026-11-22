@@ -121,6 +121,48 @@ Color color(const Json& p, const char* key = "color", std::uint32_t fallback = 0
     return {float((word >> 16) & 255) / 255, float((word >> 8) & 255) / 255, float(word & 255) / 255, alpha};
 }
 Rect rect(const Json& p) { return {p.value("x",0.0f),p.value("y",0.0f),p.value("w",0.0f),p.value("h",0.0f)}; }
+
+void draw_belladonna_activation(gfx::DrawList& list, const Fonts& fonts, float time, bool reduce_motion)
+{
+    constexpr float duration = 1.45f;
+    if (time >= duration)
+        return;
+
+    const float opacity = tween::cubic_out(time / 0.19f) *
+                          (1.0f - tween::cubic_in_out((time - 1.03f) / (duration - 1.03f)));
+    const float reveal = reduce_motion ? 1.0f : tween::cubic_in_out(time / 0.66f);
+    const float sweep = reduce_motion ? 0.0f : std::sin(3.14159265f * reveal);
+    constexpr Rect panel{1496.0f, 127.0f, 370.0f, 78.0f};
+    constexpr float x = panel.x + 39.0f;
+    constexpr float y = panel.y + panel.h * 0.5f;
+    constexpr Color violet = Color::rgb(0xb77aff);
+    constexpr Color pink = Color::rgb(0xf39ae9);
+    constexpr Color pale = Color::rgb(0xf8efff);
+
+    list.reset_state();
+    list.push_opacity(opacity);
+    list.bordered_rect(panel, 17.0f, Color::rgb(0x130d1e, 0.97f), 1.0f,
+                       violet.with_alpha(0.50f));
+    list.shadow({x - 18.0f, y - 18.0f, 36.0f, 36.0f}, 18.0f, 24.0f,
+                violet.with_alpha(0.22f + 0.35f * sweep));
+    const float half = 18.0f * tween::lerp(0.68f, 1.0f, reveal);
+    const Color facet = gfx::mix(violet, pale, 0.36f * reveal);
+    list.line(x, y - half, x + half, y, 2.0f, facet);
+    list.line(x + half, y, x, y + half, 2.0f, violet);
+    list.line(x, y + half, x - half, y, 2.0f, pink);
+    list.line(x - half, y, x, y - half, 2.0f, facet);
+    list.line(x - half, y, x + half, y, 1.15f, violet.with_alpha(0.72f));
+    list.line(x, y + half, x + half * 0.35f, y, 1.15f, pink.with_alpha(0.70f));
+    list.line(x + half * 0.35f, y, x, y - half, 1.15f, pale.with_alpha(0.78f));
+    if (sweep > 0.0f) {
+        const float travel = tween::lerp(panel.x + 83.0f, panel.x + panel.w - 22.0f, reveal);
+        list.line(travel - 20.0f, panel.y + panel.h - 1.0f, travel + 12.0f,
+                  panel.y + panel.h - 1.0f, 2.0f, pink.with_alpha(sweep));
+    }
+    list.text(*fonts.font, fonts.texture, "BELLADONNA 1.0", panel.x + 79.0f, y + 9.0f,
+              {27.0f, pale, gfx::Align::left, 1.45f, 0.035f});
+    list.pop_opacity();
+}
 }
 
 struct RuntimeLauncher::Impl {
@@ -155,9 +197,12 @@ struct RuntimeLauncher::Impl {
     std::atomic<bool> stop{false}; std::future<std::optional<std::string>> keyboard;
     Json keyboard_status = { {"ready",false} }, launch = {{"stage","idle"}}, offer;
     std::string launch_file, launch_profile; bool sync_started{}, first_start{}, picker{}, exit_update{};
+    const bool belladonna_intro;
     int picker_row{}, draw_commands{}; float time{}, poll{}, catalog_poll{}; std::uint64_t source_generation{}; gfx::DrawList* drawing{};
-    Impl(Services& s, Textures& t, const Fonts& f, gfx::GlBatch& b, bool first, std::string root, audio::Mixer* m, std::function<void(gfx::Font&)> configure)
-        : cached_preferences(s.preferences()), services(s), covers(t), fonts(f), batch(b), mixer(m), data_root(std::move(root)), first_start(first) {
+    Impl(Services& s, Textures& t, const Fonts& f, gfx::GlBatch& b, bool first, std::string root, audio::Mixer* m,
+         std::function<void(gfx::Font&)> configure, bool has_belladonna)
+        : cached_preferences(s.preferences()), services(s), covers(t), fonts(f), batch(b), mixer(m),
+          data_root(std::move(root)), first_start(first), belladonna_intro(first && has_belladonna) {
         configure_font=std::move(configure);
         auto version=s.version(); if(version.starts_with("v")) version.erase(0,1);
         launcher_updates::Host host; host.version=version; host.capabilities=kCapabilities;
@@ -677,6 +722,8 @@ struct RuntimeLauncher::Impl {
         if(updates_page || commit_started) { if(!draw_update_view(list)) draw_updates(list); return; }
         if(pack) { drawing=&list; draw_commands=0; const bool ok=call(*pack,"draw",{{"time",time}},true); drawing=nullptr; if(!ok) {list.clear(); fallback(); if(builtin) builtin->draw(list);} else batch.sync_font_texture(pack->font_texture,pack->font); }
         else if(builtin) builtin->draw(list);
+        if (belladonna_intro && !picker && selected.empty() && (!builtin || builtin->selected_game().empty()))
+            draw_belladonna_activation(list, fonts, time, cached_preferences.reduce_motion);
         if(picker) {
             list.reset_state();
             const auto& t=th(); list.rounded_rect({0,0,1920,1080},0,t.base.with_alpha(0.96f));
@@ -695,9 +742,13 @@ struct RuntimeLauncher::Impl {
     }
 };
 
-RuntimeLauncher::RuntimeLauncher(Services& s, Textures& t, const Fonts& f, gfx::GlBatch& b, bool first, std::string root, audio::Mixer* m, std::function<void(gfx::Font&)> configure)
-    : impl_(std::make_unique<Impl>(s,t,f,b,first,std::move(root),m,std::move(configure))) {
-    auto& h=*impl_; h.discover(); h.refresh(); std::string selected="builtin";
+RuntimeLauncher::RuntimeLauncher(Services& s, Textures& t, const Fonts& f, gfx::GlBatch& b, bool first,
+                                 std::string root, audio::Mixer* m,
+                                 std::function<void(gfx::Font&)> configure, bool has_belladonna)
+    : impl_(std::make_unique<Impl>(s,t,f,b,first,std::move(root),m,std::move(configure),has_belladonna)) {
+    // The built-in launcher starts its own scan after reading Home. The pack
+    // catalog starts in select() only when a pack is active.
+    auto& h=*impl_; h.discover(); std::string selected="builtin";
     try { selected=read_json(h.data_root+"/config/launcher.json").value("selected","builtin"); }catch(...){}
     if(!h.last_error.empty()) selected="builtin";
     struct stat safe{}; if(stat((h.data_root+"/config/force-builtin-launcher").c_str(),&safe)==0) selected="builtin";

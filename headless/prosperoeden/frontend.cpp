@@ -245,8 +245,15 @@ std::string RunApp(const std::string& launch_error, bool first_start, Eden::Mult
         const bool input_ready = radio_input_init();
         if (!input_ready) Eden::Report("menu failure", "The controller could not be opened");
         // Once per launch: is a newer release listed? The launcher shows the answer when it comes.
-        Eden::UpdateNotice::Start();
-        pe::ui::RuntimeLauncher launcher(services, textures, fonts, batch, first_start, Eden::kDataDir, audio_ready ? mixer.get() : nullptr, LoadLanguage);
+        // With Test builds on (Settings > Diagnostics), test builds of this version's line too.
+        Eden::UpdateNotice::Start(Eden::LoadPreferences().test_builds);
+#if defined(EDEN_PS5_RADV)
+        constexpr bool has_belladonna = true;
+#else
+        constexpr bool has_belladonna = false;
+#endif
+        pe::ui::RuntimeLauncher launcher(services, textures, fonts, batch, first_start, Eden::kDataDir,
+                                        audio_ready ? mixer.get() : nullptr, LoadLanguage, has_belladonna);
         int menu_volume = launcher.menu_volume();
         mixer->set_bus_gain(pe::audio::Bus::ui, MenuGain(menu_volume));
         std::fprintf(stderr, "EDEN_LAUNCHER display=%dx%d sounds=%d audio=%d ready_ms=%lld\n", display.width(),

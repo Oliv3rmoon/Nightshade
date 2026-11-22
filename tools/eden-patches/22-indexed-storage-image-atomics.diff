@@ -1,0 +1,139 @@
+--- a/src/shader_recompiler/backend/spirv/emit_spirv_image.cpp
++++ b/src/shader_recompiler/backend/spirv/emit_spirv_image.cpp
+@@ -291,37 +291,43 @@
+     }
+ }
+
++struct StorageImageRef {
++    Id pointer;
++    Id image_type;
++    bool is_integer;
++    bool non_uniform;
++};
++
++template <typename Definition>
++StorageImageRef StorageImage(EmitContext& ctx, const IR::Value& index, const Definition& def,
++                             NonUniformKind kind) {
++    if (def.count <= 1) {
++        return {def.id, def.image_type, def.is_integer, false};
++    }
++    const Id idx{index.IsImmediate() ? ctx.Const(index.U32()) : ctx.Def(index)};
++    const bool non_uniform{MarkNonUniform(ctx, idx, index, kind)};
++    const Id pointer{ctx.OpAccessChain(def.pointer_type, def.id, idx)};
++    if (non_uniform) {
++        DecorateNonUniform(ctx, pointer);
++    }
++    return {pointer, def.image_type, def.is_integer, non_uniform};
++}
++
++StorageImageRef StorageImage(EmitContext& ctx, const IR::Value& index, IR::TextureInstInfo info) {
++    if (info.type == TextureType::Buffer) {
++        return StorageImage(ctx, index, ctx.image_buffers.at(info.descriptor_index),
++                            NonUniformKind::StorageTexelBuffer);
++    }
++    return StorageImage(ctx, index, ctx.images.at(info.descriptor_index), NonUniformKind::StorageImage);
++}
++
+ std::pair<Id, bool> Image(EmitContext& ctx, const IR::Value& index, IR::TextureInstInfo info) {
+-    if (info.type == TextureType::Buffer) {
+-        const ImageBufferDefinition def{ctx.image_buffers.at(info.descriptor_index)};
+-        if (def.count > 1) {
+-            const Id idx{index.IsImmediate() ? ctx.Const(index.U32()) : ctx.Def(index)};
+-            const bool non_uniform{
+-                MarkNonUniform(ctx, idx, index, NonUniformKind::StorageTexelBuffer)};
+-            const Id ptr{ctx.OpAccessChain(def.pointer_type, def.id, idx)};
+-            const Id image{ctx.OpLoad(def.image_type, ptr)};
+-            if (non_uniform) {
+-                DecorateNonUniform(ctx, ptr);
+-                DecorateNonUniform(ctx, image);
+-            }
+-            return {image, def.is_integer};
+-        }
+-        return {ctx.OpLoad(def.image_type, def.id), def.is_integer};
+-    } else {
+-        const ImageDefinition def{ctx.images.at(info.descriptor_index)};
+-        if (def.count > 1) {
+-            const Id idx{index.IsImmediate() ? ctx.Const(index.U32()) : ctx.Def(index)};
+-            const bool non_uniform{MarkNonUniform(ctx, idx, index, NonUniformKind::StorageImage)};
+-            const Id ptr{ctx.OpAccessChain(def.pointer_type, def.id, idx)};
+-            const Id image{ctx.OpLoad(def.image_type, ptr)};
+-            if (non_uniform) {
+-                DecorateNonUniform(ctx, ptr);
+-                DecorateNonUniform(ctx, image);
+-            }
+-            return {image, def.is_integer};
+-        }
+-        return {ctx.OpLoad(def.image_type, def.id), def.is_integer};
+-    }
++    const auto ref{StorageImage(ctx, index, info)};
++    const Id image{ctx.OpLoad(ref.image_type, ref.pointer)};
++    if (ref.non_uniform) {
++        DecorateNonUniform(ctx, image);
++    }
++    return {image, ref.is_integer};
+ }
+
+ bool IsTextureMsaa(EmitContext& ctx, const IR::TextureInstInfo& info) {
+@@ -458,6 +464,18 @@
+     coords = ctx.OpIAdd(result_type, coords, offset);
+ }
+ } // Anonymous namespace
++
++Id EmitImageAtomicTexelPointer(EmitContext& ctx, IR::Inst* inst, const IR::Value& index, Id coords) {
++    const auto ref{StorageImage(ctx, index, inst->Flags<IR::TextureInstInfo>())};
++    if (!index.IsImmediate() && !ref.non_uniform) {
++        throw NotImplementedException("Dynamic storage image atomic indexing");
++    }
++    const Id texel{ctx.OpImageTexelPointer(ctx.image_u32, ref.pointer, coords, ctx.u32_zero_value)};
++    if (ref.non_uniform) {
++        DecorateNonUniform(ctx, texel);
++    }
++    return texel;
++}
+
+ Id EmitBindlessImageSampleImplicitLod(EmitContext&) {
+     throw LogicError("Unreachable instruction");
+--- a/src/shader_recompiler/backend/spirv/emit_spirv_image_atomic.cpp
++++ b/src/shader_recompiler/backend/spirv/emit_spirv_image_atomic.cpp
+@@ -7,16 +7,6 @@
+
+ namespace Shader::Backend::SPIRV {
+ namespace {
+-Id Image(EmitContext& ctx, IR::TextureInstInfo info) {
+-    if (info.type == TextureType::Buffer) {
+-        const ImageBufferDefinition def{ctx.image_buffers.at(info.descriptor_index)};
+-        return def.id;
+-    } else {
+-        const ImageDefinition def{ctx.images.at(info.descriptor_index)};
+-        return def.id;
+-    }
+-}
+-
+ std::pair<Id, Id> AtomicArgs(EmitContext& ctx) {
+     const Id scope{ctx.Const(static_cast<u32>(spv::Scope::Device))};
+     const Id semantics{ctx.u32_zero_value};
+@@ -25,13 +15,7 @@
+
+ Id ImageAtomicU32(EmitContext& ctx, IR::Inst* inst, const IR::Value& index, Id coords, Id value,
+                   Id (Sirit::Module::*atomic_func)(Id, Id, Id, Id, Id)) {
+-    if (!index.IsImmediate() || index.U32() != 0) {
+-        // TODO: handle layers
+-        throw NotImplementedException("Image indexing");
+-    }
+-    const auto info{inst->Flags<IR::TextureInstInfo>()};
+-    const Id image{Image(ctx, info)};
+-    const Id pointer{ctx.OpImageTexelPointer(ctx.image_u32, image, coords, ctx.Const(0U))};
++    const Id pointer{EmitImageAtomicTexelPointer(ctx, inst, index, coords)};
+     const auto [scope, semantics]{AtomicArgs(ctx)};
+     return (ctx.*atomic_func)(ctx.U32[1], pointer, scope, semantics, value);
+ }
+--- a/src/shader_recompiler/backend/spirv/emit_spirv_instructions.h
++++ b/src/shader_recompiler/backend/spirv/emit_spirv_instructions.h
+@@ -597,6 +597,7 @@
+ Id EmitBoundImageAtomicOr32(EmitContext&);
+ Id EmitBoundImageAtomicXor32(EmitContext&);
+ Id EmitBoundImageAtomicExchange32(EmitContext&);
++Id EmitImageAtomicTexelPointer(EmitContext& ctx, IR::Inst* inst, const IR::Value& index, Id coords);
+ Id EmitImageAtomicIAdd32(EmitContext& ctx, IR::Inst* inst, const IR::Value& index, Id coords,
+                          Id value);
+ Id EmitImageAtomicSMin32(EmitContext& ctx, IR::Inst* inst, const IR::Value& index, Id coords,

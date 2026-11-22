@@ -2155,6 +2155,16 @@ msgstr "Đã bỏ khỏi danh sách. Dữ liệu lưu vẫn ở trên máy."
 msgid "Tears of the Kingdom: 4 GiB and compressed ASTC in every tier, what it needs to play for hours."
 msgstr "Tears of the Kingdom: 4 GiB và ASTC nén ở mọi mức, đủ để chơi nhiều giờ liền."
 
+#. Update dialog and notification title: the newer release of this app on offer is a test build (made for testing, before a regular release).
+#: pe/ui/launcher.cpp, pe/ui/update.cpp
+msgid "Test build available"
+msgstr "Có bản thử nghiệm"
+
+#. Settings switch (Diagnostics, under Update notices): whether the app's update offer also includes test builds, releases of this app made for testing before a regular release (not games).
+#: pe/ui/settings.cpp
+msgid "Test builds"
+msgstr "Bản thử nghiệm"
+
 #: settings_store.h
 msgid "Thai"
 msgstr "Tiếng Thái"
@@ -2441,6 +2451,11 @@ msgstr "Thông báo cập nhật"
 #: pe/ui/update.cpp
 msgid "Update now"
 msgstr "Cập nhật ngay"
+
+#. About the Test builds switch. A version line is the releases sharing the version's first two numbers (1.010.007, 1.010.008...); test builds of other lines are never offered.
+#: pe/ui/settings.cpp
+msgid "Update offers include test builds of this version line. They can have new bugs."
+msgstr "Bản cập nhật gồm cả các bản thử nghiệm của dòng phiên bản này. Chúng có thể có lỗi mới."
 
 #: pe/ui/update.cpp
 msgid "Update ready"
@@ -2802,3 +2817,35 @@ msgstr "{0}: {1}. Tắt tạo khung hình và hậu kỳ; đổi một trong s�
 #: pe/ui/settings.cpp
 msgid "Crash reports (FTP): {0}\nAttach crash-*.txt and its matching logs to your issue."
 msgstr "Báo cáo sự cố (FTP): {0}\nĐính kèm crash-*.txt và nhật ký tương ứng vào báo cáo lỗi."
+
+#: pe/ui/showcase.cpp
+msgid "All"
+msgstr "Tất cả"
+
+#: pe/ui/showcase.cpp
+msgid "Recently played"
+msgstr "Đã chơi gần đây"
+
+#: pe/ui/showcase.cpp
+msgid "Favorites"
+msgstr "Yêu thích"
+
+#: pe/ui/showcase.cpp
+msgid "Search games"
+msgstr "Tìm trò chơi"
+
+#: pe/ui/quick.cpp
+msgid "Favorite"
+msgstr "Yêu thích"
+
+#: pe/ui/showcase.cpp
+msgid "No games match your search."
+msgstr "Không có trò chơi nào khớp với tìm kiếm."
+
+#: pe/ui/showcase.cpp
+msgid "No favorites yet. Add one from Quick settings."
+msgstr "Chưa có mục yêu thích. Thêm từ Cài đặt nhanh."
+
+#: pe/ui/quick.cpp
+msgid "Shows the game under Favorites in the Library."
+msgstr "Hiển thị trò chơi trong mục Yêu thích của Thư viện."

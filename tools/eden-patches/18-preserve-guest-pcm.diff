@@ -1,0 +1,31 @@
+--- a/src/audio_core/device/device_session.cpp
++++ b/src/audio_core/device/device_session.cpp
+@@ -11,7 +11,6 @@
+ #include "audio_core/sink/sink_stream.h"
+ #include "core/core.h"
+ #include "core/core_timing.h"
+-#include "core/guest_memory.h"
+ #include "core/memory.h"
+
+ #include "core/hle/kernel/k_process.h"
+@@ -98,13 +97,13 @@
+             .consumed = false,
+         };
+
+-        tmp_samples.resize_destructive(buffer.size / sizeof(s16));
+-        if (type == Sink::StreamType::In) {
+-            stream->AppendBuffer(new_buffer, tmp_samples);
+-        } else {
+-            Core::Memory::CpuGuestMemory<s16, Core::Memory::GuestMemoryFlags::UnsafeRead> samples(
+-                handle->GetMemory(), buffer.samples, buffer.size / sizeof(s16));
+-            stream->AppendBuffer(new_buffer, samples);
++        const size_t sample_count = buffer.size / sizeof(s16);
++        tmp_samples.resize_destructive(sample_count);
++        if (type != Sink::StreamType::In && sample_count != 0) {
++            // The sink can scale or downmix these samples in place.
++            handle->GetMemory().ReadBlockUnsafe(buffer.samples, tmp_samples.data(),
++                                               sample_count * sizeof(s16));
+         }
++        stream->AppendBuffer(new_buffer, tmp_samples);
+     }
+ }

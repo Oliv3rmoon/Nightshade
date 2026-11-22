@@ -1,0 +1,20 @@
+--- a/src/core/hle/service/nvdrv/devices/nvhost_as_gpu.cpp
++++ b/src/core/hle/service/nvdrv/devices/nvhost_as_gpu.cpp
+@@ -305,6 +305,8 @@
+             const u64 backing_offset = static_cast<u64>(entry.handle_offset_big_pages)
+                                        << vm.big_page_size_bits;
+             if (backing_offset > handle->aligned_size || size > handle->aligned_size - backing_offset) {
++                LOG_ERROR(Service_NVDRV, "Sparse GPU backing range rejected: handle={}, offset={}, size={}, original={}, aligned={}",
++                          entry.handle, backing_offset, size, handle->orig_size, handle->aligned_size);
+                 return NvResult::BadValue;
+             }
+ 
+@@ -368,6 +370,8 @@
+     const u64 buffer_offset = static_cast<u64>(params.buffer_offset);
+     const u64 size = params.mapping_size ? params.mapping_size : handle->orig_size;
+     if (buffer_offset > handle->aligned_size || size > handle->aligned_size - buffer_offset) {
++        LOG_ERROR(Service_NVDRV, "GPU backing range rejected: handle={}, offset={}, size={}, original={}, aligned={}",
++                  params.handle, buffer_offset, size, handle->orig_size, handle->aligned_size);
+         return NvResult::BadValue;
+     }
+ 

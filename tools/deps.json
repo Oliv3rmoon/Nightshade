@@ -156,11 +156,16 @@
     },
     {
       "name": "ps5-mesa",
-      "about": "Belladonna, Nightshade's driver: RADV forked from Mihawk's PS5_Mesa, with Nightshade's changes as commits on its nightshade branch. shader_cache_id is the RADV build id the on-disk shader cache is keyed by (Mihawk's 1ba9874, which players' caches were made with); it changes only when a Belladonna commit changes how shaders compile",
+      "about": "Belladonna 1.0 with PS5 queue staging and pipeline cache record validation. The bundle contains the source commits after the public Belladonna base. shader_cache_id identifies the last change to compiled shaders (9bebc54), which stays valid across the queue and cache-validation changes",
       "kind": "git",
       "url": "https://github.com/Oliv3rmoon/Belladonna.git",
-      "commit": "aa170330c09601601fec22f85a5e3858f0e538b3",
-      "shader_cache_id": "1ba9874f478657ccf6da72ce55f0260164cc0bd0",
+      "commit": "871f66e94cf3b6ca3787115784d833f08b04fba1",
+      "git_bundle": {
+        "base": "bd34ec1aff7e26f88010bb359b1fcec46577e9fd",
+        "path": "tools/driver-sources/belladonna-1.0-871f66e.bundle",
+        "sha256": "1a510b8ff878898552c6ff8c62c9bfb38fbad921d8532d88db6e175fd9791481"
+      },
+      "shader_cache_id": "9bebc54299c0314e54f10d856f8f8b6bef25b547",
       "path": "../belladonna"
     },
     {

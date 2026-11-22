@@ -1,0 +1,84 @@
+--- a/src/video_core/buffer_cache/buffer_cache.h
++++ b/src/video_core/buffer_cache/buffer_cache.h
+@@ -8,6 +8,7 @@
+ 
+ #include <algorithm>
+ #include <atomic>
++#include <limits>
+ #include <cstdio>
+ #include <memory>
+ #include <numeric>
+@@ -191,6 +192,47 @@
+ 
+ template <class P>
+ void BufferCache<P>::ClearDownload(DAddr device_addr, u64 size) {
++    // Cancellation must also remove the corresponding queued copies. Otherwise a
++    // later download of the same address re-adds it to async_downloads and revives
++    // the canceled copy, which can overwrite guest memory and retire the new copy.
++    bool has_pending_download = false;
++    async_downloads.ForEachInRange(device_addr, size,
++                                  [&](DAddr, DAddr, s32) { has_pending_download = true; });
++    if (has_pending_download) {
++        const DAddr cancel_end = size > (std::numeric_limits<DAddr>::max)() - device_addr
++                                     ? (std::numeric_limits<DAddr>::max)()
++                                     : device_addr + size;
++        for (auto& copies : pending_downloads) {
++            const size_t original_count = copies.size();
++            for (size_t i = 0; i < original_count; ++i) {
++                const BufferCopy original = copies[i];
++                const DAddr copy_end = original.src_offset + original.size;
++                const DAddr start = (std::max)(device_addr, DAddr{original.src_offset});
++                const DAddr end = (std::min)(cancel_end, copy_end);
++                if (start >= end) {
++                    continue;
++                }
++                const u64 left_size = start - original.src_offset;
++                const u64 right_size = copy_end - end;
++                const BufferCopy right{
++                    .src_offset = end,
++                    .dst_offset = original.dst_offset + end - original.src_offset,
++                    .size = right_size,
++                };
++                if (left_size != 0) {
++                    copies[i].size = left_size;
++                    if (right_size != 0) {
++                        copies.push_back(right);
++                    }
++                } else {
++                    copies[i] = right;
++                }
++            }
++            copies.erase(std::remove_if(copies.begin(), copies.end(),
++                                        [](const BufferCopy& copy) { return copy.size == 0; }),
++                         copies.end());
++        }
++    }
+     async_downloads.DeleteAll(device_addr, size);
+     uncommitted_gpu_modified_ranges.Subtract(device_addr, size);
+     for (auto& interval_set : committed_gpu_modified_ranges) {
+@@ -715,8 +757,9 @@
+         });
+         async_downloads.Subtract(device_addr, copy.size, [&](DAddr start, DAddr end) {
+             // Guest memory now holds what the GPU had written when this download was recorded.
+-            // A range the GPU wrote again since then (still uncommitted) stays GPU-modified, or
+-            // the next commit would skip it and CPU reads would take this older copy as current.
++            // A newer GPU write stays dirty until its own download completes. An
++            // ordering fence may already have moved it into the committed queue
++            // without staging a download, so neither pending-write set is settled.
+             Common::RangeSet<DAddr> settled;
+             settled.Add(start, end - start);
+             uncommitted_gpu_modified_ranges.ForEachInRange(
+@@ -724,6 +767,13 @@
+                 [&](DAddr rewritten_start, DAddr rewritten_end) {
+                     settled.Subtract(rewritten_start, rewritten_end - rewritten_start);
+                 });
++            for (const auto& pending : committed_gpu_modified_ranges) {
++                pending.ForEachInRange(start, end - start,
++                                       [&](DAddr rewritten_start, DAddr rewritten_end) {
++                                           settled.Subtract(rewritten_start,
++                                                            rewritten_end - rewritten_start);
++                                       });
++            }
+             settled.ForEach([&](DAddr settled_start, DAddr settled_end) {
+                 gpu_modified_ranges.Subtract(settled_start, settled_end - settled_start);
+             });

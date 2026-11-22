@@ -147,6 +147,9 @@ class FakeServices : public ui::Services
         "https://github.com/blackbearreloaded/ProsperoEden/blob/main/README.md#updating\n\n"
         "Thanks\nThank you to everyone who tested this release and reported what they found.";
     bool update_notes_truncated = false;
+    // A test build (Settings > Diagnostics > Test builds): a GitHub pre-release and its title.
+    bool update_test_build = false;
+    std::string update_title;
     bool update_fails = false;
     int update_steps = -1; // looks since start_update; -1: not begun
     bool update_cancelled = false;
@@ -159,6 +162,8 @@ class FakeServices : public ui::Services
         offer->installable = update_installable;
         offer->notes = update_notes;
         offer->notes_truncated = update_notes_truncated;
+        offer->test_build = update_test_build;
+        offer->title = update_title;
         update_version.clear();
         return true;
     }
@@ -418,9 +423,12 @@ class FakeServices : public ui::Services
     {
         return game_settings_;
     }
-    bool set_game_settings(std::uint64_t, const ui::GameSettings &settings) override
+    // The game whose settings were saved last (the walk checks they reach the game shown).
+    std::uint64_t saved_title = 0;
+    bool set_game_settings(std::uint64_t title_id, const ui::GameSettings &settings) override
     {
         game_settings_ = settings;
+        saved_title = title_id;
         return true;
     }
     // What the keyboard gives the next time a game's RNG seed is asked for: a seed, -1 for a
@@ -429,6 +437,27 @@ class FakeServices : public ui::Services
     std::optional<std::int64_t> ask_seed(std::int64_t, const std::atomic<bool> &) override
     {
         return typed_seed;
+    }
+    // What the keyboard gives the next time the Library's search asks (nothing: cancelled).
+    std::optional<std::string> typed_search;
+    std::optional<std::string> ask_search(const std::string &, const std::atomic<bool> &) override
+    {
+        return typed_search;
+    }
+    // The Library's favorites, kept in memory.
+    std::vector<std::string> favorite_files;
+    std::vector<std::string> favorites() override
+    {
+        return favorite_files;
+    }
+    bool set_favorite(const std::string &file, bool favorite) override
+    {
+        const auto at = std::find(favorite_files.begin(), favorite_files.end(), file);
+        if (favorite && at == favorite_files.end())
+            favorite_files.push_back(file);
+        else if (!favorite && at != favorite_files.end())
+            favorite_files.erase(at);
+        return true;
     }
     ui::Preferences preferences() override
     {

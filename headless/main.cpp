@@ -13,7 +13,11 @@
 #include "jit_list.h"
 #include "boot_trace.h"
 #ifdef PS5_NATIVE
+#ifdef EDEN_MOUNTED_STORAGE_ONLY
+#include "mounted_storage.h"
+#else
 #include "elevation/elevation.hpp"
+#endif
 #include <cerrno>
 #include <cstring>
 #include <sys/stat.h>
@@ -37,6 +41,8 @@
 #include "devices.h"
 #include "amiibo.h"
 #include "memory_layout_guard.h"
+#include "title_defaults.h"
+#include "async_shaders.h"
 #include "diagnostics.h"
 #include "hud.h"
 #include "loading_art.h"
@@ -144,6 +150,7 @@ extern "C" unsigned long long eden_dmb_dropped, eden_checkbit_fused;
 #endif
 #include "profiles.h"
 #include "stop_limit.h"
+#include "guest_progress.h"
 namespace Common {
 bool SparseTablesAvailable() noexcept; // src/memory_pages.cpp
 void SetGuestMemoryService(bool on, bool scan, bool dedup) noexcept; // src/guest_memory_service.inc
@@ -307,32 +314,36 @@ int main(int argc, char** argv) {
         // The PS5 keyboard's module, for a game's text entry: asked for before anything else
         // changes what the app may load (system_keyboard.h).
         Eden::BootTrace::Line("PS5 keyboard module: %#x", static_cast<unsigned>(Eden::PrepareSystemKeyboard()));
+#ifdef EDEN_MOUNTED_STORAGE_ONLY
+        Eden::BootTrace::Line("checking mounted data directory: %s", Eden::kDataDir);
+#else
         Eden::BootTrace::Line("requesting filesystem access");
-        // Filesystem access beyond the sandbox, first: every path below depends on it
-        // (assets_dir.h). A resident upstream Lapy service gets the first opportunity; otherwise
-        // the packaged exact-title upstream helper is sent to the local elfldr. ProsperoEden
-        // contains no locally implemented kernel mutation code. If neither path works, the app
-        // keeps its sandbox paths.
+#endif
 #if defined(EDEN_DEV_PROFILE)
         // Development: a start without access, to see what the launcher says then.
         if (access("/app0/no-filesystem-access.txt", F_OK) == 0) Eden::FilesystemAccessStatus() = 99;
         else
 #endif
+#ifdef EDEN_MOUNTED_STORAGE_ONLY
+        Eden::FilesystemAccessStatus() = Eden::MountedStorageStatus(Eden::kDataDir);
+#else
         Eden::FilesystemAccessStatus() = static_cast<int>(elevation::request(elevation::Capability::filesystem));
+#endif
         Eden::BootTrace::Line("filesystem access returned status=%d, uid %d/%d gid %d/%d", Eden::FilesystemAccessStatus(),
                               static_cast<int>(getuid()), static_cast<int>(geteuid()), static_cast<int>(getgid()),
                               static_cast<int>(getegid()));
 #if defined(EDEN_DEV_PROFILE)
-        // Upstream Lapy deliberately accepts only a single-threaded target. Keep every
-        // development worker behind the completed elevation exchange.
+        // Initialize development workers after the startup storage check.
         Eden::Stall::Start();
 #endif
+#ifndef EDEN_MOUNTED_STORAGE_ONLY
         // Elevation leaves the effective group (1) apart from the real one (0), and Mesa turns
         // RADV's disk cache off for a process whose real and effective ids differ, so no
         // compiled shader was ever kept between sessions. Match them; the effective user is
         // root, which may set its group.
         if (getegid() != getgid() && setegid(getgid()) != 0)
             Eden::Report("filesystem access", "Could not match the effective group; RADV's disk cache stays off");
+#endif
         if (Eden::FilesystemAccess()) {
             MigrateSandboxData();
             MoveGameFilesOutOfTheApp();
@@ -421,7 +432,11 @@ int main(int argc, char** argv) {
             // The ids too: Mesa's disk cache turned itself off when the effective and real ids differed
             // (no longer in Belladonna: src/util/disk_cache_os.c).
             const std::string access = "status=" + std::to_string(Eden::FilesystemAccessStatus()) +
+#ifdef EDEN_MOUNTED_STORAGE_ONLY
+                " filesystem_mode=mounted" +
+#else
                 " elevation=" + elevation::path() +
+#endif
                 " app=" + Eden::AppDir() + " data=" + Eden::UserDir() + " game_files=" + Eden::AssetsDir() + " games=" + Eden::GamesDir() +
                 " uid=" + std::to_string(getuid()) + "/" + std::to_string(geteuid()) +
                 " gid=" + std::to_string(getgid()) + "/" + std::to_string(getegid());
@@ -477,7 +492,12 @@ int main(int argc, char** argv) {
             Eden::StopLimit::Start(note);
         }
         report = std::fopen(Eden::LogFile("result.tsv").c_str(), "w");
-        if (!report) { report = stdout; return 2; }
+        if (!report) {
+            const int error = errno;
+            report = stdout;
+            Eden::BootTrace::Line("could not open result.tsv: %s (%d); writing results to the session log",
+                                  std::strerror(error), error);
+        }
         std::puts("[headless-startup] directories_ready");
 #ifdef EDEN_DEV_VULKAN
         if (std::filesystem::exists(Eden::AppFile("sdk-audit.txt"))) {
@@ -587,14 +607,6 @@ int main(int argc, char** argv) {
         // limit still watches: letting it go waits for its transfer to end.
         Eden::StreamedGame::Close();
         Eden::StopLimit::End();  // whatever game ran before is gone
-#ifdef EDEN_PS5_OPENGL
-        std::error_code trim_error;
-        const auto cache_entries = Eden::ReadNativeDirectory(native_shader_cache, trim_error);
-        if (!trim_error) {
-            const auto removed = Eden::TrimShaderCache(cache_entries);
-            if (removed) Eden::Report("cache", "Removed old shader cache records to reserve writable storage");
-        }
-#endif
         std::string selected_game;
         Eden::Crash::SetSession("launcher", false);
 #ifdef PS5_NATIVE
@@ -686,9 +698,18 @@ int main(int argc, char** argv) {
         // reads its settings below and takes the safe ones where it does; the file is not touched.
         if (Eden::SafeLaunch::Begin(eden_game_title_id(selected_game.c_str())))
             Eden::Report("launch", Eden::SafeLaunch::kReport);
-#ifdef EDEN_DEV_VULKAN
+        // A timing run, in every build: with an empty cost-run.txt in the app's folder, the Vulkan
+        // renderer's timers are on (performance.h, VulkanTimer), and every 5 s heap.log gets the
+        // session's totals so far, one EDEN_VULKAN_COST line each: pipeline builds by the driver
+        // (graphics_pipeline), the GPU thread's guest shader translation (shader_prepare, shader_ir,
+        // shader_spirv), draws waiting for a pipeline (pipeline_ready_wait) and the rest. The timers
+        // cost a little on every draw, so the file is for a test session (docs/SETTINGS.md).
         Eden::Performance::vulkan_cost_enabled = std::filesystem::exists(Eden::AppFile("cost-run.txt"));
-        if (Eden::Performance::vulkan_cost_enabled) Eden::Performance::timers_on = true;  // a cost run
+        if (Eden::Performance::vulkan_cost_enabled) {
+            Eden::Performance::timers_on = true;
+            Eden::Report("launch", "Timing run: cost-run.txt is in the app's folder; EDEN_VULKAN_COST lines go to heap.log");
+        }
+#ifdef EDEN_DEV_VULKAN
         const bool performance_run = std::filesystem::exists(Eden::AppFile("performance-run.txt"));
 #ifdef EDEN_DEV_PROFILE
         Eden::Performance::texture_budget_log = true;  // EDEN_VULKAN_TEXTURE_BUDGET every 300 frames
@@ -736,6 +757,18 @@ int main(int argc, char** argv) {
         const bool game = Eden::StreamedGame::Find(selected_game) != nullptr ||
                           std::filesystem::is_regular_file(selected_game);
         if (!game) throw std::runtime_error("Selected ROM is no longer available");
+#ifdef EDEN_PS5_OPENGL
+        // Reserve writable storage before gameplay. The previous session and
+        // the launcher have closed, so neither can write cache records here.
+        {
+            std::error_code trim_error;
+            const auto cache_entries = Eden::ReadNativeDirectory(native_shader_cache, trim_error);
+            if (!trim_error) {
+                const auto removed = Eden::TrimShaderCache(cache_entries);
+                if (removed) Eden::Report("cache", "Removed old shader cache records to reserve writable storage");
+            }
+        }
+#endif
         const char* guest = selected_game.c_str();
         // The game as the Library names it: its path in roms/ ("Game.nsp", or "Game/Game.nsp" in a
         // game folder), else its file name. Its cover and its place among the recent games go by it.
@@ -840,7 +873,11 @@ int main(int argc, char** argv) {
             Common::Log::Filter filter;
             filter.SetClassLevel(Common::Log::Class::Service_FS, Common::Log::Level::Info);
 #if defined(PS5_NATIVE) && !defined(EDEN_DEV_PROFILE) && !defined(EDEN_DEV_ROM_ID)
-            if (Eden::LoadPreferences().detailed_logging) filter.ParseFilterString("*:Debug");
+            if (Eden::LoadPreferences().detailed_logging) {
+                // Keep noisy service/FS/NVDRV debug polling out of the 100 MiB log file
+                // while retaining graphics, shader, GPU, and ARM diagnostics.
+                filter.ParseFilterString("*:Info Render:Debug Render.Vulkan:Debug HW.GPU:Debug Shader:Debug Core.ARM:Debug");
+            }
 #endif
             Common::Log::SetGlobalFilter(filter);
         }
@@ -1351,12 +1388,25 @@ int main(int argc, char** argv) {
             // one is off unless chosen there, for every game or for this one. The levels start
             // every session at their exact values (above), so one that is not chosen is off.
             auto speed = Eden::LoadPerformance(eden_game_title_id(guest));
+            // Asynchronous shaders on for a game listed in title_defaults.h (Tears of the Kingdom)
+            // unless its own Performance settings have the switch, which then decides.
+            static_assert(std::string_view{Eden::kPerformanceKeys[1]} == "async_shaders");
+            const auto async_shaders = Eden::TitleDefaults::AsyncShadersFor(
+                eden_game_title_id(guest), speed.async_shaders,
+                Eden::LoadGameSettings(eden_game_title_id(guest)).performance[1]);
+            speed.async_shaders = async_shaders.on;
             // A safe start: every switch at its default, 4 GiB, 100% (Safe Launch).
             if (Eden::SafeLaunch::On()) Eden::SafeLaunch::Apply(speed);
+            else if (async_shaders.by_title)
+                Eden::Report("launch", "Asynchronous shaders on: this game's own default (title_defaults.h); its "
+                                       "Performance switch in the Library decides instead once it has one");
             // Clock adjustment is an explicit per-game workaround, not a default speed change.
             // This runs before Core::System creates any of the new guest's threads.
             Eden::GuestClock::Reset(Eden::LoadAdaptiveClock(eden_game_title_id(guest)));
             Settings::values.use_asynchronous_shaders = speed.async_shaders;
+            // What the pipeline cache does with draws whose pipeline is not built yet, counted from
+            // here for this session (async_shaders.h, EDEN_ASYNC_SHADERS in stderr.log).
+            Eden::AsyncShaders::Reset(speed.async_shaders);
             // A game's saved pipelines are built while it plays (shader_start.h), unless the settings
             // file says otherwise: Vulkan only, the OpenGL renderer builds them before the game starts.
             Eden::ShaderStart::background = speed.background_shader_cache && backend == Eden::GraphicsBackend::Vulkan;
@@ -2035,6 +2085,9 @@ int main(int argc, char** argv) {
                         completion->wake.notify_one();
                     });
                 system.Run();
+                // While it runs: EDEN_STUCK and EDEN_PROGRESS in stderr.log say what a frozen game's
+                // cores and service requests are held in (guest_progress.h).
+                Eden::Progress::Start();
 #if defined(EDEN_DEV_PROFILE) && defined(PS5_NATIVE)
                 Eden::Stall::Trace("main running");
                 Eden::Stall::Disarm();
@@ -2327,6 +2380,8 @@ int main(int argc, char** argv) {
                 // A read that waits for a stalled network, or for this stop after its source failed,
                 // must not hold it: the reads of a game played where it lies end now, with what is kept
                 // (streamed_game.h).
+                // Before the cores are suspended, which would read as cores held in the emulator.
+                Eden::Progress::Stop();
                 if (streamed) streamed->stop();
                 system.ShutdownMainProcess();
                 Eden::Report("shutdown", "Game stopped; releasing renderer");
@@ -2364,7 +2419,8 @@ int main(int argc, char** argv) {
                     // (a boot race between two guest threads); a fresh boot normally passes. Retry early faults, report others.
                     // Four retries: two faults in a row were seen with slower GPU synchronization
                     // (RADV_DEBUG=syncshaders), so the per-boot rate can exceed the usual ~1 in 5.
-                    if (game && session_seconds < 60 && guest_fault_retries < 4) {
+                    if (game && session_seconds < 60 && guest_fault_retries < 4 &&
+                        Eden::GuestFaultMayRetry(completion->guest_fault)) {
                         ++guest_fault_retries;
                         relaunch_game = selected_game;
                         Eden::SafeLaunch::Again();  // a safe start stays safe when it starts again

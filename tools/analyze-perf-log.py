@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Say where a development run's frame time went.
+"""Compare game frame rates and explain a Vulkan development run's GPU timings.
 
-The GPU thread prints one report every five seconds (EDEN_VULKAN_FRAME, then
-EDEN_DEV_GPU and the lines under it). Those are cumulative since the process
-started, so every rate below is a difference between consecutive reports - the
-first report has nothing to difference against and is left out.
+The Vulkan (EDEN_VULKAN_FRAME) and OpenGL (EDEN_GAME_FRAME) reports in an
+ordinary heap.log cover one window each. Use one log per gameplay run.
+Development GPU counters are cumulative, so their rates use differences
+between consecutive reports.
 
     tools/analyze-perf-log.py heap.log            one run
     tools/analyze-perf-log.py --windows heap.log  the per-window table too
@@ -17,6 +17,7 @@ from pathlib import Path
 
 TOKEN = re.compile(r'\b(EDEN_[A-Z0-9_]+)')
 FIELD = re.compile(r'([A-Za-z_]\w*)=([^\s]+)')
+FRAME_REPORTS = {'EDEN_VULKAN_FRAME': 'Vulkan', 'EDEN_GAME_FRAME': 'OpenGL'}
 
 # Cumulative counters (ReportGpuThread's "Cumulative totals; the analyzer takes
 # deltas between consecutive reports"). Everything else printed inside a window
@@ -80,19 +81,20 @@ def parse(path):
             continue
         values = {key: number(raw) if number(raw) is not None else raw
                   for key, raw in FIELD.findall(line[match.start():])}
-        if values:
-            events.append((match.group(1), values))
+        kind = match.group(1)
+        if values or kind in FRAME_REPORTS:
+            events.append((kind, values))
     return events
 
 
 def split_windows(events):
-    """Every event up to the next EDEN_VULKAN_FRAME belongs to the window it opens."""
+    """Every event up to the next frame report belongs to the window it opens."""
     windows, current = [], None
     for kind, values in events:
-        if kind == 'EDEN_VULKAN_FRAME':
+        if kind in FRAME_REPORTS:
             if current is not None:
                 windows.append(current)
-            current = {'frame': values, 'groups': {}}
+            current = {'frame': values, 'renderer': FRAME_REPORTS[kind], 'groups': {}}
         elif current is not None:
             current['groups'].setdefault(kind, []).append(values)
     if current is not None:
@@ -105,7 +107,9 @@ def build_rows(windows):
     for index, window in enumerate(windows):
         row = dict(window['frame'])
         row['index'] = index
-        for kind, values in window['groups'].items():
+        row['renderer'] = window['renderer']
+        groups = window['groups'] if window['renderer'] == 'Vulkan' else {}
+        for kind, values in groups.items():
             if kind not in CUMULATIVE:
                 continue
             raw = values[0]
@@ -119,7 +123,7 @@ def build_rows(windows):
                     # A decrease is the counters starting over, not a negative interval.
                     row[f'{CUMULATIVE[kind]}.{key}'] = step if step >= 0 else value
             previous[kind] = raw
-        for kind, values in window['groups'].items():
+        for kind, values in groups.items():
             if kind in SNAPSHOT:
                 for key, value in values[-1].items():
                     row[f'{SNAPSHOT[kind]}.{key}'] = value
@@ -202,22 +206,47 @@ CORE = ('fps', 'dispatch_ms', 'rast_ms', 'disp_us_per_frame', 'rast_us_per_draw'
 
 def report(rows, path, show_windows):
     usable = [row for row in rows if 'disp_us_per_frame' in row]
-    if not usable:
-        print(f'{path}: no report window has a previous one to difference against')
+    if not rows or any(not isinstance(row.get('frames'), int) or row['frames'] < 0 or
+                       not isinstance(row.get('seconds'), (int, float)) or
+                       not math.isfinite(row['seconds']) or row['seconds'] <= 0
+                       for row in rows):
+        print(f'{path}: expected complete Vulkan or OpenGL frame reports', file=sys.stderr)
         return None
-    frame_rows = [row for row in rows if 'fps' in row]
-    frame_rows = [row for row in frame_rows if row['index'] > 0] or frame_rows
+    renderer = rows[0]['renderer']
+    if any(row['renderer'] != renderer for row in rows[1:]):
+        print(f'{path}: mixed Vulkan and OpenGL reports; use one log per run', file=sys.stderr)
+        return None
+    totals = [row['total'] for row in rows if isinstance(row.get('total'), int)]
+    if any(current <= previous for previous, current in zip(totals, totals[1:])):
+        print(f'{path}: frame totals restart or repeat; use one log per run', file=sys.stderr)
+        return None
 
-    print(f'\n{path}  {len(rows)} reports, {len(usable)} usable, '
-          f"{sum(r.get('frames', 0) for r in frame_rows)} frames "
-          f"{sum(r.get('seconds', 0) for r in frame_rows):.1f}s")
-    fps = [row['fps'] for row in frame_rows if row.get('fps')]
-    if fps:
-        stats = summarize(fps)
-        under = sum(1 for value in fps if value < 30) / len(fps) * 100
-        print(f"  fps   min {stats['min']:.1f}  p25 {stats['p25']:.1f}  med {stats['med']:.1f}  "
-              f"p75 {stats['p75']:.1f}  max {stats['max']:.1f}  mean {stats['mean']:.1f}  "
-              f"{under:.0f}% of windows under 30")
+    seconds = sum(row['seconds'] for row in rows)
+    frames = sum(row['frames'] for row in rows)
+    fps = [row['frames'] / row['seconds'] for row in rows]
+    stats = summarize(fps)
+    stats['mean'] = frames / seconds
+    stats['under_30_s'] = sum(row['seconds'] for row, rate in zip(rows, fps) if rate < 30)
+    worst = [row.get('worst_ms') for row in rows]
+    if all(isinstance(value, (int, float)) and math.isfinite(value) and value >= 0
+           for value in worst):
+        stats['worst_ms'] = max(worst)
+    summary = {'fps': stats}
+
+    print(f'\n{path}  {renderer}, {len(rows)} frame windows, {frames} frames over {seconds:.1f}s')
+    print(f"  game FPS  mean {stats['mean']:.2f}  "
+          f"window min {stats['min']:.2f}  median {stats['med']:.2f}  max {stats['max']:.2f}")
+    print(f"  time in windows under 30 FPS  {stats['under_30_s']:.2f}s")
+    if 'worst_ms' in stats:
+        print(f"  worst frame  {stats['worst_ms']:.2f} ms")
+    if not usable:
+        if show_windows:
+            print('    win      fps seconds worst_ms')
+            for row, rate in zip(rows, fps):
+                hitch = row.get('worst_ms')
+                hitch_text = f'{hitch:.2f}' if isinstance(hitch, (int, float)) else '-'
+                print(f"  {row['index']:>4} {rate:>8.2f} {row['seconds']:>7.2f} {hitch_text:>8}")
+        return summary
 
     present = [name for name in CORE[1:] if any(name in row for row in usable)]
     print('  ' + f'{"metric":>22} ' + '  '.join(f'{key:>6}' for key in
@@ -243,7 +272,6 @@ def report(rows, path, show_windows):
                   f"{row['rast_ms']:>7.1f} {row['rast_us_per_draw']:>8.2f} "
                   f"{row['draws_per_frame']:>8.1f} {row.get('ipc_ms', float('nan')):>7.1f} "
                   f"{row.get('lockcont_per_frame', 0):>9.0f}")
-    summary = {'fps': summarize(fps) if fps else {}}
     for name in present:
         values = [row[name] for row in usable if name in row]
         if values:
@@ -307,12 +335,14 @@ def compare(runs):
     keys = sorted({key for summary in runs.values() for key, value in summary.items()
                    if isinstance(value, dict) and value})
     for key in keys:
-        for statistic in ('mean', 'p25', 'med', 'p75'):
+        stats = [('mean', key), ('p25', '  p25'), ('med', '  med'), ('p75', '  p75')]
+        if key == 'fps':
+            stats.extend([('under_30_s', 's in <30 FPS windows'), ('worst_ms', 'worst frame ms')])
+        for statistic, label in stats:
             cells = []
             for name in names:
                 value = runs[name].get(key, {}).get(statistic)
                 cells.append('-' if value is None else f'{value:.2f}')
-            label = key if statistic == 'mean' else f'  {statistic}'
             print(f'  {label:>24} ' + '  '.join(f'{cell:>24}' for cell in cells))
 
 
@@ -332,8 +362,9 @@ def main(argv):
             print(f'{path}: no such file', file=sys.stderr)
             return 1
         summary = report(build_rows(split_windows(parse(file))), path, show_windows)
-        if summary is not None:
-            runs[path] = summary
+        if summary is None:
+            return 1
+        runs[path] = summary
     if len(runs) > 1:
         compare(runs)
     return 0

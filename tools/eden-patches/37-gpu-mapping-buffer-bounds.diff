@@ -1,0 +1,47 @@
+--- a/src/core/hle/service/nvdrv/devices/nvhost_as_gpu.cpp
++++ b/src/core/hle/service/nvdrv/devices/nvhost_as_gpu.cpp
+@@ -265,6 +265,8 @@
+ NvResult nvhost_as_gpu::Remap(std::span<IoctlRemapEntry> entries) {
+     LOG_DEBUG(Service_NVDRV, "called, num_entries={:#x}", entries.size());
+ 
++    std::scoped_lock lock(mutex);
++
+     if (!vm.initialised) {
+         return NvResult::BadValue;
+     }
+@@ -328,7 +330,8 @@
+     if ((params.flags & MappingFlags::Remap) != MappingFlags::None) {
+         if (auto const it = mapping_map.find(params.offset); it != mapping_map.end()) {
+             auto const mapping = it->second;
+-            if (mapping.size < params.mapping_size) {
++            if (params.buffer_offset < 0 || static_cast<u64>(params.buffer_offset) > mapping.size ||
++                params.mapping_size > mapping.size - static_cast<u64>(params.buffer_offset)) {
+                 LOG_WARNING(Service_NVDRV, "Cannot remap a partially mapped GPU address space region: {:#x}", params.offset);
+                 return NvResult::BadValue;
+             }
+@@ -347,6 +350,17 @@
+         return NvResult::BadValue;
+     }
+ 
++    // Validate against the alignment-rounded backing actually pinned by NvMap.
++    // Subtraction avoids overflow in offset + length for malformed requests.
++    if (params.buffer_offset < 0) {
++        return NvResult::BadValue;
++    }
++    const u64 buffer_offset = static_cast<u64>(params.buffer_offset);
++    const u64 size = params.mapping_size ? params.mapping_size : handle->orig_size;
++    if (buffer_offset > handle->aligned_size || size > handle->aligned_size - buffer_offset) {
++        return NvResult::BadValue;
++    }
++
+     const DAddr pinned_address = nvmap.PinHandle(params.handle, false);
+     if (pinned_address == 0) {
+         return NvResult::InsufficientMemory;
+@@ -358,7 +372,6 @@
+         }
+     };
+     DAddr device_address = pinned_address + params.buffer_offset;
+-    u64 size{params.mapping_size ? params.mapping_size : handle->orig_size};
+ 
+     bool big_page{[&]() {
+         if (Common::IsAligned(handle->align, vm.big_page_size)) {

@@ -17,12 +17,16 @@
 </p>
 
 <p align="center">
-  <a href="https://nightly-insider.nightly-ps5.workers.dev"><strong>New releases: nightly insider</strong></a><br>
-  <a href="https://github.com/Oliv3rmoon/Nightshade/releases">Public test builds and earlier releases</a>
+  <a href="https://github.com/Oliv3rmoon/Nightshade/releases/latest"><strong>Download Nightshade 1.5 (v1.500.000)</strong></a><br>
+  <a href="https://nightly-insider.nightly-ps5.workers.dev">nightly insider</a> · <a href="https://github.com/Oliv3rmoon/Nightshade/releases">All releases &amp; test builds</a>
 </p>
 
 > [!IMPORTANT]
-> **Test builds are public again.** [v1.010.012](https://github.com/Oliv3rmoon/Nightshade/releases/tag/v1.010.012) is out as a pre-release for anyone to try and report on; nothing in it is confirmed on a console yet. Full releases stay insider only, with no delayed public drop. Existing public releases and source stay available. Follow [nightly on Discord](https://discord.gg/pSqgRU3YP9) and [nightly insider](https://nightly-insider.nightly-ps5.workers.dev) for upcoming builds.
+> **Nightshade 1.5 ([v1.500.000](https://github.com/Oliv3rmoon/Nightshade/releases/tag/v1.500.000)) is out now as a full public release.** It brings **Belladonna 1.0**, the redesigned launcher, Tears of the Kingdom freeze and async-shader fixes, and **24 adapted GPU, memory, Vulkan, shader-cache, and guest-fault stability fixes**. Physical PS5 console testing is still pending — back up `/data/prosperoeden` and report results in [Issues](https://github.com/Oliv3rmoon/Nightshade/issues) or [nightly on Discord](https://discord.gg/pSqgRU3YP9).
+
+<p align="center">
+  <img src="docs/images/nightshade-1.5-cover.jpg" width="100%" alt="Nightshade 1.5 — The Stability Leap: 24 core fixes and Belladonna 1.0">
+</p>
 
 <p align="center">If Nightshade works for you, a ⭐ helps other PS5 owners find it.</p>
 
@@ -165,8 +169,6 @@ Nightshade comes with apps of its own, in the same black and red, each with its 
 
 ## Install
 
-These instructions describe the archived public builds. New insider builds include their own installation, account and testing-window instructions.
-
 > [!TIP]
 > **Use [ShadowMountPlus 1.7beta4](https://github.com/drakmor/ShadowMountPlus/releases/tag/1.7beta4) or newer.** It mounts Nightshade from the folder or drive you copy it to, and it mounts `/data` and USB and extended storage drives into the app's sandbox, so Nightshade reaches its data and your game files with nothing else to load. With an older ShadowMountPlus, Nightshade falls back to its bundled [Lapy](https://github.com/ArkSama/PS5-Lapy-JB-Daemon) helper, which is sent through your ELF loader.
 
@@ -177,23 +179,19 @@ These instructions describe the archived public builds. New insider builds inclu
 5. Open **Nightshade**, go to **Settings > Game files**, browse to that folder and select it. The default is `/data/prosperoeden`.
 6. Close and reopen Nightshade, then open **Library**. Setup is checked when the app opens, so reopen it after changing the folder or adding keys or firmware.
 
-The released app (v1.010.x) installs as `PPSA99008` and keeps its data in `/data/prosperoeden`, so it replaces the official app on the console and your settings, saves, covers, games and forwarders stay as they are. Nightshade's own title ID, `PPSA64448`, with its data in `/data/nightshade`, is in testing (the v1.011.x test releases; see [Testing builds](#testing-builds)).
+The released app (`v1.500.000`, and `v1.010.x` before it) installs as `PPSA99008` and keeps its data in `/data/prosperoeden`, so it replaces the official app on the console and your settings, saves, covers, games and forwarders stay as they are. Nightshade's own title ID, `PPSA64448`, with its data in `/data/nightshade`, is in testing (the v1.011.x test releases; see [Testing builds](#testing-builds)).
 
-**Updating:** from 1.005.102 on, **Update now** in the app installs the next release. If it doesn't take, send `/data/prosperoeden/logs/updater.log`. **Going back:** the version an update replaces is kept, or copy an official release over the app the same way; see [Updating](docs/INSTALL.md#updating) and [Going back](docs/INSTALL.md#going-back-to-the-previous-version).
+**Updating:** from `v1.005.102` through `v1.010.008`, **Update now** in the app installs `v1.500.000` directly. On `v1.010.009–v1.010.015`, turn **Settings > Diagnostics > Test builds** off and reopen Nightshade so **Update now** checks full releases (or update manually). Versions `v1.005.101` and earlier require a manual install. If an update doesn't take, send `/data/prosperoeden/logs/updater.log`. **Going back:** the version an update replaces is kept, or copy an earlier release over the app the same way; see [Updating](docs/INSTALL.md#updating) and [Going back](docs/INSTALL.md#going-back-to-the-previous-version).
 
 ## nightly insider
 
-**Full releases are nightly insider only,** with no delayed public drop. Test builds are published here as pre-releases, starting again with v1.010.012 on 14 November 2026. This repository keeps the previously published source and downloads available. Eligible insiders receive new builds through [nightly insider](https://nightly-insider.nightly-ps5.workers.dev), with the matching source, build instructions and license notices. Existing licenses and recipients' source rights remain unchanged.
+**Nightshade 1.5 (`v1.500.000`) is a full public release** on [GitHub Releases](https://github.com/Oliv3rmoon/Nightshade/releases/latest) with its matching source and Belladonna 1.0 source archive attached. **[nightly insider](https://nightly-insider.nightly-ps5.workers.dev)** remains free to join for early access to upcoming Nightshade 2 and multi-system testing builds, with matching complete Corresponding Source, build instructions and license notices delivered with every build.
 
-Join [nightly on Discord](https://discord.gg/pSqgRU3YP9), complete verification and the tester requirements, then sign in at [nightly insider](https://nightly-insider.nightly-ps5.workers.dev). Access depends on current eligibility and the release's testing window.
+Join [nightly on Discord](https://discord.gg/pSqgRU3YP9), complete verification and the tester requirements, then sign in at [nightly insider](https://nightly-insider.nightly-ps5.workers.dev). Access depends on current eligibility and active testing windows.
 
-### What is coming
+### What is coming next (Nightshade 2)
 
-The next Nightshade brings more of your library together: **Game Boy, Game Boy Color, Game Boy Advance, NES/FDS, SNES and Nintendo DS**, alongside Switch. Core settings open before a game launches, artwork reacts to actual gameplay, and the launcher includes a manual cover picker. The new **Belladonna** driver brings stronger submission handling, memory-failure recovery and useful diagnostics.
-
-**The next three-day Nightshade test includes the new Belladonna driver and is for current eligible insiders.** Delivery is currently paused while the PS5 launcher, old-install migration and encrypted app-storage requirements are checked. The planned window is November 8, 2026 at 8 PM through November 11 at 8 PM, Los Angeles time (PST); it will not open automatically while this hold is active. [Check the live release status](https://nightly-insider.nightly-ps5.workers.dev/testing/nightshade). At the end of the window, downloads and new game launches in that private test build close. A game already running is not force-closed, and saves and files are not deleted.
-
-The verified package includes the matching complete source, **AES-256 encrypted hosted storage**, account-authenticated downloads, approved updates while idle and automatic app diagnostics after tester consent. The encrypted upload passed a full readback check, and the native installer verified all 82 extracted files. Physical PS5 gameplay and performance validation remain pending; this is a test build. Follow Discord for testing instructions and reports.
+Nightshade 2 brings more of your library together: **Game Boy, Game Boy Color, Game Boy Advance, NES/FDS, SNES and Nintendo DS**, alongside Switch. Core settings open before a game launches, artwork reacts to actual gameplay, and the launcher includes a manual cover picker. Physical PS5 gameplay and performance validation for multi-system builds remain pending; follow [nightly on Discord](https://discord.gg/pSqgRU3YP9) and [nightly insider status](https://nightly-insider.nightly-ps5.workers.dev/testing/nightshade) for upcoming testing windows.
 
 ## Testing builds
 
@@ -201,7 +199,7 @@ The verified package includes the matching complete source, **AES-256 encrypted 
   <a href="https://github.com/Oliv3rmoon/Nightshade/releases/tag/v1.010.012"><img src="docs/images/nightshade-v1.010.012-test.jpg" width="100%" alt="Nightshade test build v1.010.012: a glowing crimson nightshade flower with two berries beside a lake under a starry night sky. Not confirmed on a console yet"></a>
 </p>
 
-Test builds are marked **Pre-release** on the [Releases page](https://github.com/Oliv3rmoon/Nightshade/releases). The newest is **[v1.010.012](https://github.com/Oliv3rmoon/Nightshade/releases/tag/v1.010.012)** (14 November 2026): the redrawn launcher and background shaders in Tears of the Kingdom, with the freeze watchdog from the earlier test builds. Nothing in it is confirmed on a console yet; if you run it, send `/data/prosperoeden/logs`. The earlier test lines remain available for reference and rollback:
+Pre-release test builds are marked **Pre-release** on the [Releases page](https://github.com/Oliv3rmoon/Nightshade/releases). Earlier `v1.010.008–v1.010.015` pre-releases (including the redrawn launcher, Tears of the Kingdom async shaders and freeze watchdog, and the Belladonna 1.0 test builds) have now been rolled forward into the full **[Nightshade 1.5 (`v1.500.000`)](https://github.com/Oliv3rmoon/Nightshade/releases/tag/v1.500.000)** public release, alongside 24 adapted stability fixes. Earlier experimental lines remain available for reference and rollback:
 
 - **v1.011.x: Nightshade as its own app.** It runs under its own title ID, `PPSA64448`, with its own data folder, `/data/nightshade`, beside the official app instead of in its place. v1.011.002 has everything in v1.010.006. An earlier install moves over by itself: the old tile turns into a bridge that installs the new app, and the first start asks once whether to **Move** your data, **Copy** it or **Start fresh**. Nothing in `/data/prosperoeden` is ever deleted. See the notes of [v1.011.000](https://github.com/Oliv3rmoon/Nightshade/releases/tag/v1.011.000).
 - **v1.012.x: Switch 2 games, experimental.** These builds sit on Takoroka's [eden-nx2](https://git.eden-emu.dev/Takoroka/eden-nx2), the newer emulator core with experimental Switch 2 support. A Switch 2 game is a game folder with its ExeFS and RomFS, dumped from your own game. No Switch 2 game has been run on a PS5 yet, and Switch 1 games have not been played on the newer core on a console either. See the notes of [v1.012.000](https://github.com/Oliv3rmoon/Nightshade/releases/tag/v1.012.000).
@@ -300,6 +298,8 @@ Thank you also to the code, documentation and translation contributors (several 
 - **kasobos67** ([GitHub](https://github.com/kasobos67)), for custom launcher support, and launcher pack updates from a feed with a faster library for packs.
 - **Rockiu0** ([GitHub](https://github.com/Rockiu0)), for JIT and memory-access optimizations, GPU command and texture-cache improvements, Vulkan rendering fixes, CPU scheduling and vsync changes, OpenGL queue tuning, build tooling, and OnionHEN elevation support.
 - **cippy-9** ([GitHub](https://github.com/cippy-9)), for the Malay (ms-MY) translation.
+- **bf39l** ([GitHub](https://github.com/bf39l)), for the GPU buffer cache, NVDRV/SMMU, Vulkan shader/cache, and guest-fault stability patches in [bf39l/ProsperoEden](https://github.com/bf39l/ProsperoEden) adapted into Nightshade 1.5.
+- **bluegaterune, renhexforge, GameNostalgic0 and bobrass**, for testing, logs, and bug reports that shaped Nightshade 1.5.
 - **Oliv3rmoon** ([GitHub](https://github.com/Oliv3rmoon)), for letting games with many pipelines start, keeping the driver's pipeline cache when a write is cut short, naming the refused allocation in crash reports, and reading a packed update's languages for a game's language.
 
 <!-- bbr-footer:start -->
@@ -313,7 +313,7 @@ Third-party components, authors and licenses are listed in
 
 ## License
 
-Copyright © 2026 BlackBearReloaded. Licensed under GPL-3.0-or-later; see [LICENSE](LICENSE). Third-party components keep their own licenses. Archived public binaries correspond to the tagged source in this repository. New insider binaries are delivered with their matching complete Corresponding Source, build instructions and license notices.
+Copyright © 2026 BlackBearReloaded. Licensed under GPL-3.0-or-later; see [LICENSE](LICENSE). Third-party components keep their own licenses. Public binaries correspond to the tagged source in this repository and are accompanied by their matching complete Corresponding Source. Insider binaries are delivered with their matching complete Corresponding Source, build instructions and license notices.
 
 ## Disclaimer
 
@@ -330,10 +330,6 @@ Copyright © 2026 BlackBearReloaded. Licensed under GPL-3.0-or-later; see [LICEN
   loss.
 - **Legal use only.** Use it only with hardware, accounts and content you own.
   This project does not support or enable piracy.
-
-## AI assistance
-
-This project was developed with AI assistance from OpenAI and/or Anthropic tools.
 <!-- bbr-footer:end -->
 
 ## Help Nightshade grow
